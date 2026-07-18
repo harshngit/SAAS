@@ -1,0 +1,16 @@
+export const visits = [
+  { id: 'VIS-1', customerId: 'cust-1', customerName: 'Hotel Grand Meridian', salesOfficerId: 'usr-3', date: '2026-07-10', status: 'Completed', purpose: 'Order follow-up' },
+  { id: 'VIS-2', customerId: 'cust-3', customerName: 'Sunrise Corporate Park', salesOfficerId: 'usr-3', date: '2026-07-11', status: 'Completed', purpose: 'New product pitch' },
+  { id: 'VIS-3', customerId: 'cust-5', customerName: 'Green Leaf Caterers', salesOfficerId: 'usr-3', date: '2026-07-13', status: 'Completed', purpose: 'Payment collection discussion' },
+  { id: 'VIS-4', customerId: 'cust-8', customerName: 'TechNova Solutions Pvt Ltd', salesOfficerId: 'usr-3', date: '2026-07-14', status: 'Completed', purpose: 'Dispenser installation follow-up' },
+  { id: 'VIS-5', customerId: 'cust-12', customerName: 'Blue Orchid Banquet Hall', salesOfficerId: 'usr-3', date: '2026-07-14', status: 'Missed', purpose: 'Monthly review', notes: 'Client unavailable, reschedule needed' },
+  { id: 'VIS-6', customerId: 'cust-9', customerName: 'The Coastal Kitchen', salesOfficerId: 'usr-3', date: '2026-07-15', status: 'Completed', purpose: 'Relationship check-in' },
+  { id: 'VIS-7', customerId: 'cust-16', customerName: 'Vinayaka Medical Store', salesOfficerId: 'usr-3', date: '2026-07-15', status: 'Follow-up Required', purpose: 'Payment reminder', notes: 'Promised payment by Friday' },
+  { id: 'VIS-8', customerId: 'cust-2', customerName: 'Spice Route Restaurant', salesOfficerId: 'usr-3', date: '2026-07-16', status: 'Completed', purpose: 'Order follow-up' },
+  { id: 'VIS-9', customerId: 'cust-19', customerName: 'Cloud Nine Café', salesOfficerId: 'usr-3', date: '2026-07-16', status: 'Completed', purpose: 'New account onboarding' },
+  { id: 'VIS-10', customerId: 'cust-6', customerName: 'Café Mocha', salesOfficerId: 'usr-3', date: '2026-07-17', status: 'Scheduled', purpose: 'Delivery confirmation visit' },
+  { id: 'VIS-11', customerId: 'cust-15', customerName: 'Star Public School', salesOfficerId: 'usr-3', date: '2026-07-17', status: 'Scheduled', purpose: 'Bulk order discussion' },
+  { id: 'VIS-12', customerId: 'cust-21', customerName: 'Prime Legal Associates', salesOfficerId: 'usr-3', date: '2026-07-17', status: 'Follow-up Required', purpose: 'Quotation follow-up' },
+  { id: 'VIS-13', customerId: 'cust-13', customerName: 'Fitness First Gym', salesOfficerId: 'usr-3', date: '2026-07-18', status: 'Scheduled', purpose: 'New customer introduction' },
+  { id: 'VIS-14', customerId: 'cust-23', customerName: 'Rajdhani Sweets & Snacks', salesOfficerId: 'usr-3', date: '2026-07-19', status: 'Scheduled', purpose: 'Bulk order discussion' },
+]

@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  /* Primary: purple */
+  --color-primary-50: #faf5ff;
+  --color-primary-100: #f3e8ff;
+  --color-primary-200: #e9d5ff;
+  --color-primary-300: #d8b4fe;
+  --color-primary-400: #c084fc;
+  --color-primary-500: #a855f7;
+  --color-primary-600: #9333ea;
+  --color-primary-700: #7e22ce;
+  --color-primary-800: #6b21a8;
+  --color-primary-900: #581c87;
+  --color-primary-950: #3b0764;
+
+  /* Neutral grays for surfaces, text, borders */
+  --color-neutral-50: #f8f9fa;
+  --color-neutral-100: #f1f2f4;
+  --color-neutral-200: #e4e6e9;
+  --color-neutral-300: #d1d5db;
+  --color-neutral-400: #9aa1ac;
+  --color-neutral-500: #6b7280;
+  --color-neutral-600: #4b5563;
+  --color-neutral-700: #374151;
+  --color-neutral-800: #1f2937;
+  --color-neutral-900: #111827;
+  --color-neutral-950: #0a0e14;
+
+  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Lexend', 'Inter', system-ui, sans-serif;
+
+  /* Elevation: soft, layered shadows for a premium, quiet-depth feel */
+  --shadow-xs: 0 1px 2px 0 rgb(17 24 39 / 0.04);
+  --shadow-card: 0 1px 2px 0 rgb(17 24 39 / 0.04), 0 8px 24px -12px rgb(17 24 39 / 0.08);
+  --shadow-card-hover: 0 2px 4px 0 rgb(17 24 39 / 0.05), 0 16px 32px -12px rgb(88 28 135 / 0.14);
+  --shadow-popover: 0 4px 8px -2px rgb(17 24 39 / 0.06), 0 20px 40px -8px rgb(17 24 39 / 0.14);
+  --shadow-glow-primary: 0 8px 20px -6px rgb(147 51 234 / 0.35);
+}
+
+* {
+  border-color: var(--color-neutral-200);
+}
+
+.dark * {
+  border-color: var(--color-neutral-700);
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-neutral-50);
+  color: var(--color-neutral-900);
+  letter-spacing: -0.006em;
+}
+
+.dark body {
+  background-color: var(--color-neutral-950);
+  color: var(--color-neutral-100);
+}
+
+#root {
+  min-height: 100svh;
+}
+
+::selection {
+  background-color: var(--color-primary-200);
+  color: var(--color-primary-900);
+}
+
+/* Slim, unobtrusive scrollbars — Webkit + Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-neutral-300) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-neutral-300);
+  border-radius: 999px;
+  border: 2.5px solid transparent;
+  background-clip: content-box;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: var(--color-neutral-700);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-neutral-400);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-neutral-600);
+}

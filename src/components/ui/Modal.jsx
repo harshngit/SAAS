@@ -1,0 +1,55 @@
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
+
+export default function Modal({ isOpen, onClose, title, children, footer }) {
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [isOpen, onClose])
+
+  if (!isOpen) return null
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? 'modal-title' : undefined}
+        className="w-full max-w-md rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-popover)"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
+          <h2 id="modal-title" className="text-base font-semibold tracking-tight text-neutral-900">
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+        <div className="px-5 py-4">{children}</div>
+        {footer && <div className="flex justify-end gap-2 border-t border-neutral-100 px-5 py-4">{footer}</div>}
+      </div>
+    </div>,
+    document.body,
+  )
+}

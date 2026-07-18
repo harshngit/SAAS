@@ -1,0 +1,15 @@
+export const expenses = [
+  { id: 'EXP-1', category: 'Fuel', description: 'Diesel refill - delivery van KA05', amount: 4200, date: '2026-07-15', submittedBy: 'usr-4', status: 'Approved', approvedBy: 'usr-2' },
+  { id: 'EXP-2', category: 'Vehicle Maintenance', description: 'Van service & oil change', amount: 3500, date: '2026-07-10', submittedBy: 'usr-4', status: 'Approved', approvedBy: 'usr-2' },
+  { id: 'EXP-3', category: 'Salaries', description: 'Staff salary - June 2026', amount: 185000, date: '2026-07-01', submittedBy: 'usr-5', status: 'Approved', approvedBy: 'usr-2' },
+  { id: 'EXP-4', category: 'Rent', description: 'Warehouse rent - July 2026', amount: 45000, date: '2026-07-02', submittedBy: 'usr-5', status: 'Approved', approvedBy: 'usr-2' },
+  { id: 'EXP-5', category: 'Utilities', description: 'Electricity bill - bottling plant', amount: 12800, date: '2026-07-05', submittedBy: 'usr-5', status: 'Pending', approvedBy: null },
+  { id: 'EXP-6', category: 'Packaging', description: 'Extra shrink wrap rolls', amount: 3200, date: '2026-07-11', submittedBy: 'usr-2', status: 'Approved', approvedBy: 'usr-2' },
+  { id: 'EXP-7', category: 'Office Supplies', description: 'Printer ink & stationery', amount: 1800, date: '2026-07-12', submittedBy: 'usr-2', status: 'Pending', approvedBy: null },
+  { id: 'EXP-8', category: 'Miscellaneous', description: 'Client hospitality - Sunrise Corporate Park visit', amount: 950, date: '2026-07-13', submittedBy: 'usr-3', status: 'Approved', approvedBy: 'usr-2' },
+  { id: 'EXP-9', category: 'Fuel', description: 'Diesel refill - delivery van KA05', amount: 3900, date: '2026-07-08', submittedBy: 'usr-4', status: 'Approved', approvedBy: 'usr-2' },
+  { id: 'EXP-10', category: 'Vehicle Maintenance', description: 'Tyre puncture repair', amount: 400, date: '2026-07-14', submittedBy: 'usr-4', status: 'Rejected', approvedBy: 'usr-2', rejectionReason: 'Missing receipt' },
+  { id: 'EXP-11', category: 'Utilities', description: 'Backup generator diesel top-up', amount: 2200, date: '2026-07-16', submittedBy: 'usr-5', status: 'Pending', approvedBy: null },
+  { id: 'EXP-12', category: 'Miscellaneous', description: 'Office tea & pantry supplies', amount: 650, date: '2026-07-09', submittedBy: 'usr-2', status: 'Approved', approvedBy: 'usr-2' },
+  { id: 'EXP-13', category: 'Packaging', description: 'Carton boxes - urgent restock', amount: 5600, date: '2026-07-17', submittedBy: 'usr-2', status: 'Pending', approvedBy: null },
+]
