@@ -15,10 +15,18 @@ export const useAuthStore = create(
       users: seedUsers,
       organizations: seedOrganizations,
 
-      login: (email, password) => {
-        const user = get().users.find((u) => u.email.toLowerCase() === email.toLowerCase())
-        if (!user || password !== DEMO_PASSWORD) {
-          return { success: false, error: 'Invalid email or password' }
+      login: ({ email, phone, password, otp }) => {
+        const normalizedPhone = phone?.replace(/\D/g, '')
+        const user = get().users.find((u) => {
+          if (email) {
+            return u.email.toLowerCase() === email.toLowerCase()
+          }
+          const userPhone = u.phone?.replace(/\D/g, '')
+          return userPhone && normalizedPhone && (userPhone === normalizedPhone || userPhone.endsWith(normalizedPhone))
+        })
+        const validCredential = email ? password === DEMO_PASSWORD : /^\d{6}$/.test(otp || '')
+        if (!user || !validCredential) {
+          return { success: false, error: email ? 'Invalid email or password' : 'Invalid phone number or OTP' }
         }
         set({ currentUser: user })
         return { success: true, user }
