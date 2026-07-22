@@ -1,8 +1,11 @@
 export const plans = [
   {
-    id: 'free',
-    name: 'Free',
-    price: 0,
+    id: 'basic',
+    name: 'Basic',
+    price: 199,
+    originalPrice: 499,
+    yearlyPrice: 2199,
+    originalYearlyPrice: 5988,
     billingCycle: 'month',
     maxUsers: 2,
     maxOrders: 50,
@@ -11,7 +14,10 @@ export const plans = [
   {
     id: 'pro',
     name: 'Pro',
-    price: 1999,
+    price: 399,
+    originalPrice: 999,
+    yearlyPrice: 4199,
+    originalYearlyPrice: 11988,
     billingCycle: 'month',
     maxUsers: 10,
     maxOrders: 2000,
@@ -20,7 +26,10 @@ export const plans = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: 4999,
+    price: 599,
+    originalPrice: 1499,
+    yearlyPrice: 6199,
+    originalYearlyPrice: 17988,
     billingCycle: 'month',
     maxUsers: 50,
     maxOrders: null,
@@ -31,4 +40,4 @@ export const plans = [
 export const planPricing = plans.reduce((acc, plan) => {
   acc[plan.name] = plan.price
   return acc
-}, {})
+}, { Free: 199 })

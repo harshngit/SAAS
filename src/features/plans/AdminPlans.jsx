@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, CreditCard, Crown } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -8,16 +8,46 @@ import { plans } from '../../mockData/plans'
 import { formatCurrency } from '../../utils/format'
 
 const currentPlanId = 'basic'
+const trialDaysLeft = 7
 
-export default function SubscriptionPlans() {
+export default function AdminPlans() {
   const [billingCycle, setBillingCycle] = useState('monthly')
+  const currentPlan = plans.find((plan) => plan.id === currentPlanId)
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Subscription Plans</h1>
-        <p className="mt-1 text-sm text-neutral-500">Manage subscription plans</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-neutral-900">Plans</h1>
+          <p className="mt-1 text-sm text-neutral-500">Review your subscription and compare available plans</p>
+        </div>
+        <Button variant="outline">
+          <CreditCard className="size-4" aria-hidden="true" />
+          Manage Billing
+        </Button>
       </div>
+
+      <Card>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+              <Crown className="size-6" aria-hidden="true" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-semibold text-neutral-900">{currentPlan?.name} Plan</h2>
+                <Badge variant="primary" dot>Current plan</Badge>
+              </div>
+              <p className="mt-1 text-sm text-neutral-500">
+                {trialDaysLeft} days Free Trial left
+              </p>
+            </div>
+          </div>
+          <Button>
+            Upgrade Plan
+          </Button>
+        </div>
+      </Card>
 
       <Tabs value={billingCycle} onValueChange={setBillingCycle} className="flex justify-center sm:justify-start">
         <TabsList>

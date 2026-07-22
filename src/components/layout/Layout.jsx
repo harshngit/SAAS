@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import PageWrapper from './PageWrapper'
+import AdminTrialPopup from '../../features/plans/AdminTrialPopup'
 
 export default function Layout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
@@ -33,6 +34,7 @@ export default function Layout() {
           </PageWrapper>
         </main>
       </div>
+      <AdminTrialPopup />
     </div>
   )
 }

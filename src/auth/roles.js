@@ -74,6 +74,7 @@ export const roleMenus = {
   [ROLES.ADMIN]: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Company Settings', path: '/admin/company-settings', icon: Store },
+    { label: 'Plans', path: '/admin/plans', icon: CreditCard },
     { label: 'User Management', path: '/admin/users', icon: Users },
     { label: 'Products', path: '/admin/products', icon: Package },
     { label: 'Inventory', path: '/admin/inventory', icon: Warehouse },

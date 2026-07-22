@@ -43,6 +43,7 @@ import OrganizationsList from '../features/superadmin/OrganizationsList'
 import OrganizationDetail from '../features/superadmin/OrganizationDetail'
 import SubscriptionPlans from '../features/superadmin/SubscriptionPlans'
 import PlatformAnalytics from '../features/superadmin/PlatformAnalytics'
+import AdminPlans from '../features/plans/AdminPlans'
 
 function RootRedirect() {
   const currentUser = useAuthStore((state) => state.currentUser)
@@ -81,6 +82,7 @@ export default function AppRoutes() {
         >
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/company-settings" element={<CompanySettings />} />
+          <Route path="/admin/plans" element={<AdminPlans />} />
           <Route path="/admin/users" element={<UserManagement />} />
           <Route path="/admin/products" element={<ProductList />} />
           <Route path="/admin/inventory" element={<StockBoard />} />
