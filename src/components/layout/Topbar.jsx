@@ -1,12 +1,35 @@
-import { Bell, LogOut, Search } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Bell, ChevronDown, LogOut, Search, Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
-import { roleLabels } from '../../auth/roles'
+import { roleLabels, roleProfileSettingsPath } from '../../auth/roles'
 
 export default function Topbar() {
   const currentUser = useAuthStore((state) => state.currentUser)
   const logout = useAuthStore((state) => state.logout)
   const navigate = useNavigate()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    if (!isMenuOpen) return
+
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false)
+      }
+    }
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setIsMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isMenuOpen])
 
   if (!currentUser) return null
 
@@ -17,7 +40,15 @@ export default function Topbar() {
     .join('')
     .toUpperCase()
 
+  const profileSettingsPath = roleProfileSettingsPath[currentUser.role]
+
+  const handleProfileSettings = () => {
+    setIsMenuOpen(false)
+    if (profileSettingsPath) navigate(profileSettingsPath)
+  }
+
   const handleLogout = () => {
+    setIsMenuOpen(false)
     logout()
     navigate('/login', { replace: true })
   }
@@ -43,25 +74,57 @@ export default function Topbar() {
           <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500 ring-2 ring-white" />
         </button>
 
-        <div className="flex items-center gap-2.5 rounded-full border border-neutral-100 bg-white py-1.5 pl-1.5 pr-3 shadow-(--shadow-xs)">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary-500 to-primary-700 text-xs font-semibold text-white">
-            {initials}
-          </div>
-          <div className="hidden text-left sm:block">
-            <p className="text-sm font-medium leading-tight text-neutral-900">{currentUser.name}</p>
-            <span className="text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
-          </div>
-        </div>
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+            aria-haspopup="menu"
+            aria-expanded={isMenuOpen}
+            className="flex items-center gap-2 rounded-full border border-neutral-100 bg-white py-1.5 pl-1.5 pr-3 shadow-(--shadow-xs) transition-colors hover:bg-neutral-50"
+          >
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary-500 to-primary-700 text-xs font-semibold text-white">
+              {initials}
+            </div>
+            <div className="hidden text-left sm:block">
+              <p className="text-sm font-medium leading-tight text-neutral-900">{currentUser.name}</p>
+              <span className="text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
+            </div>
+            <ChevronDown
+              className={`size-4 shrink-0 text-neutral-400 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
+          </button>
 
-        <button
-          type="button"
-          onClick={handleLogout}
-          aria-label="Logout"
-          className="flex items-center gap-1.5 rounded-full border border-neutral-100 bg-white px-3.5 py-2.5 text-sm font-medium text-neutral-500 shadow-(--shadow-xs) transition-colors hover:bg-neutral-50 hover:text-neutral-800"
-        >
-          <LogOut className="size-4" />
-          <span className="hidden sm:inline">Logout</span>
-        </button>
+          {isMenuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-2xl border border-neutral-100 bg-white p-1.5 shadow-(--shadow-popover)"
+            >
+              <div className="px-3 py-2.5 sm:hidden">
+                <p className="text-sm font-medium leading-tight text-neutral-900">{currentUser.name}</p>
+                <span className="text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
+              </div>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleProfileSettings}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+              >
+                <Settings className="size-4" aria-hidden="true" />
+                Profile Settings
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+              >
+                <LogOut className="size-4" aria-hidden="true" />
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

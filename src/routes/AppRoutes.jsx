@@ -3,7 +3,6 @@ import Layout from '../components/layout/Layout'
 import ProtectedRoute from '../auth/ProtectedRoute'
 import Login from '../features/auth/Login'
 import Register from '../auth/Register'
-import PlaceholderPage from './PlaceholderPage'
 import SuperAdminDashboard from '../features/dashboard/SuperAdminDashboard'
 import AdminDashboard from '../features/dashboard/AdminDashboard'
 import SalesOfficerDashboard from '../features/dashboard/SalesOfficerDashboard'
@@ -44,6 +43,10 @@ import OrganizationDetail from '../features/superadmin/OrganizationDetail'
 import SubscriptionPlans from '../features/superadmin/SubscriptionPlans'
 import PlatformAnalytics from '../features/superadmin/PlatformAnalytics'
 import AdminPlans from '../features/plans/AdminPlans'
+import AdminDeliveries from '../features/deliveries/AdminDeliveries'
+import AdminExpenses from '../features/expenses/AdminExpenses'
+import AdminInvoices from '../features/invoices/AdminInvoices'
+import AdminSettings from '../features/settings/AdminSettings'
 
 function RootRedirect() {
   const currentUser = useAuthStore((state) => state.currentUser)
@@ -88,13 +91,13 @@ export default function AppRoutes() {
           <Route path="/admin/inventory" element={<StockBoard />} />
           <Route path="/admin/vehicle-stock" element={<VehicleStockOverview />} />
           <Route path="/admin/purchases" element={<PurchaseInvoiceList />} />
-          <Route path="/admin/deliveries" element={<PlaceholderPage title="Deliveries" />} />
-          <Route path="/admin/expenses" element={<PlaceholderPage title="Expenses" />} />
-          <Route path="/admin/invoices" element={<PlaceholderPage title="Invoices" />} />
+          <Route path="/admin/deliveries" element={<AdminDeliveries />} />
+          <Route path="/admin/expenses" element={<AdminExpenses />} />
+          <Route path="/admin/invoices" element={<AdminInvoices />} />
           <Route path="/admin/reports" element={<ReportsHub />} />
           <Route path="/admin/notifications" element={<NotificationsList />} />
           <Route path="/admin/audit-logs" element={<AuditLogList />} />
-          <Route path="/admin/settings" element={<PlaceholderPage title="Settings" />} />
+          <Route path="/admin/settings" element={<AdminSettings />} />
         </Route>
 
         <Route

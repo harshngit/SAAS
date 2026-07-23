@@ -64,6 +64,10 @@ export const roleHomePath = {
   [ROLES.ACCOUNTANT]: '/accounts/dashboard',
 }
 
+export const roleProfileSettingsPath = {
+  [ROLES.ADMIN]: '/admin/settings',
+}
+
 export const roleMenus = {
   [ROLES.SUPER_ADMIN]: [
     { label: 'Dashboard', path: '/superadmin/dashboard', icon: LayoutDashboard },
@@ -87,6 +91,23 @@ export const roleMenus = {
     { label: 'Notifications', path: '/admin/notifications', icon: Bell },
     { label: 'Audit Logs', path: '/admin/audit-logs', icon: History },
     { label: 'Settings', path: '/admin/settings', icon: Settings },
+  ],
+  [ROLES.SALES_OFFICER]: [
+    { label: 'Dashboard', path: '/sales/dashboard', icon: LayoutDashboard },
+    { label: 'Customers', path: '/sales/customers', icon: Users },
+    { label: 'Create Order', path: '/sales/orders/create', icon: ShoppingCart },
+    { label: 'Visits', path: '/sales/visits', icon: MapPin },
+    { label: 'Follow-ups', path: '/sales/followups', icon: ClipboardList },
+    { label: 'My Performance', path: '/sales/performance', icon: Target },
+  ],
+  [ROLES.DELIVERY_PARTNER]: [
+    { label: 'Dashboard', path: '/delivery/dashboard', icon: LayoutDashboard },
+    { label: 'Vehicle Loading', path: '/delivery/vehicle-loading', icon: PackageCheck },
+    { label: 'Deliveries', path: '/delivery/deliveries', icon: Truck },
+    { label: 'Expenses', path: '/delivery/expenses', icon: Receipt },
+    { label: 'End of Day Return', path: '/delivery/end-of-day', icon: PackageX },
+    { label: 'Attendance', path: '/delivery/attendance', icon: Calendar },
+    { label: 'Vehicle Stock', path: '/delivery/vehicle-stock', icon: Warehouse },
   ],
   [ROLES.ACCOUNTANT]: [
     { label: 'Dashboard', path: '/accounts/dashboard', icon: LayoutDashboard },
