@@ -73,7 +73,7 @@ export default function DataTable({
   return (
     <div>
       {searchable && (
-        <div className="mb-4 flex items-center gap-3">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full max-w-xs">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
             <input
@@ -81,23 +81,23 @@ export default function DataTable({
               value={search}
               onChange={handleSearchChange}
               placeholder={searchPlaceholder}
-              className="w-full rounded-full border border-neutral-200 bg-neutral-50 py-2 pl-10 pr-4 text-sm text-neutral-700 transition-all placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12 focus:border-primary-400"
+              className="w-full rounded-full border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs font-medium text-neutral-400">
             {sorted.length} {sorted.length === 1 ? 'result' : 'results'}
           </p>
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
+      <div className="overflow-x-auto rounded-[1rem] border border-neutral-100 bg-white shadow-(--shadow-xs)">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-neutral-100 bg-neutral-50/70">
+            <tr className="border-b border-neutral-100 bg-neutral-50/80">
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-400 ${alignClass(column.align)}`}
+                  className={`whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400 ${alignClass(column.align)}`}
                 >
                   {column.sortable ? (
                     <button
@@ -139,14 +139,14 @@ export default function DataTable({
               </tr>
             ) : (
               paginated.map((row) => (
-                <tr key={row[rowKey]} className="transition-colors hover:bg-primary-50/40">
+                <tr key={row[rowKey]} className="transition-colors hover:bg-primary-50/35">
                   {columns.map((column) => (
-                    <td key={column.key} className={`px-4 py-3 text-neutral-700 ${alignClass(column.align)}`}>
+                    <td key={column.key} className={`px-4 py-3.5 text-neutral-700 ${alignClass(column.align)}`}>
                       {column.render ? column.render(row) : row[column.key]}
                     </td>
                   ))}
                   {actions && (
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3.5 text-right">
                       <ActionMenu items={actions(row)} />
                     </td>
                   )}

@@ -26,13 +26,13 @@ const sortedDeliveries = [...deliveries].sort((a, b) => (a.scheduledDate < b.sch
 
 export default function DeliveryPartnerDashboard() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">My Deliveries</h1>
-        <p className="mt-1 text-sm text-neutral-500">Suresh Kumar · Delivery Partner · as of {TODAY}</p>
+    <div className="space-y-5 lg:space-y-6">
+      <div className="rounded-[1.25rem] border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card)">
+        <h1 className="font-(--font-display) text-3xl font-semibold tracking-tight text-neutral-900">My Deliveries</h1>
+        <p className="mt-1.5 text-sm text-neutral-500">Suresh Kumar · Delivery Partner · as of {TODAY}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Truck} iconVariant="primary" label="Deliveries Today" value={deliveriesToday} />
         <StatCard icon={CheckCircle2} iconVariant="success" label="Completed" value={completedCount} />
         <StatCard icon={Clock} iconVariant="warning" label="Pending" value={dashboardStats.pendingDeliveries} />

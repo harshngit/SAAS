@@ -5,7 +5,7 @@ const variantClasses = {
   warning: 'bg-amber-50 text-amber-700',
   danger: 'bg-red-50 text-red-700',
   info: 'bg-blue-50 text-blue-700',
-  purple: 'bg-purple-50 text-purple-700',
+  purple: 'bg-primary-50 text-primary-700',
 }
 
 const dotClasses = {
@@ -15,7 +15,7 @@ const dotClasses = {
   warning: 'bg-amber-500',
   danger: 'bg-red-500',
   info: 'bg-blue-500',
-  purple: 'bg-purple-500',
+  purple: 'bg-primary-500',
 }
 
 export default function Badge({ variant = 'neutral', dot = false, className = '', children }) {

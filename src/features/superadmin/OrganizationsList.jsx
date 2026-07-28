@@ -1,16 +1,74 @@
+import { useEffect, useState } from 'react'
 import Card from '../../components/ui/Card'
 import DataTable from '../../components/ui/DataTable'
 import Badge from '../../components/ui/Badge'
-import { organizations } from '../../mockData/organizations'
+import { listSuperAdminOrganizations } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
 
 const statusVariant = {
   Active: 'success',
   Inactive: 'danger',
   Suspended: 'warning',
+  Trial: 'info',
+  Locked: 'warning',
 }
 
 export default function OrganizationsList() {
+  const [organizations, setOrganizations] = useState([])
+  const [isLoadingOrganizations, setIsLoadingOrganizations] = useState(false)
+  const [listError, setListError] = useState('')
+
+  const normalizeOrganization = (organization) => ({
+    id: organization.id,
+    name: organization.name,
+    adminName: organization.email,
+    plan: organization.plan?.name || 'No plan',
+    mrr: organization.plan?.price_monthly || 0,
+    status: organization.status
+      ? `${organization.status.charAt(0).toUpperCase()}${organization.status.slice(1)}`
+      : 'Unknown',
+    email: organization.email,
+    phone: organization.phone,
+    businessType: organization.business_type,
+    gstNumber: organization.gst_number,
+    panNumber: organization.pan_number,
+    address: organization.address,
+    financialYear: organization.financial_year,
+    billingCycle: organization.billing_cycle,
+    trialEndsAt: organization.trial_ends_at,
+    trialDaysLeft: organization.trial_days_left,
+    upgradeStatus: organization.upgrade_status,
+    createdAt: organization.created_at,
+  })
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadOrganizations() {
+      setIsLoadingOrganizations(true)
+      setListError('')
+
+      const result = await listSuperAdminOrganizations()
+
+      if (!isMounted) return
+
+      setIsLoadingOrganizations(false)
+
+      if (!result.success) {
+        setListError(result.error)
+        return
+      }
+
+      setOrganizations((result.organizations || []).map(normalizeOrganization))
+    }
+
+    loadOrganizations()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   return (
     <div className="space-y-6">
       <div>
@@ -36,7 +94,10 @@ export default function OrganizationsList() {
           data={organizations}
           searchKeys={['id', 'name', 'adminName', 'plan', 'status']}
           searchPlaceholder="Search organizations..."
-          actions={(row) => [
+          loading={isLoadingOrganizations}
+          emptyTitle={listError ? 'Unable to load organizations' : 'No organizations found'}
+          emptyDescription={listError || undefined}
+          actions={() => [
             { label: 'View Details', onClick: () => {} },
           ]}
         />

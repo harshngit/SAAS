@@ -1,18 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  /* Primary: purple */
-  --color-primary-50: #faf5ff;
-  --color-primary-100: #f3e8ff;
-  --color-primary-200: #e9d5ff;
-  --color-primary-300: #d8b4fe;
-  --color-primary-400: #c084fc;
-  --color-primary-500: #a855f7;
-  --color-primary-600: #9333ea;
-  --color-primary-700: #7e22ce;
-  --color-primary-800: #6b21a8;
-  --color-primary-900: #581c87;
-  --color-primary-950: #3b0764;
+  /* Primary: brand green, with black/white supporting states */
+  --color-primary-50: #f7f7f7;
+  --color-primary-100: #eeeeee;
+  --color-primary-200: #dddddd;
+  --color-primary-300: #bdbdbd;
+  --color-primary-400: #063b00;
+  --color-primary-500: #063b00;
+  --color-primary-600: #063b00;
+  --color-primary-700: #063b00;
+  --color-primary-800: #063b00;
+  --color-primary-900: #052f00;
+  --color-primary-950: #021a00;
 
   /* Neutral grays for surfaces, text, borders */
   --color-neutral-50: #f8f9fa;
@@ -32,10 +32,10 @@
 
   /* Elevation: soft, layered shadows for a premium, quiet-depth feel */
   --shadow-xs: 0 1px 2px 0 rgb(17 24 39 / 0.04);
-  --shadow-card: 0 1px 2px 0 rgb(17 24 39 / 0.04), 0 8px 24px -12px rgb(17 24 39 / 0.08);
-  --shadow-card-hover: 0 2px 4px 0 rgb(17 24 39 / 0.05), 0 16px 32px -12px rgb(88 28 135 / 0.14);
-  --shadow-popover: 0 4px 8px -2px rgb(17 24 39 / 0.06), 0 20px 40px -8px rgb(17 24 39 / 0.14);
-  --shadow-glow-primary: 0 8px 20px -6px rgb(147 51 234 / 0.35);
+  --shadow-card: 0 1px 1px 0 rgb(17 24 39 / 0.03), 0 18px 44px -28px rgb(17 24 39 / 0.22);
+  --shadow-card-hover: 0 2px 4px 0 rgb(17 24 39 / 0.05), 0 22px 48px -28px rgb(6 59 0 / 0.2);
+  --shadow-popover: 0 10px 24px -12px rgb(17 24 39 / 0.18), 0 28px 56px -24px rgb(17 24 39 / 0.22);
+  --shadow-glow-primary: 0 8px 20px -6px rgb(6 59 0 / 0.35);
 }
 
 * {
@@ -54,7 +54,9 @@ html {
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background-color: var(--color-neutral-50);
+  background:
+    linear-gradient(135deg, rgb(248 249 250 / 0.98), rgb(241 242 244 / 0.92)),
+    var(--color-neutral-50);
   color: var(--color-neutral-900);
   letter-spacing: -0.006em;
 }
@@ -105,4 +107,20 @@ body {
 
 .dark ::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-neutral-600);
+}
+
+.sidebar-nav {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.dashboard-page-content > :first-child > :first-child:has(> h1:first-child) > h1:first-child,
+.dashboard-page-content > :first-child > :first-child:has(> h1:first-child) > h1:first-child + p,
+.dashboard-page-content > :first-child > :first-child:has(> div > h1:first-child) > div:first-child > h1:first-child,
+.dashboard-page-content > :first-child > :first-child:has(> div > h1:first-child) > div:first-child > h1:first-child + p {
+  display: none;
 }

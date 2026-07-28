@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react'
 
 const variantClasses = {
   primary:
-    'bg-linear-to-b from-primary-500 to-primary-600 text-white shadow-[0_1px_0_0_rgb(255_255_255/0.15)_inset,0_8px_20px_-6px_rgb(147_51_234/0.4)] hover:from-primary-500 hover:to-primary-700 hover:shadow-[0_1px_0_0_rgb(255_255_255/0.15)_inset,0_10px_24px_-6px_rgb(147_51_234/0.5)] active:scale-[0.98] focus-visible:outline-primary-600',
+    'bg-linear-to-b from-primary-500 to-primary-600 text-white shadow-[0_1px_0_0_rgb(255_255_255/0.15)_inset,0_8px_20px_-6px_rgb(6_59_0/0.4)] hover:from-primary-500 hover:to-primary-700 hover:shadow-[0_1px_0_0_rgb(255_255_255/0.15)_inset,0_10px_24px_-6px_rgb(6_59_0/0.5)] active:scale-[0.98] focus-visible:outline-primary-600',
   secondary:
     'bg-neutral-100 text-neutral-800 hover:bg-neutral-200 active:scale-[0.98] focus-visible:outline-neutral-400',
   outline:

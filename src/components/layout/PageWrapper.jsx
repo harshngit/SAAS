@@ -1,3 +1,3 @@
 export default function PageWrapper({ children }) {
-  return <div className="mx-auto max-w-full px-6 py-7 sm:px-8">{children}</div>
+  return <div className="dashboard-page-content w-full px-4 pb-4 sm:px-5 lg:px-7 lg:pb-7">{children}</div>
 }

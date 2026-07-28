@@ -28,24 +28,38 @@ const financialYearOptions = [
   { value: '2027-2028', label: 'FY 2027-2028' },
 ]
 
+const gstNumberPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
+const panNumberPattern = /^[A-Z]{5}[0-9]{4}[A-Z]$/
+const phonePattern = /^\+?[0-9][0-9\s-]{9,14}$/
+
 const schema = z
   .object({
     companyName: z.string().min(2, 'Company/Firm/Shop name is required'),
     companyLogo: z.any().optional(),
     businessType: z.string().min(1, 'Select a business type'),
-    gstNumber: z.string().length(15, 'GST number must be 15 characters'),
-    panNumber: z.string().optional().or(z.literal('')),
+    gstNumber: z
+      .string()
+      .trim()
+      .transform((value) => value.toUpperCase())
+      .refine((value) => gstNumberPattern.test(value), 'Enter a valid 15-character GST number'),
+    panNumber: z
+      .string()
+      .trim()
+      .transform((value) => value.toUpperCase())
+      .refine((value) => !value || panNumberPattern.test(value), 'Enter a valid 10-character PAN number')
+      .optional()
+      .or(z.literal('')),
     billingAddress: z.string().min(5, 'Billing address is required'),
     shippingAddress: z.string().optional().or(z.literal('')),
     sameAsBilling: z.boolean().optional().default(false),
-    phone: z.string().min(10, 'Enter a valid phone number'),
+    phone: z.string().trim().regex(phonePattern, 'Enter a valid phone number'),
     email: z.string().email('Enter a valid email'),
     website: z.string().optional().or(z.literal('')),
     financialYear: z.string().min(1, 'Select a financial year'),
-    invoicePrefix: z.string().min(1, 'Invoice prefix is required'),
-    invoiceStartNumber: z.coerce.number().int().min(1, 'Enter a valid starting number'),
+    invoicePrefix: z.string().optional().or(z.literal('')),
+    invoiceStartNumber: z.coerce.number().int().min(1, 'Enter a valid starting number').optional(),
     adminName: z.string().min(2, 'Your name is required'),
-    password: z.string().min(6, 'Password must be at least 6 characters'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
   })
 
 export default function Register() {
@@ -88,7 +102,7 @@ export default function Register() {
       setServerError(result.error)
       return
     }
-    navigate(roleHomePath[result.user.role], { replace: true })
+    navigate(roleHomePath[result.user.role] || '/admin/dashboard', { replace: true })
   }
 
   return (
@@ -303,7 +317,7 @@ export default function Register() {
                 <Button
                   type="button"
                   onClick={goToOrganizationStep}
-                  className="w-full rounded-xl bg-linear-to-r from-primary-500 to-primary-600 py-3 text-base shadow-[0_14px_30px_-14px_rgb(147_51_234/0.8)] hover:from-primary-500 hover:to-primary-700"
+                  className="w-full rounded-xl bg-linear-to-r from-primary-500 to-primary-600 py-3 text-base shadow-[0_14px_30px_-14px_rgb(6_59_0/0.8)] hover:from-primary-500 hover:to-primary-700"
                 >
                   Next
                 </Button>
@@ -319,7 +333,7 @@ export default function Register() {
                   <Button
                     type="button"
                     onClick={goToBusinessStep}
-                    className="rounded-xl bg-linear-to-r from-primary-500 to-primary-600 py-3 text-base shadow-[0_14px_30px_-14px_rgb(147_51_234/0.8)] hover:from-primary-500 hover:to-primary-700"
+                    className="rounded-xl bg-linear-to-r from-primary-500 to-primary-600 py-3 text-base shadow-[0_14px_30px_-14px_rgb(6_59_0/0.8)] hover:from-primary-500 hover:to-primary-700"
                   >
                     Next
                   </Button>
@@ -333,7 +347,7 @@ export default function Register() {
                   </Button>
                   <Button
                     type="submit"
-                    className="rounded-xl bg-linear-to-r from-primary-500 to-primary-600 py-3 text-base shadow-[0_14px_30px_-14px_rgb(147_51_234/0.8)] hover:from-primary-500 hover:to-primary-700"
+                    className="rounded-xl bg-linear-to-r from-primary-500 to-primary-600 py-3 text-base shadow-[0_14px_30px_-14px_rgb(6_59_0/0.8)] hover:from-primary-500 hover:to-primary-700"
                     loading={isSubmitting}
                   >
                     Create organization

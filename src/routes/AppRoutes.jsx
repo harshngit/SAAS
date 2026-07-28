@@ -47,6 +47,7 @@ import AdminDeliveries from '../features/deliveries/AdminDeliveries'
 import AdminExpenses from '../features/expenses/AdminExpenses'
 import AdminInvoices from '../features/invoices/AdminInvoices'
 import AdminSettings from '../features/settings/AdminSettings'
+import Profile from '../features/profile/Profile'
 
 function RootRedirect() {
   const currentUser = useAuthStore((state) => state.currentUser)
@@ -61,6 +62,16 @@ export default function AppRoutes() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/superadmin/login" element={<Navigate to="/login" replace />} />
+
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.SALES_OFFICER, ROLES.DELIVERY_PARTNER, ROLES.ACCOUNTANT]}>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/profile" element={<Profile />} />
+        </Route>
 
         <Route
           element={

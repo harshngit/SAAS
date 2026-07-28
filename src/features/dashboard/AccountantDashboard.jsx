@@ -19,13 +19,13 @@ const isGstCredit = dashboardStats.gstSummary.netPayable < 0
 
 export default function AccountantDashboard() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Accounts Overview</h1>
-        <p className="mt-1 text-sm text-neutral-500">Priya Nair · Accountant · as of {dashboardStats.asOf}</p>
+    <div className="space-y-5 lg:space-y-6">
+      <div className="rounded-[1.25rem] border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card)">
+        <h1 className="font-(--font-display) text-3xl font-semibold tracking-tight text-neutral-900">Accounts Overview</h1>
+        <p className="mt-1.5 text-sm text-neutral-500">Priya Nair · Accountant · as of {dashboardStats.asOf}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard icon={Wallet} iconVariant="success" label="Outstanding Receivables" value={formatCurrency(dashboardStats.outstandingReceivables)} />
         <StatCard icon={CreditCard} iconVariant="danger" label="Outstanding Payables" value={formatCurrency(dashboardStats.outstandingPayables)} />
         <StatCard icon={HandCoins} iconVariant="info" label="Pending Cash Handover" value={formatCurrency(dashboardStats.cashPendingHandover)} />
@@ -33,8 +33,8 @@ export default function AccountantDashboard() {
         <StatCard icon={FileWarning} iconVariant="warning" label="Overdue Invoices" value={dashboardStats.overdueInvoicesCount} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card title="GST Summary" subtitle="This financial year, computed from sales & purchase invoices" className="lg:col-span-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <Card title="GST Summary" subtitle="This financial year, computed from sales & purchase invoices" className="xl:col-span-2">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <p className="text-sm text-neutral-500">Output GST (Sales)</p>
@@ -76,7 +76,7 @@ export default function AccountantDashboard() {
           searchPlaceholder="Search invoices…"
           emptyTitle="No overdue invoices"
           emptyDescription="Every delivered order has been fully paid."
-          actions={(row) => [
+          actions={() => [
             { label: 'View invoice', icon: Eye, onClick: () => {} },
             { label: 'Send reminder', icon: Send, onClick: () => {} },
             { label: 'Mark as paid', icon: CircleCheck, onClick: () => {} },

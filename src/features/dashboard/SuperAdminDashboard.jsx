@@ -25,13 +25,13 @@ const planChartData = Object.entries(platformStats.planCounts).map(([name, value
 
 export default function SuperAdminDashboard() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Platform Overview</h1>
-        <p className="mt-1 text-sm text-neutral-500">Super Admin · as of {platformStats.asOf}</p>
+    <div className="space-y-5 lg:space-y-6">
+      <div className="rounded-[1.25rem] border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card)">
+        <h1 className="font-(--font-display) text-3xl font-semibold tracking-tight text-neutral-900">Platform Overview</h1>
+        <p className="mt-1.5 text-sm text-neutral-500">Super Admin · as of {platformStats.asOf}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard icon={Building2} iconVariant="primary" label="Total Organizations" value={platformStats.totalOrgs} />
         <StatCard icon={CircleCheck} iconVariant="success" label="Active" value={platformStats.activeCount} />
         <StatCard icon={Clock} iconVariant="info" label="Trial" value={platformStats.trialCount} />
@@ -44,8 +44,8 @@ export default function SuperAdminDashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card title="Organization Growth" subtitle="Cumulative organizations on the platform" className="lg:col-span-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <Card title="Organization Growth" subtitle="Cumulative organizations on the platform" className="xl:col-span-2">
           <SalesLineChart
             data={platformStats.orgGrowthSeries}
             dataKey="total"

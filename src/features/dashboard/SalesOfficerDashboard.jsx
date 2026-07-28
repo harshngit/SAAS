@@ -30,13 +30,13 @@ const upcomingVisits = [...visits].sort((a, b) => (a.date < b.date ? -1 : 1))
 
 export default function SalesOfficerDashboard() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">My Dashboard</h1>
-        <p className="mt-1 text-sm text-neutral-500">Vikram Singh · Sales Officer · as of {TODAY}</p>
+    <div className="space-y-5 lg:space-y-6">
+      <div className="rounded-[1.25rem] border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card)">
+        <h1 className="font-(--font-display) text-3xl font-semibold tracking-tight text-neutral-900">My Dashboard</h1>
+        <p className="mt-1.5 text-sm text-neutral-500">Vikram Singh · Sales Officer · as of {TODAY}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Users} iconVariant="primary" label="Assigned Customers" value={assignedCustomers.length} />
         <StatCard icon={MapPin} iconVariant="info" label="Visits Today" value={visitsToday} />
         <StatCard icon={BellRing} iconVariant="warning" label="Pending Follow-ups" value={pendingFollowUps} />
@@ -72,7 +72,7 @@ export default function SalesOfficerDashboard() {
           rowKey="id"
           searchKeys={['customerName', 'purpose', 'status']}
           searchPlaceholder="Search visits…"
-          actions={(row) => [
+          actions={() => [
             { label: 'Mark completed', icon: CheckCircle2, onClick: () => {} },
             { label: 'Reschedule', icon: CalendarClock, onClick: () => {} },
             { label: 'Call customer', icon: Phone, onClick: () => {} },
