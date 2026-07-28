@@ -49,3 +49,63 @@ export async function listSuperAdminOrganizations(filters = {}) {
     return { success: false, error: message }
   }
 }
+
+export async function listPlans() {
+  try {
+    const { data } = await apiClient.get('/superadmin/plans')
+    return { success: true, plans: Array.isArray(data) ? data : data?.plans || [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load plans. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function createPlan(payload) {
+  try {
+    const { data } = await apiClient.post('/superadmin/plans', payload)
+    return { success: true, plan: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to create plan. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function updatePlan(id, payload) {
+  try {
+    const { data } = await apiClient.put(`/superadmin/plans/${id}`, payload)
+    return { success: true, plan: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to update plan. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function deactivatePlan(id) {
+  try {
+    const { data } = await apiClient.patch(`/superadmin/plans/${id}/deactivate`)
+    return { success: true, plan: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to deactivate plan. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}

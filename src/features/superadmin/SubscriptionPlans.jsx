@@ -1,23 +1,121 @@
-import { useState } from 'react'
-import { Check } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Check, Pencil, Plus, Power } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
+import EmptyState from '../../components/ui/EmptyState'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/Tabs'
-import { plans } from '../../mockData/plans'
+import { listPlans, createPlan, updatePlan, deactivatePlan } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
-
-const currentPlanId = 'basic'
+import PlanForm from './PlanForm'
 
 export default function SubscriptionPlans() {
   const [billingCycle, setBillingCycle] = useState('monthly')
+  const [plans, setPlans] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [listError, setListError] = useState('')
+
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingPlan, setEditingPlan] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  const [deactivatingId, setDeactivatingId] = useState(null)
+  const [actionError, setActionError] = useState('')
+
+  const loadPlans = useCallback(async () => {
+    setIsLoading(true)
+    setListError('')
+
+    const result = await listPlans()
+
+    setIsLoading(false)
+
+    if (!result.success) {
+      setListError(result.error)
+      return
+    }
+
+    setPlans(result.plans)
+  }, [])
+
+  useEffect(() => {
+    loadPlans()
+  }, [loadPlans])
+
+  const openCreateForm = () => {
+    setEditingPlan(null)
+    setFormError('')
+    setIsFormOpen(true)
+  }
+
+  const openEditForm = (plan) => {
+    setEditingPlan(plan)
+    setFormError('')
+    setIsFormOpen(true)
+  }
+
+  const closeForm = () => {
+    setIsFormOpen(false)
+    setFormError('')
+  }
+
+  const handleSave = async (payload) => {
+    setIsSubmitting(true)
+    setFormError('')
+
+    const result = editingPlan ? await updatePlan(editingPlan.id, payload) : await createPlan(payload)
+
+    setIsSubmitting(false)
+
+    if (!result.success) {
+      setFormError(result.error)
+      return
+    }
+
+    setIsFormOpen(false)
+    await loadPlans()
+  }
+
+  const handleDeactivate = async (plan) => {
+    if (!window.confirm(`Deactivate the "${plan.name}" plan? Admins will no longer be able to select it.`)) {
+      return
+    }
+
+    setActionError('')
+    setDeactivatingId(plan.id)
+
+    const result = await deactivatePlan(plan.id)
+
+    setDeactivatingId(null)
+
+    if (!result.success) {
+      setActionError(result.error)
+      return
+    }
+
+    await loadPlans()
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Subscription Plans</h1>
-        <p className="mt-1 text-sm text-neutral-500">Manage subscription plans</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-neutral-900">Subscription Plans</h1>
+          <p className="mt-1 text-sm text-neutral-500">Manage subscription plans available to organizations</p>
+        </div>
+        <Button onClick={openCreateForm}>
+          <Plus className="size-4" aria-hidden="true" />
+          Create Plan
+        </Button>
       </div>
+
+      {actionError && (
+        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
 
       <Tabs value={billingCycle} onValueChange={setBillingCycle} className="flex justify-center sm:justify-start">
         <TabsList>
@@ -26,51 +124,94 @@ export default function SubscriptionPlans() {
         </TabsList>
       </Tabs>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {plans.map((plan) => {
-          const isCurrent = plan.id === currentPlanId
-          const price = billingCycle === 'monthly' ? plan.price : plan.yearlyPrice
-          const originalPrice = billingCycle === 'monthly' ? plan.originalPrice : plan.originalYearlyPrice
-          const cycleLabel = billingCycle === 'monthly' ? 'month' : 'year'
+      {isLoading ? (
+        <Card>
+          <LoadingSpinner label="Loading plans…" />
+        </Card>
+      ) : plans.length === 0 ? (
+        <Card>
+          <EmptyState
+            title={listError ? 'Unable to load plans' : 'No plans yet'}
+            description={listError || 'Create your first subscription plan to get started.'}
+          />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {plans.map((plan) => {
+            const isActive = plan.is_active !== false
+            const price = billingCycle === 'monthly' ? plan.price_monthly : plan.price_yearly
+            const originalPrice = billingCycle === 'monthly' ? plan.original_price_monthly : plan.original_price_yearly
+            const cycleLabel = billingCycle === 'monthly' ? 'month' : 'year'
 
-          return (
-            <Card
-              key={plan.id}
-              className={`h-full ${isCurrent ? 'border-primary-300 ring-2 ring-primary-100' : ''}`}
-              bodyClassName="flex h-full flex-col space-y-5"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-semibold text-neutral-900">{plan.name}</h3>
-                    {isCurrent && <Badge variant="primary">Active</Badge>}
+            return (
+              <Card
+                key={plan.id}
+                className={`h-full ${!isActive ? 'opacity-60' : ''}`}
+                bodyClassName="flex h-full flex-col space-y-5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-lg font-semibold text-neutral-900">{plan.name}</h3>
+                      <Badge variant={isActive ? 'success' : 'neutral'} dot>{isActive ? 'Active' : 'Inactive'}</Badge>
+                    </div>
+                    <p className="mt-2 text-3xl font-semibold tracking-tight text-neutral-900">
+                      {formatCurrency(price)}
+                      {originalPrice != null && (
+                        <span className="ml-2 align-middle text-base font-medium text-neutral-400 line-through">
+                          {formatCurrency(originalPrice)}
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-1 text-sm text-neutral-500">
+                      per {cycleLabel} · {plan.max_users ? `${plan.max_users} users` : 'Unlimited users'} ·{' '}
+                      {plan.max_orders ? `${plan.max_orders} orders` : 'Unlimited orders'}
+                    </p>
                   </div>
-                  <p className="mt-2 text-3xl font-semibold tracking-tight text-neutral-900">
-                    {formatCurrency(price)}
-                    <span className="ml-2 align-middle text-base font-medium text-neutral-400 line-through">
-                      {formatCurrency(originalPrice)}
-                    </span>
-                  </p>
-                  <p className="mt-1 text-sm text-neutral-500">per {cycleLabel}</p>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => openEditForm(plan)}
+                      aria-label={`Edit ${plan.name}`}
+                      className="rounded-lg p-2 text-neutral-500 hover:bg-primary-50 hover:text-primary-600"
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeactivate(plan)}
+                      disabled={!isActive || deactivatingId === plan.id}
+                      aria-label={`Deactivate ${plan.name}`}
+                      className="rounded-lg p-2 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    >
+                      <Power className="size-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <ul className="flex-1 space-y-2">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2 text-sm text-neutral-600">
-                    <Check className="mt-0.5 size-4 shrink-0 text-green-600" aria-hidden="true" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
+                <ul className="flex-1 space-y-2">
+                  {(plan.features || []).map((feature) => (
+                    <li key={feature} className="flex items-start gap-2 text-sm text-neutral-600">
+                      <Check className="mt-0.5 size-4 shrink-0 text-green-600" aria-hidden="true" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
-              <Button variant={isCurrent ? 'secondary' : 'primary'} className="w-full" disabled={isCurrent}>
-                {isCurrent ? 'Current Plan' : 'Choose Plan'}
-              </Button>
-            </Card>
-          )
-        })}
-      </div>
+      <PlanForm
+        key={isFormOpen ? editingPlan?.id || 'create' : 'closed'}
+        isOpen={isFormOpen}
+        onClose={closeForm}
+        plan={editingPlan}
+        onSave={handleSave}
+        isSubmitting={isSubmitting}
+        submitError={formError}
+      />
     </div>
   )
 }
