@@ -84,38 +84,34 @@ export default function AdminPlans() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Plans</h1>
-          <p className="mt-1 text-sm text-neutral-500">Review your subscription and compare available plans</p>
-        </div>
-        <Button variant="outline">
-          <CreditCard className="size-4" aria-hidden="true" />
-          Manage Billing
-        </Button>
-      </div>
-
-      <Card>
+    <div className="space-y-8 pb-6">
+      <section className="rounded-[1.75rem] border border-neutral-100 bg-linear-to-br from-white via-white to-[#eef6eb] p-5 shadow-(--shadow-card)">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex size-13 shrink-0 items-center justify-center rounded-[1.1rem] bg-primary-50 text-primary-700 ring-1 ring-primary-100">
               <Crown className="size-6" aria-hidden="true" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold text-neutral-900">{currentPlanName || 'No active plan'}</h2>
+                <h2 className="text-xl font-semibold tracking-tight text-neutral-900">{currentPlanName || 'No active plan'}</h2>
                 <Badge variant="primary" dot>Current plan</Badge>
                 {hasPendingUpgrade && <Badge variant="warning">Upgrade requested</Badge>}
               </div>
               {isOnTrial && (
-                <p className="mt-1 text-sm text-neutral-500">{trialDaysLeft} days Free Trial left</p>
+                <p className="mt-1.5 text-sm text-neutral-500">{trialDaysLeft} days Free Trial left</p>
               )}
             </div>
           </div>
-          <Button onClick={scrollToPlans}>Upgrade Plan</Button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm">
+              <CreditCard className="size-4" aria-hidden="true" />
+              Manage Billing
+            </Button>
+            <Button size="sm" onClick={scrollToPlans}>Upgrade Plan</Button>
+          </div>
         </div>
-      </Card>
+      </section>
 
       {requestError && (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -123,7 +119,7 @@ export default function AdminPlans() {
         </div>
       )}
 
-      <Tabs value={billingCycle} onValueChange={setBillingCycle} className="flex justify-center sm:justify-start">
+      <Tabs value={billingCycle} onValueChange={setBillingCycle} className="flex justify-center">
         <TabsList>
           <TabsTrigger value="monthly">Monthly</TabsTrigger>
           <TabsTrigger value="yearly">Yearly</TabsTrigger>
@@ -143,9 +139,10 @@ export default function AdminPlans() {
             />
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {plans.map((plan) => {
+          <div className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-5 xl:grid-cols-[22.5rem_25rem_22.5rem] xl:justify-center">
+            {plans.map((plan, index) => {
               const isCurrent = plan.id === currentPlanId
+              const isFeatured = index === 1 && !isCurrent
               const price = billingCycle === 'monthly' ? plan.price_monthly : plan.price_yearly
               const originalPrice = billingCycle === 'monthly' ? plan.original_price_monthly : plan.original_price_yearly
               const cycleLabel = billingCycle === 'monthly' ? 'month' : 'year'
@@ -153,48 +150,92 @@ export default function AdminPlans() {
               const isRequested = requestedPlanId === plan.id
 
               return (
-                <Card
+                <div
                   key={plan.id}
-                  className={`h-full ${isCurrent ? 'border-primary-300 ring-2 ring-primary-100' : ''}`}
-                  bodyClassName="flex h-full flex-col space-y-5"
+                  className={`group flex h-[29rem] overflow-hidden rounded-[1.75rem] border shadow-(--shadow-card) transition-all duration-300 hover:-translate-y-2 hover:shadow-(--shadow-card-hover) ${
+                    isFeatured
+                      ? 'xl:h-[33rem] border-primary-200 bg-[#eef6eb] ring-1 ring-primary-100 xl:shadow-[0_10px_22px_-12px_rgb(6_59_0/0.22),0_34px_70px_-40px_rgb(6_59_0/0.42)]'
+                    : isCurrent
+                        ? 'border-primary-300 bg-white ring-2 ring-primary-100'
+                        : 'border-neutral-100 bg-white'
+                  }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold text-neutral-900">{plan.name}</h3>
-                        {isCurrent && <Badge variant="primary">Active</Badge>}
+                  <div className="flex w-full flex-col p-6">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`flex size-10 shrink-0 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 group-hover:scale-105 ${
+                              isFeatured
+                                ? 'bg-white text-primary-700 ring-primary-100'
+                                : 'bg-primary-50 text-primary-700 ring-primary-100'
+                            }`}
+                          >
+                            <Crown className="size-5" aria-hidden="true" />
+                          </div>
+                          <h3 className="truncate text-xl font-semibold tracking-tight text-neutral-900">
+                            {plan.name}
+                          </h3>
+                        </div>
+                        <p className="mt-4 text-sm leading-6 text-neutral-500">
+                          {plan.features?.[0] || `per ${cycleLabel}`}
+                        </p>
                       </div>
-                      <p className="mt-2 text-3xl font-semibold tracking-tight text-neutral-900">
-                        {formatCurrency(price)}
-                        {originalPrice != null && (
-                          <span className="ml-2 align-middle text-base font-medium text-neutral-400 line-through">
-                            {formatCurrency(originalPrice)}
+                      {isCurrent && <Badge variant="primary">Active</Badge>}
+                    </div>
+
+                    <ul className="mt-7 flex-1 space-y-3.5">
+                      {(plan.features || []).map((feature) => (
+                        <li
+                          key={feature}
+                          className="flex items-start gap-3 text-sm text-neutral-600"
+                        >
+                          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600 ring-1 ring-green-100">
+                            <Check
+                              className="size-3.5"
+                              aria-hidden="true"
+                            />
                           </span>
-                        )}
-                      </p>
-                      <p className="mt-1 text-sm text-neutral-500">per {cycleLabel}</p>
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="mt-8 border-t border-neutral-100 pt-6">
+                      <div>
+                        <p className="text-4xl font-semibold tracking-tight text-neutral-900">
+                          {formatCurrency(price)}
+                          {originalPrice != null && (
+                            <span className="ml-2 align-middle text-base font-medium text-neutral-400 line-through">
+                              {formatCurrency(originalPrice)}
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-1 text-xs text-neutral-500">
+                          per {cycleLabel}
+                        </p>
+                      </div>
+
+                      <Button
+                        variant={isFeatured ? 'outline' : isRequested ? 'secondary' : 'primary'}
+                        className={`mt-5 w-full transition-transform duration-200 group-hover:scale-[1.01] ${
+                          isCurrent
+                            ? 'disabled:opacity-100 disabled:hover:from-primary-500 disabled:hover:to-primary-600'
+                            : ''
+                        } ${
+                          isFeatured
+                            ? 'border-primary-200 bg-[#bdeaa5] text-primary-700 shadow-[0_10px_24px_-12px_rgb(6_59_0/0.35)] hover:border-primary-300 hover:bg-[#aee391] hover:text-primary-900'
+                            : ''
+                        }`}
+                        disabled={isCurrent || isRequested}
+                        loading={isRequesting}
+                        onClick={() => handleChoosePlan(plan)}
+                      >
+                        {isCurrent ? 'Current Plan' : isRequested ? 'Requested' : 'Choose Plan'}
+                      </Button>
                     </div>
                   </div>
-
-                  <ul className="flex-1 space-y-2">
-                    {(plan.features || []).map((feature) => (
-                      <li key={feature} className="flex items-start gap-2 text-sm text-neutral-600">
-                        <Check className="mt-0.5 size-4 shrink-0 text-green-600" aria-hidden="true" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Button
-                    variant={isCurrent || isRequested ? 'secondary' : 'primary'}
-                    className="w-full"
-                    disabled={isCurrent || isRequested}
-                    loading={isRequesting}
-                    onClick={() => handleChoosePlan(plan)}
-                  >
-                    {isCurrent ? 'Current Plan' : isRequested ? 'Requested' : 'Choose Plan'}
-                  </Button>
-                </Card>
+                </div>
               )
             })}
           </div>

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
-export default function Modal({ isOpen, onClose, title, children, footer }) {
+export default function Modal({ isOpen, onClose, title, children, footer, className = '' }) {
   useEffect(() => {
     if (!isOpen) return
 
@@ -30,7 +30,7 @@ export default function Modal({ isOpen, onClose, title, children, footer }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'modal-title' : undefined}
-        className="w-full max-w-md rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-popover)"
+        className={`w-full max-w-md rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-popover) ${className}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">

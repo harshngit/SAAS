@@ -95,6 +95,21 @@ export async function updatePlan(id, payload) {
   }
 }
 
+export async function updatePlanStatus(id, isActive) {
+  try {
+    const { data } = await apiClient.patch(`/superadmin/plans/${id}/status`, { is_active: isActive })
+    return { success: true, plan: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to update plan status. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function deactivatePlan(id) {
   try {
     const { data } = await apiClient.patch(`/superadmin/plans/${id}/deactivate`)

@@ -5,19 +5,25 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import { ROLES } from '../../auth/roles'
 import { useAuthStore } from '../../store/authStore'
+import { getCurrentProfile } from '../../api/auth'
 
-const trialDaysLeft = 7
-const trialTotalDays = 14
-const trialProgress = ((trialTotalDays - trialDaysLeft) / trialTotalDays) * 100
+const defaultTrialTotalDays = 14
 
 export default function AdminTrialPopup() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
+  const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const [isOpen, setIsOpen] = useState(false)
+
+  const trialDaysLeft = currentOrganization?.trial_days_left ?? currentOrganization?.trialDaysLeft
+  const trialTotalDays = currentOrganization?.trial_total_days ?? currentOrganization?.trialTotalDays ?? defaultTrialTotalDays
+  const trialProgress =
+    typeof trialDaysLeft === 'number' ? ((trialTotalDays - trialDaysLeft) / trialTotalDays) * 100 : 0
 
   useEffect(() => {
     if (currentUser?.role === ROLES.ADMIN) {
       setIsOpen(true)
+      getCurrentProfile()
     }
   }, [currentUser?.id, currentUser?.role])
 
@@ -26,7 +32,7 @@ export default function AdminTrialPopup() {
     navigate('/admin/plans')
   }
 
-  if (currentUser?.role !== ROLES.ADMIN) return null
+  if (currentUser?.role !== ROLES.ADMIN || typeof trialDaysLeft !== 'number') return null
 
   return (
     <Modal

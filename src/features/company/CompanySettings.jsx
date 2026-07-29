@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Bell,
   Building2,
+  ChevronDown,
   CreditCard,
   LifeBuoy,
   Save,
@@ -14,6 +15,8 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
 import Select from '../../components/ui/Select'
+import { getCurrentProfile } from '../../api/auth'
+import { useAuthStore } from '../../store/authStore'
 
 const initialCompanyData = {
   name: 'SAAS Distributors',
@@ -25,7 +28,19 @@ const initialCompanyData = {
   state: 'Maharashtra',
   pincode: '400001',
   fax: '',
-  gstin: '27AABCU9603R1ZX'
+  gstin: '27AABCU9603R1ZX',
+  businessType: '',
+  panNumber: '',
+  financialYear: '',
+  billingAddress: '',
+  shippingAddressSameAsBilling: false,
+  shippingAddress: '',
+  website: '',
+  invoicePrefix: '',
+  adminName: '',
+  adminEmail: '',
+  adminPassword: '',
+  adminPhone: '',
 }
 
 const settingsNav = [
@@ -67,29 +82,86 @@ const settingsNav = [
   },
 ]
 
-const countryOptions = [
-  { value: 'india', label: 'India' },
-  { value: 'usa', label: 'United States' },
-  { value: 'uae', label: 'United Arab Emirates' },
-  { value: 'singapore', label: 'Singapore' },
+const businessTypeOptions = [
+  { value: 'sole-proprietorship', label: 'Sole Proprietorship' },
+  { value: 'partnership', label: 'Partnership' },
+  { value: 'private-limited', label: 'Private Limited' },
+  { value: 'llp', label: 'LLP' },
 ]
 
-const stateOptions = [
-  { value: 'Maharashtra', label: 'Maharashtra' },
-  { value: 'Gujarat', label: 'Gujarat' },
-  { value: 'Karnataka', label: 'Karnataka' },
-  { value: 'Delhi', label: 'Delhi' },
+const financialYearOptions = [
+  { value: '2024-2025', label: '2024-2025' },
+  { value: '2025-2026', label: '2025-2026' },
+  { value: '2026-2027', label: '2026-2027' },
 ]
+
+function buildCompanyDataFromProfile(user, organization) {
+  return {
+    ...initialCompanyData,
+    name: organization?.name || initialCompanyData.name,
+    email: organization?.email || initialCompanyData.email,
+    phone: organization?.phone || initialCompanyData.phone,
+    address: organization?.address || initialCompanyData.address,
+    gstin: organization?.gst_number || organization?.gstNumber || initialCompanyData.gstin,
+    businessType: organization?.business_type || organization?.businessType || '',
+    panNumber: organization?.pan_number || organization?.panNumber || '',
+    financialYear: organization?.financial_year || organization?.financialYear || '',
+    billingAddress: organization?.address || organization?.billingAddress || '',
+    adminName: user?.name || '',
+    adminEmail: user?.email || '',
+    adminPhone: user?.phone || '',
+    adminPassword: '',
+  }
+}
 
 export default function CompanySettings() {
-  const [companyData, setCompanyData] = useState(initialCompanyData)
+  const currentUser = useAuthStore((state) => state.currentUser)
+  const currentOrganization = useAuthStore((state) => state.currentOrganization)
+  const [companyData, setCompanyData] = useState(() => buildCompanyDataFromProfile(currentUser, currentOrganization))
   const [activeTab, setActiveTab] = useState('general')
+  const [isAdminDetailsOpen, setIsAdminDetailsOpen] = useState(true)
+  const [isOrganizationDetailsOpen, setIsOrganizationDetailsOpen] = useState(false)
+  const [isBusinessDetailsOpen, setIsBusinessDetailsOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [profileError, setProfileError] = useState('')
   const activeNavItem = settingsNav.find((item) => item.id === activeTab) || settingsNav[0]
 
+  const resetCompanyData = useCallback(() => {
+    setCompanyData(buildCompanyDataFromProfile(currentUser, currentOrganization))
+  }, [currentOrganization, currentUser])
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadProfile() {
+      const result = await getCurrentProfile()
+
+      if (!isMounted) return
+
+      if (!result.success) {
+        setProfileError(result.error)
+        return
+      }
+
+      setProfileError('')
+      setCompanyData(buildCompanyDataFromProfile(result.user, result.organization))
+    }
+
+    loadProfile()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    resetCompanyData()
+  }, [resetCompanyData])
+
   const handleChange = (e) => {
-    const { name, value } = e.target
-    setCompanyData(prev => ({ ...prev, [name]: value }))
+    const { name, type, checked, value } = e.target
+    const nextValue = type === 'checkbox' ? checked : value
+    setCompanyData(prev => ({ ...prev, [name]: nextValue }))
   }
 
   const handleSave = async () => {
@@ -107,16 +179,22 @@ export default function CompanySettings() {
           <h1 className="font-(--font-display) text-2xl font-bold tracking-tight text-neutral-900">Settings</h1>
           <p className="mt-1 text-sm text-neutral-500">Manage your company information and workspace details.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => setCompanyData(initialCompanyData)}>
+        <div className="translate-y-2 flex flex-wrap items-center gap-2 ">
+          <Button variant="outline" size="sm" onClick={resetCompanyData}>
             Cancel
           </Button>
-          <Button onClick={handleSave} loading={isSaving}>
-            <Save className="size-4" />
+          <Button size="sm" onClick={handleSave} loading={isSaving}>
+            <Save className="size-3.5" />
             Save Changes
           </Button>
         </div>
       </div>
+
+      {profileError && (
+        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {profileError}
+        </div>
+      )}
 
       <Card className="p-0">
         <div className="grid min-h-[34rem] grid-cols-1 lg:grid-cols-[17rem_1fr]">
@@ -157,9 +235,9 @@ export default function CompanySettings() {
 
             {activeTab === 'general' ? (
               <>
-                <section className="border-b border-neutral-100 py-6">
-                  <p className="text-sm font-semibold text-neutral-900">Profile picture upload</p>
-                  <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <section className="border-b border-neutral-100 py-2">
+                  {/* <p className="text-sm font-semibold text-neutral-900">Company logo upload</p> */}
+                  <div className="mt-1 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-center gap-4">
                       <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700 ring-1 ring-primary-100">
                         <Building2 className="size-7" />
@@ -173,7 +251,7 @@ export default function CompanySettings() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Button size="sm">
                         <Upload className="size-4" />
-                        Upload New Photo
+                        Upload New Logo
                       </Button>
                       <Button variant="outline" size="sm">
                         <Trash2 className="size-4" />
@@ -183,80 +261,204 @@ export default function CompanySettings() {
                   </div>
                 </section>
 
-                <section className="pt-6">
-                  <h3 className="text-sm font-semibold text-neutral-900">Organization Information</h3>
-                  <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                      label="Business Name"
-                      name="name"
-                      value={companyData.name}
-                      onChange={handleChange}
+                <section className="border-b border-neutral-100 py-5">
+                  <button
+                    type="button"
+                    aria-expanded={isAdminDetailsOpen}
+                    onClick={() => setIsAdminDetailsOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-2xl border border-neutral-100 bg-neutral-50 px-4 py-3 text-left transition-colors hover:bg-neutral-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">
+                        1
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-semibold text-neutral-900">Admin Details</h3>
+                        <p className="mt-0.5 text-xs text-neutral-500">Manage primary admin registration details.</p>
+                      </div>
+                    </div>
+                    <ChevronDown
+                      className={`size-4 text-neutral-500 transition-transform ${isAdminDetailsOpen ? 'rotate-180' : ''}`}
+                      aria-hidden="true"
                     />
-                    <Input
-                      label="Email Address"
-                      name="email"
-                      type="email"
-                      value={companyData.email}
-                      onChange={handleChange}
-                    />
-                    <Input
-                      label="Phone Number"
-                      name="phone"
-                      value={companyData.phone}
-                      onChange={handleChange}
-                    />
-                    <Input
-                      label="Fax"
-                      name="fax"
-                      value={companyData.fax}
-                      placeholder="Add fax number"
-                      onChange={handleChange}
-                    />
-                    <Input
-                      label="GSTIN"
-                      name="gstin"
-                      value={companyData.gstin}
-                      onChange={handleChange}
-                    />
-                    <Input
-                      label="Registered Address"
-                      name="address"
-                      value={companyData.address}
-                      onChange={handleChange}
-                    />
-                  </div>
+                  </button>
+
+                  {isAdminDetailsOpen && (
+                    <div className="mt-5">
+                      <h3 className="text-sm font-semibold text-neutral-900">Admin Registration</h3>
+                      <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
+                        <Input
+                          label="Admin Name"
+                          name="adminName"
+                          value={companyData.adminName}
+                          onChange={handleChange}
+                        />
+                        <Input
+                          label="Email Address"
+                          name="adminEmail"
+                          type="email"
+                          value={companyData.adminEmail}
+                          onChange={handleChange}
+                        />
+                        <Input
+                          label="Password"
+                          name="adminPassword"
+                          type="password"
+                          placeholder="Enter your password"
+                          value={companyData.adminPassword}
+                          onChange={handleChange}
+                        />
+                        <Input
+                          label="Phone Number"
+                          name="adminPhone"
+                          value={companyData.adminPhone}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </section>
 
-                <section className="pt-7">
-                  <h3 className="text-sm font-semibold text-neutral-900">Address</h3>
-                  <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
-                      label="Country"
-                      name="country"
-                      value={companyData.country}
-                      options={countryOptions}
-                      onChange={handleChange}
+                <section className="border-b border-neutral-100 py-5">
+                  <button
+                    type="button"
+                    aria-expanded={isOrganizationDetailsOpen}
+                    onClick={() => setIsOrganizationDetailsOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-2xl border border-neutral-100 bg-neutral-50 px-4 py-3 text-left transition-colors hover:bg-neutral-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">
+                        2
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-semibold text-neutral-900">Organization Details</h3>
+                        <p className="mt-0.5 text-xs text-neutral-500">Update business identity and tax details.</p>
+                      </div>
+                    </div>
+                    <ChevronDown
+                      className={`size-4 text-neutral-500 transition-transform ${
+                        isOrganizationDetailsOpen ? 'rotate-180' : ''
+                      }`}
+                      aria-hidden="true"
                     />
-                    <Input
-                      label="City"
-                      name="city"
-                      value={companyData.city}
-                      onChange={handleChange}
+                  </button>
+
+                  {isOrganizationDetailsOpen && (
+                    <div className="mt-5">
+                      {/* <h3 className="text-sm font-semibold text-neutral-900">Organization Details</h3> */}
+                      <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
+                        <Input
+                          label="Company/Firm/Shop Name"
+                          name="name"
+                          value={companyData.name}
+                          onChange={handleChange}
+                        />
+                        <Select
+                          label="Business Type"
+                          name="businessType"
+                          placeholder="Select business type"
+                          value={companyData.businessType}
+                          options={businessTypeOptions}
+                          onChange={handleChange}
+                        />
+                        <Input
+                          label="GST Number"
+                          name="gstin"
+                          value={companyData.gstin}
+                          onChange={handleChange}
+                        />
+                        <Input
+                          label="PAN Number (if applicable)"
+                          name="panNumber"
+                          value={companyData.panNumber}
+                          onChange={handleChange}
+                        />
+                        <Select
+                          label="Financial Year"
+                          name="financialYear"
+                          placeholder="Select financial year"
+                          value={companyData.financialYear}
+                          options={financialYearOptions}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                <section className="py-5">
+                  <button
+                    type="button"
+                    aria-expanded={isBusinessDetailsOpen}
+                    onClick={() => setIsBusinessDetailsOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-2xl border border-neutral-100 bg-neutral-50 px-4 py-3 text-left transition-colors hover:bg-neutral-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">
+                        3
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-semibold text-neutral-900">Business Details</h3>
+                        <p className="mt-0.5 text-xs text-neutral-500">Manage billing, shipping, and invoice settings.</p>
+                      </div>
+                    </div>
+                    <ChevronDown
+                      className={`size-4 text-neutral-500 transition-transform ${isBusinessDetailsOpen ? 'rotate-180' : ''}`}
+                      aria-hidden="true"
                     />
-                    <Input
-                      label="Postcode"
-                      name="pincode"
-                      value={companyData.pincode}
-                      onChange={handleChange}
-                    />
-                    <Select
-                      label="State"
-                      name="state"
-                      value={companyData.state}
-                      options={stateOptions}
-                      onChange={handleChange}
-                    />
-                  </div>
+                  </button>
+
+                  {isBusinessDetailsOpen && (
+                    <div className="mt-5">
+                      {/* <h3 className="text-sm font-semibold text-neutral-900">Business Details</h3> */}
+                      <div className="mt-4 space-y-5">
+                        <Input
+                          label="Billing Address"
+                          name="billingAddress"
+                          as="textarea"
+                          value={companyData.billingAddress}
+                          onChange={handleChange}
+                        />
+                        <label className="flex items-center gap-3 text-sm font-medium text-neutral-700">
+                          <input
+                            type="checkbox"
+                            name="shippingAddressSameAsBilling"
+                            checked={companyData.shippingAddressSameAsBilling}
+                            onChange={handleChange}
+                            className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500/20"
+                          />
+                          Shipping/Warehouse address same as billing address
+                        </label>
+                        <Input
+                          label="Shipping/Warehouse Address"
+                          name="shippingAddress"
+                          as="textarea"
+                          value={
+                            companyData.shippingAddressSameAsBilling
+                              ? companyData.billingAddress
+                              : companyData.shippingAddress
+                          }
+                          onChange={handleChange}
+                          disabled={companyData.shippingAddressSameAsBilling}
+                        />
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                          <Input
+                            label="Website (if applicable)"
+                            name="website"
+                            value={companyData.website}
+                            onChange={handleChange}
+                          />
+                          <Input
+                            label="Invoice Prefix"
+                            name="invoicePrefix"
+                            placeholder="e.g. INV"
+                            value={companyData.invoicePrefix}
+                            onChange={handleChange}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </section>
               </>
             ) : (

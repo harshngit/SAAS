@@ -6,7 +6,7 @@ import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/Tabs'
-import { listPlans, createPlan, updatePlan, deactivatePlan } from '../../api/superadmin'
+import { listPlans, createPlan, updatePlan, updatePlanStatus } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
 import PlanForm from './PlanForm'
 
@@ -21,7 +21,7 @@ export default function SubscriptionPlans() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
 
-  const [deactivatingId, setDeactivatingId] = useState(null)
+  const [updatingStatusId, setUpdatingStatusId] = useState(null)
   const [actionError, setActionError] = useState('')
 
   const loadPlans = useCallback(async () => {
@@ -78,17 +78,13 @@ export default function SubscriptionPlans() {
     await loadPlans()
   }
 
-  const handleDeactivate = async (plan) => {
-    if (!window.confirm(`Deactivate the "${plan.name}" plan? Admins will no longer be able to select it.`)) {
-      return
-    }
-
+  const handleStatusChange = async (plan, isActive) => {
     setActionError('')
-    setDeactivatingId(plan.id)
+    setUpdatingStatusId(plan.id)
 
-    const result = await deactivatePlan(plan.id)
+    const result = await updatePlanStatus(plan.id, isActive)
 
-    setDeactivatingId(null)
+    setUpdatingStatusId(null)
 
     if (!result.success) {
       setActionError(result.error)
@@ -171,20 +167,25 @@ export default function SubscriptionPlans() {
                   <div className="flex shrink-0 gap-1">
                     <button
                       type="button"
+                      aria-pressed={isActive}
+                      aria-label={`${isActive ? 'Deactivate' : 'Activate'} ${plan.name}`}
+                      onClick={() => handleStatusChange(plan, !isActive)}
+                      disabled={updatingStatusId === plan.id}
+                      className={`inline-flex size-8 items-center justify-center rounded-full border transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isActive
+                          ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
+                          : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                      }`}
+                    >
+                      <Power className="size-4" strokeWidth={2.5} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => openEditForm(plan)}
                       aria-label={`Edit ${plan.name}`}
                       className="rounded-lg p-2 text-neutral-500 hover:bg-primary-50 hover:text-primary-600"
                     >
                       <Pencil className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeactivate(plan)}
-                      disabled={!isActive || deactivatingId === plan.id}
-                      aria-label={`Deactivate ${plan.name}`}
-                      className="rounded-lg p-2 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                    >
-                      <Power className="size-4" />
                     </button>
                   </div>
                 </div>
