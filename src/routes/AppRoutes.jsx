@@ -13,13 +13,18 @@ import { ROLES, roleHomePath } from '../auth/roles'
 import CompanySettings from '../features/company/CompanySettings'
 import UserManagement from '../features/users/UserManagement'
 import ProductList from '../features/products/ProductList'
+import ProductDetail from '../features/products/ProductDetail'
 import StockBoard from '../features/inventory/StockBoard'
+import StockDetail from '../features/inventory/StockDetail'
 import VehicleStockOverview from '../features/vehicleStock/VehicleStockOverview'
 import PurchaseInvoiceList from '../features/purchases/PurchaseInvoiceList'
 import ReportsHub from '../features/reports/ReportsHub'
 import NotificationsList from '../features/notifications/NotificationsList'
 import AuditLogList from '../features/auditLogs/AuditLogList'
 import CustomerList from '../features/customers/CustomerList'
+import CustomerDetail from '../features/customers/CustomerDetail'
+import SupplierList from '../features/suppliers/SupplierList'
+import SupplierDetail from '../features/suppliers/SupplierDetail'
 import CreateSalesOrder from '../features/orders/CreateSalesOrder'
 import VisitCheckIn from '../features/visits/VisitCheckIn'
 import FollowUpsList from '../features/followups/FollowUpsList'
@@ -99,8 +104,13 @@ export default function AppRoutes() {
           <Route path="/admin/plans" element={<AdminPlans />} />
           <Route path="/admin/users" element={<UserManagement />} />
           <Route path="/admin/customers" element={<CustomerList />} />
+          <Route path="/admin/customers/:id" element={<CustomerDetail />} />
+          <Route path="/admin/suppliers" element={<SupplierList />} />
+          <Route path="/admin/suppliers/:id" element={<SupplierDetail />} />
           <Route path="/admin/products" element={<ProductList />} />
+          <Route path="/admin/products/:id" element={<ProductDetail />} />
           <Route path="/admin/inventory" element={<StockBoard />} />
+          <Route path="/admin/inventory/:sku" element={<StockDetail />} />
           <Route path="/admin/vehicle-stock" element={<VehicleStockOverview />} />
           <Route path="/admin/purchases" element={<PurchaseInvoiceList />} />
           <Route path="/admin/deliveries" element={<AdminDeliveries />} />
@@ -121,6 +131,7 @@ export default function AppRoutes() {
         >
           <Route path="/sales/dashboard" element={<SalesOfficerDashboard />} />
           <Route path="/sales/customers" element={<CustomerList />} />
+          <Route path="/sales/customers/:id" element={<CustomerDetail />} />
           <Route path="/sales/orders/create" element={<CreateSalesOrder />} />
           <Route path="/sales/visits" element={<VisitCheckIn />} />
           <Route path="/sales/followups" element={<FollowUpsList />} />

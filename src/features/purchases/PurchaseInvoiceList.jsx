@@ -2,33 +2,8 @@ import { useState } from 'react'
 import { Plus, Edit, Trash2, FileText } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
+import { purchaseInvoices as initialInvoices } from '../../mockData/purchaseInvoices'
 import PurchaseInvoiceForm from './PurchaseInvoiceForm'
-
-const initialInvoices = [
-  {
-    id: 1,
-    supplier: 'Prime Manufacturing',
-    invoiceNumber: 'PO-2024-001',
-    date: '2024-07-15',
-    total: 25000,
-    items: [
-      { product: '250ml Bottles', quantity: 1000, price: 8, total: 8000 },
-      { product: '500ml Bottles', quantity: 500, price: 15, total: 7500 },
-      { product: '1L Bottles', quantity: 400, price: 25, total: 10000 },
-    ]
-  },
-  {
-    id: 2,
-    supplier: 'Bottle Suppliers Inc',
-    invoiceNumber: 'PO-2024-002',
-    date: '2024-07-10',
-    total: 18000,
-    items: [
-      { product: 'Bottle Caps', quantity: 5000, price: 1.5, total: 7500 },
-      { product: 'Labels', quantity: 5000, price: 2.1, total: 10500 },
-    ]
-  }
-]
 
 export default function PurchaseInvoiceList() {
   const [invoices, setInvoices] = useState(initialInvoices)

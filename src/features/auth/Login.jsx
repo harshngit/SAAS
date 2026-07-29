@@ -505,8 +505,8 @@ export default function Login() {
                     <label className="text-sm font-medium text-neutral-700">
                       Phone Number
                     </label>
-                    <div className="grid grid-cols-[8.5rem_1fr] gap-2">
-                      <div className="relative" ref={countryMenuRef}>
+                    <div className="grid grid-cols-[1fr_4fr] gap-2">
+                      <div className="relative h-full" ref={countryMenuRef}>
                         <input type="hidden" {...register("countryCode")} />
                         <button
                           type="button"
@@ -515,7 +515,7 @@ export default function Login() {
                           onClick={() =>
                             setIsCountryMenuOpen((isOpen) => !isOpen)
                           }
-                          className="flex w-full items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pl-3 pr-9 text-sm text-neutral-900 transition-all focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                          className="flex h-full w-full items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pl-3 pr-9 text-sm text-neutral-900 transition-all focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                         >
                           <ReactCountryFlag
                             countryCode={selectedCountry.value.split(":")[0]}
@@ -549,11 +549,11 @@ export default function Login() {
                             ))}
                           </div>
                         )}
-d                      </div>
+                      </div>
                       <input
                         type="tel"
                         placeholder={phonePlaceholder}
-                        className={`w-full rounded-xl border bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition-all placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-4 ${
+                        className={`h-full w-full rounded-xl border bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition-all placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-4 ${
                           errors.phone
                             ? "border-red-300 focus:border-red-400 focus:ring-red-500/15"
                             : "border-neutral-200 focus:border-primary-400 focus:ring-primary-500/12"

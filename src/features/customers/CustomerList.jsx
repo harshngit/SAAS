@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Edit,
   Plus,
@@ -15,7 +16,6 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import { listUsers } from '../../api/users'
 import { customers as seedCustomers } from '../../mockData/customers'
 import { users as seedUsers } from '../../mockData/users'
 import { useAuthStore } from '../../store/authStore'
@@ -56,9 +56,11 @@ const getInitials = (name = '') =>
     .toUpperCase()
 
 export default function CustomerList() {
+  const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
   const isAdmin = currentUser?.role === ROLES.ADMIN
   const isSalesOfficer = currentUser?.role === ROLES.SALES_OFFICER
+  const basePath = isAdmin ? '/admin/customers' : '/sales/customers'
 
   const [customers, setCustomers] = useState([])
   const [staffUsers, setStaffUsers] = useState(seedUsers.map(normalizeUser))
@@ -84,30 +86,19 @@ export default function CustomerList() {
     [staffUsers],
   )
 
-  const loadCustomers = useCallback(async () => {
+  const loadCustomers = useCallback(() => {
     setIsLoading(true)
     setListError('')
 
-    try {
-      const usersResult = await listUsers()
-
-      if (usersResult.success) {
-        setStaffUsers((usersResult.users || []).map(normalizeUser))
+    const nextCustomers = seedCustomers.map(normalizeCustomer).map((customer) => {
+      if (isSalesOfficer && currentUser?.id) {
+        return { ...customer, assignedSalesOfficerId: currentUser.id }
       }
+      return customer
+    })
 
-      const nextCustomers = seedCustomers.map(normalizeCustomer).map((customer) => {
-        if (isSalesOfficer && currentUser?.id) {
-          return { ...customer, assignedSalesOfficerId: currentUser.id }
-        }
-        return customer
-      })
-
-      setCustomers(nextCustomers)
-    } catch {
-      setListError('Unable to load customers. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
+    setCustomers(nextCustomers)
+    setIsLoading(false)
   }, [currentUser?.id, isSalesOfficer])
 
   useEffect(() => {
@@ -227,61 +218,64 @@ export default function CustomerList() {
   return (
     <div className="space-y-5">
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-5 py-3">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-              <div className="flex flex-wrap gap-10">
-                {customerStatusTabs.map((tab) => {
-                  const isActive = statusFilter === tab.value
+        <div className="border-b border-neutral-100 px-5 py-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-5">
+              {customerStatusTabs.map((tab) => {
+                const isActive = statusFilter === tab.value
 
-                  return (
-                    <button
-                      key={tab.value}
-                      type="button"
-                      onClick={() => setStatusFilter(tab.value)}
-                      className={`relative py-2 text-md font-medium transition-colors ${
-                        isActive ? 'text-primary-700' : 'text-neutral-500 hover:text-neutral-900'
-                      }`}
-                    >
-                      {tab.label}
-                      {isActive && (
-                        <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-600" aria-hidden="true" />
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="relative w-full sm:w-80">
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                  <input
-                    type="search"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search customers"
-                    className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                  />
-                </div>
-                <Select
-                  options={[{ value: 'all', label: 'All types' }, ...customerTypeOptions]}
-                  value={typeFilter}
-                  onChange={(event) => setTypeFilter(event.target.value)}
-                  className="sm:w-44"
-                />
-                {isAdmin && (
-                  <Select
-                    options={salesOfficerFilterOptions}
-                    value={salesOfficerFilter}
-                    onChange={(event) => setSalesOfficerFilter(event.target.value)}
-                    className="sm:w-56"
-                  />
-                )}
-              </div>
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setStatusFilter(tab.value)}
+                    className={`relative py-2 text-sm font-medium transition-colors ${
+                      isActive ? 'text-primary-700' : 'text-neutral-500 hover:text-neutral-900'
+                    }`}
+                  >
+                    {tab.label}
+                    {isActive && (
+                      <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-600" aria-hidden="true" />
+                    )}
+                  </button>
+                )
+              })}
             </div>
             <Button onClick={() => handleOpenForm()} size="sm" className="w-full sm:w-auto">
               <Plus className="size-4" aria-hidden="true" />
               Add Customer
             </Button>
+          </div>
+        </div>
+
+        <div className="border-b border-neutral-100 px-5 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative w-full sm:w-80">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search customers"
+                  className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+              </div>
+              <Select
+                options={[{ value: 'all', label: 'All types' }, ...customerTypeOptions]}
+                value={typeFilter}
+                onChange={(event) => setTypeFilter(event.target.value)}
+                className="sm:w-44"
+              />
+              {isAdmin && (
+                <Select
+                  options={salesOfficerFilterOptions}
+                  value={salesOfficerFilter}
+                  onChange={(event) => setSalesOfficerFilter(event.target.value)}
+                  className="sm:w-56"
+                />
+              )}
+            </div>
           </div>
         </div>
 
@@ -327,7 +321,8 @@ export default function CustomerList() {
                 {filteredCustomers.map((customer) => (
                   <tr
                     key={customer.id}
-                    className="bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                    onClick={() => navigate(`${basePath}/${customer.id}`)}
+                    className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
                   >
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
@@ -360,9 +355,10 @@ export default function CustomerList() {
                         {customer.status}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3.5 text-right">
+                    <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
                       <ActionMenu
                         items={[
+                          { label: 'View Details', icon: UserCheck, onClick: () => navigate(`${basePath}/${customer.id}`) },
                           { label: 'Edit', icon: Edit, onClick: () => handleOpenForm(customer) },
                           { label: 'Reassign Sales Officer', icon: UserCheck, onClick: () => handleOpenForm(customer) },
                           {

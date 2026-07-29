@@ -25,13 +25,16 @@ export default function Sidebar({
 
   if (!currentUser) return null
 
-  const menuItems = roleMenus[currentUser.role] || []
+  const menuGroups = roleMenus[currentUser.role] || []
   const labelVisibilityClass = isExpanded
     ? 'visible max-w-36 opacity-100 delay-150'
     : 'invisible max-w-0 opacity-0 delay-0'
   const desktopLabelVisibilityClass = isExpanded
     ? 'md:visible md:max-w-36 md:opacity-100 md:delay-150'
     : 'md:invisible md:max-w-0 md:opacity-0 md:delay-0'
+  const sectionLabelVisibilityClass = isExpanded
+    ? 'visible max-w-48 whitespace-nowrap opacity-100 delay-150'
+    : 'invisible max-w-0 opacity-0 delay-0'
 
   return (
     <>
@@ -50,15 +53,23 @@ export default function Sidebar({
           isExpanded ? 'md:w-60' : 'md:w-[4.75rem]'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'}`}
       >
+        <span
+          aria-hidden="true"
+          className="absolute -right-[1.4rem] top-1/2 z-10 hidden size-8 -translate-y-1/2 rounded-full bg-[#eef6eb] md:block"
+        />
         <button
           type="button"
           onClick={onToggleExpanded}
           aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
           aria-expanded={isExpanded}
           aria-controls={id}
-          className="absolute right-[-0.65rem] top-1/2 z-20 hidden size-6 -translate-y-1/2 items-center justify-center rounded-full bg-white text-primary-700 shadow-(--shadow-card) ring-1 ring-primary-100 transition-colors hover:text-primary-900 focus:outline-none focus:ring-4 focus:ring-primary-500/15 md:flex"
+          className="group absolute right-[-0.65rem] top-1/2 z-20 hidden size-6 -translate-y-1/2 items-center justify-center rounded-full bg-white text-primary-700 shadow-(--shadow-card) ring-1 ring-primary-100 transition-colors hover:text-primary-900 focus:outline-none focus:ring-4 focus:ring-primary-500/15 md:flex"
         >
-          {isExpanded ? <ChevronLeft className="size-4" /> : <ChevronRight className="size-4" />}
+          {isExpanded ? (
+            <ChevronLeft className="size-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
+          ) : (
+            <ChevronRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+          )}
         </button>
 
         <div className={`relative flex items-center px-4 pb-4 pt-5 ${isExpanded ? 'justify-between' : 'md:justify-center'}`}>
@@ -95,52 +106,64 @@ export default function Sidebar({
         <div className={`${isExpanded ? 'mx-5' : 'mx-3'} hidden h-px bg-neutral-100 transition-all duration-300 md:block`} />
         <div className="mx-5 h-px bg-neutral-100 md:hidden" />
 
-        <nav className={`sidebar-nav min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden ${isExpanded ? 'py-5 md:px-3' : 'py-3 md:px-2.5 md:pt-0'} px-3`}>
-          <p
-            className={`hidden overflow-hidden px-3 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition-all duration-150 md:block ${
-              isExpanded ? `${labelVisibilityClass} pb-2` : 'invisible h-0 max-w-0 pb-0 opacity-0'
-            }`}
-          >
-            Main menu
-          </p>
-          <p className="px-3 pb-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 md:hidden">
-            Main menu
-          </p>
-          {menuItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={onCloseMobile}
-              aria-label={!isExpanded ? item.label : undefined}
-              title={!isExpanded ? item.label : undefined}
-              className={({ isActive }) =>
-                `group relative flex items-center rounded-[0.9rem] py-2.5 text-sm font-medium transition-all duration-150 ${
-                  isExpanded
-                    ? 'gap-3 px-3.5 md:justify-start'
-                    : 'gap-3 px-3.5 md:gap-0 md:px-0 md:justify-center'
-                } ${
-                  isActive
-                    ? 'bg-[#bdeaa5] text-primary-700 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
-                    : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span
-                    className={`absolute left-1 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-linear-to-b from-primary-500 to-primary-700 transition-opacity ${
-                      isActive ? 'opacity-100' : 'opacity-0'
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <item.icon className="size-4.5 shrink-0" aria-hidden="true" />
-                  <span className={`visible max-w-44 overflow-hidden whitespace-nowrap opacity-100 transition-all duration-150 ${desktopLabelVisibilityClass}`}>
-                    {item.label}
-                  </span>
-                  {!isExpanded && <CollapsedTooltip label={item.label} />}
-                </>
+        <nav className={`sidebar-nav min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? 'py-5 md:px-3' : 'py-3 md:px-2.5 md:pt-0'} px-3`}>
+          {menuGroups.map((group, groupIndex) => (
+            <div key={group.section} className={groupIndex > 0 ? `mt-5 ${!isExpanded ? 'md:mt-2' : ''}` : ''}>
+              {groupIndex > 0 && (
+                <div
+                  className={`mx-2 mb-2 hidden h-px bg-neutral-100 md:block ${isExpanded ? 'md:hidden' : ''}`}
+                  aria-hidden="true"
+                />
               )}
-            </NavLink>
+              <p
+                className={`hidden overflow-hidden px-3 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition-all duration-150 md:block ${
+                  isExpanded ? `${sectionLabelVisibilityClass} pb-2` : 'invisible h-0 max-w-0 pb-0 opacity-0'
+                }`}
+              >
+                {group.section}
+              </p>
+              <p className="px-3 pb-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 md:hidden">
+                {group.section}
+              </p>
+              <div className="space-y-1">
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    onClick={onCloseMobile}
+                    aria-label={!isExpanded ? item.label : undefined}
+                    title={!isExpanded ? item.label : undefined}
+                    className={({ isActive }) =>
+                      `group relative flex items-center rounded-[0.9rem] py-2.5 text-sm font-medium transition-all duration-150 ${
+                        isExpanded
+                          ? 'gap-3 px-3.5 md:justify-start'
+                          : 'gap-3 px-3.5 md:gap-0 md:px-0 md:justify-center'
+                      } ${
+                        isActive
+                          ? 'bg-[#bdeaa5] text-primary-700 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
+                          : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
+                      }`
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <span
+                          className={`absolute left-1 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-linear-to-b from-primary-500 to-primary-700 transition-opacity ${
+                            isActive ? 'opacity-100' : 'opacity-0'
+                          }`}
+                          aria-hidden="true"
+                        />
+                        <item.icon className="size-4.5 shrink-0" aria-hidden="true" />
+                        <span className={`visible max-w-44 overflow-hidden whitespace-nowrap opacity-100 transition-all duration-150 ${desktopLabelVisibilityClass}`}>
+                          {item.label}
+                        </span>
+                        {!isExpanded && <CollapsedTooltip label={item.label} />}
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 

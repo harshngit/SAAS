@@ -44,7 +44,7 @@ export default function Topbar() {
 
   if (!currentUser) return null
 
-  const menuItems = roleMenus[currentUser.role] || []
+  const menuItems = (roleMenus[currentUser.role] || []).flatMap((group) => group.items)
   const activeMenuItem = menuItems
     .filter((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))
     .sort((a, b) => b.path.length - a.path.length)[0]

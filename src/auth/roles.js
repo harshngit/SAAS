@@ -38,6 +38,7 @@ import {
   PieChart,
   UsersRound,
   Activity,
+  Factory,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -70,55 +71,101 @@ export const roleProfileSettingsPath = {
 
 export const roleMenus = {
   [ROLES.SUPER_ADMIN]: [
-    { label: 'Dashboard', path: '/superadmin/dashboard', icon: LayoutDashboard },
-    { label: 'Organizations', path: '/superadmin/organizations', icon: Building2 },
-    { label: 'Plans', path: '/superadmin/plans', icon: CreditCard },
-    { label: 'Platform Analytics', path: '/superadmin/analytics', icon: Activity },
+    {
+      section: 'Main menu',
+      items: [
+        { label: 'Dashboard', path: '/superadmin/dashboard', icon: LayoutDashboard },
+        { label: 'Organizations', path: '/superadmin/organizations', icon: Building2 },
+        { label: 'Plans', path: '/superadmin/plans', icon: CreditCard },
+        { label: 'Platform Analytics', path: '/superadmin/analytics', icon: Activity },
+      ],
+    },
   ],
   [ROLES.ADMIN]: [
-    { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-    { label: 'Company Settings', path: '/admin/company-settings', icon: Store },
-    { label: 'Plans', path: '/admin/plans', icon: CreditCard },
-    { label: 'Staff', path: '/admin/users', icon: Users },
-    { label: 'Customers', path: '/admin/customers', icon: UsersRound },
-    { label: 'Products', path: '/admin/products', icon: Package },
-    { label: 'Inventory', path: '/admin/inventory', icon: Warehouse },
-    { label: 'Vehicle Stock', path: '/admin/vehicle-stock', icon: Car },
-    { label: 'Purchases', path: '/admin/purchases', icon: PackagePlus },
-    { label: 'Deliveries', path: '/admin/deliveries', icon: Truck },
-    { label: 'Expenses', path: '/admin/expenses', icon: Receipt },
-    { label: 'Invoices', path: '/admin/invoices', icon: FileText },
-    { label: 'Reports', path: '/admin/reports', icon: FileSpreadsheet },
-    { label: 'Notifications', path: '/admin/notifications', icon: Bell },
-    { label: 'Audit Logs', path: '/admin/audit-logs', icon: History },
-    { label: 'Settings', path: '/admin/settings', icon: Settings },
+    {
+      section: 'Overview',
+      items: [
+        { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+      ],
+    },
+    {
+      section: 'Sales & Catalog',
+      items: [
+        { label: 'Customers', path: '/admin/customers', icon: UsersRound },
+        { label: 'Suppliers', path: '/admin/suppliers', icon: Factory },
+        { label: 'Products', path: '/admin/products', icon: Package },
+      ],
+    },
+    {
+      section: 'Operations',
+      items: [
+        { label: 'Inventory', path: '/admin/inventory', icon: Warehouse },
+        { label: 'Vehicle Stock', path: '/admin/vehicle-stock', icon: Car },
+        { label: 'Purchases', path: '/admin/purchases', icon: PackagePlus },
+        { label: 'Deliveries', path: '/admin/deliveries', icon: Truck },
+      ],
+    },
+    {
+      section: 'Finance',
+      items: [
+        { label: 'Invoices', path: '/admin/invoices', icon: FileText },
+        { label: 'Expenses', path: '/admin/expenses', icon: Receipt },
+        { label: 'Reports', path: '/admin/reports', icon: FileSpreadsheet },
+      ],
+    },
+    {
+      section: 'Administration',
+      items: [
+        { label: 'Company Settings', path: '/admin/company-settings', icon: Store },
+        { label: 'Plans', path: '/admin/plans', icon: CreditCard },
+        { label: 'Staff', path: '/admin/users', icon: Users },
+        { label: 'Notifications', path: '/admin/notifications', icon: Bell },
+        { label: 'Audit Logs', path: '/admin/audit-logs', icon: History },
+        { label: 'Settings', path: '/admin/settings', icon: Settings },
+      ],
+    },
   ],
   [ROLES.SALES_OFFICER]: [
-    { label: 'Dashboard', path: '/sales/dashboard', icon: LayoutDashboard },
-    { label: 'Customers', path: '/sales/customers', icon: Users },
-    { label: 'Create Order', path: '/sales/orders/create', icon: ShoppingCart },
-    { label: 'Visits', path: '/sales/visits', icon: MapPin },
-    { label: 'Follow-ups', path: '/sales/followups', icon: ClipboardList },
-    { label: 'My Performance', path: '/sales/performance', icon: Target },
+    {
+      section: 'Main menu',
+      items: [
+        { label: 'Dashboard', path: '/sales/dashboard', icon: LayoutDashboard },
+        { label: 'Customers', path: '/sales/customers', icon: Users },
+        { label: 'Create Order', path: '/sales/orders/create', icon: ShoppingCart },
+        { label: 'Visits', path: '/sales/visits', icon: MapPin },
+        { label: 'Follow-ups', path: '/sales/followups', icon: ClipboardList },
+        { label: 'My Performance', path: '/sales/performance', icon: Target },
+      ],
+    },
   ],
   [ROLES.DELIVERY_PARTNER]: [
-    { label: 'Dashboard', path: '/delivery/dashboard', icon: LayoutDashboard },
-    { label: 'Vehicle Loading', path: '/delivery/vehicle-loading', icon: PackageCheck },
-    { label: 'Deliveries', path: '/delivery/deliveries', icon: Truck },
-    { label: 'Expenses', path: '/delivery/expenses', icon: Receipt },
-    { label: 'End of Day Return', path: '/delivery/end-of-day', icon: PackageX },
-    { label: 'Attendance', path: '/delivery/attendance', icon: Calendar },
-    { label: 'Vehicle Stock', path: '/delivery/vehicle-stock', icon: Warehouse },
+    {
+      section: 'Main menu',
+      items: [
+        { label: 'Dashboard', path: '/delivery/dashboard', icon: LayoutDashboard },
+        { label: 'Vehicle Loading', path: '/delivery/vehicle-loading', icon: PackageCheck },
+        { label: 'Deliveries', path: '/delivery/deliveries', icon: Truck },
+        { label: 'Expenses', path: '/delivery/expenses', icon: Receipt },
+        { label: 'End of Day Return', path: '/delivery/end-of-day', icon: PackageX },
+        { label: 'Attendance', path: '/delivery/attendance', icon: Calendar },
+        { label: 'Vehicle Stock', path: '/delivery/vehicle-stock', icon: Warehouse },
+      ],
+    },
   ],
   [ROLES.ACCOUNTANT]: [
-    { label: 'Dashboard', path: '/accounts/dashboard', icon: LayoutDashboard },
-    { label: 'Purchase Invoices', path: '/accounts/invoices/purchases', icon: PackagePlus },
-    { label: 'Sales Invoices', path: '/accounts/invoices/sales', icon: ShoppingCart },
-    { label: 'Record Payment', path: '/accounts/payments/record', icon: Wallet },
-    { label: 'Expense Approval', path: '/accounts/expenses/approval', icon: Receipt },
-    { label: 'Cash Reconciliation', path: '/accounts/reconciliation/cash', icon: IndianRupee },
-    { label: 'Receivables/Payables', path: '/accounts/outstanding', icon: TrendingUp },
-    { label: 'GST Summary', path: '/accounts/gst', icon: FileCheck },
-    { label: 'Financial Reports', path: '/accounts/reports', icon: FileSpreadsheet },
+    {
+      section: 'Main menu',
+      items: [
+        { label: 'Dashboard', path: '/accounts/dashboard', icon: LayoutDashboard },
+        { label: 'Purchase Invoices', path: '/accounts/invoices/purchases', icon: PackagePlus },
+        { label: 'Sales Invoices', path: '/accounts/invoices/sales', icon: ShoppingCart },
+        { label: 'Record Payment', path: '/accounts/payments/record', icon: Wallet },
+        { label: 'Expense Approval', path: '/accounts/expenses/approval', icon: Receipt },
+        { label: 'Cash Reconciliation', path: '/accounts/reconciliation/cash', icon: IndianRupee },
+        { label: 'Receivables/Payables', path: '/accounts/outstanding', icon: TrendingUp },
+        { label: 'GST Summary', path: '/accounts/gst', icon: FileCheck },
+        { label: 'Financial Reports', path: '/accounts/reports', icon: FileSpreadsheet },
+      ],
+    },
   ],
 }

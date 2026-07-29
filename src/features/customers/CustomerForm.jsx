@@ -202,7 +202,7 @@ export default function CustomerForm({
             </div>
           </section>
 
-          {/* <section>
+          <section>
             <div className="mb-3 flex items-center gap-2">
               <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">3</span>
               <p className="text-sm font-semibold text-neutral-900">Ownership and credit</p>
@@ -227,7 +227,7 @@ export default function CustomerForm({
                 </div>
               )}
             </div>
-          </section> */}
+          </section>
         </div>
 
         <div className="mt-6 flex flex-col-reverse gap-3 border-t border-neutral-100 pt-5 sm:flex-row sm:justify-end">
