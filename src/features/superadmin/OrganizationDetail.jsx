@@ -22,7 +22,7 @@ export default function OrganizationDetail() {
         </Button>
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900">{organization.name}</h1>
-          {/* <p className="mt-1 text-sm text-neutral-500">Organization Details</p> */}
+          <p className="mt-1 text-sm text-neutral-500">Organization Details</p>
         </div>
       </div>
 

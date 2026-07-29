@@ -98,6 +98,7 @@ export default function AppRoutes() {
           <Route path="/admin/company-settings" element={<CompanySettings />} />
           <Route path="/admin/plans" element={<AdminPlans />} />
           <Route path="/admin/users" element={<UserManagement />} />
+          <Route path="/admin/customers" element={<CustomerList />} />
           <Route path="/admin/products" element={<ProductList />} />
           <Route path="/admin/inventory" element={<StockBoard />} />
           <Route path="/admin/vehicle-stock" element={<VehicleStockOverview />} />

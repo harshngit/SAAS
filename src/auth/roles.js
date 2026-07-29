@@ -80,6 +80,7 @@ export const roleMenus = {
     { label: 'Company Settings', path: '/admin/company-settings', icon: Store },
     { label: 'Plans', path: '/admin/plans', icon: CreditCard },
     { label: 'Staff', path: '/admin/users', icon: Users },
+    { label: 'Customers', path: '/admin/customers', icon: UsersRound },
     { label: 'Products', path: '/admin/products', icon: Package },
     { label: 'Inventory', path: '/admin/inventory', icon: Warehouse },
     { label: 'Vehicle Stock', path: '/admin/vehicle-stock', icon: Car },

@@ -12,6 +12,56 @@ import { getCurrentProfile } from '../../api/auth'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 
+const getFeatureDescription = (feature) => {
+  const normalizedFeature = feature.toLowerCase()
+
+  if (normalizedFeature.includes('user')) {
+    return normalizedFeature.includes('unlimited')
+      ? 'Invite every team member without seat limits.'
+      : 'Set up the right number of staff accounts for daily work.'
+  }
+
+  if (normalizedFeature.includes('order')) {
+    return normalizedFeature.includes('unlimited')
+      ? 'Keep processing orders as your business grows.'
+      : 'Handle monthly order volume with clear plan limits.'
+  }
+
+  if (normalizedFeature.includes('dashboard')) {
+    return 'Track the most important business activity from one place.'
+  }
+
+  if (normalizedFeature.includes('report')) {
+    return 'Review performance, activity, and business trends faster.'
+  }
+
+  if (normalizedFeature.includes('gst') || normalizedFeature.includes('invoice')) {
+    return 'Create cleaner billing records with tax-ready details.'
+  }
+
+  if (normalizedFeature.includes('support')) {
+    return 'Get help faster when your team needs assistance.'
+  }
+
+  if (normalizedFeature.includes('integration')) {
+    return 'Connect workflows with the tools your business depends on.'
+  }
+
+  if (normalizedFeature.includes('warehouse')) {
+    return 'Manage inventory activity across multiple locations.'
+  }
+
+  if (normalizedFeature.includes('delivery')) {
+    return 'Monitor delivery movement and customer fulfilment status.'
+  }
+
+  if (normalizedFeature.includes('analytics')) {
+    return 'Turn operational data into clearer business decisions.'
+  }
+
+  return 'Included to support smoother day-to-day operations.'
+}
+
 export default function AdminPlans() {
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const [billingCycle, setBillingCycle] = useState('monthly')
@@ -152,9 +202,9 @@ export default function AdminPlans() {
               return (
                 <div
                   key={plan.id}
-                  className={`group flex h-[29rem] overflow-hidden rounded-[1.75rem] border shadow-(--shadow-card) transition-all duration-300 hover:-translate-y-2 hover:shadow-(--shadow-card-hover) ${
+                  className={`group flex min-h-[39rem] rounded-[1.75rem] border shadow-(--shadow-card) transition-all duration-300 hover:-translate-y-2 hover:shadow-(--shadow-card-hover) ${
                     isFeatured
-                      ? 'xl:h-[33rem] border-primary-200 bg-[#eef6eb] ring-1 ring-primary-100 xl:shadow-[0_10px_22px_-12px_rgb(6_59_0/0.22),0_34px_70px_-40px_rgb(6_59_0/0.42)]'
+                      ? 'xl:min-h-[43rem] border-primary-700 bg-[#063B00] ring-1 ring-primary-700 xl:shadow-[0_10px_22px_-12px_rgb(6_59_0/0.22),0_34px_70px_-40px_rgb(6_59_0/0.42)]'
                     : isCurrent
                         ? 'border-primary-300 bg-white ring-2 ring-primary-100'
                         : 'border-neutral-100 bg-white'
@@ -167,17 +217,17 @@ export default function AdminPlans() {
                           <div
                             className={`flex size-10 shrink-0 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 group-hover:scale-105 ${
                               isFeatured
-                                ? 'bg-white text-primary-700 ring-primary-100'
+                                ? 'bg-white/12 text-white ring-white/15'
                                 : 'bg-primary-50 text-primary-700 ring-primary-100'
                             }`}
                           >
                             <Crown className="size-5" aria-hidden="true" />
                           </div>
-                          <h3 className="truncate text-xl font-semibold tracking-tight text-neutral-900">
+                          <h3 className={`truncate text-xl font-semibold tracking-tight ${isFeatured ? 'text-white' : 'text-neutral-900'}`}>
                             {plan.name}
                           </h3>
                         </div>
-                        <p className="mt-4 text-sm leading-6 text-neutral-500">
+                        <p className={`mt-4 text-sm leading-6 ${isFeatured ? 'text-white/70' : 'text-neutral-500'}`}>
                           {plan.features?.[0] || `per ${cycleLabel}`}
                         </p>
                       </div>
@@ -188,30 +238,45 @@ export default function AdminPlans() {
                       {(plan.features || []).map((feature) => (
                         <li
                           key={feature}
-                          className="flex items-start gap-3 text-sm text-neutral-600"
+                          className={`flex items-start gap-3 rounded-2xl px-0 py-1 text-sm transition-colors duration-200 ${
+                            isFeatured ? 'text-white/85 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'
+                          }`}
                         >
-                          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600 ring-1 ring-green-100">
+                          <span
+                            className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full ring-1 transition-transform duration-200 group-hover:scale-105 ${
+                              isFeatured
+                                ? 'bg-white/12 text-white ring-white/15'
+                                : 'bg-green-50 text-green-600 ring-green-100'
+                            }`}
+                          >
                             <Check
                               className="size-3.5"
                               aria-hidden="true"
                             />
                           </span>
-                          <span>{feature}</span>
+                          <span className="min-w-0">
+                            <span className={`block font-medium ${isFeatured ? 'text-white' : 'text-neutral-800'}`}>
+                              {feature}
+                            </span>
+                            <span className={`mt-1 block text-xs leading-5 ${isFeatured ? 'text-white/62' : 'text-neutral-500'}`}>
+                              {getFeatureDescription(feature)}
+                            </span>
+                          </span>
                         </li>
                       ))}
                     </ul>
 
-                    <div className="mt-8 border-t border-neutral-100 pt-6">
+                    <div className={`mt-8 border-t pt-6 ${isFeatured ? 'border-white/15' : 'border-neutral-100'}`}>
                       <div>
-                        <p className="text-4xl font-semibold tracking-tight text-neutral-900">
+                        <p className={`text-4xl font-semibold tracking-tight ${isFeatured ? 'text-white' : 'text-neutral-900'}`}>
                           {formatCurrency(price)}
                           {originalPrice != null && (
-                            <span className="ml-2 align-middle text-base font-medium text-neutral-400 line-through">
+                            <span className={`ml-2 align-middle text-base font-medium line-through ${isFeatured ? 'text-white/35' : 'text-neutral-400'}`}>
                               {formatCurrency(originalPrice)}
                             </span>
                           )}
                         </p>
-                        <p className="mt-1 text-xs text-neutral-500">
+                        <p className={`mt-1 text-xs ${isFeatured ? 'text-white/65' : 'text-neutral-500'}`}>
                           per {cycleLabel}
                         </p>
                       </div>
@@ -244,3 +309,4 @@ export default function AdminPlans() {
     </div>
   )
 }
+
