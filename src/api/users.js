@@ -39,12 +39,22 @@ function authHeader() {
 
 export async function createUser(payload) {
   try {
+    const normalizedEmail = payload.email.trim().toLowerCase()
+    const username = (payload.username || normalizedEmail.split('@')[0] || payload.name).trim()
+    const selectedRole = payload.role
+
     const requestBody = {
       name: payload.name.trim(),
-      email: payload.email.trim().toLowerCase(),
+      email: normalizedEmail,
+      username,
       phone: payload.phone.trim(),
       password: payload.password,
-      role: payload.role,
+      role: selectedRole,
+    }
+
+    const selectedRoleId = payload.role_id || payload.roleId
+    if (selectedRoleId && selectedRoleId !== selectedRole) {
+      requestBody.role_id = selectedRoleId
     }
 
     const { data } = await apiClient.post('/users', requestBody, {
@@ -63,6 +73,24 @@ export async function createUser(payload) {
   }
 }
 
+export async function listRoles() {
+  try {
+    const { data } = await apiClient.get('/roles', {
+      headers: authHeader(),
+    })
+
+    return { success: true, roles: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load roles. Using default staff roles.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function listUsers() {
   try {
     const { data } = await apiClient.get('/users', {
@@ -75,6 +103,85 @@ export async function listUsers() {
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to load staff. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function getUser(userId) {
+  try {
+    const { data } = await apiClient.get(`/users/${userId}`, {
+      headers: authHeader(),
+    })
+
+    return { success: true, user: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load staff details. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function updateUser(userId, payload) {
+  try {
+    const requestBody = {
+      name: payload.name.trim(),
+      email: payload.email.trim().toLowerCase(),
+      username: payload.username.trim(),
+      phone: payload.phone.trim(),
+    }
+
+    const { data } = await apiClient.patch(`/users/${userId}`, requestBody, {
+      headers: authHeader(),
+    })
+
+    return { success: true, user: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to update staff. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function changeUserRole(userId, roleId) {
+  try {
+    const { data } = await apiClient.patch(`/users/${userId}/role`, { role_id: roleId }, {
+      headers: authHeader(),
+    })
+
+    return { success: true, user: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to change staff role. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function updateUserStatus(userId, isActive) {
+  try {
+    const { data } = await apiClient.patch(`/users/${userId}/status`, { is_active: isActive }, {
+      headers: authHeader(),
+    })
+
+    return { success: true, user: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to update staff status. Please try again.',
     )
 
     return { success: false, error: message }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { CalendarDays, Camera, Edit, Plus, Search, Trash2, X } from 'lucide-react'
+import { CalendarDays, Camera, Edit, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -7,8 +8,10 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Modal from '../../components/ui/Modal'
 import { ROLES, roleLabels } from '../../auth/roles'
-import { createUser, listUsers } from '../../api/users'
+import { createUser, listRoles, listUsers, updateUserStatus } from '../../api/users'
+import { getSystemRoleFromRoleName, normalizeApiUser, staffRoleOptions } from './userRoleUtils'
 
 const initialUsers = [
   { id: 1, name: 'Amit Sharma', email: 'amit@aquapure.com', role: ROLES.ADMIN, status: 'active' },
@@ -17,21 +20,10 @@ const initialUsers = [
   { id: 4, name: 'Sneha Desai', email: 'sneha@aquapure.com', role: ROLES.ACCOUNTANT, status: 'active' },
 ]
 
-const staffRoleOptions = [
-  ROLES.SALES_OFFICER,
-  ROLES.DELIVERY_PARTNER,
-  ROLES.ACCOUNTANT,
-]
-
 const staffRoleSelectOptions = staffRoleOptions.map((role) => ({
   value: role,
   label: roleLabels[role],
 }))
-
-const staffFilterTabs = [
-  { value: 'all', label: 'All' },
-  ...staffRoleSelectOptions,
-]
 
 const getInitials = (name = '') =>
   name
@@ -42,7 +34,9 @@ const getInitials = (name = '') =>
     .toUpperCase()
 
 export default function UserManagement() {
+  const navigate = useNavigate()
   const [users, setUsers] = useState(initialUsers)
+  const [roles, setRoles] = useState([])
   const [activeRoleFilter, setActiveRoleFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
@@ -50,66 +44,85 @@ export default function UserManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [editingUser, setEditingUser] = useState(null)
+  const [statusUser, setStatusUser] = useState(null)
+  const [statusError, setStatusError] = useState('')
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    username: '',
     phone: '',
     role: ROLES.SALES_OFFICER,
+    role_id: '',
     password: '',
     profilePictureName: '',
   })
 
-  const handleOpenModal = (user = null) => {
-    setEditingUser(user)
+  const apiRoleOptions = roles
+    .map((role) => {
+      const systemRole = getSystemRoleFromRoleName(role.name)
+      return {
+        value: systemRole,
+        label: role.name,
+        roleId: role.id,
+      }
+    })
+    .filter((role) => staffRoleOptions.includes(role.value))
+
+  const effectiveRoleSelectOptions = apiRoleOptions.length > 0 ? apiRoleOptions : staffRoleSelectOptions
+  const effectiveFilterTabs = [
+    { value: 'all', label: 'All' },
+    ...effectiveRoleSelectOptions.map((role) => ({ value: role.value, label: role.label })),
+  ]
+
+  const handleOpenModal = () => {
     setFormError('')
     setFormData(
-      user
-        ? { ...user, phone: user.phone || '', profilePictureName: user.profilePictureName || '' }
-        : { name: '', email: '', phone: '', role: ROLES.SALES_OFFICER, password: '', profilePictureName: '' },
+      {
+        name: '',
+        email: '',
+        username: '',
+        phone: '',
+        role: ROLES.SALES_OFFICER,
+        role_id: effectiveRoleSelectOptions.find((role) => role.value === ROLES.SALES_OFFICER)?.roleId || '',
+        password: '',
+        profilePictureName: '',
+      },
     )
     setIsModalOpen(true)
   }
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
-    setEditingUser(null)
     setFormError('')
   }
-
-  const normalizeApiUser = (user) => ({
-    id: user.id,
-    organizationId: user.organization_id,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    role: user.role,
-    status: user.is_active ? 'active' : 'inactive',
-    createdAt: user.created_at,
-  })
 
   useEffect(() => {
     let isMounted = true
 
-    async function loadUsers() {
+    async function loadStaffData() {
       setIsLoadingUsers(true)
       setListError('')
 
-      const result = await listUsers()
+      const [usersResult, rolesResult] = await Promise.all([listUsers(), listRoles()])
 
       if (!isMounted) return
 
       setIsLoadingUsers(false)
 
-      if (!result.success) {
-        setListError(result.error)
+      if (rolesResult.success) {
+        setRoles(rolesResult.roles || [])
+      }
+
+      if (!usersResult.success) {
+        setListError(usersResult.error)
         return
       }
 
-      setUsers((result.users || []).map(normalizeApiUser))
+      setUsers((usersResult.users || []).map(normalizeApiUser))
     }
 
-    loadUsers()
+    loadStaffData()
 
     return () => {
       isMounted = false
@@ -119,12 +132,6 @@ export default function UserManagement() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setFormError('')
-
-    if (editingUser) {
-      setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...formData } : u))
-      handleCloseModal()
-      return
-    }
 
     setIsSaving(true)
     const result = await createUser(formData)
@@ -149,6 +156,40 @@ export default function UserManagement() {
     if (confirm('Are you sure you want to delete this user?')) {
       setUsers(users.filter(u => u.id !== id))
     }
+  }
+
+  const handleOpenStatusModal = (user) => {
+    setStatusUser(user)
+    setStatusError('')
+  }
+
+  const handleCloseStatusModal = () => {
+    if (isUpdatingStatus) return
+    setStatusUser(null)
+    setStatusError('')
+  }
+
+  const handleChangeStatus = async () => {
+    if (!statusUser) return
+
+    const nextIsActive = statusUser.status !== 'active'
+    setIsUpdatingStatus(true)
+    setStatusError('')
+
+    const result = await updateUserStatus(statusUser.id, nextIsActive)
+    setIsUpdatingStatus(false)
+
+    if (!result.success) {
+      setStatusError(result.error)
+      return
+    }
+
+    const updatedUser = result.user
+      ? normalizeApiUser(result.user)
+      : { ...statusUser, status: nextIsActive ? 'active' : 'inactive' }
+
+    setUsers((currentUsers) => currentUsers.map((user) => (user.id === statusUser.id ? updatedUser : user)))
+    setStatusUser(null)
   }
 
   const filteredUsers = users.filter((user) => {
@@ -244,21 +285,25 @@ export default function UserManagement() {
                       required
                     />
                     <Input
+                      label="Username"
+                      value={formData.username}
+                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      required
+                    />
+                    <Input
                       label="Phone Number"
                       type="tel"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       required
                     />
-                    {!editingUser && (
-                      <Input
-                        label="Password"
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        required
-                      />
-                    )}
+                    <Input
+                      label="Password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      required
+                    />
                   </div>
                 </div>
 
@@ -270,12 +315,19 @@ export default function UserManagement() {
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-1">
                     <Select
                       label="Role"
-                      options={staffRoleSelectOptions}
+                      options={effectiveRoleSelectOptions}
                       placeholder="Select role"
                       name="role"
                       className="w-[50%]"
                       value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                      onChange={(e) => {
+                        const selectedRole = effectiveRoleSelectOptions.find((role) => role.value === e.target.value)
+                        setFormData({
+                          ...formData,
+                          role: e.target.value,
+                          role_id: selectedRole?.roleId || '',
+                        })
+                      }}
                     />
                     <label className="flex w-[50%] items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-3.5 text-sm text-neutral-600">
                       <input
@@ -301,7 +353,7 @@ export default function UserManagement() {
                 Cancel
               </Button>
               <Button type="submit" loading={isSaving}>
-                {editingUser ? 'Update User' : 'Add New User'}
+                Add New User
               </Button>
             </div>
           </form>
@@ -312,11 +364,49 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-5">
+      <Modal
+        isOpen={Boolean(statusUser)}
+        onClose={handleCloseStatusModal}
+        title="Change Status"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={handleCloseStatusModal} disabled={isUpdatingStatus}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleChangeStatus} loading={isUpdatingStatus}>
+              {statusUser?.status === 'active' ? 'Set Inactive' : 'Set Active'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-neutral-500">Current status</p>
+            <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
+              <div>
+                <p className="font-medium text-neutral-900">{statusUser?.name}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">{statusUser?.email}</p>
+              </div>
+              <Badge variant={statusUser?.status === 'active' ? 'success' : 'danger'}>
+                {statusUser?.status === 'active' ? 'active' : 'inactive'}
+              </Badge>
+            </div>
+          </div>
+          <p className="text-sm leading-6 text-neutral-600">
+            This will change the user to {statusUser?.status === 'active' ? 'inactive' : 'active'}.
+          </p>
+          {statusError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {statusError}
+            </div>
+          )}
+        </div>
+      </Modal>
       <Card className="p-0">
         <div className="border-b border-neutral-100 px-5 py-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-5">
-                {staffFilterTabs.map((tab) => {
+                {effectiveFilterTabs.map((tab) => {
                   const isActive = activeRoleFilter === tab.value
 
                   return (
@@ -338,7 +428,7 @@ export default function UserManagement() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={() => handleOpenModal()} size="sm">
+              <Button onClick={handleOpenModal} size="sm">
                 <Plus className="size-4" />
                 Add Staff
               </Button>
@@ -364,7 +454,7 @@ export default function UserManagement() {
                 />
               </div>
               <Select
-                options={staffFilterTabs}
+                options={effectiveFilterTabs}
                 value={activeRoleFilter}
                 onChange={(event) => setActiveRoleFilter(event.target.value)}
                 className="sm:w-48"
@@ -387,7 +477,12 @@ export default function UserManagement() {
                   setIsLoadingUsers(true)
                   setListError('')
                   const result = await listUsers()
+                  const rolesResult = await listRoles()
                   setIsLoadingUsers(false)
+
+                  if (rolesResult.success) {
+                    setRoles(rolesResult.roles || [])
+                  }
 
                   if (!result.success) {
                     setListError(result.error)
@@ -426,14 +521,19 @@ export default function UserManagement() {
                           {getInitials(user.name)}
                         </div>
                         <div>
-                          <span className="font-medium text-neutral-900">{user.name}</span>
+                          <Link
+                            to={`/admin/users/${user.id}`}
+                            className="font-medium text-neutral-900 transition-colors hover:text-primary-700"
+                          >
+                            {user.name}
+                          </Link>
                           {user.phone && <p className="mt-0.5 text-xs text-neutral-400">{user.phone}</p>}
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-neutral-600">{user.email}</td>
                     <td className="px-4 py-3.5">
-                      <Badge variant="primary">{roleLabels[user.role]}</Badge>
+                      <Badge variant="primary">{roleLabels[user.role] || user.roleDetail?.name || user.role}</Badge>
                     </td>
                     <td className="px-4 py-3.5">
                       <Badge variant={user.status === 'active' ? 'success' : 'danger'}>
@@ -444,7 +544,8 @@ export default function UserManagement() {
                     <td className="px-4 py-3.5 text-right">
                       <ActionMenu
                         items={[
-                          { label: 'Edit', icon: Edit, onClick: () => handleOpenModal(user) },
+                          { label: 'Edit', icon: Edit, onClick: () => navigate(`/admin/users/edit/${user.id}`) },
+                          { label: 'Change Status', icon: RefreshCw, onClick: () => handleOpenStatusModal(user) },
                           { label: 'Delete', icon: Trash2, danger: true, onClick: () => handleDelete(user.id) },
                         ]}
                       />

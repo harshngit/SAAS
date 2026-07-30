@@ -5,11 +5,11 @@ import {
   ChevronDown,
   CreditCard,
   LifeBuoy,
+  Pencil,
   Save,
   Trash2,
   Upload,
   UserRound,
-  UsersRound,
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -45,34 +45,28 @@ const initialCompanyData = {
 
 const settingsNav = [
   {
+    id: 'account',
+    label: 'Account',
+    icon: UserRound,
+    description: 'Manage primary admin registration details.',
+  },
+  {
     id: 'general',
     label: 'General Information',
     icon: Building2,
     description: 'Update public company details used across invoices and reports.',
   },
   {
-    id: 'notifications',
-    label: 'Notifications',
-    icon: Bell,
-    description: 'Manage company alerts and communication settings.',
-  },
-  {
-    id: 'account',
-    label: 'Account',
-    icon: UserRound,
-    description: 'Review workspace account ownership and access details.',
-  },
-  {
-    id: 'account-manager',
-    label: 'Account Manager',
-    icon: UsersRound,
-    description: 'Manage the primary account manager for this company.',
-  },
-  {
     id: 'billings',
     label: 'Billings',
     icon: CreditCard,
     description: 'Review billing profile, tax, and subscription information.',
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: Bell,
+    description: 'Manage company alerts and communication settings.',
   },
   {
     id: 'support',
@@ -118,13 +112,17 @@ export default function CompanySettings() {
   const currentUser = useAuthStore((state) => state.currentUser)
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const [companyData, setCompanyData] = useState(() => buildCompanyDataFromProfile(currentUser, currentOrganization))
-  const [activeTab, setActiveTab] = useState('general')
-  const [isAdminDetailsOpen, setIsAdminDetailsOpen] = useState(true)
-  const [isOrganizationDetailsOpen, setIsOrganizationDetailsOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('account')
+  const [editingSections, setEditingSections] = useState({ account: false, general: false })
+  const [isOrganizationDetailsOpen, setIsOrganizationDetailsOpen] = useState(true)
   const [isBusinessDetailsOpen, setIsBusinessDetailsOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [profileError, setProfileError] = useState('')
   const activeNavItem = settingsNav.find((item) => item.id === activeTab) || settingsNav[0]
+  const isEditableSection = activeTab === 'account' || activeTab === 'general'
+  const isActiveSectionEditing = Boolean(editingSections[activeTab])
+  const isAccountEditing = editingSections.account
+  const isGeneralEditing = editingSections.general
 
   const resetCompanyData = useCallback(() => {
     setCompanyData(buildCompanyDataFromProfile(currentUser, currentOrganization))
@@ -164,12 +162,27 @@ export default function CompanySettings() {
     setCompanyData(prev => ({ ...prev, [name]: nextValue }))
   }
 
+  const handleEditProfile = () => {
+    if (!isEditableSection) return
+    setEditingSections((prev) => ({ ...prev, [activeTab]: true }))
+  }
+
+  const handleCancel = () => {
+    resetCompanyData()
+    if (isEditableSection) {
+      setEditingSections((prev) => ({ ...prev, [activeTab]: false }))
+    }
+  }
+
   const handleSave = async () => {
     setIsSaving(true)
     // Mock save
     await new Promise(resolve => setTimeout(resolve, 1000))
     alert('Company settings saved successfully!')
     setIsSaving(false)
+    if (isEditableSection) {
+      setEditingSections((prev) => ({ ...prev, [activeTab]: false }))
+    }
   }
 
   return (
@@ -178,15 +191,6 @@ export default function CompanySettings() {
         <div>
           <h1 className="font-(--font-display) text-2xl font-bold tracking-tight text-neutral-900">Settings</h1>
           <p className="mt-1 text-sm text-neutral-500">Manage your company information and workspace details.</p>
-        </div>
-        <div className="translate-y-2 flex flex-wrap items-center gap-2 ">
-          <Button variant="outline" size="sm" onClick={resetCompanyData}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleSave} loading={isSaving}>
-            <Save className="size-3.5" />
-            Save Changes
-          </Button>
         </div>
       </div>
 
@@ -227,15 +231,41 @@ export default function CompanySettings() {
 
           <div className="p-5 sm:p-7">
             <div className="border-b border-neutral-100 pb-5">
-              <h2 className="font-(--font-display) text-xl font-semibold tracking-tight text-neutral-900">
-                {activeNavItem.label}
-              </h2>
-              <p className="mt-1 text-sm text-neutral-500">{activeNavItem.description}</p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="font-(--font-display) text-xl font-semibold tracking-tight text-neutral-900">
+                    {activeNavItem.label}
+                  </h2>
+                  <p className="mt-1 text-sm text-neutral-500">{activeNavItem.description}</p>
+                </div>
+                {isEditableSection && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isActiveSectionEditing ? (
+                      <>
+                        <Button variant="outline" size="sm" onClick={handleCancel}>
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={handleSave} loading={isSaving}>
+                          <Save className="size-3.5" />
+                          Save Changes
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" onClick={handleEditProfile}>
+                        <Pencil className="size-3.5" />
+                        Edit Profile
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {activeTab === 'general' ? (
-              <>
-                <section className="border-b border-neutral-100 py-2">
+            {activeTab === 'account' ? (
+              <section className="pb-5">
+                {/* <h3 className="text-sm font-semibold text-neutral-900">Admin Registration</h3> */}
+
+                <section className="border-b border-neutral-100 py-3">
                   {/* <p className="text-sm font-semibold text-neutral-900">Company logo upload</p> */}
                   <div className="mt-1 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-center gap-4">
@@ -249,11 +279,11 @@ export default function CompanySettings() {
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Button size="sm">
+                      <Button size="sm" disabled={!isAccountEditing}>
                         <Upload className="size-4" />
                         Upload New Logo
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" disabled={!isAccountEditing}>
                         <Trash2 className="size-4" />
                         Delete
                       </Button>
@@ -261,64 +291,42 @@ export default function CompanySettings() {
                   </div>
                 </section>
 
-                <section className="border-b border-neutral-100 py-5">
-                  <button
-                    type="button"
-                    aria-expanded={isAdminDetailsOpen}
-                    onClick={() => setIsAdminDetailsOpen((prev) => !prev)}
-                    className="flex w-full items-center justify-between rounded-2xl border border-neutral-100 bg-neutral-50 px-4 py-3 text-left transition-colors hover:bg-neutral-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">
-                        1
-                      </span>
-                      <div>
-                        <h3 className="text-sm font-semibold text-neutral-900">Admin Details</h3>
-                        <p className="mt-0.5 text-xs text-neutral-500">Manage primary admin registration details.</p>
-                      </div>
-                    </div>
-                    <ChevronDown
-                      className={`size-4 text-neutral-500 transition-transform ${isAdminDetailsOpen ? 'rotate-180' : ''}`}
-                      aria-hidden="true"
-                    />
-                  </button>
-
-                  {isAdminDetailsOpen && (
-                    <div className="mt-5">
-                      <h3 className="text-sm font-semibold text-neutral-900">Admin Registration</h3>
-                      <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
-                        <Input
-                          label="Admin Name"
-                          name="adminName"
-                          value={companyData.adminName}
-                          onChange={handleChange}
-                        />
-                        <Input
-                          label="Email Address"
-                          name="adminEmail"
-                          type="email"
-                          value={companyData.adminEmail}
-                          onChange={handleChange}
-                        />
-                        <Input
-                          label="Password"
-                          name="adminPassword"
-                          type="password"
-                          placeholder="Enter your password"
-                          value={companyData.adminPassword}
-                          onChange={handleChange}
-                        />
-                        <Input
-                          label="Phone Number"
-                          name="adminPhone"
-                          value={companyData.adminPhone}
-                          onChange={handleChange}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </section>
-
+                <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
+                  <Input
+                    label="Admin Name"
+                    name="adminName"
+                    value={companyData.adminName}
+                    onChange={handleChange}
+                    disabled={!isAccountEditing}
+                  />
+                  <Input
+                    label="Email Address"
+                    name="adminEmail"
+                    type="email"
+                    value={companyData.adminEmail}
+                    onChange={handleChange}
+                    disabled={!isAccountEditing}
+                  />
+                  <Input
+                    label="Password"
+                    name="adminPassword"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={companyData.adminPassword}
+                    onChange={handleChange}
+                    disabled={!isAccountEditing}
+                  />
+                  <Input
+                    label="Phone Number"
+                    name="adminPhone"
+                    value={companyData.adminPhone}
+                    onChange={handleChange}
+                    disabled={!isAccountEditing}
+                  />
+                </div>
+              </section>
+            ) : activeTab === 'general' ? (
+              <>
                 <section className="border-b border-neutral-100 py-5">
                   <button
                     type="button"
@@ -328,7 +336,7 @@ export default function CompanySettings() {
                   >
                     <div className="flex items-center gap-3">
                       <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">
-                        2
+                        1
                       </span>
                       <div>
                         <h3 className="text-sm font-semibold text-neutral-900">Organization Details</h3>
@@ -352,6 +360,7 @@ export default function CompanySettings() {
                           name="name"
                           value={companyData.name}
                           onChange={handleChange}
+                          disabled={!isGeneralEditing}
                         />
                         <Select
                           label="Business Type"
@@ -360,18 +369,21 @@ export default function CompanySettings() {
                           value={companyData.businessType}
                           options={businessTypeOptions}
                           onChange={handleChange}
+                          disabled={!isGeneralEditing}
                         />
                         <Input
                           label="GST Number"
                           name="gstin"
                           value={companyData.gstin}
                           onChange={handleChange}
+                          disabled={!isGeneralEditing}
                         />
                         <Input
                           label="PAN Number (if applicable)"
                           name="panNumber"
                           value={companyData.panNumber}
                           onChange={handleChange}
+                          disabled={!isGeneralEditing}
                         />
                         <Select
                           label="Financial Year"
@@ -380,6 +392,7 @@ export default function CompanySettings() {
                           value={companyData.financialYear}
                           options={financialYearOptions}
                           onChange={handleChange}
+                          disabled={!isGeneralEditing}
                         />
                       </div>
                     </div>
@@ -395,7 +408,7 @@ export default function CompanySettings() {
                   >
                     <div className="flex items-center gap-3">
                       <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">
-                        3
+                        2
                       </span>
                       <div>
                         <h3 className="text-sm font-semibold text-neutral-900">Business Details</h3>
@@ -418,6 +431,7 @@ export default function CompanySettings() {
                           as="textarea"
                           value={companyData.billingAddress}
                           onChange={handleChange}
+                          disabled={!isGeneralEditing}
                         />
                         <label className="flex items-center gap-3 text-sm font-medium text-neutral-700">
                           <input
@@ -425,6 +439,7 @@ export default function CompanySettings() {
                             name="shippingAddressSameAsBilling"
                             checked={companyData.shippingAddressSameAsBilling}
                             onChange={handleChange}
+                            disabled={!isGeneralEditing}
                             className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500/20"
                           />
                           Shipping/Warehouse address same as billing address
@@ -439,7 +454,7 @@ export default function CompanySettings() {
                               : companyData.shippingAddress
                           }
                           onChange={handleChange}
-                          disabled={companyData.shippingAddressSameAsBilling}
+                          disabled={!isGeneralEditing || companyData.shippingAddressSameAsBilling}
                         />
                         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                           <Input
@@ -447,6 +462,7 @@ export default function CompanySettings() {
                             name="website"
                             value={companyData.website}
                             onChange={handleChange}
+                            disabled={!isGeneralEditing}
                           />
                           <Input
                             label="Invoice Prefix"
@@ -454,6 +470,7 @@ export default function CompanySettings() {
                             placeholder="e.g. INV"
                             value={companyData.invoicePrefix}
                             onChange={handleChange}
+                            disabled={!isGeneralEditing}
                           />
                         </div>
                       </div>

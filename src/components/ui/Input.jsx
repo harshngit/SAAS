@@ -16,7 +16,7 @@ const Input = forwardRef(function Input(
         <Component
           ref={ref}
           type={isPassword ? (showPassword ? 'text' : 'password') : type}
-          className={`w-full rounded-xl border bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition-all placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-4 ${
+          className={`w-full rounded-xl border bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition-all placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:placeholder:text-neutral-300 ${
             isPassword ? 'pr-10' : ''
           } ${
             error

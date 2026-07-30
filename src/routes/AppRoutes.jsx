@@ -12,6 +12,8 @@ import { useAuthStore } from '../store/authStore'
 import { ROLES, roleHomePath } from '../auth/roles'
 import CompanySettings from '../features/company/CompanySettings'
 import UserManagement from '../features/users/UserManagement'
+import UserDetail from '../features/users/UserDetail'
+import UserEdit from '../features/users/UserEdit'
 import ProductList from '../features/products/ProductList'
 import ProductDetail from '../features/products/ProductDetail'
 import StockBoard from '../features/inventory/StockBoard'
@@ -103,6 +105,8 @@ export default function AppRoutes() {
           <Route path="/admin/company-settings" element={<CompanySettings />} />
           <Route path="/admin/plans" element={<AdminPlans />} />
           <Route path="/admin/users" element={<UserManagement />} />
+          <Route path="/admin/users/edit/:user_id" element={<UserEdit />} />
+          <Route path="/admin/users/:user_id" element={<UserDetail />} />
           <Route path="/admin/customers" element={<CustomerList />} />
           <Route path="/admin/customers/:id" element={<CustomerDetail />} />
           <Route path="/admin/suppliers" element={<SupplierList />} />
