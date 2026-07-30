@@ -83,7 +83,7 @@ export default function ProductDetail() {
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-start gap-4">
           <Button variant="secondary" size="sm" onClick={() => navigate('/admin/products')}>
             <ArrowLeft className="size-4" aria-hidden="true" />
             Back

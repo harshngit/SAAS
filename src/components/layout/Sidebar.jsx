@@ -55,7 +55,7 @@ export default function Sidebar({
       >
         <span
           aria-hidden="true"
-          className="absolute -right-[1.4rem] top-1/2 z-10 hidden size-8 -translate-y-1/2 rounded-full bg-[#eef6eb] md:block"
+          className="absolute -right-[0.6rem] top-1/2 z-10 hidden size-8 -translate-y-1/2 rounded-full bg-white md:block"
         />
         <button
           type="button"
@@ -63,7 +63,7 @@ export default function Sidebar({
           aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
           aria-expanded={isExpanded}
           aria-controls={id}
-          className="group absolute right-[-0.65rem] top-1/2 z-20 hidden size-6 -translate-y-1/2 items-center justify-center rounded-full bg-white text-primary-700 shadow-(--shadow-card) ring-1 ring-primary-100 transition-colors hover:text-primary-900 focus:outline-none focus:ring-4 focus:ring-primary-500/15 md:flex"
+          className="group absolute right-[-0.65rem] top-1/2 z-20 hidden size-7 -translate-y-1/2 items-center justify-center rounded-full bg-white text-primary-700 shadow-(--shadow-card) ring-1 ring-primary-100 transition-colors hover:text-primary-900 focus:outline-none focus:ring-4 focus:ring-primary-500/15 md:flex"
         >
           {isExpanded ? (
             <ChevronLeft className="size-4 transition-transform duration-200 group-hover:-translate-x-0.5" />

@@ -149,7 +149,7 @@ export default function CustomerForm({
               type="button"
               variant="outline"
               size="sm"
-              className="border-[#063B00] bg-[#063B00] text-[#063B00] hover:border-[#063B00] hover:bg-[#052f00] hover:text-white"
+              className="border-[#063B00]! bg-white! text-[#063B00]! hover:bg-primary-900! hover:text-white!"
               onClick={onClose}
             >
               Back to Customers
