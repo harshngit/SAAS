@@ -55,7 +55,7 @@ export default function Sidebar({
       >
         <span
           aria-hidden="true"
-          className="absolute -right-[0.6rem] top-1/2 z-10 hidden size-8 -translate-y-1/2 rounded-full bg-white md:block"
+          className="absolute right-[-0.6rem] top-1/2 z-10 hidden size-8 -translate-y-1/2 rounded-full bg-white md:block"
         />
         <button
           type="button"
