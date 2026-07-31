@@ -99,8 +99,8 @@ export const roleMenus = {
     {
       section: 'Operations',
       items: [
-        { label: 'Orders', path: '/admin/orders', icon: ShoppingCart },
         { label: 'Inventory', path: '/admin/inventory', icon: Warehouse },
+        { label: 'Orders', path: '/admin/orders', icon: ShoppingCart },
         { label: 'Vehicle Stock', path: '/admin/vehicle-stock', icon: Car },
         { label: 'Purchases', path: '/admin/purchases', icon: PackagePlus },
         { label: 'Deliveries', path: '/admin/deliveries', icon: Truck },
