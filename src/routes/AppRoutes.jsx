@@ -28,6 +28,8 @@ import CustomerDetail from '../features/customers/CustomerDetail'
 import SupplierList from '../features/suppliers/SupplierList'
 import SupplierDetail from '../features/suppliers/SupplierDetail'
 import CreateSalesOrder from '../features/orders/CreateSalesOrder'
+import OrderList from '../features/orders/OrderList'
+import OrderDetail from '../features/orders/OrderDetail'
 import VisitCheckIn from '../features/visits/VisitCheckIn'
 import FollowUpsList from '../features/followups/FollowUpsList'
 import MyTargets from '../features/performance/MyTargets'
@@ -102,6 +104,9 @@ export default function AppRoutes() {
           }
         >
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/orders" element={<OrderList />} />
+          <Route path="/admin/orders/create" element={<CreateSalesOrder />} />
+          <Route path="/admin/orders/:id" element={<OrderDetail />} />
           <Route path="/admin/company-settings" element={<CompanySettings />} />
           <Route path="/admin/plans" element={<AdminPlans />} />
           <Route path="/admin/users" element={<UserManagement />} />

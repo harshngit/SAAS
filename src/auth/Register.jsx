@@ -14,6 +14,7 @@ const phonePattern = /^\+?[0-9][0-9\s-]{9,14}$/
 
 const schema = z
   .object({
+    organizationName: z.string().trim().min(2, 'Organization name is required'),
     phone: z.string().trim().regex(phonePattern, 'Enter a valid phone number'),
     email: z.string().email('Enter a valid email'),
     adminName: z.string().min(2, 'Your name is required'),
@@ -89,6 +90,11 @@ export default function Register() {
                     <h2 className="text-base font-semibold text-neutral-950">Admin Registration</h2>
                   </div>
                   <div className="mt-5 grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2">
+                    <Input
+                      label="Organization Name"
+                      error={errors.organizationName?.message}
+                      {...register('organizationName')}
+                    />
                     <Input label="Admin Name" error={errors.adminName?.message} {...register('adminName')} />
                     <Input label="Email Address" type="email" error={errors.email?.message} {...register('email')} />
                     <Input

@@ -65,39 +65,12 @@ export async function login({ email, phone, password, otp }) {
 export async function registerOrganization(payload) {
   try {
     const requestBody = {
-      phone: payload.phone.trim(),
-      email: payload.email.trim().toLowerCase(),
+      organization_name: payload.organizationName.trim(),
       admin_name: payload.adminName.trim(),
+      email: payload.email.trim().toLowerCase(),
+      phone: payload.phone.trim(),
       password: payload.password,
       role: 'admin',
-    }
-
-    if (payload.companyName) {
-      requestBody.organization_name = payload.companyName.trim()
-    }
-
-    if (payload.businessType) {
-      requestBody.business_type = payload.businessType
-    }
-
-    if (payload.gstNumber) {
-      requestBody.gst_number = payload.gstNumber.trim().toUpperCase()
-    }
-
-    if (payload.panNumber) {
-      requestBody.pan_number = payload.panNumber.trim().toUpperCase()
-    }
-
-    if (payload.billingAddress) {
-      requestBody.address = payload.billingAddress.trim()
-    }
-
-    if (payload.financialYear) {
-      requestBody.financial_year = payload.financialYear
-    }
-
-    if (payload.companyLogo) {
-      requestBody.logo_url = ''
     }
 
     const { data } = await apiClient.post('/auth/register', requestBody)

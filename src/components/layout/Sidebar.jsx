@@ -63,7 +63,7 @@ export default function Sidebar({
           aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
           aria-expanded={isExpanded}
           aria-controls={id}
-          className="group absolute right-[-0.65rem] top-1/2 z-20 hidden size-7 -translate-y-1/2 items-center justify-center rounded-full bg-white text-primary-700 shadow-(--shadow-card) ring-1 ring-primary-100 transition-colors hover:text-primary-900 focus:outline-none focus:ring-4 focus:ring-primary-500/15 md:flex"
+          className="group absolute right-[-0.65rem] top-1/2 z-20 hidden size-7 -translate-y-1/2 items-center justify-center rounded-full bg-white text-primary-700 shadow-(--shadow-card) ring-2 ring-neutral-200 transition-colors hover:text-primary-900 focus:outline-none focus:ring-2 focus:ring-neutral-200 md:flex"
         >
           {isExpanded ? (
             <ChevronLeft className="size-4 transition-transform duration-200 group-hover:-translate-x-0.5" />

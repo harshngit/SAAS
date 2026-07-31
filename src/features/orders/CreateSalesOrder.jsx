@@ -1,44 +1,41 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Package, CheckCircle, AlertCircle } from 'lucide-react'
 import Button from '../../components/ui/Button'
-import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
-
-const mockProducts = [
-  { id: 1, name: 'AquaPure 250ml', sku: 'WTR-250', price: 10, mrp: 15, stock: 1500, variants: ['250ml'] },
-  { id: 2, name: 'AquaPure 500ml', sku: 'WTR-500', price: 18, mrp: 25, stock: 200, variants: ['500ml'] },
-  { id: 3, name: 'AquaPure 1L', sku: 'WTR-1L', price: 35, mrp: 45, stock: 800, variants: ['1L'] },
-]
-
-const mockCustomers = [
-  { id: 1, name: 'Rajesh Kumar', email: 'rajesh@example.com' },
-  { id: 2, name: 'Priya Desai', email: 'priya@example.com' },
-  { id: 3, name: 'Amit Sharma', email: 'amit@example.com' },
-]
-
-const initialOrders = [
-  { id: 1, customerId: 1, customerName: 'Rajesh Kumar', date: '2024-07-17', total: 500, items: [{ productId: 1, name: 'AquaPure 250ml', quantity: 50, price: 10 }] },
-]
+import { products } from '../../mockData/products'
+import { customers } from '../../mockData/customers'
+import { buildOrder, orders as seedOrders } from '../../mockData/orders'
+import { formatCurrency } from '../../utils/format'
 
 export default function CreateSalesOrder() {
-  const [orders, setOrders] = useState(initialOrders)
+  const navigate = useNavigate()
+  const [orders, setOrders] = useState(seedOrders)
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [orderItems, setOrderItems] = useState([{ productId: null, quantity: 1 }])
   const [discount, setDiscount] = useState(0)
   const [showOrderList, setShowOrderList] = useState(true)
 
   const calculateItemTotal = (item) => {
-    const product = mockProducts.find(p => p.id === item.productId)
-    return product ? product.price * item.quantity : 0
+    const product = products.find((p) => p.id === item.productId)
+    return product ? product.sellingPrice * item.quantity : 0
   }
 
   const calculateSubtotal = () => {
     return orderItems.reduce((sum, item) => sum + calculateItemTotal(item), 0)
   }
 
+  const calculateGst = () => {
+    return orderItems.reduce((sum, item) => {
+      const product = products.find((p) => p.id === item.productId)
+      return sum + (product ? product.sellingPrice * item.quantity * product.gstRate : 0)
+    }, 0)
+  }
+
   const calculateTotal = () => {
     const subtotal = calculateSubtotal()
-    return subtotal - (subtotal * discount / 100)
+    const discountAmount = (subtotal * discount) / 100
+    return subtotal - discountAmount + calculateGst()
   }
 
   const handleAddItem = () => {
@@ -58,23 +55,28 @@ export default function CreateSalesOrder() {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!selectedCustomer) return alert('Please select a customer')
-    if (orderItems.some(item => !item.productId)) return alert('Please select all products')
-    const newOrder = {
-      id: Date.now(),
+    if (orderItems.some((item) => !item.productId)) return alert('Please select all products')
+
+    const newOrder = buildOrder({
+      id: `ORD-${Date.now()}`,
+      orderNumber: `SO-${new Date().getFullYear()}-${1000 + orders.length + 1}`,
       customerId: selectedCustomer.id,
       customerName: selectedCustomer.name,
-      date: new Date().toISOString().split('T')[0],
-      total: calculateTotal(),
-      items: orderItems.map(item => {
-        const product = mockProducts.find(p => p.id === item.productId)
-        return { productId: item.productId, name: product?.name, quantity: item.quantity, price: product?.price }
-      }),
-    }
+      status: 'Draft',
+      orderDate: new Date().toISOString().slice(0, 10),
+      expectedDeliveryDate: null,
+      amountPaid: 0,
+      discountPercent: discount,
+      lines: orderItems.map((item) => ({ productId: item.productId, qty: item.quantity })),
+    })
+
+    seedOrders.unshift(newOrder)
     setOrders([newOrder, ...orders])
     setSelectedCustomer(null)
     setOrderItems([{ productId: null, quantity: 1 }])
     setDiscount(0)
     alert('Order created successfully!')
+    navigate('/admin/orders')
   }
 
   return (
@@ -98,16 +100,16 @@ export default function CreateSalesOrder() {
               <div className="p-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="font-semibold text-neutral-900">Order #{order.id}</h3>
-                    <p className="text-sm text-neutral-500">{order.customerName} • {order.date}</p>
+                    <h3 className="font-semibold text-neutral-900">{order.orderNumber}</h3>
+                    <p className="text-sm text-neutral-500">{order.customerName} • {order.orderDate}</p>
                   </div>
-                  <span className="text-xl font-bold text-primary-700">₹{order.total}</span>
+                  <span className="text-xl font-bold text-primary-700">{formatCurrency(order.total)}</span>
                 </div>
                 <div className="mt-4 space-y-2">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-sm text-neutral-600">
-                      <span>{item.quantity}x {item.name}</span>
-                      <span>₹{item.price * item.quantity}</span>
+                  {order.items.map((item) => (
+                    <div key={item.productId} className="flex items-center justify-between text-sm text-neutral-600">
+                      <span>{item.qty}x {item.name} ({item.variant})</span>
+                      <span>{formatCurrency(item.lineTotal)}</span>
                     </div>
                   ))}
                 </div>
@@ -125,11 +127,11 @@ export default function CreateSalesOrder() {
                   <label className="text-sm font-medium text-neutral-700">Select Customer</label>
                   <select
                     value={selectedCustomer?.id || ''}
-                    onChange={(e) => setSelectedCustomer(mockCustomers.find(c => c.id === Number(e.target.value)))}
+                    onChange={(e) => setSelectedCustomer(customers.find((c) => c.id === e.target.value))}
                     className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                   >
                     <option value="">-- Select Customer --</option>
-                    {mockCustomers.map((customer) => (
+                    {customers.map((customer) => (
                       <option key={customer.id} value={customer.id}>{customer.name} ({customer.email})</option>
                     ))}
                   </select>
@@ -148,7 +150,7 @@ export default function CreateSalesOrder() {
                 </div>
                 <div className="space-y-4">
                   {orderItems.map((item, index) => {
-                    const product = mockProducts.find(p => p.id === item.productId)
+                    const product = products.find((p) => p.id === item.productId)
                     const isLowStock = product && item.quantity > product.stock
                     return (
                       <div key={index} className="p-4 bg-neutral-50 rounded-xl space-y-3">
@@ -157,12 +159,12 @@ export default function CreateSalesOrder() {
                             <label className="text-xs font-medium text-neutral-600 mb-1 block">Product</label>
                             <select
                               value={item.productId || ''}
-                              onChange={(e) => handleItemChange(index, 'productId', Number(e.target.value))}
+                              onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
                               className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
                             >
                               <option value="">-- Select --</option>
-                              {mockProducts.map((prod) => (
-                                <option key={prod.id} value={prod.id}>{prod.name} (₹{prod.price})</option>
+                              {products.map((prod) => (
+                                <option key={prod.id} value={prod.id}>{prod.fullName} ({formatCurrency(prod.sellingPrice)})</option>
                               ))}
                             </select>
                           </div>
@@ -177,7 +179,7 @@ export default function CreateSalesOrder() {
                             />
                           </div>
                           <div className="col-span-2">
-                            <div className="text-sm font-semibold text-neutral-900">₹{calculateItemTotal(item)}</div>
+                            <div className="text-sm font-semibold text-neutral-900">{formatCurrency(calculateItemTotal(item))}</div>
                           </div>
                           <div className="col-span-1">
                             <button
@@ -212,7 +214,7 @@ export default function CreateSalesOrder() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-neutral-600">Subtotal</span>
-                    <span className="text-sm font-medium text-neutral-900">₹{calculateSubtotal()}</span>
+                    <span className="text-sm font-medium text-neutral-900">{formatCurrency(calculateSubtotal())}</span>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-neutral-700">Discount (%)</label>
@@ -228,12 +230,16 @@ export default function CreateSalesOrder() {
                   {discount > 0 && (
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-neutral-600">Discount</span>
-                      <span className="text-sm font-medium text-red-600">-₹{calculateSubtotal() * discount / 100}</span>
+                      <span className="text-sm font-medium text-red-600">-{formatCurrency((calculateSubtotal() * discount) / 100)}</span>
                     </div>
                   )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-600">GST</span>
+                    <span className="text-sm font-medium text-neutral-900">{formatCurrency(calculateGst())}</span>
+                  </div>
                   <div className="border-t border-neutral-200 pt-4 flex items-center justify-between">
                     <span className="text-base font-semibold text-neutral-900">Total</span>
-                    <span className="text-2xl font-bold text-primary-700">₹{calculateTotal()}</span>
+                    <span className="text-2xl font-bold text-primary-700">{formatCurrency(calculateTotal())}</span>
                   </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={!selectedCustomer}>

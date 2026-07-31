@@ -2,16 +2,35 @@ import { products } from './products'
 
 const findProduct = (id) => products.find((product) => product.id === id)
 
-const buildOrder = ({
+export const ORDER_STATUSES = [
+  { value: 'Draft', label: 'Draft', badge: 'neutral' },
+  { value: 'Confirmed', label: 'Confirmed', badge: 'info' },
+  { value: 'Processing', label: 'Processing', badge: 'primary' },
+  { value: 'Out for Delivery', label: 'Out for Delivery', badge: 'warning' },
+  { value: 'Delivered', label: 'Delivered', badge: 'success' },
+  { value: 'Partially Delivered', label: 'Partially Delivered', badge: 'warning' },
+  { value: 'Cancelled', label: 'Cancelled', badge: 'danger' },
+  { value: 'Returned', label: 'Returned', badge: 'danger' },
+]
+
+export const orderStatusBadgeVariant = (status) =>
+  ORDER_STATUSES.find((item) => item.value === status)?.badge || 'neutral'
+
+const APPROVAL_DISCOUNT_THRESHOLD = 10
+const APPROVAL_TOTAL_THRESHOLD = 50000
+
+export const buildOrder = ({
   id,
   orderNumber,
   customerId,
   customerName,
+  salesOfficerId = 'usr-3',
   status,
   orderDate,
   expectedDeliveryDate,
   deliveryPartnerId = null,
   amountPaid,
+  discountPercent = 0,
   lines,
 }) => {
   const items = lines.map(({ productId, qty }) => {
@@ -32,7 +51,8 @@ const buildOrder = ({
 
   const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0)
   const gstAmount = items.reduce((sum, item) => sum + item.gstAmount, 0)
-  const total = subtotal + gstAmount
+  const discountAmount = subtotal * (discountPercent / 100)
+  const total = subtotal - discountAmount + gstAmount
   const balanceDue = status === 'Cancelled' ? 0 : total - amountPaid
   const paymentStatus =
     status === 'Cancelled'
@@ -42,24 +62,28 @@ const buildOrder = ({
         : amountPaid < total
           ? 'Partial'
           : 'Paid'
+  const requiresApproval = discountPercent > APPROVAL_DISCOUNT_THRESHOLD || total > APPROVAL_TOTAL_THRESHOLD
 
   return {
     id,
     orderNumber,
     customerId,
     customerName,
-    salesOfficerId: 'usr-3',
+    salesOfficerId,
     deliveryPartnerId,
     status,
     orderDate,
     expectedDeliveryDate,
     items,
     subtotal,
+    discountPercent,
+    discountAmount,
     gstAmount,
     total,
     amountPaid,
     balanceDue,
     paymentStatus,
+    requiresApproval,
   }
 }
 
@@ -223,6 +247,7 @@ export const orders = [
     orderDate: '2026-07-17',
     expectedDeliveryDate: '2026-07-19',
     amountPaid: 0,
+    discountPercent: 12,
     lines: [
       { productId: 'DISP-N', qty: 3 },
       { productId: 'PW-2L', qty: 30 },
@@ -319,5 +344,46 @@ export const orders = [
     expectedDeliveryDate: null,
     amountPaid: 0,
     lines: [{ productId: 'PW-500', qty: 20 }],
+  }),
+  buildOrder({
+    id: 'ORD-1019',
+    orderNumber: 'SO-2026-1019',
+    customerId: 'cust-13',
+    customerName: 'Fitness First Gym',
+    status: 'Processing',
+    orderDate: '2026-07-18',
+    expectedDeliveryDate: '2026-07-20',
+    amountPaid: 0,
+    lines: [
+      { productId: 'PW-500', qty: 60 },
+      { productId: 'MW-500', qty: 20 },
+    ],
+  }),
+  buildOrder({
+    id: 'ORD-1020',
+    orderNumber: 'SO-2026-1020',
+    customerId: 'cust-14',
+    customerName: 'Mrs. Deepa Menon',
+    status: 'Partially Delivered',
+    orderDate: '2026-07-15',
+    expectedDeliveryDate: '2026-07-17',
+    deliveryPartnerId: 'usr-4',
+    amountPaid: 300,
+    lines: [
+      { productId: 'PW-1L', qty: 15 },
+      { productId: 'PW-500', qty: 15 },
+    ],
+  }),
+  buildOrder({
+    id: 'ORD-1021',
+    orderNumber: 'SO-2026-1021',
+    customerId: 'cust-17',
+    customerName: 'Mr. Rohit Malhotra',
+    status: 'Returned',
+    orderDate: '2026-07-09',
+    expectedDeliveryDate: '2026-07-10',
+    deliveryPartnerId: 'usr-4',
+    amountPaid: 0,
+    lines: [{ productId: 'JR-20L-N', qty: 2 }],
   }),
 ]
