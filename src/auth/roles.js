@@ -39,6 +39,7 @@ import {
   UsersRound,
   Activity,
   Factory,
+  Tags,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -93,6 +94,7 @@ export const roleMenus = {
       items: [
         { label: 'Customers', path: '/admin/customers', icon: UsersRound },
         { label: 'Suppliers', path: '/admin/suppliers', icon: Factory },
+        { label: 'Categories', path: '/admin/categories', icon: Tags },
         { label: 'Products', path: '/admin/products', icon: Package },
       ],
     },

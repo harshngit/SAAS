@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Edit, Eye, Package, Plus, Power, Search, Trash2 } from 'lucide-react'
+import { Edit, Eye, Package, Plus, Power, RotateCw, Search, Trash2 } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import { productCatalog } from '../../mockData/productCatalog'
+import { createProduct, listProducts } from '../../api/products'
 import { formatCurrency } from '../../utils/format'
 import ProductForm from './ProductForm'
 
@@ -18,32 +19,93 @@ const productStatusTabs = [
 ]
 
 const priceRange = (variants) => {
+  if (!variants?.length) {
+    return formatCurrency(0)
+  }
+
   const prices = variants.map((variant) => variant.sellingPrice)
   const min = Math.min(...prices)
   const max = Math.max(...prices)
-  return min === max ? formatCurrency(min) : `${formatCurrency(min)} – ${formatCurrency(max)}`
+  return min === max ? formatCurrency(min) : `${formatCurrency(min)} - ${formatCurrency(max)}`
 }
+
+const normalizeApiProduct = (product, fallback = {}) => ({
+  ...fallback,
+  id: product.id || fallback.id,
+  name: product.name || fallback.name,
+  brand: product.brand || fallback.brand || '',
+  sku: product.sku || fallback.sku || fallback.variants?.[0]?.sku || '',
+  categoryId: product.category_id || fallback.categoryId || fallback.category_id || fallback.category || '',
+  category: fallback.category || product.product_type || product.category_id || '',
+  status: product.is_active === false ? 'inactive' : 'active',
+  description: product.description || fallback.description || '',
+  variants: (product.variations?.length ? product.variations : fallback.variants || []).map((variant) => ({
+    size: variant.name || variant.size || '',
+    sku: variant.sku || fallback.sku || '',
+    hsn: variant.hsn || '',
+    unit: variant.unit || 'Bottle',
+    gstRate: variant.gstRate || 0,
+    purchasePrice: variant.purchasePrice || 0,
+    sellingPrice: Number(variant.price ?? variant.sellingPrice) || 0,
+    inventory: Number(variant.inventory) || 0,
+  })),
+})
 
 export default function ProductList() {
   const navigate = useNavigate()
-  const [products, setProducts] = useState(productCatalog)
+  const [products, setProducts] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [listError, setListError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [statusProduct, setStatusProduct] = useState(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [formError, setFormError] = useState('')
 
   const categoryFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: 'All categories' },
-      ...[...new Set(products.map((product) => product.category))].map((category) => ({
-        value: category,
-        label: category,
-      })),
-    ],
+    () => {
+      const categories = products.reduce((options, product) => {
+        const value = product.categoryId || product.category
+        if (!value || options.some((option) => option.value === value)) {
+          return options
+        }
+
+        options.push({ value, label: product.category || value })
+        return options
+      }, [])
+
+      return [{ value: 'all', label: 'All categories' }, ...categories]
+    },
     [products],
   )
+
+  const loadProducts = useCallback(async () => {
+    setIsLoading(true)
+    setListError('')
+
+    const result = await listProducts({
+      search: searchTerm.trim() || undefined,
+      category_id: categoryFilter === 'all' ? undefined : categoryFilter,
+      is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
+    })
+
+    if (!result.success) {
+      setProducts([])
+      setListError(result.error)
+      setIsLoading(false)
+      return
+    }
+
+    setProducts(result.products.map((product) => normalizeApiProduct(product)))
+    setIsLoading(false)
+  }, [categoryFilter, searchTerm, statusFilter])
+
+  useEffect(() => {
+    loadProducts()
+  }, [loadProducts])
 
   const filteredProducts = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -51,10 +113,17 @@ export default function ProductList() {
     return products.filter((product) => {
       const matchesSearch =
         !normalizedSearch ||
-        [product.name, product.brand, ...product.variants.map((variant) => variant.sku)]
+        [
+          product.name,
+          product.brand,
+          product.sku,
+          product.category,
+          ...product.variants.map((variant) => variant.sku),
+        ]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(normalizedSearch))
-      const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter
+      const matchesCategory =
+        categoryFilter === 'all' || product.categoryId === categoryFilter || product.category === categoryFilter
       const matchesStatus = statusFilter === 'all' || product.status === statusFilter
 
       return matchesSearch && matchesCategory && matchesStatus
@@ -63,11 +132,13 @@ export default function ProductList() {
 
   const handleAddProduct = () => {
     setEditingProduct(null)
+    setFormError('')
     setIsFormOpen(true)
   }
 
   const handleEditProduct = (product) => {
     setEditingProduct(product)
+    setFormError('')
     setIsFormOpen(true)
   }
 
@@ -77,16 +148,32 @@ export default function ProductList() {
     }
   }
 
-  const handleSaveProduct = (productData) => {
+  const handleSaveProduct = async (productData) => {
+    setIsSaving(true)
+    setFormError('')
+
     if (editingProduct) {
       setProducts(
         products.map((product) =>
           product.id === editingProduct.id ? { ...product, ...productData, id: editingProduct.id } : product,
         ),
       )
-    } else {
-      setProducts([...products, { status: 'active', ...productData, id: Date.now() }])
+      setIsSaving(false)
+      setIsFormOpen(false)
+      return
     }
+
+    const createResult = await createProduct(productData)
+
+    if (!createResult.success) {
+      setFormError(createResult.error)
+      setIsSaving(false)
+      return
+    }
+
+    setProducts((current) => [normalizeApiProduct(createResult.product, productData), ...current])
+    setIsSaving(false)
+    setIsFormOpen(false)
   }
 
   const handleToggleStatus = () => {
@@ -106,9 +193,15 @@ export default function ProductList() {
     return (
       <ProductForm
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={() => {
+          if (isSaving) return
+          setFormError('')
+          setIsFormOpen(false)
+        }}
         product={editingProduct}
         onSave={handleSaveProduct}
+        saving={isSaving}
+        formError={formError}
       />
     )
   }
@@ -170,7 +263,28 @@ export default function ProductList() {
         </div>
 
         <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">
-          {filteredProducts.length === 0 ? (
+          {listError ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-red-600">{listError}</p>
+              <Button type="button" variant="outline" className="mt-4" onClick={loadProducts}>
+                <RotateCw className="size-4" aria-hidden="true" />
+                Retry
+              </Button>
+            </div>
+          ) : isLoading ? (
+            <LoadingSpinner label="Loading products..." />
+          ) : products.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm font-medium text-neutral-900">No products yet</p>
+              <p className="mt-1 text-sm text-neutral-500">
+                Create the first product to begin tracking variants, pricing, and inventory.
+              </p>
+              <Button type="button" className="mt-4" onClick={handleAddProduct}>
+                <Plus className="size-4" aria-hidden="true" />
+                Add Product
+              </Button>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No products match these filters.</p>
           ) : (
             <table className="w-full text-left text-sm">

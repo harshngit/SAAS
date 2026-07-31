@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, CreditCard, Edit, ShoppingBag, UsersRound, Wallet } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import StatCard from '../../components/ui/StatCard'
 import { ROLES } from '../../auth/roles'
-import { customers as seedCustomers } from '../../mockData/customers'
+import { getCustomer, updateCustomer } from '../../api/customers'
 import { orders } from '../../mockData/orders'
 import { users } from '../../mockData/users'
 import { useAuthStore } from '../../store/authStore'
@@ -28,6 +29,25 @@ const paymentVariant = {
   Unpaid: 'danger',
 }
 
+const normalizeCustomer = (customer) => ({
+  ...customer,
+  organizationId: customer.organization_id || customer.organizationId,
+  businessName: customer.business_name || customer.businessName || customer.name,
+  type: customer.category || customer.type || '',
+  billingAddress: customer.billing_address || customer.billingAddress || customer.address || '',
+  deliveryAddress: customer.delivery_address || customer.deliveryAddress || customer.address || '',
+  assignedSalesOfficerId: customer.assigned_sales_officer_id || customer.assignedSalesOfficerId || '',
+  assignedSalesOfficer: customer.assigned_sales_officer || customer.assignedSalesOfficer,
+  outstandingBalance: customer.outstanding_balance || customer.outstandingBalance || 0,
+  creditLimit: customer.credit_limit ?? customer.creditLimit ?? 0,
+  gstNumber: customer.gst_number || customer.gstNumber || '',
+  joinedAt: customer.created_at || customer.joinedAt,
+  updatedAt: customer.updated_at || customer.updatedAt,
+  notes: customer.notes || '',
+  isActive: customer.is_active ?? customer.isActive,
+  status: customer.is_active === false || customer.status === 'inactive' ? 'inactive' : 'active',
+})
+
 export default function CustomerDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -35,9 +55,41 @@ export default function CustomerDetail() {
   const isAdmin = currentUser?.role === ROLES.ADMIN
   const basePath = isAdmin ? '/admin/customers' : '/sales/customers'
 
-  const initialCustomer = useMemo(() => seedCustomers.find((item) => item.id === id), [id])
-  const [customer, setCustomer] = useState(initialCustomer)
+  const [customer, setCustomer] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadCustomer() {
+      setIsLoading(true)
+      setLoadError('')
+
+      const result = await getCustomer(id)
+
+      if (!isMounted) return
+
+      setIsLoading(false)
+
+      if (!result.success) {
+        setCustomer(null)
+        setLoadError(result.error)
+        return
+      }
+
+      setCustomer(normalizeCustomer(result.customer))
+    }
+
+    loadCustomer()
+
+    return () => {
+      isMounted = false
+    }
+  }, [id])
 
   const customerOrders = useMemo(
     () => (customer ? orders.filter((order) => order.customerId === customer.id) : []),
@@ -49,7 +101,11 @@ export default function CustomerDetail() {
     [],
   )
 
-  const assignedSalesOfficer = users.find((user) => user.id === customer?.assignedSalesOfficerId)
+  const assignedSalesOfficer = customer?.assignedSalesOfficer || users.find((user) => user.id === customer?.assignedSalesOfficerId)
+
+  if (isLoading) {
+    return <LoadingSpinner label="Loading customer details..." />
+  }
 
   if (!customer) {
     return (
@@ -57,7 +113,7 @@ export default function CustomerDetail() {
         <EmptyState
           icon={UsersRound}
           title="Customer not found"
-          description="This customer may have been deleted or the link is out of date."
+          description={loadError || 'This customer may have been deleted or the link is out of date.'}
           action={{ label: 'Back to Customers', onClick: () => navigate(basePath) }}
         />
       </Card>
@@ -66,8 +122,27 @@ export default function CustomerDetail() {
 
   const lifetimeValue = customerOrders.reduce((sum, order) => sum + order.total, 0)
 
-  const handleSaveCustomer = (customerData) => {
-    setCustomer((current) => ({ ...current, ...customerData }))
+  const handleSaveCustomer = async (customerData) => {
+    setIsSaving(true)
+    setFormError('')
+
+    const result = await updateCustomer(customer.id, {
+      ...customer,
+      ...customerData,
+    })
+
+    if (!result.success) {
+      setFormError(result.error)
+      setIsSaving(false)
+      return
+    }
+
+    setCustomer((current) => normalizeCustomer({
+      ...current,
+      ...customerData,
+      ...result.customer,
+    }))
+    setIsSaving(false)
     setIsFormOpen(false)
   }
 
@@ -80,6 +155,8 @@ export default function CustomerDetail() {
         onSave={handleSaveCustomer}
         salesOfficers={salesOfficers}
         currentUser={currentUser}
+        saving={isSaving}
+        formError={formError}
       />
     )
   }
@@ -101,12 +178,22 @@ export default function CustomerDetail() {
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <Badge variant="primary">{customer.type}</Badge>
-              <span className="text-xs text-neutral-400">{customer.city}</span>
             </div>
           </div>
         </div>
 
-        <Button variant="outline" size="sm" onClick={() => setIsFormOpen(true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (isAdmin) {
+              navigate(`/admin/customers/edit/${customer.id}`)
+              return
+            }
+
+            setIsFormOpen(true)
+          }}
+        >
           <Edit className="size-4" aria-hidden="true" />
           Edit
         </Button>

@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import {
   Edit,
   Plus,
-  Power,
   RotateCw,
   Search,
+  Trash2,
   UserCheck,
 } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
@@ -16,9 +16,8 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import { createCustomer } from '../../api/customers'
+import { createCustomer, deleteCustomer as deleteCustomerApi, listCustomers, updateCustomer } from '../../api/customers'
 import { listUsers } from '../../api/users'
-import { customers as seedCustomers } from '../../mockData/customers'
 import { users as seedUsers } from '../../mockData/users'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
@@ -87,7 +86,9 @@ export default function CustomerList() {
   const [editingCustomer, setEditingCustomer] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
-  const [statusCustomer, setStatusCustomer] = useState(null)
+  const [deleteCustomer, setDeleteCustomer] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const salesOfficers = useMemo(
     () => staffUsers.filter((user) => user.role === ROLES.SALES_OFFICER && user.status === 'active'),
@@ -116,18 +117,32 @@ export default function CustomerList() {
     setIsLoading(true)
     setListError('')
 
-    await loadStaffUsers()
+    const queryParams = {
+      search: searchTerm.trim() || undefined,
+      category: typeFilter === 'all' ? undefined : typeFilter,
+      is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
+      assigned_sales_officer_id: isSalesOfficer
+        ? currentUser?.id
+        : isAdmin && salesOfficerFilter !== 'all'
+          ? salesOfficerFilter
+          : undefined,
+    }
 
-    const nextCustomers = seedCustomers.map(normalizeCustomer).map((customer) => {
-      if (isSalesOfficer && currentUser?.id) {
-        return { ...customer, assignedSalesOfficerId: currentUser.id }
-      }
-      return customer
-    })
+    const [customerResult] = await Promise.all([
+      listCustomers(queryParams),
+      loadStaffUsers(),
+    ])
 
-    setCustomers(nextCustomers)
+    if (!customerResult.success) {
+      setCustomers([])
+      setListError(customerResult.error)
+      setIsLoading(false)
+      return
+    }
+
+    setCustomers(customerResult.customers.map(normalizeCustomer))
     setIsLoading(false)
-  }, [currentUser?.id, isSalesOfficer, loadStaffUsers])
+  }, [currentUser?.id, isAdmin, isSalesOfficer, loadStaffUsers, salesOfficerFilter, searchTerm, statusFilter, typeFilter])
 
   useEffect(() => {
     loadCustomers()
@@ -189,10 +204,25 @@ export default function CustomerList() {
     }
 
     if (editingCustomer) {
+      const updateResult = await updateCustomer(editingCustomer.id, {
+        ...editingCustomer,
+        ...customerData,
+      })
+
+      if (!updateResult.success) {
+        setFormError(updateResult.error)
+        setIsSaving(false)
+        return
+      }
+
       setCustomers((current) =>
         current.map((customer) =>
           customer.id === editingCustomer.id
-            ? { ...customer, ...customerData }
+            ? normalizeCustomer({
+              ...customer,
+              ...customerData,
+              ...updateResult.customer,
+            })
             : customer,
         ),
       )
@@ -213,7 +243,6 @@ export default function CustomerList() {
       normalizeCustomer({
         ...customerData,
         ...createResult.customer,
-        city: customerData.city,
       }),
       ...current,
     ])
@@ -222,17 +251,23 @@ export default function CustomerList() {
     handleCloseForm()
   }
 
-  const handleToggleStatus = () => {
-    if (!statusCustomer) return
+  const handleDeleteCustomer = async () => {
+    if (!deleteCustomer) return
 
-    setCustomers((current) =>
-      current.map((customer) =>
-        customer.id === statusCustomer.id
-          ? { ...customer, status: customer.status === 'active' ? 'inactive' : 'active' }
-          : customer,
-      ),
-    )
-    setStatusCustomer(null)
+    setIsDeleting(true)
+    setDeleteError('')
+
+    const result = await deleteCustomerApi(deleteCustomer.id)
+
+    if (!result.success) {
+      setDeleteError(result.error)
+      setIsDeleting(false)
+      return
+    }
+
+    setCustomers((current) => current.filter((customer) => customer.id !== deleteCustomer.id))
+    setIsDeleting(false)
+    setDeleteCustomer(null)
   }
 
   if (isFormOpen) {
@@ -344,7 +379,6 @@ export default function CustomerList() {
                 <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
                   <th className="whitespace-nowrap px-4 py-3">Customer</th>
                   <th className="whitespace-nowrap px-4 py-3">Phone</th>
-                  <th className="whitespace-nowrap px-4 py-3">City</th>
                   <th className="whitespace-nowrap px-4 py-3">Sales Officer</th>
                   <th className="whitespace-nowrap px-4 py-3">Credit Limit</th>
                   <th className="whitespace-nowrap px-4 py-3">Outstanding</th>
@@ -371,7 +405,6 @@ export default function CustomerList() {
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-neutral-600">{customer.phone}</td>
-                    <td className="px-4 py-3.5 text-neutral-600">{customer.city || '-'}</td>
                     <td className="px-4 py-3.5 text-neutral-600">
                       {salesOfficerById.get(customer.assignedSalesOfficerId) || 'Unassigned'}
                     </td>
@@ -394,13 +427,24 @@ export default function CustomerList() {
                       <ActionMenu
                         items={[
                           { label: 'View Details', icon: UserCheck, onClick: () => navigate(`${basePath}/${customer.id}`) },
-                          { label: 'Edit', icon: Edit, onClick: () => handleOpenForm(customer) },
-                          { label: 'Reassign Sales Officer', icon: UserCheck, onClick: () => handleOpenForm(customer) },
                           {
-                            label: customer.status === 'active' ? 'Deactivate' : 'Activate',
-                            icon: Power,
-                            danger: customer.status === 'active',
-                            onClick: () => setStatusCustomer(customer),
+                            label: 'Edit',
+                            icon: Edit,
+                            onClick: () => {
+                              if (isAdmin) {
+                                navigate(`/admin/customers/edit/${customer.id}`)
+                                return
+                              }
+
+                              handleOpenForm(customer)
+                            },
+                          },
+                          // { label: 'Reassign Sales Officer', icon: UserCheck, onClick: () => handleOpenForm(customer) },
+                          {
+                            label: 'Delete',
+                            icon: Trash2,
+                            danger: true,
+                            onClick: () => setDeleteCustomer(customer),
                           },
                         ]}
                       />
@@ -420,26 +464,42 @@ export default function CustomerList() {
       </Card>
 
       <Modal
-        isOpen={Boolean(statusCustomer)}
-        onClose={() => setStatusCustomer(null)}
-        title={`${statusCustomer?.status === 'active' ? 'Deactivate' : 'Activate'} Customer`}
+        isOpen={Boolean(deleteCustomer)}
+        onClose={() => {
+          if (isDeleting) return
+          setDeleteError('')
+          setDeleteCustomer(null)
+        }}
+        title="Delete Customer"
       >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-neutral-600">
-            {statusCustomer?.status === 'active'
-              ? 'This customer will be moved to inactive status. Existing invoices and outstanding balances will remain unchanged.'
-              : 'This customer will be marked active and available for sales workflows again.'}
+            Delete {deleteCustomer?.name || 'this customer'} from the customer list? Existing invoices and outstanding balances will remain unchanged.
           </p>
+          {deleteError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {deleteError}
+            </div>
+          )}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setStatusCustomer(null)}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isDeleting}
+              onClick={() => {
+                setDeleteError('')
+                setDeleteCustomer(null)
+              }}
+            >
               Cancel
             </Button>
             <Button
               type="button"
-              variant={statusCustomer?.status === 'active' ? 'danger' : 'primary'}
-              onClick={handleToggleStatus}
+              variant="danger"
+              loading={isDeleting}
+              onClick={handleDeleteCustomer}
             >
-              {statusCustomer?.status === 'active' ? 'Deactivate' : 'Activate'}
+              Delete
             </Button>
           </div>
         </div>

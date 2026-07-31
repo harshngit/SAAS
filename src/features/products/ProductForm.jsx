@@ -20,7 +20,7 @@ const statusOptions = [
   { value: 'inactive', label: 'Inactive' },
 ]
 
-export default function ProductForm({ isOpen, onClose, product, onSave }) {
+export default function ProductForm({ isOpen, onClose, product, onSave, saving = false, formError = '' }) {
   const [formData, setFormData] = useState(emptyForm)
 
   useEffect(() => {
@@ -58,9 +58,9 @@ export default function ProductForm({ isOpen, onClose, product, onSave }) {
         gstRate: Number(variant.gstRate) || 0,
         purchasePrice: Number(variant.purchasePrice) || 0,
         sellingPrice: Number(variant.sellingPrice) || 0,
+        inventory: Number(variant.inventory) || 0,
       })),
     })
-    onClose()
   }
 
   return (
@@ -78,9 +78,15 @@ export default function ProductForm({ isOpen, onClose, product, onSave }) {
         <Button type="button" variant="outline" size="sm" onClick={onClose}>
           Back to Products
         </Button>
-      </div>
+        </div>
 
-      <div className="mt-6 space-y-6">
+        {formError && (
+          <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {formError}
+          </div>
+        )}
+
+        <div className="mt-6 space-y-6">
         <section>
           <div className="mb-3 flex items-center gap-2">
             <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">1</span>
@@ -162,10 +168,10 @@ export default function ProductForm({ isOpen, onClose, product, onSave }) {
       </div>
 
       <div className="mt-6 flex flex-col-reverse gap-3 border-t border-neutral-100 pt-5 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={onClose}>
+        <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
           Cancel
         </Button>
-        <Button type="submit">{product ? 'Save Changes' : 'Save Product'}</Button>
+        <Button type="submit" loading={saving}>{product ? 'Save Changes' : 'Save Product'}</Button>
       </div>
     </form>
   )

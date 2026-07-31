@@ -37,110 +37,94 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
-function buildCustomerRequestBody(payload) {
-  const name = payload.name.trim()
-
+function buildCategoryBody(payload) {
   return {
-    name,
-    business_name: (payload.businessName || payload.business_name || name).trim(),
-    phone: payload.phone.trim(),
-    email: payload.email?.trim().toLowerCase() || '',
-    gst_number: payload.gstNumber || payload.gst_number || '',
-    billing_address: payload.billingAddress?.trim() || '',
-    delivery_address: payload.deliveryAddress?.trim() || payload.billingAddress?.trim() || '',
-    assigned_sales_officer_id: payload.assignedSalesOfficerId || payload.assigned_sales_officer_id || '',
-    credit_limit: Number(payload.creditLimit) || 0,
-    category: payload.type || payload.category || '',
-    notes: payload.notes?.trim() || '',
-    is_active: payload.isActive ?? payload.is_active ?? payload.status !== 'inactive',
+    name: payload.name?.trim() || payload.category_name?.trim() || '',
+    image: payload.image?.trim() || payload.category_image?.trim() || '',
+    description: payload.description?.trim() || payload.category_description?.trim() || '',
   }
 }
 
-export async function createCustomer(payload) {
+export async function createCategory(payload) {
   try {
-    const requestBody = buildCustomerRequestBody(payload)
-
-    const { data } = await apiClient.post('/customers', requestBody, {
+    const { data } = await apiClient.post('/categories', buildCategoryBody(payload), {
       headers: authHeader(),
     })
 
-    return { success: true, customer: data }
+    return { success: true, category: data }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to create customer. Please try again.',
+      'Unable to create category. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
-export async function updateCustomer(customerId, payload) {
-  try {
-    const { data } = await apiClient.patch(`/customers/${customerId}`, buildCustomerRequestBody(payload), {
-      headers: authHeader(),
-    })
-
-    return { success: true, customer: data }
-  } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to update customer. Please try again.',
-    )
-
-    return { success: false, error: message }
-  }
-}
-
-export async function listCustomers(params = {}) {
+export async function listCategories(params = {}) {
   try {
     const queryParams = {}
 
     if (params.search) queryParams.search = params.search
-    if (params.category) queryParams.category = params.category
-    if (params.is_active !== undefined && params.is_active !== null) queryParams.is_active = params.is_active
-    if (params.assigned_sales_officer_id) queryParams.assigned_sales_officer_id = params.assigned_sales_officer_id
 
-    const { data } = await apiClient.get('/customers', {
+    const { data } = await apiClient.get('/categories', {
       headers: authHeader(),
       params: queryParams,
     })
 
-    return { success: true, customers: Array.isArray(data) ? data : data?.customers || [] }
+    return { success: true, categories: Array.isArray(data) ? data : data?.categories || [] }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to load customers. Please try again.',
+      'Unable to load categories. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
-export async function getCustomer(customerId) {
+export async function getCategory(categoryId) {
   try {
-    const { data } = await apiClient.get(`/customers/${customerId}`, {
+    const { data } = await apiClient.get(`/categories/${categoryId}`, {
       headers: authHeader(),
     })
 
-    return { success: true, customer: data }
+    return { success: true, category: data }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to load customer details. Please try again.',
+      'Unable to load category details. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
-export async function deleteCustomer(customerId) {
+export async function updateCategory(categoryId, payload) {
   try {
-    await apiClient.delete(`/customers/${customerId}`, {
+    const { data } = await apiClient.patch(`/categories/${categoryId}`, buildCategoryBody(payload), {
+      headers: authHeader(),
+    })
+
+    return { success: true, category: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to update category. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function deleteCategory(categoryId) {
+  try {
+    await apiClient.delete(`/categories/${categoryId}`, {
       headers: authHeader(),
     })
 
@@ -149,7 +133,26 @@ export async function deleteCustomer(customerId) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to delete customer. Please try again.',
+      'Unable to delete category. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function deleteCategoriesBulk(categoryIds) {
+  try {
+    await apiClient.delete('/categories/bulk', {
+      headers: authHeader(),
+      data: { category_ids: categoryIds },
+    })
+
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to delete selected categories. Please try again.',
     )
 
     return { success: false, error: message }

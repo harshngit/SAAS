@@ -25,8 +25,10 @@ import NotificationsList from '../features/notifications/NotificationsList'
 import AuditLogList from '../features/auditLogs/AuditLogList'
 import CustomerList from '../features/customers/CustomerList'
 import CustomerDetail from '../features/customers/CustomerDetail'
+import CustomerEdit from '../features/customers/CustomerEdit'
 import SupplierList from '../features/suppliers/SupplierList'
 import SupplierDetail from '../features/suppliers/SupplierDetail'
+import CategoryList from '../features/categories/CategoryList'
 import CreateSalesOrder from '../features/orders/CreateSalesOrder'
 import OrderList from '../features/orders/OrderList'
 import OrderDetail from '../features/orders/OrderDetail'
@@ -113,9 +115,11 @@ export default function AppRoutes() {
           <Route path="/admin/users/edit/:user_id" element={<UserEdit />} />
           <Route path="/admin/users/:user_id" element={<UserDetail />} />
           <Route path="/admin/customers" element={<CustomerList />} />
+          <Route path="/admin/customers/edit/:customer_id" element={<CustomerEdit />} />
           <Route path="/admin/customers/:id" element={<CustomerDetail />} />
           <Route path="/admin/suppliers" element={<SupplierList />} />
           <Route path="/admin/suppliers/:id" element={<SupplierDetail />} />
+          <Route path="/admin/categories" element={<CategoryList />} />
           <Route path="/admin/products" element={<ProductList />} />
           <Route path="/admin/products/:id" element={<ProductDetail />} />
           <Route path="/admin/inventory" element={<StockBoard />} />

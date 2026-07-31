@@ -19,15 +19,31 @@ const emptyForm = {
   billingAddress: '',
   deliveryAddress: '',
   sameAsBilling: false,
-  city: '',
   assignedSalesOfficerId: '',
   creditLimit: 0,
+}
+
+function normalizeComparableForm(data = {}) {
+  return {
+    name: data.name?.trim() || '',
+    type: data.type || '',
+    customType: data.customType?.trim() || '',
+    phone: data.phone?.trim() || '',
+    email: data.email?.trim().toLowerCase() || '',
+    gstNumber: data.gstNumber?.trim().toUpperCase() || '',
+    billingAddress: data.billingAddress?.trim() || data.address?.trim() || '',
+    deliveryAddress: data.deliveryAddress?.trim() || '',
+    sameAsBilling: Boolean(data.sameAsBilling),
+    assignedSalesOfficerId: data.assignedSalesOfficerId || '',
+    creditLimit: Number(data.creditLimit) || 0,
+  }
 }
 
 export default function CustomerForm({
   isOpen,
   onClose,
   customer,
+  initialCustomer,
   onSave,
   salesOfficers = [],
   currentUser,
@@ -36,6 +52,7 @@ export default function CustomerForm({
 }) {
   const isSalesOfficer = currentUser?.role === ROLES.SALES_OFFICER
   const [formData, setFormData] = useState(emptyForm)
+  const [initialFormData, setInitialFormData] = useState(emptyForm)
   const [errors, setErrors] = useState({})
 
   const salesOfficerOptions = useMemo(
@@ -45,26 +62,32 @@ export default function CustomerForm({
 
   useEffect(() => {
     if (!isOpen) return
+    const formCustomer = customer || initialCustomer
 
     const assignedSalesOfficerId =
-      customer?.assignedSalesOfficerId ||
+      formCustomer?.assignedSalesOfficerId ||
       (isSalesOfficer ? currentUser?.id : '') ||
       salesOfficerOptions[0]?.value ||
       ''
 
-    setFormData({
+    const nextFormData = {
       ...emptyForm,
-      ...customer,
-      gstNumber: customer?.gstNumber || '',
-      billingAddress: customer?.billingAddress || customer?.address || '',
-      deliveryAddress: customer?.deliveryAddress || '',
-      sameAsBilling: Boolean(customer?.sameAsBilling),
+      ...formCustomer,
+      gstNumber: formCustomer?.gstNumber || '',
+      billingAddress: formCustomer?.billingAddress || formCustomer?.address || '',
+      deliveryAddress: formCustomer?.deliveryAddress || '',
+      sameAsBilling: Boolean(formCustomer?.sameAsBilling),
       assignedSalesOfficerId,
-      creditLimit: customer?.creditLimit ?? 0,
-      customType: customer?.customType || '',
-    })
+      creditLimit: formCustomer?.creditLimit ?? 0,
+      customType: formCustomer?.customType || '',
+    }
+
+    setFormData(nextFormData)
+    setInitialFormData(nextFormData)
     setErrors({})
-  }, [customer, currentUser?.id, isOpen, isSalesOfficer, salesOfficerOptions])
+  }, [customer, currentUser?.id, initialCustomer, isOpen, isSalesOfficer, salesOfficerOptions])
+
+  const hasChanges = !customer || JSON.stringify(normalizeComparableForm(formData)) !== JSON.stringify(normalizeComparableForm(initialFormData))
 
   const updateField = (field, value) => {
     setFormData((current) => {
@@ -96,7 +119,6 @@ export default function CustomerForm({
       nextErrors.gstNumber = 'Enter a valid GST number.'
     }
     if (!formData.billingAddress.trim()) nextErrors.billingAddress = 'Billing address is required.'
-    if (!formData.city.trim()) nextErrors.city = 'City is required.'
     if (!formData.assignedSalesOfficerId) nextErrors.assignedSalesOfficerId = 'Assign a sales officer.'
     if (Number(formData.creditLimit) < 0) nextErrors.creditLimit = 'Credit limit cannot be negative.'
 
@@ -106,6 +128,7 @@ export default function CustomerForm({
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    if (!hasChanges) return
     if (!validate()) return
 
     const resolvedType = formData.type === 'Other' ? formData.customType.trim() : formData.type
@@ -116,7 +139,6 @@ export default function CustomerForm({
       gstNumber: formData.gstNumber ? formData.gstNumber.trim().toUpperCase() : null,
       billingAddress: formData.billingAddress.trim(),
       deliveryAddress: formData.deliveryAddress.trim(),
-      city: formData.city.trim(),
       creditLimit: Number(formData.creditLimit) || 0,
     })
   }
@@ -177,7 +199,6 @@ export default function CustomerForm({
               )}
               <Input label="Phone" type="tel" value={formData.phone} onChange={(event) => updateField('phone', event.target.value)} error={errors.phone} required />
               <Input label="Email" type="email" value={formData.email} onChange={(event) => updateField('email', event.target.value)} />
-              <Input label="City" value={formData.city} onChange={(event) => updateField('city', event.target.value)} error={errors.city} required />
               <Input label="GST Number" value={formData.gstNumber} onChange={(event) => updateField('gstNumber', event.target.value.toUpperCase())} error={errors.gstNumber} />
             </div>
           </section>
@@ -234,7 +255,7 @@ export default function CustomerForm({
           <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button type="submit" loading={saving}>
+          <Button type="submit" loading={saving} disabled={!hasChanges}>
             {customer ? 'Save Changes' : 'Save Customer'}
           </Button>
         </div>
