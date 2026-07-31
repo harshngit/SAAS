@@ -16,12 +16,15 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
+import { createCustomer } from '../../api/customers'
+import { listUsers } from '../../api/users'
 import { customers as seedCustomers } from '../../mockData/customers'
 import { users as seedUsers } from '../../mockData/users'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import CustomerForm from './CustomerForm'
 import { customerTypeOptions } from './customerConstants'
+import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 
 const customerStatusTabs = [
   { value: 'all', label: 'All' },
@@ -31,11 +34,21 @@ const customerStatusTabs = [
 
 const normalizeCustomer = (customer) => ({
   ...customer,
-  status: customer.status || 'active',
-  billingAddress: customer.billingAddress || customer.address || '',
-  deliveryAddress: customer.deliveryAddress || customer.address || '',
-  outstandingBalance: customer.outstandingBalance || 0,
-  creditLimit: customer.creditLimit || 0,
+  organizationId: customer.organization_id || customer.organizationId,
+  businessName: customer.business_name || customer.businessName || customer.name,
+  type: customer.category || customer.type || '',
+  billingAddress: customer.billing_address || customer.billingAddress || customer.address || '',
+  deliveryAddress: customer.delivery_address || customer.deliveryAddress || customer.address || '',
+  assignedSalesOfficerId: customer.assigned_sales_officer_id || customer.assignedSalesOfficerId || '',
+  assignedSalesOfficer: customer.assigned_sales_officer || customer.assignedSalesOfficer,
+  outstandingBalance: customer.outstanding_balance || customer.outstandingBalance || 0,
+  creditLimit: customer.credit_limit ?? customer.creditLimit ?? 0,
+  gstNumber: customer.gst_number || customer.gstNumber || '',
+  joinedAt: customer.created_at || customer.joinedAt,
+  updatedAt: customer.updated_at || customer.updatedAt,
+  notes: customer.notes || '',
+  isActive: customer.is_active ?? customer.isActive,
+  status: customer.is_active === false || customer.status === 'inactive' ? 'inactive' : 'active',
 })
 
 const normalizeUser = (user) => ({
@@ -43,7 +56,7 @@ const normalizeUser = (user) => ({
   name: user.name,
   email: user.email,
   phone: user.phone,
-  role: user.role,
+  role: user.role || user.system_role || getSystemRoleFromRoleName(user.role_detail?.name),
   status: user.is_active === false || user.status === 'inactive' ? 'inactive' : 'active',
 })
 
@@ -82,13 +95,28 @@ export default function CustomerList() {
   )
 
   const salesOfficerById = useMemo(
-    () => new Map(staffUsers.map((user) => [user.id, user.name])),
-    [staffUsers],
+    () => new Map([
+      ...staffUsers.map((user) => [user.id, user.name]),
+      ...customers
+        .filter((customer) => customer.assignedSalesOfficer?.id)
+        .map((customer) => [customer.assignedSalesOfficer.id, customer.assignedSalesOfficer.name]),
+    ]),
+    [customers, staffUsers],
   )
 
-  const loadCustomers = useCallback(() => {
+  const loadStaffUsers = useCallback(async () => {
+    const userResult = await listUsers()
+
+    if (userResult.success) {
+      setStaffUsers(userResult.users.map(normalizeUser))
+    }
+  }, [])
+
+  const loadCustomers = useCallback(async () => {
     setIsLoading(true)
     setListError('')
+
+    await loadStaffUsers()
 
     const nextCustomers = seedCustomers.map(normalizeCustomer).map((customer) => {
       if (isSalesOfficer && currentUser?.id) {
@@ -99,7 +127,7 @@ export default function CustomerList() {
 
     setCustomers(nextCustomers)
     setIsLoading(false)
-  }, [currentUser?.id, isSalesOfficer])
+  }, [currentUser?.id, isSalesOfficer, loadStaffUsers])
 
   useEffect(() => {
     loadCustomers()
@@ -144,47 +172,54 @@ export default function CustomerList() {
     setFormError('')
   }
 
-  const handleSaveCustomer = (customerData) => {
+  const handleSaveCustomer = async (customerData) => {
     setIsSaving(true)
     setFormError('')
 
-    window.setTimeout(() => {
-      const duplicatePhone = customers.some(
-        (customer) =>
-          customer.phone.replace(/\D/g, '') === customerData.phone.replace(/\D/g, '') &&
-          customer.id !== editingCustomer?.id,
+    const duplicatePhone = customers.some(
+      (customer) =>
+        customer.phone.replace(/\D/g, '') === customerData.phone.replace(/\D/g, '') &&
+        customer.id !== editingCustomer?.id,
+    )
+
+    if (duplicatePhone) {
+      setFormError('Phone number already exists for another customer.')
+      setIsSaving(false)
+      return
+    }
+
+    if (editingCustomer) {
+      setCustomers((current) =>
+        current.map((customer) =>
+          customer.id === editingCustomer.id
+            ? { ...customer, ...customerData }
+            : customer,
+        ),
       )
-
-      if (duplicatePhone) {
-        setFormError('Phone number already exists for another customer.')
-        setIsSaving(false)
-        return
-      }
-
-      if (editingCustomer) {
-        setCustomers((current) =>
-          current.map((customer) =>
-            customer.id === editingCustomer.id
-              ? { ...customer, ...customerData }
-              : customer,
-          ),
-        )
-      } else {
-        setCustomers((current) => [
-          {
-            ...customerData,
-            id: `cust-${Date.now()}`,
-            joinedAt: new Date().toISOString().slice(0, 10),
-            status: 'active',
-            outstandingBalance: 0,
-          },
-          ...current,
-        ])
-      }
-
       setIsSaving(false)
       handleCloseForm()
-    }, 250)
+      return
+    }
+
+    const createResult = await createCustomer(customerData)
+
+    if (!createResult.success) {
+      setFormError(createResult.error)
+      setIsSaving(false)
+      return
+    }
+
+    setCustomers((current) => [
+      normalizeCustomer({
+        ...customerData,
+        ...createResult.customer,
+        city: customerData.city,
+      }),
+      ...current,
+    ])
+
+    setIsSaving(false)
+    handleCloseForm()
   }
 
   const handleToggleStatus = () => {

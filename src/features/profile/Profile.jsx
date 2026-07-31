@@ -14,11 +14,23 @@ function formatDate(value) {
   }).format(new Date(value))
 }
 
+function formatDetailValue(value) {
+  if (value === null || value === undefined || value === '') {
+    return 'Not available'
+  }
+
+  if (typeof value === 'object') {
+    return value.name || value.title || value.id || 'Not available'
+  }
+
+  return String(value)
+}
+
 function DetailItem({ label, value }) {
   return (
     <div>
       <p className="text-xs font-medium uppercase text-neutral-400">{label}</p>
-      <p className="mt-1 text-sm font-medium text-neutral-900">{value || 'Not available'}</p>
+      <p className="mt-1 text-sm font-medium text-neutral-900">{formatDetailValue(value)}</p>
     </div>
   )
 }
@@ -93,7 +105,7 @@ export default function Profile() {
         <Card>
           <div className="flex items-center gap-3">
             <Building2 className="size-5 text-primary-600" />
-            <DetailItem label="Plan" value={currentOrganization?.plan} />
+            <DetailItem label="Plan" value={currentOrganization?.plan?.name || currentOrganization?.plan} />
           </div>
         </Card>
         <Card>
