@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Edit, Trash2, FileText } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
+import Modal from '../../components/ui/Modal'
 import { purchaseInvoices as initialInvoices } from '../../mockData/purchaseInvoices'
 import PurchaseInvoiceForm from './PurchaseInvoiceForm'
 
@@ -9,6 +10,7 @@ export default function PurchaseInvoiceList() {
   const [invoices, setInvoices] = useState(initialInvoices)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingInvoice, setEditingInvoice] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const handleAddInvoice = () => {
     setEditingInvoice(null)
@@ -20,10 +22,10 @@ export default function PurchaseInvoiceList() {
     setIsFormOpen(true)
   }
 
-  const handleDeleteInvoice = (id) => {
-    if (confirm('Are you sure you want to delete this invoice?')) {
-      setInvoices(invoices.filter(i => i.id !== id))
-    }
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return
+    setInvoices(invoices.filter(i => i.id !== deleteTarget.id))
+    setDeleteTarget(null)
   }
 
   const handleSaveInvoice = (invoiceData) => {
@@ -69,7 +71,7 @@ export default function PurchaseInvoiceList() {
                     <Edit className="size-4" />
                   </button>
                   <button
-                    onClick={() => handleDeleteInvoice(invoice.id)}
+                    onClick={() => setDeleteTarget(invoice)}
                     className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
                   >
                     <Trash2 className="size-4" />
@@ -97,6 +99,22 @@ export default function PurchaseInvoiceList() {
         invoice={editingInvoice}
         onSave={handleSaveInvoice}
       />
+
+      <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Invoice">
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-neutral-600">
+            Delete invoice {deleteTarget?.invoiceNumber || 'this invoice'}? This cannot be undone.
+          </p>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

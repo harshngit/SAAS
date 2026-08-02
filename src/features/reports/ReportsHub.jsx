@@ -1,6 +1,7 @@
 import { BarChart3, Download, FileText, TrendingUp, Users } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
+import { useToast } from '../../components/ui/toastContext'
 
 const reportTypes = [
   { id: 'sales', name: 'Sales Report', icon: TrendingUp, description: 'Detailed sales report with daily, weekly, monthly stats' },
@@ -10,8 +11,10 @@ const reportTypes = [
 ]
 
 export default function ReportsHub() {
+  const { showToast } = useToast()
+
   const handleExport = (type) => {
-    alert(`Exporting ${type} report...`)
+    showToast({ title: 'Export started', message: `Exporting ${type} report...` })
   }
 
   return (

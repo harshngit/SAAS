@@ -14,6 +14,8 @@ import CompanySettings from '../features/company/CompanySettings'
 import UserManagement from '../features/users/UserManagement'
 import UserDetail from '../features/users/UserDetail'
 import UserEdit from '../features/users/UserEdit'
+import RolesList from '../features/roles/RolesList'
+import RoleForm from '../features/roles/RoleForm'
 import ProductList from '../features/products/ProductList'
 import ProductDetail from '../features/products/ProductDetail'
 import StockBoard from '../features/inventory/StockBoard'
@@ -58,6 +60,7 @@ import AdminDeliveries from '../features/deliveries/AdminDeliveries'
 import AdminExpenses from '../features/expenses/AdminExpenses'
 import AdminInvoices from '../features/invoices/AdminInvoices'
 import AdminSettings from '../features/settings/AdminSettings'
+import AdminAttendance from '../features/attendance/AdminAttendance'
 import Profile from '../features/profile/Profile'
 
 function RootRedirect() {
@@ -114,6 +117,10 @@ export default function AppRoutes() {
           <Route path="/admin/users" element={<UserManagement />} />
           <Route path="/admin/users/edit/:user_id" element={<UserEdit />} />
           <Route path="/admin/users/:user_id" element={<UserDetail />} />
+          <Route path="/admin/roles" element={<RolesList />} />
+          <Route path="/admin/roles/new" element={<RoleForm />} />
+          <Route path="/admin/roles/edit/:role_id" element={<RoleForm />} />
+          <Route path="/admin/attendance" element={<AdminAttendance />} />
           <Route path="/admin/customers" element={<CustomerList />} />
           <Route path="/admin/customers/edit/:customer_id" element={<CustomerEdit />} />
           <Route path="/admin/customers/:id" element={<CustomerDetail />} />
@@ -123,7 +130,7 @@ export default function AppRoutes() {
           <Route path="/admin/products" element={<ProductList />} />
           <Route path="/admin/products/:id" element={<ProductDetail />} />
           <Route path="/admin/inventory" element={<StockBoard />} />
-          <Route path="/admin/inventory/:sku" element={<StockDetail />} />
+          <Route path="/admin/inventory/:product_id" element={<StockDetail />} />
           <Route path="/admin/vehicle-stock" element={<VehicleStockOverview />} />
           <Route path="/admin/purchases" element={<PurchaseInvoiceList />} />
           <Route path="/admin/deliveries" element={<AdminDeliveries />} />
@@ -146,8 +153,10 @@ export default function AppRoutes() {
           <Route path="/sales/customers" element={<CustomerList />} />
           <Route path="/sales/customers/:id" element={<CustomerDetail />} />
           <Route path="/sales/orders/create" element={<CreateSalesOrder />} />
+          <Route path="/sales/stock" element={<StockBoard readOnly />} />
           <Route path="/sales/visits" element={<VisitCheckIn />} />
           <Route path="/sales/followups" element={<FollowUpsList />} />
+          <Route path="/sales/attendance" element={<MyAttendance />} />
           <Route path="/sales/performance" element={<MyTargets />} />
         </Route>
 
@@ -159,6 +168,9 @@ export default function AppRoutes() {
           }
         >
           <Route path="/delivery/dashboard" element={<DeliveryPartnerDashboard />} />
+          <Route path="/delivery/customers" element={<CustomerList />} />
+          <Route path="/delivery/customers/:id" element={<CustomerDetail />} />
+          <Route path="/delivery/orders/create" element={<CreateSalesOrder restrictToVehicleStock />} />
           <Route path="/delivery/vehicle-loading" element={<VehicleLoading />} />
           <Route path="/delivery/deliveries" element={<AssignedDeliveries />} />
           <Route path="/delivery/deliveries/:id" element={<DeliveryDetail />} />

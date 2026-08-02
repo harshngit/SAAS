@@ -14,6 +14,7 @@ import { users } from '../../mockData/users'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import CustomerForm from './CustomerForm'
+import { customerBasePathByRole } from './customerConstants'
 
 const statusVariant = {
   Draft: 'neutral',
@@ -53,7 +54,7 @@ export default function CustomerDetail() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
   const isAdmin = currentUser?.role === ROLES.ADMIN
-  const basePath = isAdmin ? '/admin/customers' : '/sales/customers'
+  const basePath = customerBasePathByRole[currentUser?.role] || '/sales/customers'
 
   const [customer, setCustomer] = useState(null)
   const [isLoading, setIsLoading] = useState(true)

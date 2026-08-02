@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Save, Plus, Trash2, ArrowLeft, FileText } from 'lucide-react'
+import { Save, Plus, Trash2, ArrowLeft, FileText, MessageCircle } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -10,7 +10,9 @@ import Badge from '../../components/ui/Badge'
 import { deliveries } from '../../mockData/deliveries'
 import { products } from '../../mockData/products'
 import { orders } from '../../mockData/orders'
+import { customers } from '../../mockData/customers'
 import { formatCurrency } from '../../utils/format'
+import { useToast } from '../../components/ui/toastContext'
 
 const PAYMENT_MODES = ['Cash', 'UPI', 'Card', 'Credit']
 const DELIVERY_STATUSES = ['Delivered', 'Partial', 'Failed', 'Rescheduled']
@@ -18,8 +20,10 @@ const DELIVERY_STATUSES = ['Delivered', 'Partial', 'Failed', 'Rescheduled']
 export default function DeliveryDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const delivery = deliveries.find(d => d.id === id)
   const order = orders.find(o => o.id === delivery?.orderId)
+  const customer = customers.find(c => c.id === order?.customerId)
   
   const [status, setStatus] = useState(delivery?.status || 'Out for Delivery')
   const [paymentMode, setPaymentMode] = useState(delivery?.paymentMode || '')
@@ -69,7 +73,15 @@ export default function DeliveryDetail() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    alert('Delivery details saved successfully!')
+    showToast({ title: 'Delivery saved', message: 'Delivery details saved successfully.' })
+  }
+
+  const handleSendWhatsApp = () => {
+    const currentPending = grandTotal - amountCollected
+    const message = `Receipt for order ${delivery.orderNumber}\nAmount collected: ₹${amountCollected}\nPrevious pending: ₹${lastPendingAmount}\nCurrent pending: ₹${currentPending}`
+    const phoneDigits = (customer?.phone || '').replace(/\D/g, '')
+    const waUrl = `https://wa.me/${phoneDigits}?text=${encodeURIComponent(message)}`
+    window.open(waUrl, '_blank')
   }
 
   if (!delivery) {
@@ -218,9 +230,18 @@ export default function DeliveryDetail() {
               required
             />
           </div>
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex justify-end gap-3">
             <Button type="button" variant="secondary" icon={FileText} onClick={() => setShowReceipt(true)}>
               Preview Receipt
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              icon={MessageCircle}
+              disabled={!customer?.phone}
+              onClick={handleSendWhatsApp}
+            >
+              Send via WhatsApp
             </Button>
           </div>
         </Card>

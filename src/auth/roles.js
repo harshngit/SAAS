@@ -40,6 +40,9 @@ import {
   Activity,
   Factory,
   Tags,
+  ShieldCheck,
+  Boxes,
+  ClipboardCheck,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -122,6 +125,8 @@ export const roleMenus = {
         { label: 'Company Settings', path: '/admin/company-settings', icon: Store },
         { label: 'Plans', path: '/admin/plans', icon: CreditCard },
         { label: 'Staff', path: '/admin/users', icon: Users },
+        { label: 'Roles & Permissions', path: '/admin/roles', icon: ShieldCheck },
+        { label: 'Attendance', path: '/admin/attendance', icon: ClipboardCheck },
         { label: 'Notifications', path: '/admin/notifications', icon: Bell },
         { label: 'Audit Logs', path: '/admin/audit-logs', icon: History },
         { label: 'Settings', path: '/admin/settings', icon: Settings },
@@ -135,8 +140,10 @@ export const roleMenus = {
         { label: 'Dashboard', path: '/sales/dashboard', icon: LayoutDashboard },
         { label: 'Customers', path: '/sales/customers', icon: Users },
         { label: 'Create Order', path: '/sales/orders/create', icon: ShoppingCart },
+        { label: 'Stock', path: '/sales/stock', icon: Boxes },
         { label: 'Visits', path: '/sales/visits', icon: MapPin },
         { label: 'Follow-ups', path: '/sales/followups', icon: ClipboardList },
+        { label: 'Attendance', path: '/sales/attendance', icon: ClipboardCheck },
         { label: 'My Performance', path: '/sales/performance', icon: Target },
       ],
     },
@@ -146,6 +153,8 @@ export const roleMenus = {
       section: 'Main menu',
       items: [
         { label: 'Dashboard', path: '/delivery/dashboard', icon: LayoutDashboard },
+        { label: 'Customers', path: '/delivery/customers', icon: Users },
+        { label: 'Create Order', path: '/delivery/orders/create', icon: ShoppingCart },
         { label: 'Vehicle Loading', path: '/delivery/vehicle-loading', icon: PackageCheck },
         { label: 'Deliveries', path: '/delivery/deliveries', icon: Truck },
         { label: 'Expenses', path: '/delivery/expenses', icon: Receipt },

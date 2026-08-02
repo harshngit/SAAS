@@ -15,6 +15,7 @@ export default function FollowUpsList() {
   const [followUps, setFollowUps] = useState(initialFollowUps)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingFollowUp, setEditingFollowUp] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [formData, setFormData] = useState({
     customerName: '',
     date: new Date().toISOString().split('T')[0],
@@ -41,10 +42,10 @@ export default function FollowUpsList() {
     setIsModalOpen(true)
   }
 
-  const handleDeleteFollowUp = (id) => {
-    if (confirm('Are you sure you want to delete this follow-up?')) {
-      setFollowUps(followUps.filter(f => f.id !== id))
-    }
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return
+    setFollowUps(followUps.filter(f => f.id !== deleteTarget.id))
+    setDeleteTarget(null)
   }
 
   const handleSaveFollowUp = (e) => {
@@ -102,7 +103,7 @@ export default function FollowUpsList() {
                     <Edit className="size-4" />
                   </button>
                   <button
-                    onClick={() => handleDeleteFollowUp(followUp.id)}
+                    onClick={() => setDeleteTarget(followUp)}
                     className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
                   >
                     <Trash2 className="size-4" />
@@ -155,6 +156,22 @@ export default function FollowUpsList() {
             <Button type="submit">{editingFollowUp ? 'Update' : 'Add'} Follow-up</Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Follow-up">
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-neutral-600">
+            Delete the follow-up for {deleteTarget?.customerName || 'this customer'}? This cannot be undone.
+          </p>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

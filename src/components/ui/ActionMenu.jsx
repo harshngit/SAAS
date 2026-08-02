@@ -4,7 +4,7 @@ import { MoreVertical } from 'lucide-react'
 
 const MENU_WIDTH = 176
 
-export default function ActionMenu({ items = [], align = 'right', className = '' }) {
+export default function ActionMenu({ items = [], align = 'right', className = '', triggerClassName = '' }) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState(null)
   const containerRef = useRef(null)
@@ -60,7 +60,7 @@ export default function ActionMenu({ items = [], align = 'right', className = ''
         aria-label="Open actions menu"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex size-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+        className={`flex size-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 ${triggerClassName}`}
       >
         <MoreVertical className="size-4" aria-hidden="true" />
       </button>

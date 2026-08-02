@@ -6,6 +6,7 @@ import DataTable from '../../components/ui/DataTable'
 import Badge from '../../components/ui/Badge'
 import { expenses } from '../../mockData/expenses'
 import { formatCurrency } from '../../utils/format'
+import { useToast } from '../../components/ui/toastContext'
 
 const statusVariant = {
   Approved: 'success',
@@ -14,20 +15,21 @@ const statusVariant = {
 }
 
 export default function ExpenseApprovalQueue() {
+  const { showToast } = useToast()
   const [expenseList, setExpenseList] = useState([...expenses])
 
   const handleApprove = (id) => {
     setExpenseList(expenseList.map(e =>
       e.id === id ? { ...e, status: 'Approved' } : e
     ))
-    alert('Expense approved!')
+    showToast({ title: 'Expense approved', message: `Expense ${id} has been approved.` })
   }
 
   const handleReject = (id) => {
     setExpenseList(expenseList.map(e =>
       e.id === id ? { ...e, status: 'Rejected' } : e
     ))
-    alert('Expense rejected!')
+    showToast({ title: 'Expense rejected', message: `Expense ${id} has been rejected.` })
   }
 
   const pendingExpenses = expenseList.filter(e => e.status === 'Pending')

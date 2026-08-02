@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarDays, Camera, Edit, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { CalendarDays, Camera, Edit, KeyRound, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
@@ -9,9 +9,12 @@ import Select from '../../components/ui/Select'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
+import { useToast } from '../../components/ui/toastContext'
 import { ROLES, roleLabels } from '../../auth/roles'
+import { useAuthStore } from '../../store/authStore'
 import { createUser, listRoles, listUsers, updateUserStatus } from '../../api/users'
 import { getSystemRoleFromRoleName, normalizeApiUser, staffRoleOptions } from './userRoleUtils'
+import ResetPasswordModal from './ResetPasswordModal'
 
 const initialUsers = [
   { id: 1, name: 'Amit Sharma', email: 'amit@aquapure.com', role: ROLES.ADMIN, status: 'active' },
@@ -35,6 +38,9 @@ const getInitials = (name = '') =>
 
 export default function UserManagement() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
+  const currentUser = useAuthStore((state) => state.currentUser)
+  const isAdmin = currentUser?.role === ROLES.ADMIN
   const [users, setUsers] = useState(initialUsers)
   const [roles, setRoles] = useState([])
   const [activeRoleFilter, setActiveRoleFilter] = useState('all')
@@ -47,6 +53,8 @@ export default function UserManagement() {
   const [statusUser, setStatusUser] = useState(null)
   const [statusError, setStatusError] = useState('')
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [resetPasswordUser, setResetPasswordUser] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -152,10 +160,10 @@ export default function UserManagement() {
     handleCloseModal()
   }
 
-  const handleDelete = (id) => {
-    if (confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter(u => u.id !== id))
-    }
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return
+    setUsers(users.filter(u => u.id !== deleteTarget.id))
+    setDeleteTarget(null)
   }
 
   const handleOpenStatusModal = (user) => {
@@ -402,6 +410,32 @@ export default function UserManagement() {
           )}
         </div>
       </Modal>
+      <ResetPasswordModal
+        user={resetPasswordUser}
+        onClose={() => setResetPasswordUser(null)}
+        onSuccess={(resetUser) => {
+          setResetPasswordUser(null)
+          showToast({
+            title: 'Password reset',
+            message: `Password reset for ${resetUser.name}.`,
+          })
+        }}
+      />
+      <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Staff Member">
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-neutral-600">
+            Delete {deleteTarget?.name || 'this staff member'}? This cannot be undone.
+          </p>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
       <Card className="p-0">
         <div className="border-b border-neutral-100 px-5 py-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -546,7 +580,10 @@ export default function UserManagement() {
                         items={[
                           { label: 'Edit', icon: Edit, onClick: () => navigate(`/admin/users/edit/${user.id}`) },
                           { label: 'Change Status', icon: RefreshCw, onClick: () => handleOpenStatusModal(user) },
-                          { label: 'Delete', icon: Trash2, danger: true, onClick: () => handleDelete(user.id) },
+                          ...(isAdmin
+                            ? [{ label: 'Reset Password', icon: KeyRound, onClick: () => setResetPasswordUser(user) }]
+                            : []),
+                          { label: 'Delete', icon: Trash2, danger: true, onClick: () => setDeleteTarget(user) },
                         ]}
                       />
                     </td>

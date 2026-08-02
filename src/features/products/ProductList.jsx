@@ -8,8 +8,8 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import { createProduct, listProducts } from '../../api/products'
-import { formatCurrency } from '../../utils/format'
+import { createProduct, deleteProduct, listProducts, updateProduct } from '../../api/products'
+import { normalizeApiProduct, priceRange } from './productUtils'
 import ProductForm from './ProductForm'
 
 const productStatusTabs = [
@@ -17,39 +17,6 @@ const productStatusTabs = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
 ]
-
-const priceRange = (variants) => {
-  if (!variants?.length) {
-    return formatCurrency(0)
-  }
-
-  const prices = variants.map((variant) => variant.sellingPrice)
-  const min = Math.min(...prices)
-  const max = Math.max(...prices)
-  return min === max ? formatCurrency(min) : `${formatCurrency(min)} - ${formatCurrency(max)}`
-}
-
-const normalizeApiProduct = (product, fallback = {}) => ({
-  ...fallback,
-  id: product.id || fallback.id,
-  name: product.name || fallback.name,
-  brand: product.brand || fallback.brand || '',
-  sku: product.sku || fallback.sku || fallback.variants?.[0]?.sku || '',
-  categoryId: product.category_id || fallback.categoryId || fallback.category_id || fallback.category || '',
-  category: fallback.category || product.product_type || product.category_id || '',
-  status: product.is_active === false ? 'inactive' : 'active',
-  description: product.description || fallback.description || '',
-  variants: (product.variations?.length ? product.variations : fallback.variants || []).map((variant) => ({
-    size: variant.name || variant.size || '',
-    sku: variant.sku || fallback.sku || '',
-    hsn: variant.hsn || '',
-    unit: variant.unit || 'Bottle',
-    gstRate: variant.gstRate || 0,
-    purchasePrice: variant.purchasePrice || 0,
-    sellingPrice: Number(variant.price ?? variant.sellingPrice) || 0,
-    inventory: Number(variant.inventory) || 0,
-  })),
-})
 
 export default function ProductList() {
   const navigate = useNavigate()
@@ -64,6 +31,11 @@ export default function ProductList() {
   const [statusProduct, setStatusProduct] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [statusError, setStatusError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const categoryFilterOptions = useMemo(
     () => {
@@ -142,48 +114,69 @@ export default function ProductList() {
     setIsFormOpen(true)
   }
 
-  const handleDeleteProduct = (id) => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      setProducts(products.filter((product) => product.id !== id))
+  const handleDeleteProduct = async () => {
+    if (!deleteTarget) return
+
+    setIsDeleting(true)
+    setDeleteError('')
+
+    const result = await deleteProduct(deleteTarget.id)
+
+    setIsDeleting(false)
+
+    if (!result.success) {
+      setDeleteError(result.error)
+      return
     }
+
+    setProducts((current) => current.filter((product) => product.id !== deleteTarget.id))
+    setDeleteTarget(null)
   }
 
   const handleSaveProduct = async (productData) => {
     setIsSaving(true)
     setFormError('')
 
-    if (editingProduct) {
-      setProducts(
-        products.map((product) =>
-          product.id === editingProduct.id ? { ...product, ...productData, id: editingProduct.id } : product,
-        ),
-      )
-      setIsSaving(false)
-      setIsFormOpen(false)
-      return
-    }
+    const result = editingProduct
+      ? await updateProduct(editingProduct.id, productData)
+      : await createProduct(productData)
 
-    const createResult = await createProduct(productData)
-
-    if (!createResult.success) {
-      setFormError(createResult.error)
-      setIsSaving(false)
-      return
-    }
-
-    setProducts((current) => [normalizeApiProduct(createResult.product, productData), ...current])
     setIsSaving(false)
+
+    if (!result.success) {
+      setFormError(result.error)
+      return
+    }
+
+    setProducts((current) =>
+      editingProduct
+        ? current.map((product) =>
+            product.id === editingProduct.id ? normalizeApiProduct(result.product, productData) : product,
+          )
+        : [normalizeApiProduct(result.product, productData), ...current],
+    )
     setIsFormOpen(false)
   }
 
-  const handleToggleStatus = () => {
+  const handleToggleStatus = async () => {
     if (!statusProduct) return
+
+    const nextIsActive = statusProduct.status !== 'active'
+    setIsUpdatingStatus(true)
+    setStatusError('')
+
+    const result = await updateProduct(statusProduct.id, { isActive: nextIsActive })
+
+    setIsUpdatingStatus(false)
+
+    if (!result.success) {
+      setStatusError(result.error)
+      return
+    }
 
     setProducts((current) =>
       current.map((product) =>
-        product.id === statusProduct.id
-          ? { ...product, status: product.status === 'active' ? 'inactive' : 'active' }
-          : product,
+        product.id === statusProduct.id ? normalizeApiProduct(result.product, product) : product,
       ),
     )
     setStatusProduct(null)
@@ -339,7 +332,7 @@ export default function ProductList() {
                             label: 'Delete',
                             icon: Trash2,
                             danger: true,
-                            onClick: () => handleDeleteProduct(product.id),
+                            onClick: () => setDeleteTarget(product),
                           },
                         ]}
                       />
@@ -361,7 +354,11 @@ export default function ProductList() {
 
       <Modal
         isOpen={Boolean(statusProduct)}
-        onClose={() => setStatusProduct(null)}
+        onClose={() => {
+          if (isUpdatingStatus) return
+          setStatusError('')
+          setStatusProduct(null)
+        }}
         title={`${statusProduct?.status === 'active' ? 'Deactivate' : 'Activate'} Product`}
       >
         <div className="space-y-5">
@@ -370,16 +367,67 @@ export default function ProductList() {
               ? 'This product will be hidden from new orders. Existing invoices and stock records will remain unchanged.'
               : 'This product will be marked active and available for sales and inventory workflows again.'}
           </p>
+          {statusError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {statusError}
+            </div>
+          )}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setStatusProduct(null)}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isUpdatingStatus}
+              onClick={() => {
+                setStatusError('')
+                setStatusProduct(null)
+              }}
+            >
               Cancel
             </Button>
             <Button
               type="button"
               variant={statusProduct?.status === 'active' ? 'danger' : 'primary'}
+              loading={isUpdatingStatus}
               onClick={handleToggleStatus}
             >
               {statusProduct?.status === 'active' ? 'Deactivate' : 'Activate'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => {
+          if (isDeleting) return
+          setDeleteError('')
+          setDeleteTarget(null)
+        }}
+        title="Delete Product"
+      >
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-neutral-600">
+            Delete {deleteTarget?.name || 'this product'}? This cannot be undone.
+          </p>
+          {deleteError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {deleteError}
+            </div>
+          )}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isDeleting}
+              onClick={() => {
+                setDeleteError('')
+                setDeleteTarget(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" loading={isDeleting} onClick={handleDeleteProduct}>
+              Delete
             </Button>
           </div>
         </div>

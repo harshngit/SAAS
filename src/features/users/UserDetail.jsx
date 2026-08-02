@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Mail, Phone, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, KeyRound, Mail, Phone, ShieldCheck } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import Badge from '../../components/ui/Badge'
+import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import { useToast } from '../../components/ui/toastContext'
 import { ROLES, roleLabels } from '../../auth/roles'
+import { useAuthStore } from '../../store/authStore'
 import { getUser } from '../../api/users'
+import ResetPasswordModal from './ResetPasswordModal'
 
 const roleNameToSystemRole = {
   superadmin: ROLES.SUPER_ADMIN,
@@ -59,9 +63,13 @@ function DetailItem({ label, value }) {
 
 export default function UserDetail() {
   const { user_id: userId } = useParams()
+  const { showToast } = useToast()
+  const currentUser = useAuthStore((state) => state.currentUser)
+  const isAdmin = currentUser?.role === ROLES.ADMIN
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [resetPasswordUser, setResetPasswordUser] = useState(null)
 
   useEffect(() => {
     let isMounted = true
@@ -126,8 +134,33 @@ export default function UserDetail() {
           </h1>
           <p className="mt-1 text-sm text-neutral-500">Staff profile and role details</p>
         </div>
-        <Badge variant={user.status === 'active' ? 'success' : 'danger'}>{user.status}</Badge>
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setResetPasswordUser(user)}
+            >
+              <KeyRound className="size-4" aria-hidden="true" />
+              Reset Password
+            </Button>
+          )}
+          <Badge variant={user.status === 'active' ? 'success' : 'danger'}>{user.status}</Badge>
+        </div>
       </div>
+
+      <ResetPasswordModal
+        user={resetPasswordUser}
+        onClose={() => setResetPasswordUser(null)}
+        onSuccess={(resetUser) => {
+          setResetPasswordUser(null)
+          showToast({
+            title: 'Password reset',
+            message: `Password reset for ${resetUser.name}.`,
+          })
+        }}
+      />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
         <Card>

@@ -15,6 +15,7 @@ const emptyForm = {
   gstNumber: '',
   city: '',
   address: '',
+  openingBalance: '',
 }
 
 export default function SupplierForm({ isOpen, onClose, supplier, onSave, saving = false, formError = '' }) {
@@ -56,6 +57,7 @@ export default function SupplierForm({ isOpen, onClose, supplier, onSave, saving
       ...formData,
       gstNumber: formData.gstNumber ? formData.gstNumber.trim().toUpperCase() : null,
       city: formData.city.trim(),
+      openingBalance: Number(formData.openingBalance) || 0,
     })
   }
 
@@ -97,6 +99,14 @@ export default function SupplierForm({ isOpen, onClose, supplier, onSave, saving
             <Input label="Phone" type="tel" value={formData.phone} onChange={(event) => updateField('phone', event.target.value)} error={errors.phone} required />
             <Input label="Email" type="email" value={formData.email} onChange={(event) => updateField('email', event.target.value)} />
             <Input label="GST Number" value={formData.gstNumber} onChange={(event) => updateField('gstNumber', event.target.value.toUpperCase())} error={errors.gstNumber} />
+            <Input
+              label="Opening Balance"
+              type="number"
+              min="0"
+              placeholder="0"
+              value={formData.openingBalance}
+              onChange={(event) => updateField('openingBalance', event.target.value)}
+            />
           </div>
         </section>
 

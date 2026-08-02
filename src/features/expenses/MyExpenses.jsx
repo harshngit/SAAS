@@ -9,6 +9,7 @@ import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import { expenses } from '../../mockData/expenses'
 import { formatCurrency } from '../../utils/format'
+import { useToast } from '../../components/ui/toastContext'
 
 const EXPENSE_CATEGORIES = ['Fuel', 'Vehicle Maintenance', 'Tolls', 'Food', 'Miscellaneous']
 const statusVariant = {
@@ -18,6 +19,7 @@ const statusVariant = {
 }
 
 export default function MyExpenses() {
+  const { showToast } = useToast()
   const [showModal, setShowModal] = useState(false)
   const [newExpense, setNewExpense] = useState({
     category: '',
@@ -31,7 +33,7 @@ export default function MyExpenses() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    alert('Expense submitted successfully!')
+    showToast({ title: 'Expense submitted', message: 'Your expense has been submitted for approval.' })
     setShowModal(false)
     setNewExpense({
       category: '',

@@ -1,73 +1,60 @@
 import { useEffect, useState } from 'react'
 import Button from '../../components/ui/Button'
-import DatePicker from '../../components/ui/DatePicker'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
-import { movementTypes, stockItems } from '../../mockData/stockItems'
+import { movementTypes, getMovementMeta } from './inventoryConstants'
 
-const today = () => new Date().toISOString().slice(0, 10)
+const directionOptions = [
+  { value: 'add', label: 'Add to stock' },
+  { value: 'remove', label: 'Remove from stock' },
+]
 
-const productOptions = [...new Set(stockItems.map((item) => item.productName))].map((name) => ({
-  value: name,
-  label: name,
-}))
-
-export default function StockEntryForm({ isOpen, onClose, stockItem, onSave }) {
-  const [productName, setProductName] = useState('')
-  const [type, setType] = useState('purchase')
-  const [date, setDate] = useState(today())
-  const [poNumber, setPoNumber] = useState('')
-  const [supplier, setSupplier] = useState('')
-  const [reference, setReference] = useState('')
+export default function StockEntryForm({ isOpen, onClose, product, saving = false, formError = '', onSave }) {
+  const [movementType, setMovementType] = useState('purchase_in')
+  const [adjustDirection, setAdjustDirection] = useState('add')
+  const [note, setNote] = useState('')
   const [quantities, setQuantities] = useState({})
 
   useEffect(() => {
     if (!isOpen) return
-    setProductName(stockItem?.productName || '')
-    setType('purchase')
-    setDate(today())
-    setPoNumber('')
-    setSupplier('')
-    setReference('')
+    setMovementType('purchase_in')
+    setAdjustDirection('add')
+    setNote('')
     setQuantities({})
-  }, [isOpen, stockItem])
+  }, [isOpen, product])
 
-  if (!isOpen) return null
+  if (!isOpen || !product) return null
 
-  const isPurchase = type === 'purchase'
-  const isDeduction = ['sale', 'damaged', 'expired', 'return'].includes(type)
-  const variants = stockItem
-    ? [stockItem]
-    : stockItems.filter((item) => item.productName === productName)
+  const meta = getMovementMeta(movementType)
+  const direction = meta.direction === 'either' ? adjustDirection === 'remove' ? 'out' : 'in' : meta.direction
+  const rows = product.variations?.length
+    ? product.variations
+    : [{ id: null, name: product.name, inventory: product.total_stock || 0 }]
 
-  const handleProductChange = (value) => {
-    setProductName(value)
-    setQuantities({})
-  }
+  const rowKey = (row) => row.id ?? 'default'
 
-  const handleQuantityChange = (sku, value) => {
-    setQuantities((current) => ({ ...current, [sku]: value }))
+  const handleQuantityChange = (row, value) => {
+    setQuantities((current) => ({ ...current, [rowKey(row)]: value }))
   }
 
   const handleSubmit = (event) => {
     event.preventDefault()
 
-    const entries = variants
-      .filter((variant) => Number(quantities[variant.sku]) > 0)
-      .map((variant) => {
-        const magnitude = Math.abs(Number(quantities[variant.sku])) || 0
+    const movements = rows
+      .filter((row) => Number(quantities[rowKey(row)]) > 0)
+      .map((row) => {
+        const magnitude = Math.abs(Number(quantities[rowKey(row)])) || 0
         return {
-          sku: variant.sku,
-          type,
-          date,
-          quantity: isDeduction ? -magnitude : magnitude,
-          ...(isPurchase ? { poNumber, supplier, reference: poNumber } : { reference }),
+          product_id: product.id,
+          variant_id: row.id || undefined,
+          movement_type: movementType,
+          quantity: direction === 'out' ? -magnitude : magnitude,
+          note: note.trim() || undefined,
         }
       })
 
-    if (entries.length === 0) return
-    onSave(entries)
-    onClose()
+    if (movements.length === 0) return
+    onSave(movements)
   }
 
   return (
@@ -79,7 +66,7 @@ export default function StockEntryForm({ isOpen, onClose, stockItem, onSave }) {
         <div>
           <p className="text-lg font-semibold text-neutral-900">Record stock movement</p>
           <p className="mt-1 text-sm text-neutral-500">
-            Select a product to see every size, then enter quantities only for the variants you want to update.
+            {product.name} — enter quantities only for the variants you want to update.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={onClose}>
@@ -87,95 +74,76 @@ export default function StockEntryForm({ isOpen, onClose, stockItem, onSave }) {
         </Button>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Select
-          label="Product"
-          options={productOptions}
-          placeholder="Select product"
-          value={productName}
-          onChange={(event) => handleProductChange(event.target.value)}
-          disabled={Boolean(stockItem)}
-          required
-        />
-        <Select
-          label="Movement Type"
-          options={movementTypes}
-          value={type}
-          onChange={(event) => setType(event.target.value)}
-        />
-        <DatePicker label="Date" value={date} onChange={(value) => setDate(value)} />
-        {isPurchase ? (
-          <>
-            <Input
-              label="Supplier PO Number"
-              placeholder="e.g. PO-2024-010"
-              value={poNumber}
-              onChange={(event) => setPoNumber(event.target.value)}
-              required
-            />
-            <Input
-              label="Supplier"
-              placeholder="e.g. Prime Manufacturing"
-              value={supplier}
-              onChange={(event) => setSupplier(event.target.value)}
-              required
-            />
-          </>
-        ) : (
-          <Input
-            label="Reference / Notes"
-            className="lg:col-span-2"
-            placeholder="e.g. SO-1062, batch expired, cycle count correction"
-            value={reference}
-            onChange={(event) => setReference(event.target.value)}
-          />
-        )}
-      </div>
-
-      {productName && (
-        <div className="mt-6">
-          <p className="mb-3 text-sm font-semibold text-neutral-900">Variants</p>
-          <div className="overflow-x-auto rounded-xl border border-neutral-100">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="bg-neutral-50/80 text-[0.65rem] font-semibold uppercase tracking-widest text-neutral-400">
-                  <th className="whitespace-nowrap px-4 py-2.5">Size</th>
-                  <th className="whitespace-nowrap px-4 py-2.5">SKU</th>
-                  <th className="whitespace-nowrap px-4 py-2.5">Active Stock</th>
-                  <th className="whitespace-nowrap px-4 py-2.5">{isDeduction ? 'Qty to Deduct' : 'Qty to Add'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-50">
-                {variants.map((variant) => (
-                  <tr key={variant.sku}>
-                    <td className="whitespace-nowrap px-4 py-2.5 font-medium text-neutral-800">{variant.size}</td>
-                    <td className="whitespace-nowrap px-4 py-2.5 font-mono text-neutral-500">{variant.sku}</td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-neutral-600">
-                      {variant.currentStock} {variant.unit}s
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <input
-                        type="number"
-                        min="0"
-                        value={quantities[variant.sku] || ''}
-                        onChange={(event) => handleQuantityChange(variant.sku, event.target.value)}
-                        placeholder="0"
-                        className="w-28 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-900 transition-all focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {formError && (
+        <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {formError}
         </div>
       )}
 
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Select
+          label="Movement Type"
+          options={movementTypes}
+          value={movementType}
+          onChange={(event) => setMovementType(event.target.value)}
+        />
+        {meta.direction === 'either' && (
+          <Select
+            label="Direction"
+            options={directionOptions}
+            value={adjustDirection}
+            onChange={(event) => setAdjustDirection(event.target.value)}
+          />
+        )}
+        <Input
+          label="Note"
+          className="lg:col-span-2"
+          placeholder="e.g. PO-2024-010 from Prime Manufacturing, cycle count correction..."
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+        />
+      </div>
+
+      <div className="mt-6">
+        <p className="mb-3 text-sm font-semibold text-neutral-900">Variants</p>
+        <div className="overflow-x-auto rounded-xl border border-neutral-100">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="bg-neutral-50/80 text-[0.65rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <th className="whitespace-nowrap px-4 py-2.5">Variant</th>
+                <th className="whitespace-nowrap px-4 py-2.5">Available Stock</th>
+                <th className="whitespace-nowrap px-4 py-2.5">
+                  {direction === 'out' ? 'Qty to Deduct' : 'Qty to Add'}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-50">
+              {rows.map((row) => (
+                <tr key={rowKey(row)}>
+                  <td className="whitespace-nowrap px-4 py-2.5 font-medium text-neutral-800">{row.name}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-neutral-600">{row.inventory}</td>
+                  <td className="px-4 py-2.5">
+                    <input
+                      type="number"
+                      min="0"
+                      value={quantities[rowKey(row)] || ''}
+                      onChange={(event) => handleQuantityChange(row, event.target.value)}
+                      placeholder="0"
+                      className="w-28 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-900 transition-all focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="mt-6 flex flex-col-reverse gap-3 border-t border-neutral-100 pt-5 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={onClose}>
+        <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
           Cancel
         </Button>
-        <Button type="submit">Save Entry</Button>
+        <Button type="submit" loading={saving}>Save Entry</Button>
       </div>
     </form>
   )

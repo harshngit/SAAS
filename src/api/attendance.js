@@ -1,5 +1,5 @@
-import { apiClient } from './client'
 import { useAuthStore } from '../store/authStore'
+import { apiClient } from './client'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -11,7 +11,7 @@ function formatApiError(errorData, fallbackMessage = 'Something went wrong. Plea
   }
 
   if (Array.isArray(errorData)) {
-    return errorData.map((item) => formatApiError(item)).filter(Boolean).join(', ')
+    return errorData.map((error) => formatApiError(error)).filter(Boolean).join(', ')
   }
 
   if (typeof errorData === 'object') {
@@ -37,67 +37,65 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
-export async function getOrganizationSettings() {
+export async function checkIn(type) {
   try {
-    const { data } = await apiClient.get('/organizations/settings', {
+    const { data } = await apiClient.post('/attendance/check-in', { type }, {
       headers: authHeader(),
     })
 
-    return { success: true, organization: data }
+    return { success: true, record: data }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to load company settings. Please try again.',
+      'Unable to record attendance. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
-export async function updateOrganizationSettings(payload) {
+export async function getMyAttendance(params = {}) {
   try {
-    const requestBody = {}
+    const queryParams = {}
+    if (params.date_from) queryParams.date_from = params.date_from
+    if (params.date_to) queryParams.date_to = params.date_to
 
-    if (payload.businessType !== undefined) requestBody.business_type = payload.businessType || null
-    if (payload.gstNumber !== undefined) requestBody.gst_number = payload.gstNumber || null
-    if (payload.panNumber !== undefined) requestBody.pan_number = payload.panNumber || null
-    if (payload.address !== undefined) requestBody.address = payload.address || null
-    if (payload.phone !== undefined) requestBody.phone = payload.phone || null
-    if (payload.email !== undefined) requestBody.email = payload.email || null
-    if (payload.financialYear !== undefined) requestBody.financial_year = payload.financialYear || null
-    if (payload.logoUrl !== undefined) requestBody.logo_url = payload.logoUrl || null
-    if (payload.signatureUrl !== undefined) requestBody.signature_url = payload.signatureUrl || null
-
-    const { data } = await apiClient.put('/organizations/settings', requestBody, {
+    const { data } = await apiClient.get('/attendance/me', {
       headers: authHeader(),
+      params: queryParams,
     })
 
-    return { success: true, organization: data }
+    return { success: true, records: Array.isArray(data) ? data : data?.records || [] }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to save company settings. Please try again.',
+      'Unable to load attendance. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
-export async function requestPlanUpgrade({ requestedPlanId, billingCycle }) {
+export async function getAttendance(params = {}) {
   try {
-    const { data } = await apiClient.post('/organizations/upgrade-request', {
-      requested_plan_id: requestedPlanId,
-      billing_cycle: billingCycle,
+    const queryParams = {}
+    if (params.user_id) queryParams.user_id = params.user_id
+    if (params.date_from) queryParams.date_from = params.date_from
+    if (params.date_to) queryParams.date_to = params.date_to
+
+    const { data } = await apiClient.get('/attendance', {
+      headers: authHeader(),
+      params: queryParams,
     })
 
-    return { success: true, ...data }
+    return { success: true, records: Array.isArray(data) ? data : data?.records || [] }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to submit upgrade request. Please try again.',
+      'Unable to load attendance. Please try again.',
     )
 
     return { success: false, error: message }

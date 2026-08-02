@@ -5,8 +5,10 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Badge from '../../components/ui/Badge'
 import { products } from '../../mockData/products'
+import { useToast } from '../../components/ui/toastContext'
 
 export default function EndOfDayReturn() {
+  const { showToast } = useToast()
   const [returnItems, setReturnItems] = useState(
     products.map(p => ({
       productId: p.id,
@@ -31,7 +33,7 @@ export default function EndOfDayReturn() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    alert('End of day return recorded successfully!')
+    showToast({ title: 'Return recorded', message: 'End of day return recorded successfully.' })
   }
 
   return (

@@ -1,16 +1,24 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Edit, Plus, Power, Search, Trash2 } from 'lucide-react'
+import { Edit, Eye, Plus, Power, RotateCw, Search, Trash2 } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import { suppliers as seedSuppliers } from '../../mockData/suppliers'
+import {
+  createSupplier,
+  deleteSupplier,
+  listSuppliers,
+  updateSupplier,
+  updateSupplierStatus,
+} from '../../api/suppliers'
 import { formatCurrency } from '../../utils/format'
 import SupplierForm from './SupplierForm'
 import { supplierCategoryOptions } from './supplierConstants'
+import { normalizeApiSupplier } from './supplierUtils'
 
 const supplierStatusTabs = [
   { value: 'all', label: 'All' },
@@ -23,13 +31,47 @@ const getInitials = (name = '') =>
 
 export default function SupplierList() {
   const navigate = useNavigate()
-  const [suppliers, setSuppliers] = useState(seedSuppliers)
+  const [suppliers, setSuppliers] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [listError, setListError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [formError, setFormError] = useState('')
   const [statusSupplier, setStatusSupplier] = useState(null)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [statusError, setStatusError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
+  const loadSuppliers = useCallback(async () => {
+    setIsLoading(true)
+    setListError('')
+
+    const result = await listSuppliers({
+      search: searchTerm.trim() || undefined,
+      category: categoryFilter === 'all' ? undefined : categoryFilter,
+      is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
+    })
+
+    if (!result.success) {
+      setSuppliers([])
+      setListError(result.error)
+      setIsLoading(false)
+      return
+    }
+
+    setSuppliers(result.suppliers.map((supplier) => normalizeApiSupplier(supplier)))
+    setIsLoading(false)
+  }, [categoryFilter, searchTerm, statusFilter])
+
+  useEffect(() => {
+    loadSuppliers()
+  }, [loadSuppliers])
 
   const filteredSuppliers = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -49,54 +91,83 @@ export default function SupplierList() {
 
   const handleOpenForm = (supplier = null) => {
     setEditingSupplier(supplier)
+    setFormError('')
     setIsFormOpen(true)
   }
 
   const handleCloseForm = () => {
+    if (isSaving) return
     setIsFormOpen(false)
     setEditingSupplier(null)
+    setFormError('')
   }
 
-  const handleSaveSupplier = (supplierData) => {
-    if (editingSupplier) {
-      setSuppliers((current) =>
-        current.map((supplier) =>
-          supplier.id === editingSupplier.id ? { ...supplier, ...supplierData } : supplier,
-        ),
-      )
-    } else {
-      setSuppliers((current) => [
-        {
-          ...supplierData,
-          id: `sup-${Date.now()}`,
-          status: 'active',
-          totalPurchases: 0,
-          outstandingPayable: 0,
-          joinedAt: new Date().toISOString().slice(0, 10),
-        },
-        ...current,
-      ])
+  const handleSaveSupplier = async (supplierData) => {
+    setIsSaving(true)
+    setFormError('')
+
+    const result = editingSupplier
+      ? await updateSupplier(editingSupplier.id, supplierData)
+      : await createSupplier(supplierData)
+
+    setIsSaving(false)
+
+    if (!result.success) {
+      setFormError(result.error)
+      return
     }
+
+    setSuppliers((current) =>
+      editingSupplier
+        ? current.map((supplier) =>
+            supplier.id === editingSupplier.id ? normalizeApiSupplier(result.supplier, supplierData) : supplier,
+          )
+        : [normalizeApiSupplier(result.supplier, supplierData), ...current],
+    )
     handleCloseForm()
   }
 
-  const handleToggleStatus = () => {
+  const handleToggleStatus = async () => {
     if (!statusSupplier) return
+
+    const nextIsActive = statusSupplier.status !== 'active'
+    setIsUpdatingStatus(true)
+    setStatusError('')
+
+    const result = await updateSupplierStatus(statusSupplier.id, nextIsActive)
+
+    setIsUpdatingStatus(false)
+
+    if (!result.success) {
+      setStatusError(result.error)
+      return
+    }
 
     setSuppliers((current) =>
       current.map((supplier) =>
-        supplier.id === statusSupplier.id
-          ? { ...supplier, status: supplier.status === 'active' ? 'inactive' : 'active' }
-          : supplier,
+        supplier.id === statusSupplier.id ? normalizeApiSupplier(result.supplier, supplier) : supplier,
       ),
     )
     setStatusSupplier(null)
   }
 
-  const handleDeleteSupplier = (id) => {
-    if (confirm('Are you sure you want to delete this supplier?')) {
-      setSuppliers((current) => current.filter((supplier) => supplier.id !== id))
+  const handleDeleteSupplier = async () => {
+    if (!deleteTarget) return
+
+    setIsDeleting(true)
+    setDeleteError('')
+
+    const result = await deleteSupplier(deleteTarget.id)
+
+    setIsDeleting(false)
+
+    if (!result.success) {
+      setDeleteError(result.error)
+      return
     }
+
+    setSuppliers((current) => current.filter((supplier) => supplier.id !== deleteTarget.id))
+    setDeleteTarget(null)
   }
 
   if (isFormOpen) {
@@ -106,6 +177,8 @@ export default function SupplierList() {
         onClose={handleCloseForm}
         supplier={editingSupplier}
         onSave={handleSaveSupplier}
+        saving={isSaving}
+        formError={formError}
       />
     )
   }
@@ -167,7 +240,26 @@ export default function SupplierList() {
         </div>
 
         <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">
-          {filteredSuppliers.length === 0 ? (
+          {listError ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-red-600">{listError}</p>
+              <Button type="button" variant="outline" className="mt-4" onClick={loadSuppliers}>
+                <RotateCw className="size-4" aria-hidden="true" />
+                Retry
+              </Button>
+            </div>
+          ) : isLoading ? (
+            <LoadingSpinner label="Loading suppliers..." />
+          ) : suppliers.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm font-medium text-neutral-900">No suppliers yet</p>
+              <p className="mt-1 text-sm text-neutral-500">Add your first supplier to start tracking purchases and payments.</p>
+              <Button type="button" className="mt-4" onClick={() => handleOpenForm()}>
+                <Plus className="size-4" aria-hidden="true" />
+                Add Supplier
+              </Button>
+            </div>
+          ) : filteredSuppliers.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No suppliers match these filters.</p>
           ) : (
             <table className="w-full text-left text-sm">
@@ -223,6 +315,7 @@ export default function SupplierList() {
                     <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
                       <ActionMenu
                         items={[
+                          { label: 'View Details', icon: Eye, onClick: () => navigate(`/admin/suppliers/${supplier.id}`) },
                           { label: 'Edit', icon: Edit, onClick: () => handleOpenForm(supplier) },
                           {
                             label: supplier.status === 'active' ? 'Deactivate' : 'Activate',
@@ -233,7 +326,7 @@ export default function SupplierList() {
                             label: 'Delete',
                             icon: Trash2,
                             danger: true,
-                            onClick: () => handleDeleteSupplier(supplier.id),
+                            onClick: () => setDeleteTarget(supplier),
                           },
                         ]}
                       />
@@ -255,7 +348,11 @@ export default function SupplierList() {
 
       <Modal
         isOpen={Boolean(statusSupplier)}
-        onClose={() => setStatusSupplier(null)}
+        onClose={() => {
+          if (isUpdatingStatus) return
+          setStatusError('')
+          setStatusSupplier(null)
+        }}
         title={`${statusSupplier?.status === 'active' ? 'Deactivate' : 'Activate'} Supplier`}
       >
         <div className="space-y-5">
@@ -264,16 +361,67 @@ export default function SupplierList() {
               ? 'This supplier will be moved to inactive status. Existing purchase history remains unchanged.'
               : 'This supplier will be marked active and available for new purchases again.'}
           </p>
+          {statusError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {statusError}
+            </div>
+          )}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setStatusSupplier(null)}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isUpdatingStatus}
+              onClick={() => {
+                setStatusError('')
+                setStatusSupplier(null)
+              }}
+            >
               Cancel
             </Button>
             <Button
               type="button"
               variant={statusSupplier?.status === 'active' ? 'danger' : 'primary'}
+              loading={isUpdatingStatus}
               onClick={handleToggleStatus}
             >
               {statusSupplier?.status === 'active' ? 'Deactivate' : 'Activate'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => {
+          if (isDeleting) return
+          setDeleteError('')
+          setDeleteTarget(null)
+        }}
+        title="Delete Supplier"
+      >
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-neutral-600">
+            Delete {deleteTarget?.name || 'this supplier'}? This cannot be undone.
+          </p>
+          {deleteError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {deleteError}
+            </div>
+          )}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isDeleting}
+              onClick={() => {
+                setDeleteError('')
+                setDeleteTarget(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" loading={isDeleting} onClick={handleDeleteSupplier}>
+              Delete
             </Button>
           </div>
         </div>

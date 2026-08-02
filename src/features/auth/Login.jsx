@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, Droplet } from "lucide-react";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
+import FullScreenLoader from "../../components/ui/FullScreenLoader";
 import AuthShowcase from "../../components/auth/AuthShowcase";
 import { zodResolver } from "../../utils/zodResolver";
 import { login, resetPasswordDirect } from "../../api/auth";
@@ -128,6 +129,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const [serverError, setServerError] = useState("");
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpMessage, setOtpMessage] = useState("");
   const [otpDigits, setOtpDigits] = useState(Array(6).fill(""));
@@ -191,6 +193,7 @@ export default function Login() {
       setServerError(result.error);
       return;
     }
+    setIsRedirecting(true);
     const redirectTo =
       location.state?.from?.pathname ||
       roleHomePath[result.user.role] ||
@@ -355,6 +358,7 @@ export default function Login() {
 
   return (
     <div className="min-h-svh bg-neutral-50 p-4 sm:p-6 lg:p-8">
+      {isRedirecting && <FullScreenLoader label="Signing you in..." />}
       <div className="mx-auto flex min-h-[calc(100svh-2rem)] max-w-7xl overflow-hidden rounded-[2rem] border border-neutral-200 bg-white p-3 shadow-popover sm:min-h-[calc(100svh-3rem)] lg:min-h-[calc(100svh-4rem)]">
         <AuthShowcase
           kicker="Live workspace"
@@ -676,7 +680,7 @@ export default function Login() {
                   <Button
                     type="submit"
                     className="w-full rounded-xl bg-linear-to-b from-neutral-800 to-neutral-950 shadow-[0_10px_24px_-10px_rgb(17_24_39/0.55)] hover:from-neutral-800 hover:to-neutral-900"
-                    loading={isSubmitting}
+                    loading={isSubmitting || isRedirecting}
                   >
                     Sign in
                   </Button>

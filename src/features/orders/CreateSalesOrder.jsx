@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertCircle,
@@ -18,6 +18,7 @@ import { ROLES, roleHomePath } from '../../auth/roles'
 import { products } from '../../mockData/products'
 import { customers as seedCustomers } from '../../mockData/customers'
 import { buildOrder, orders as seedOrders } from '../../mockData/orders'
+import { vehicleStock } from '../../mockData/vehicleStock'
 import { users } from '../../mockData/users'
 import { createCustomer } from '../../api/customers'
 import { useAuthStore } from '../../store/authStore'
@@ -46,10 +47,21 @@ const phoneMatches = (registeredPhone = '', typedPhone = '') => {
   return Boolean(typed && (registered === typed || registered.endsWith(typed) || typed.endsWith(registered)))
 }
 
-export default function CreateSalesOrder() {
+export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
+  const availableProducts = useMemo(() => {
+    if (!restrictToVehicleStock) return products
+
+    return vehicleStock
+      .filter((entry) => entry.quantity > 0)
+      .map((entry) => {
+        const product = products.find((item) => item.id === entry.productId)
+        return product ? { ...product, stock: entry.quantity } : null
+      })
+      .filter(Boolean)
+  }, [restrictToVehicleStock])
   const [customerRecords, setCustomerRecords] = useState(seedCustomers)
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [customerDetails, setCustomerDetails] = useState({
@@ -68,7 +80,13 @@ export default function CreateSalesOrder() {
   const [showCustomerForm, setShowCustomerForm] = useState(false)
   const [isSavingCustomer, setIsSavingCustomer] = useState(false)
   const [customerFormError, setCustomerFormError] = useState('')
-  const canCreateOrder = Boolean(deliveryType && (deliveryType !== 'delivery_boy' || deliveryBoyId))
+  const canCreateOrder = restrictToVehicleStock || Boolean(deliveryType && (deliveryType !== 'delivery_boy' || deliveryBoyId))
+
+  useEffect(() => {
+    if (!restrictToVehicleStock || !currentUser?.id) return
+    setDeliveryType('delivery_boy')
+    setDeliveryBoyId(currentUser.id)
+  }, [restrictToVehicleStock, currentUser?.id])
 
   const deliveryBoys = useMemo(
     () => users.filter((user) => user.role === ROLES.DELIVERY_PARTNER && user.status !== 'inactive'),
@@ -81,7 +99,7 @@ export default function CreateSalesOrder() {
   )
 
   const calculateItemTotal = (item) => {
-    const product = products.find((p) => p.id === item.productId)
+    const product = availableProducts.find((p) => p.id === item.productId)
     return product ? product.sellingPrice * item.quantity : 0
   }
 
@@ -91,7 +109,7 @@ export default function CreateSalesOrder() {
 
   const calculateGst = () => {
     return orderItems.reduce((sum, item) => {
-      const product = products.find((p) => p.id === item.productId)
+      const product = availableProducts.find((p) => p.id === item.productId)
       return sum + (product ? product.sellingPrice * item.quantity * product.gstRate : 0)
     }, 0)
   }
@@ -276,6 +294,7 @@ export default function CreateSalesOrder() {
       customerEmail: customerDetails.email.trim() || null,
       paymentMethod,
       fulfillmentType: deliveryType,
+      source: restrictToVehicleStock ? 'delivery_vehicle' : 'standard',
     })
 
     showToast({
@@ -352,7 +371,7 @@ export default function CreateSalesOrder() {
               </div>
               <div className="space-y-4">
                 {orderItems.map((item, index) => {
-                  const product = products.find((p) => p.id === item.productId)
+                  const product = availableProducts.find((p) => p.id === item.productId)
                   const isLowStock = product && item.quantity > product.stock
                   return (
                     <div key={index} className="rounded-xl bg-neutral-50 p-4">
@@ -365,8 +384,8 @@ export default function CreateSalesOrder() {
                             className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                           >
                             <option value="">-- Select --</option>
-                            {products.map((prod) => (
-                              <option key={prod.id} value={prod.id}>{prod.fullName} ({formatCurrency(prod.sellingPrice)})</option>
+                            {availableProducts.map((prod) => (
+                              <option key={prod.id} value={prod.id}>{prod.fullName} ({formatCurrency(prod.sellingPrice)}) — {prod.stock} in stock</option>
                             ))}
                           </select>
                         </div>
@@ -455,9 +474,22 @@ export default function CreateSalesOrder() {
                 <div>
                   <h3 className="text-lg font-semibold text-neutral-900">Delivery</h3>
                   <p className="mt-1 text-sm text-neutral-500">
-                    {paymentMethod ? 'Select takeaway or assign a delivery boy.' : 'Select payment first, then choose delivery.'}
+                    {restrictToVehicleStock
+                      ? 'This order is being handed over directly from your vehicle.'
+                      : paymentMethod
+                        ? 'Select takeaway or assign a delivery boy.'
+                        : 'Select payment first, then choose delivery.'}
                   </p>
                 </div>
+                {restrictToVehicleStock ? (
+                  <div className="flex items-center gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
+                    <Truck className="size-5 text-primary-700" aria-hidden="true" />
+                    <span className="text-sm font-medium text-neutral-800">
+                      Delivered by you ({currentUser?.name || 'this vehicle'}) — no separate assignment needed.
+                    </span>
+                  </div>
+                ) : (
+                <>
                 <div className="space-y-3">
                   {deliveryOptions.map((option) => {
                     const Icon = option.icon
@@ -509,6 +541,8 @@ export default function CreateSalesOrder() {
                   </div>
                 )}
                 {errors.deliveryType && <p className="text-sm text-red-600">{errors.deliveryType}</p>}
+                </>
+                )}
               </div>
             </Card>
           </div>

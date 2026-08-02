@@ -4,6 +4,7 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs'
+import { useToast } from '../../components/ui/toastContext'
 
 function Toggle({ checked, onChange, label, description }) {
   return (
@@ -45,6 +46,7 @@ const initialSecurityPrefs = {
 }
 
 export default function AdminSettings() {
+  const { showToast } = useToast()
   const [notificationPrefs, setNotificationPrefs] = useState(initialNotificationPrefs)
   const [securityPrefs, setSecurityPrefs] = useState(initialSecurityPrefs)
   const [sessionTimeout, setSessionTimeout] = useState('60')
@@ -62,7 +64,7 @@ export default function AdminSettings() {
     setIsSaving(true)
     await new Promise((resolve) => setTimeout(resolve, 800))
     setIsSaving(false)
-    alert('Settings saved successfully!')
+    showToast({ title: 'Settings saved', message: 'Settings saved successfully.' })
   }
 
   return (

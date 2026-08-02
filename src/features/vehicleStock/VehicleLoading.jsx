@@ -4,8 +4,10 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import { products } from '../../mockData/products'
+import { useToast } from '../../components/ui/toastContext'
 
 export default function VehicleLoading() {
+  const { showToast } = useToast()
   const [loadingItems, setLoadingItems] = useState(
     products.map(p => ({ productId: p.id, productName: p.fullName, quantity: 0 }))
   )
@@ -23,7 +25,7 @@ export default function VehicleLoading() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    alert('Opening load recorded successfully!')
+    showToast({ title: 'Opening load recorded', message: 'Opening load recorded successfully.' })
   }
 
   const totalItems = loadingItems.reduce((sum, item) => sum + item.quantity, 0)

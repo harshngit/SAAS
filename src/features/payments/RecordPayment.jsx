@@ -4,11 +4,13 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
+import { useToast } from '../../components/ui/toastContext'
 
 const paymentTypes = ['Customer Payment', 'Supplier Payment']
 const paymentModes = ['Cash', 'UPI', 'Card', 'Bank Transfer', 'Cheque']
 
 export default function RecordPayment() {
+  const { showToast } = useToast()
   const [paymentType, setPaymentType] = useState('Customer Payment')
   const [partyName, setPartyName] = useState('')
   const [amount, setAmount] = useState('')
@@ -19,7 +21,7 @@ export default function RecordPayment() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    alert('Payment recorded successfully!')
+    showToast({ title: 'Payment recorded', message: 'Payment recorded successfully.' })
   }
 
   return (

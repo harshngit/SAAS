@@ -129,12 +129,12 @@ export async function getUser(userId) {
 
 export async function updateUser(userId, payload) {
   try {
-    const requestBody = {
-      name: payload.name.trim(),
-      email: payload.email.trim().toLowerCase(),
-      username: payload.username.trim(),
-      phone: payload.phone.trim(),
-    }
+    const requestBody = {}
+
+    if (payload.name !== undefined) requestBody.name = payload.name.trim()
+    if (payload.email !== undefined) requestBody.email = payload.email.trim().toLowerCase()
+    if (payload.username !== undefined) requestBody.username = payload.username.trim()
+    if (payload.phone !== undefined) requestBody.phone = payload.phone.trim()
 
     const { data } = await apiClient.patch(`/users/${userId}`, requestBody, {
       headers: authHeader(),
@@ -182,6 +182,26 @@ export async function updateUserStatus(userId, isActive) {
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to update staff status. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function resetUserPassword(userId, newPassword) {
+  try {
+    const { data } = await apiClient.post(
+      `/users/${userId}/reset-password`,
+      { new_password: newPassword },
+      { headers: authHeader() },
+    )
+
+    return { success: true, detail: data?.detail || 'Password reset successfully.' }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to reset password. Please try again.',
     )
 
     return { success: false, error: message }

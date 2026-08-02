@@ -16,7 +16,10 @@ import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
 import Select from '../../components/ui/Select'
 import { getCurrentProfile } from '../../api/auth'
+import { updateOrganizationSettings } from '../../api/organizations'
+import { updateUser } from '../../api/users'
 import { useAuthStore } from '../../store/authStore'
+import { useToast } from '../../components/ui/toastContext'
 
 const initialCompanyData = {
   name: 'SAAS Distributors',
@@ -109,6 +112,7 @@ function buildCompanyDataFromProfile(user, organization) {
 }
 
 export default function CompanySettings() {
+  const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const [companyData, setCompanyData] = useState(() => buildCompanyDataFromProfile(currentUser, currentOrganization))
@@ -118,6 +122,7 @@ export default function CompanySettings() {
   const [isBusinessDetailsOpen, setIsBusinessDetailsOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [profileError, setProfileError] = useState('')
+  const [saveError, setSaveError] = useState('')
   const activeNavItem = settingsNav.find((item) => item.id === activeTab) || settingsNav[0]
   const isEditableSection = activeTab === 'account' || activeTab === 'general'
   const isActiveSectionEditing = Boolean(editingSections[activeTab])
@@ -176,10 +181,36 @@ export default function CompanySettings() {
 
   const handleSave = async () => {
     setIsSaving(true)
-    // Mock save
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    alert('Company settings saved successfully!')
+    setSaveError('')
+
+    let result
+    if (activeTab === 'account') {
+      result = await updateUser(currentUser.id, {
+        name: companyData.adminName.trim(),
+        email: companyData.adminEmail.trim(),
+        phone: companyData.adminPhone.trim(),
+      })
+    } else if (activeTab === 'general') {
+      result = await updateOrganizationSettings({
+        businessType: companyData.businessType,
+        gstNumber: companyData.gstin,
+        panNumber: companyData.panNumber,
+        address: companyData.billingAddress,
+        financialYear: companyData.financialYear,
+      })
+    } else {
+      result = { success: true }
+    }
+
+    if (!result.success) {
+      setIsSaving(false)
+      setSaveError(result.error)
+      return
+    }
+
+    await getCurrentProfile()
     setIsSaving(false)
+    showToast({ title: 'Settings saved', message: 'Company settings saved successfully.' })
     if (isEditableSection) {
       setEditingSections((prev) => ({ ...prev, [activeTab]: false }))
     }
@@ -197,6 +228,12 @@ export default function CompanySettings() {
       {profileError && (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
           {profileError}
+        </div>
+      )}
+
+      {saveError && (
+        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {saveError}
         </div>
       )}
 

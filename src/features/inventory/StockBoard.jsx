@@ -1,139 +1,134 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Boxes, Edit, Package, Plus, Power, Search, Trash2, XCircle } from 'lucide-react'
+import { Boxes, Eye, Package, PackagePlus, PowerOff, RotateCw, Search, XCircle } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
-import Input from '../../components/ui/Input'
-import Modal from '../../components/ui/Modal'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
-import { stockItems as initialStockItems } from '../../mockData/stockItems'
+import { getStockBoard, recordStockAdjustment } from '../../api/inventory'
 import StockEntryForm from './StockEntryForm'
 
 const stockStatusTabs = [
   { value: 'all', label: 'All' },
-  { value: 'low', label: 'Low Stock' },
+  { value: 'active', label: 'Active' },
   { value: 'out', label: 'Out of Stock' },
+  { value: 'inactive', label: 'Inactive' },
 ]
 
-const getStockStatus = (item) => {
-  if (item.currentStock <= 0) return 'out'
-  if (item.currentStock < item.minStock) return 'low'
-  return 'in'
-}
-
-export default function StockBoard() {
+export default function StockBoard({ readOnly = false }) {
   const navigate = useNavigate()
-  const [stock, setStock] = useState(initialStockItems)
+  const [items, setItems] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [listError, setListError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState(null)
-  const [editForm, setEditForm] = useState(null)
-  const [statusItem, setStatusItem] = useState(null)
+  const [adjustingProduct, setAdjustingProduct] = useState(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [formError, setFormError] = useState('')
 
-  const categoryFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: 'All categories' },
-      ...[...new Set(stock.map((item) => item.category))].map((category) => ({ value: category, label: category })),
-    ],
-    [stock],
-  )
+  const categoryFilterOptions = useMemo(() => {
+    const categories = items.reduce((options, item) => {
+      const value = item.category_id || item.product_type
+      if (!value || options.some((option) => option.value === value)) {
+        return options
+      }
+
+      options.push({ value, label: item.product_type || value })
+      return options
+    }, [])
+
+    return [{ value: 'all', label: 'All categories' }, ...categories]
+  }, [items])
+
+  const loadStock = useCallback(async () => {
+    setIsLoading(true)
+    setListError('')
+
+    const result = await getStockBoard({
+      search: searchTerm.trim() || undefined,
+      category_id: categoryFilter === 'all' ? undefined : categoryFilter,
+    })
+
+    if (!result.success) {
+      setItems([])
+      setListError(result.error)
+      setIsLoading(false)
+      return
+    }
+
+    setItems(result.items)
+    setIsLoading(false)
+  }, [categoryFilter, searchTerm])
+
+  useEffect(() => {
+    loadStock()
+  }, [loadStock])
 
   const stats = useMemo(
     () => ({
-      totalSkus: stock.length,
-      lowStock: stock.filter((item) => getStockStatus(item) === 'low').length,
-      outOfStock: stock.filter((item) => getStockStatus(item) === 'out').length,
-      totalUnits: stock.reduce((sum, item) => sum + item.currentStock, 0),
+      totalProducts: items.length,
+      totalStock: items.reduce((sum, item) => sum + (item.total_stock || 0), 0),
+      outOfStock: items.filter((item) => (item.total_stock || 0) <= 0).length,
+      inactive: items.filter((item) => !item.is_active).length,
     }),
-    [stock],
+    [items],
   )
 
-  const filteredStock = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase()
-
-    return stock.filter((item) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        [item.productName, item.sku, item.brand]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(normalizedSearch))
-      const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter
-      const matchesStatus = statusFilter === 'all' || getStockStatus(item) === statusFilter
-
-      return matchesSearch && matchesCategory && matchesStatus
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      if (statusFilter === 'active') return item.is_active
+      if (statusFilter === 'inactive') return !item.is_active
+      if (statusFilter === 'out') return (item.total_stock || 0) <= 0
+      return true
     })
-  }, [categoryFilter, searchTerm, statusFilter, stock])
+  }, [items, statusFilter])
 
-  const handleSaveEntry = (entries) => {
-    setStock((current) =>
-      current.map((item) => {
-        const entry = entries.find((candidate) => candidate.sku === item.sku)
-        if (!entry) return item
-        const { sku: _sku, ...rest } = entry
-        const balanceAfter = item.currentStock + rest.quantity
-        return {
-          ...item,
-          currentStock: balanceAfter,
-          movements: [...item.movements, { id: item.movements.length + 1, ...rest, balanceAfter }],
-        }
-      }),
-    )
+  const handleOpenEntryForm = (item) => {
+    setAdjustingProduct(item)
+    setFormError('')
+    setIsFormOpen(true)
   }
 
-  const handleEditItem = (item) => {
-    setEditingItem(item)
-    setEditForm({
-      productName: item.productName,
-      size: item.size,
-      brand: item.brand,
-      category: item.category,
-      unit: item.unit,
-      minStock: item.minStock,
-    })
+  const handleCloseEntryForm = () => {
+    if (isSaving) return
+    setIsFormOpen(false)
+    setAdjustingProduct(null)
+    setFormError('')
   }
 
-  const handleSaveEdit = (event) => {
-    event.preventDefault()
-    setStock((current) =>
-      current.map((item) =>
-        item.sku === editingItem.sku
-          ? { ...item, ...editForm, minStock: Number(editForm.minStock) || 0 }
-          : item,
-      ),
-    )
-    setEditingItem(null)
-    setEditForm(null)
-  }
+  const handleSaveEntry = async (movements) => {
+    setIsSaving(true)
+    setFormError('')
 
-  const handleToggleStatus = () => {
-    if (!statusItem) return
+    for (const movement of movements) {
+      const result = await recordStockAdjustment(movement)
 
-    setStock((current) =>
-      current.map((item) =>
-        item.sku === statusItem.sku
-          ? { ...item, status: item.status === 'active' ? 'inactive' : 'active' }
-          : item,
-      ),
-    )
-    setStatusItem(null)
-  }
-
-  const handleDeleteItem = (sku) => {
-    if (confirm('Are you sure you want to delete this inventory item?')) {
-      setStock((current) => current.filter((item) => item.sku !== sku))
+      if (!result.success) {
+        setIsSaving(false)
+        setFormError(result.error)
+        return
+      }
     }
+
+    setIsSaving(false)
+    setIsFormOpen(false)
+    setAdjustingProduct(null)
+    await loadStock()
   }
 
-  if (isFormOpen) {
+  if (isFormOpen && !readOnly) {
     return (
       <StockEntryForm
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={handleCloseEntryForm}
+        product={adjustingProduct}
+        saving={isSaving}
+        formError={formError}
         onSave={handleSaveEntry}
       />
     )
@@ -142,40 +137,34 @@ export default function StockBoard() {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={Boxes} iconVariant="primary" label="Tracked SKUs" value={stats.totalSkus} />
-        <StatCard icon={Package} iconVariant="info" label="Total Units" value={stats.totalUnits.toLocaleString()} />
-        <StatCard icon={AlertTriangle} iconVariant="warning" label="Low Stock" value={stats.lowStock} />
+        <StatCard icon={Boxes} iconVariant="primary" label="Tracked Products" value={stats.totalProducts} />
+        <StatCard icon={Package} iconVariant="info" label="Total Stock Units" value={stats.totalStock.toLocaleString()} />
         <StatCard icon={XCircle} iconVariant="danger" label="Out of Stock" value={stats.outOfStock} />
+        <StatCard icon={PowerOff} iconVariant="warning" label="Inactive" value={stats.inactive} />
       </div>
 
       <Card className="p-0">
         <div className="border-b border-neutral-100 px-5 py-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-5">
-              {stockStatusTabs.map((tab) => {
-                const isActive = statusFilter === tab.value
+          <div className="flex flex-wrap gap-5">
+            {stockStatusTabs.map((tab) => {
+              const isActive = statusFilter === tab.value
 
-                return (
-                  <button
-                    key={tab.value}
-                    type="button"
-                    onClick={() => setStatusFilter(tab.value)}
-                    className={`relative py-2 text-sm font-medium transition-colors ${
-                      isActive ? 'text-primary-700' : 'text-neutral-500 hover:text-neutral-900'
-                    }`}
-                  >
-                    {tab.label}
-                    {isActive && (
-                      <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-600" aria-hidden="true" />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-            <Button onClick={() => setIsFormOpen(true)} size="sm" className="w-full sm:w-auto">
-              <Plus className="size-4" aria-hidden="true" />
-              Add Stock Entry
-            </Button>
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.value)}
+                  className={`relative py-2 text-sm font-medium transition-colors ${
+                    isActive ? 'text-primary-700' : 'text-neutral-500 hover:text-neutral-900'
+                  }`}
+                >
+                  {tab.label}
+                  {isActive && (
+                    <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-600" aria-hidden="true" />
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -203,7 +192,17 @@ export default function StockBoard() {
         </div>
 
         <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">
-          {filteredStock.length === 0 ? (
+          {listError ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-red-600">{listError}</p>
+              <Button type="button" variant="outline" className="mt-4" onClick={loadStock}>
+                <RotateCw className="size-4" aria-hidden="true" />
+                Retry
+              </Button>
+            </div>
+          ) : isLoading ? (
+            <LoadingSpinner label="Loading stock board..." />
+          ) : filteredItems.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No stock items match these filters.</p>
           ) : (
             <table className="w-full text-left text-sm">
@@ -211,23 +210,21 @@ export default function StockBoard() {
                 <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
                   <th className="whitespace-nowrap px-4 py-3">Product</th>
                   <th className="whitespace-nowrap px-4 py-3">SKU</th>
-                  <th className="whitespace-nowrap px-4 py-3">Category</th>
+                  <th className="whitespace-nowrap px-4 py-3">Variants</th>
                   <th className="whitespace-nowrap px-4 py-3">Current Stock</th>
-                  <th className="whitespace-nowrap px-4 py-3">Min Stock</th>
                   <th className="whitespace-nowrap px-4 py-3">Status</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
+                  {!readOnly && <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>}
                 </tr>
               </thead>
               <tbody>
-                {filteredStock.map((item) => {
-                  const status = getStockStatus(item)
-                  const isInactive = item.status === 'inactive'
+                {filteredItems.map((item) => {
+                  const isOutOfStock = (item.total_stock || 0) <= 0
 
                   return (
                     <tr
-                      key={item.sku}
-                      onClick={() => navigate(`/admin/inventory/${item.sku}`)}
-                      className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                      key={item.id}
+                      onClick={readOnly ? undefined : () => navigate(`/admin/inventory/${item.id}`)}
+                      className={`bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35 ${readOnly ? '' : 'cursor-pointer'}`}
                     >
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
@@ -235,52 +232,38 @@ export default function StockBoard() {
                             <Package className="size-4" aria-hidden="true" />
                           </div>
                           <div>
-                            <span className="font-medium text-neutral-900">{item.productName}</span>
-                            <p className="mt-0.5 text-xs text-neutral-400">{item.size}</p>
+                            <span className="font-medium text-neutral-900">{item.name}</span>
+                            {item.brand && <p className="mt-0.5 text-xs text-neutral-400">{item.brand}</p>}
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3.5 font-mono text-neutral-600">{item.sku}</td>
-                      <td className="px-4 py-3.5 text-neutral-600">{item.category}</td>
+                      <td className="px-4 py-3.5 font-mono text-neutral-600">{item.sku || '—'}</td>
+                      <td className="px-4 py-3.5 text-neutral-600">{item.variations?.length || 0}</td>
                       <td className="px-4 py-3.5">
-                        <span className={status !== 'in' ? 'font-semibold text-red-600' : 'font-medium text-neutral-900'}>
-                          {item.currentStock} {item.unit}
-                          {item.unit === 'Bottle' ? 's' : ''}
+                        <span className={isOutOfStock ? 'font-semibold text-red-600' : 'font-medium text-neutral-900'}>
+                          {item.total_stock}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-neutral-600">
-                        {item.minStock} {item.unit}
-                        {item.unit === 'Bottle' ? 's' : ''}
-                      </td>
                       <td className="px-4 py-3.5">
-                        {isInactive ? (
-                          <Badge variant="neutral">Inactive</Badge>
-                        ) : status === 'out' ? (
-                          <Badge variant="danger" dot>Out of Stock</Badge>
-                        ) : status === 'low' ? (
-                          <Badge variant="warning" dot>Low Stock</Badge>
-                        ) : (
-                          <Badge variant="success">In Stock</Badge>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {!item.is_active && <Badge variant="neutral">Inactive</Badge>}
+                          {isOutOfStock ? (
+                            <Badge variant="danger" dot>Out of Stock</Badge>
+                          ) : (
+                            <Badge variant="success">In Stock</Badge>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
-                        <ActionMenu
-                          items={[
-                            { label: 'Edit Inventory', icon: Edit, onClick: () => handleEditItem(item) },
-                            {
-                              label: isInactive ? 'Activate' : 'Deactivate',
-                              icon: Power,
-                              onClick: () => setStatusItem(item),
-                            },
-                            {
-                              label: 'Delete Inventory',
-                              icon: Trash2,
-                              danger: true,
-                              onClick: () => handleDeleteItem(item.sku),
-                            },
-                          ]}
-                        />
-                      </td>
+                      {!readOnly && (
+                        <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
+                          <ActionMenu
+                            items={[
+                              { label: 'View Details', icon: Eye, onClick: () => navigate(`/admin/inventory/${item.id}`) },
+                              { label: 'Adjust Stock', icon: PackagePlus, onClick: () => handleOpenEntryForm(item) },
+                            ]}
+                          />
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -291,90 +274,11 @@ export default function StockBoard() {
 
         <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-3 text-xs text-neutral-400">
           <span>
-            {filteredStock.length === 0 ? '0' : `1 to ${filteredStock.length}`} of {stock.length}
+            {filteredItems.length === 0 ? '0' : `1 to ${filteredItems.length}`} of {items.length}
           </span>
           <span>Stock Items</span>
         </div>
       </Card>
-
-      <Modal isOpen={Boolean(editingItem)} onClose={() => setEditingItem(null)} title="Edit Inventory Item">
-        {editForm && (
-          <form onSubmit={handleSaveEdit} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input
-                label="Product Name"
-                value={editForm.productName}
-                onChange={(event) => setEditForm({ ...editForm, productName: event.target.value })}
-                required
-              />
-              <Input
-                label="Size"
-                value={editForm.size}
-                onChange={(event) => setEditForm({ ...editForm, size: event.target.value })}
-                required
-              />
-              <Input
-                label="Brand"
-                value={editForm.brand}
-                onChange={(event) => setEditForm({ ...editForm, brand: event.target.value })}
-                required
-              />
-              <Input
-                label="Category"
-                value={editForm.category}
-                onChange={(event) => setEditForm({ ...editForm, category: event.target.value })}
-                required
-              />
-              <Input
-                label="Unit"
-                value={editForm.unit}
-                onChange={(event) => setEditForm({ ...editForm, unit: event.target.value })}
-                required
-              />
-              <Input
-                label="Minimum Stock"
-                type="number"
-                min="0"
-                value={editForm.minStock}
-                onChange={(event) => setEditForm({ ...editForm, minStock: event.target.value })}
-                required
-              />
-            </div>
-            <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
-              <Button type="button" variant="secondary" onClick={() => setEditingItem(null)}>
-                Cancel
-              </Button>
-              <Button type="submit">Save Changes</Button>
-            </div>
-          </form>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={Boolean(statusItem)}
-        onClose={() => setStatusItem(null)}
-        title={`${statusItem?.status === 'active' ? 'Deactivate' : 'Activate'} Inventory Item`}
-      >
-        <div className="space-y-5">
-          <p className="text-sm leading-6 text-neutral-600">
-            {statusItem?.status === 'active'
-              ? 'This SKU will be excluded from low-stock and out-of-stock alerts, but its history stays intact.'
-              : 'This SKU will be marked active and included in stock alerts again.'}
-          </p>
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setStatusItem(null)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant={statusItem?.status === 'active' ? 'danger' : 'primary'}
-              onClick={handleToggleStatus}
-            >
-              {statusItem?.status === 'active' ? 'Deactivate' : 'Activate'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   )
 }

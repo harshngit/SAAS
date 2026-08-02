@@ -80,6 +80,120 @@ export async function createProduct(payload) {
   }
 }
 
+export async function getProduct(productId) {
+  try {
+    const { data } = await apiClient.get(`/products/${productId}`, {
+      headers: authHeader(),
+    })
+
+    return { success: true, product: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load product details. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function updateProduct(productId, payload) {
+  try {
+    const requestBody = {}
+
+    if (payload.name !== undefined) requestBody.name = payload.name.trim()
+    if (payload.description !== undefined) requestBody.description = payload.description?.trim() || ''
+    if (payload.price !== undefined) requestBody.price = Number(payload.price) || 0
+    if (payload.coverImage !== undefined || payload.cover_image !== undefined) {
+      requestBody.cover_image = payload.coverImage ?? payload.cover_image ?? ''
+    }
+    if (payload.images !== undefined) requestBody.images = payload.images
+    if (payload.productType !== undefined || payload.product_type !== undefined || payload.category !== undefined) {
+      requestBody.product_type = payload.productType || payload.product_type || payload.category || ''
+    }
+    if (payload.vendor !== undefined) requestBody.vendor = payload.vendor || ''
+    if (payload.brand !== undefined) requestBody.brand = payload.brand?.trim() || ''
+    if (payload.sku !== undefined) requestBody.sku = payload.sku || payload.variants?.[0]?.sku || ''
+    if (payload.categoryId !== undefined || payload.category_id !== undefined || payload.category !== undefined) {
+      requestBody.category_id = payload.categoryId || payload.category_id || payload.category || ''
+    }
+    if (payload.isActive !== undefined || payload.is_active !== undefined) {
+      requestBody.is_active = payload.isActive ?? payload.is_active
+    }
+    if (payload.totalInventory !== undefined || payload.total_inventory !== undefined) {
+      requestBody.total_inventory = Number(payload.totalInventory ?? payload.total_inventory) || 0
+    }
+    if (payload.variants !== undefined) {
+      requestBody.variations = payload.variants.map((variant) => ({
+        name: variant.size || variant.name || 'Default',
+        length: Number(variant.length) || 0,
+        width: Number(variant.width) || 0,
+        height: Number(variant.height) || 0,
+        weight: Number(variant.weight) || 0,
+        price: Number(variant.sellingPrice ?? variant.price) || 0,
+        inventory: Number(variant.inventory ?? variant.stock) || 0,
+      }))
+
+      if (requestBody.total_inventory === undefined) {
+        requestBody.total_inventory = requestBody.variations.reduce((sum, variant) => sum + variant.inventory, 0)
+      }
+    }
+
+    const { data } = await apiClient.patch(`/products/${productId}`, requestBody, {
+      headers: authHeader(),
+    })
+
+    return { success: true, product: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to update product. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function deleteProduct(productId) {
+  try {
+    await apiClient.delete(`/products/${productId}`, {
+      headers: authHeader(),
+    })
+
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to delete product. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function deleteProductsBulk(productIds) {
+  try {
+    const { data } = await apiClient.post(
+      '/products/bulk-delete',
+      { ids: productIds },
+      { headers: authHeader() },
+    )
+
+    return { success: true, deleted: data?.deleted ?? productIds.length }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to delete selected products. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function listProducts(params = {}) {
   try {
     const queryParams = {}

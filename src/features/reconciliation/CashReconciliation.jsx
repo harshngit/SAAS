@@ -4,8 +4,10 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import { formatCurrency } from '../../utils/format'
+import { useToast } from '../../components/ui/toastContext'
 
 export default function CashReconciliation() {
+  const { showToast } = useToast()
   const [openingBalance, setOpeningBalance] = useState(50000)
   const [cashSales, setCashSales] = useState(25000)
   const [cashReceived, setCashReceived] = useState(15000)
@@ -18,7 +20,7 @@ export default function CashReconciliation() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    alert('Cash reconciliation saved!')
+    showToast({ title: 'Reconciliation saved', message: 'Cash reconciliation saved successfully.' })
   }
 
   return (
