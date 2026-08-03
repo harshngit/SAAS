@@ -1,4 +1,17 @@
 export const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024
+export const ORG_ASSET_MAX_SIZE_BYTES = 1 * 1024 * 1024
+
+export function getImageFileError(file, maxSizeBytes = MAX_IMAGE_SIZE_BYTES) {
+  if (!file.type.startsWith('image/')) {
+    return `${file.name} is not an image file.`
+  }
+
+  if (file.size > maxSizeBytes) {
+    return `${file.name} is larger than ${Math.round(maxSizeBytes / (1024 * 1024))}MB.`
+  }
+
+  return null
+}
 
 export function readImageAsDataUrl(file) {
   return new Promise((resolve, reject) => {
