@@ -90,6 +90,8 @@ export const useAuthStore = create(
         const normalizedOrganization = organization
           ? {
               ...organization,
+              legalName: organization.legal_name,
+              industry: organization.industry,
               businessType: organization.business_type,
               gstNumber: organization.gst_number,
               panNumber: organization.pan_number,

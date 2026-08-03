@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { showGlobalToast } from '../components/ui/toastContext'
 import { useAuthStore } from '../store/authStore'
 
 export const API_BASE_URL = 'https://crm-saas-backend-9nom.onrender.com/'
@@ -51,6 +52,12 @@ async function refreshAuthTokens() {
   }
 
   if (!refreshRequest) {
+    showGlobalToast({
+      title: 'Refreshing session',
+      message: 'Your access token is being refreshed.',
+      duration: 2500,
+    })
+
     refreshRequest = refreshClient
       .post('/auth/refresh', { refresh_token: refreshToken })
       .then(({ data }) => {

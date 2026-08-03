@@ -59,6 +59,9 @@ export async function updateOrganizationSettings(payload) {
   try {
     const requestBody = {}
 
+    if (payload.name !== undefined) requestBody.name = payload.name || null
+    if (payload.legalName !== undefined) requestBody.legal_name = payload.legalName || null
+    if (payload.industry !== undefined) requestBody.industry = payload.industry || null
     if (payload.businessType !== undefined) requestBody.business_type = payload.businessType || null
     if (payload.gstNumber !== undefined) requestBody.gst_number = payload.gstNumber || null
     if (payload.panNumber !== undefined) requestBody.pan_number = payload.panNumber || null

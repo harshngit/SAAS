@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle, X } from 'lucide-react'
-import { ToastContext } from './toastContext'
+import { setToastHandler, ToastContext } from './toastContext'
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
@@ -20,6 +20,14 @@ export function ToastProvider({ children }) {
   }
 
   const value = useMemo(() => ({ showToast }), [])
+
+  useEffect(() => {
+    setToastHandler(showToast)
+
+    return () => {
+      setToastHandler(null)
+    }
+  }, [])
 
   return (
     <ToastContext.Provider value={value}>

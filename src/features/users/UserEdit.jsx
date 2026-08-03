@@ -40,6 +40,8 @@ export default function UserEdit() {
     formData.username !== (user.username || '') ||
     formData.phone !== (user.phone || '')
   )
+  const profilePictureChanged = Boolean(formData.profilePictureName)
+  const userProfileChanged = basicInformationChanged || profilePictureChanged
 
   const apiRoleOptions = roles
     .map((role) => {
@@ -100,7 +102,7 @@ export default function UserEdit() {
     event.preventDefault()
     setError('')
 
-    if (!basicInformationChanged) {
+    if (!userProfileChanged) {
       return
     }
 
@@ -303,7 +305,7 @@ export default function UserEdit() {
         <Button type="button" variant="secondary" onClick={() => navigate(`/admin/users/${userId}`)}>
           Cancel
         </Button>
-        <Button type="submit" loading={isSaving} disabled={!basicInformationChanged}>
+        <Button type="submit" loading={isSaving} disabled={!userProfileChanged}>
           Update User
         </Button>
       </div>
