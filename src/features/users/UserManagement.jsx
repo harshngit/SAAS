@@ -1,5 +1,22 @@
-import { useEffect, useState } from 'react'
-import { CalendarDays, Camera, Edit, KeyRound, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  Banknote,
+  BriefcaseBusiness,
+  CalendarDays,
+  Edit,
+  FileText,
+  KeyRound,
+  MapPin,
+  Phone,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  UserRound,
+} from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
@@ -28,6 +45,145 @@ const staffRoleSelectOptions = staffRoleOptions.map((role) => ({
   label: roleLabels[role],
 }))
 
+const genderOptions = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+]
+
+const maritalStatusOptions = [
+  { value: 'single', label: 'Single' },
+  { value: 'married', label: 'Married' },
+  { value: 'divorced', label: 'Divorced' },
+  { value: 'widowed', label: 'Widowed' },
+]
+
+const bloodGroupOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((value) => ({ value, label: value }))
+
+const countryOptions = [
+  { value: 'india', label: 'India' },
+  { value: 'usa', label: 'United States' },
+  { value: 'uk', label: 'United Kingdom' },
+  { value: 'uae', label: 'United Arab Emirates' },
+]
+
+const employmentTypeOptions = [
+  { value: 'full-time', label: 'Full-time' },
+  { value: 'part-time', label: 'Part-time' },
+  { value: 'contract', label: 'Contract' },
+  { value: 'intern', label: 'Intern' },
+]
+
+const employeeStatusOptions = [
+  { value: 'active', label: 'Active' },
+  { value: 'probation', label: 'Probation' },
+  { value: 'notice-period', label: 'Notice Period' },
+  { value: 'resigned', label: 'Resigned' },
+  { value: 'terminated', label: 'Terminated' },
+  { value: 'relieved', label: 'Relieved' },
+]
+
+const shiftOptions = [
+  { value: 'general', label: 'General' },
+  { value: 'morning', label: 'Morning' },
+  { value: 'evening', label: 'Evening' },
+  { value: 'night', label: 'Night' },
+]
+
+const identityProofOptions = [
+  { value: 'aadhaar', label: 'Aadhaar' },
+  { value: 'pan', label: 'PAN' },
+  { value: 'voter-id', label: 'Voter ID' },
+  { value: 'passport', label: 'Passport' },
+  { value: 'driving-license', label: 'Driving License' },
+]
+
+const languageOptions = [
+  { value: 'en', label: 'English' },
+  { value: 'hi', label: 'Hindi' },
+  { value: 'mr', label: 'Marathi' },
+]
+
+const timeZoneOptions = [
+  { value: 'Asia/Kolkata', label: 'Asia/Kolkata' },
+  { value: 'UTC', label: 'UTC' },
+  { value: 'Asia/Dubai', label: 'Asia/Dubai' },
+]
+
+const systemStatusOptions = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'suspended', label: 'Suspended' },
+  { value: 'locked', label: 'Locked' },
+]
+
+const initialStaffFormData = {
+  employeeId: '',
+  firstName: '',
+  lastName: '',
+  name: '',
+  gender: '',
+  dateOfBirth: '',
+  maritalStatus: '',
+  bloodGroup: '',
+  nationality: '',
+  profilePictureName: '',
+  mobileNumber: '',
+  alternateMobileNumber: '',
+  personalEmail: '',
+  email: '',
+  emergencyContactName: '',
+  emergencyContactNumber: '',
+  emergencyContactRelationship: '',
+  currentAddress: '',
+  permanentAddress: '',
+  city: '',
+  state: '',
+  country: '',
+  pinCode: '',
+  role: ROLES.SALES_OFFICER,
+  role_id: '',
+  reportingManager: '',
+  employmentType: '',
+  dateOfJoining: '',
+  dateOfExit: '',
+  workLocation: '',
+  shift: '',
+  employeeStatus: 'active',
+  username: '',
+  password: '',
+  confirmPassword: '',
+  basicSalary: '',
+  bankName: '',
+  accountNumber: '',
+  ifscSwiftCode: '',
+  accountHolderName: '',
+  upiId: '',
+  identityProofType: '',
+  identityDocumentsName: '',
+  resumeCvName: '',
+  offerLetterName: '',
+  appointmentLetterName: '',
+  experienceCertificatesName: '',
+  educationalCertificatesName: '',
+  skills: '',
+  language: '',
+  timeZone: '',
+  systemStatus: 'active',
+  sendNotification: true,
+}
+
+const staffFormSections = [
+  { number: '1', title: 'Basic Information', description: 'Employee identity and personal profile details.', icon: UserRound },
+  { number: '2', title: 'Contact Information', description: 'Primary, secondary, and emergency contact details.', icon: Phone },
+  { number: '3', title: 'Address Information', description: 'Residential and regional address details.', icon: MapPin },
+  { number: '4', title: 'Employment Information', description: 'Role, reporting, joining, location, and employee status.', icon: BriefcaseBusiness },
+  { number: '5', title: 'Login & Security', description: 'Authentication credentials and invitation settings.', icon: ShieldCheck },
+  { number: '6', title: 'Payroll Information', description: 'Salary bank and payment details.', icon: Banknote },
+  { number: '7', title: 'Uploads', description: 'Compliance, onboarding, and qualification documents.', icon: FileText },
+  { number: '8', title: 'System Preferences', description: 'Application language, timezone, and account status.', icon: Settings },
+]
+
 const getInitials = (name = '') =>
   name
     .split(' ')
@@ -35,6 +191,202 @@ const getInitials = (name = '') =>
     .join('')
     .slice(0, 2)
     .toUpperCase()
+
+function StaffSection({ number, title, description, children }) {
+  void title
+  void description
+
+  return (
+    <section id={`staff-section-${number}`} className="scroll-mt-6 border-b border-neutral-100 py-5 first:pt-0 last:border-b-0">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{children}</div>
+    </section>
+  )
+}
+
+function StaffField({ description, format, required, children, className = '' }) {
+  void description
+  void format
+  void required
+
+  return (
+    <div className={className}>
+      {children}
+    </div>
+  )
+}
+
+const createUploadPreview = (file) => ({
+  name: file.name,
+  type: file.type,
+  url: URL.createObjectURL(file),
+})
+
+const revokeUploadPreviewUrls = (previews = []) => {
+  previews.forEach((preview) => URL.revokeObjectURL(preview.url))
+}
+
+function UploadPreview({ previews = [] }) {
+  if (!previews.length) {
+    return (
+      <div className="flex h-12 min-w-24 items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-400">
+        Preview
+      </div>
+    )
+  }
+
+  const visiblePreviews = previews.slice(0, 2)
+  const remainingCount = previews.length - visiblePreviews.length
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      {visiblePreviews.map((preview) => {
+        const isImage = preview.type.startsWith('image/')
+        const isPdf = preview.type === 'application/pdf'
+
+        return (
+          <a
+            key={`${preview.name}-${preview.url}`}
+            href={preview.url}
+            target="_blank"
+            rel="noreferrer"
+            title={`Preview ${preview.name}`}
+            className="group relative flex size-12 shrink-0 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
+          >
+            {isImage ? (
+              <img src={preview.url} alt={preview.name} className="size-full object-cover" />
+            ) : isPdf ? (
+              <iframe src={preview.url} title={preview.name} className="size-full pointer-events-none border-0 bg-white" />
+            ) : (
+              <span className="flex size-full items-center justify-center text-neutral-500">
+                <FileText className="size-5" aria-hidden="true" />
+              </span>
+            )}
+            <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1 py-0.5 text-[9px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+              {preview.name}
+            </span>
+          </a>
+        )
+      })}
+      {remainingCount > 0 && (
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-xs font-semibold text-neutral-500">
+          +{remainingCount}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function StaffUploadField({
+  label,
+  name,
+  value,
+  previews,
+  required = false,
+  accept,
+  multiple = false,
+  onChange,
+  onRemove,
+}) {
+  return (
+    <div className="flex min-h-[4.625rem] items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+      <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 pr-2">
+          <p className="truncate text-sm font-semibold text-neutral-900">
+            {label}
+            {required && <span className="text-red-500"> *</span>}
+          </p>
+          {value && <p className="mt-1 truncate text-xs font-medium text-primary-700">{value}</p>}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <UploadPreview previews={previews} />
+          <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+            <Upload className="size-3.5" aria-hidden="true" />
+            Upload
+            <input
+              type="file"
+              accept={accept}
+              multiple={multiple}
+              className="sr-only"
+              onChange={(event) => {
+                const files = Array.from(event.target.files || [])
+                onChange(name, files)
+                event.target.value = ''
+              }}
+            />
+          </label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-full px-3 text-xs"
+            disabled={!value}
+            onClick={() => onRemove(name)}
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            Remove
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function IdentityProofUploadField({
+  proofValue,
+  fileValue,
+  previews,
+  options,
+  onProofChange,
+  onFileChange,
+  onRemove,
+}) {
+  return (
+    <div className="flex min-h-[4.625rem] items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5">
+      <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <Select
+          label="Identity Proofs"
+          name="identityProofType"
+          options={options}
+          value={proofValue}
+          onChange={onProofChange}
+          required
+        />
+        <div className="flex flex-col gap-1.5">
+          <p className="text-sm font-semibold text-neutral-900">Upload Documents</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <UploadPreview previews={previews} />
+            <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+              <Upload className="size-3.5" aria-hidden="true" />
+              Upload
+              <input
+                type="file"
+                accept="application/pdf,image/*"
+                className="sr-only"
+                onChange={(event) => {
+                  const files = Array.from(event.target.files || [])
+                  onFileChange('identityDocumentsName', files)
+                  event.target.value = ''
+                }}
+              />
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full px-3 text-xs"
+              disabled={!fileValue}
+              onClick={() => onRemove('identityDocumentsName')}
+            >
+              <Trash2 className="size-3.5" aria-hidden="true" />
+              Remove
+            </Button>
+          </div>
+          {fileValue && <p className="max-w-80 truncate text-xs font-medium text-primary-700">{fileValue}</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function UserManagement() {
   const navigate = useNavigate()
@@ -55,16 +407,10 @@ export default function UserManagement() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [resetPasswordUser, setResetPasswordUser] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    username: '',
-    phone: '',
-    role: ROLES.SALES_OFFICER,
-    role_id: '',
-    password: '',
-    profilePictureName: '',
-  })
+  const [formData, setFormData] = useState(initialStaffFormData)
+  const [uploadPreviews, setUploadPreviews] = useState({})
+  const uploadPreviewsRef = useRef({})
+  const [activeStaffSection, setActiveStaffSection] = useState('1')
 
   const apiRoleOptions = roles.map((role) => {
     const systemRole = getSystemRoleFromRoleName(role.name)
@@ -83,16 +429,17 @@ export default function UserManagement() {
 
   const handleOpenModal = () => {
     setFormError('')
+    setActiveStaffSection('1')
+    setUploadPreviews((current) => {
+      Object.values(current).forEach(revokeUploadPreviewUrls)
+      uploadPreviewsRef.current = {}
+      return {}
+    })
     setFormData(
       {
-        name: '',
-        email: '',
-        username: '',
-        phone: '',
+        ...initialStaffFormData,
         role: ROLES.SALES_OFFICER,
         role_id: effectiveRoleSelectOptions.find((role) => role.value === ROLES.SALES_OFFICER)?.roleId || '',
-        password: '',
-        profilePictureName: '',
       },
     )
     setIsModalOpen(true)
@@ -101,7 +448,48 @@ export default function UserManagement() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setFormError('')
+    setUploadPreviews((current) => {
+      Object.values(current).forEach(revokeUploadPreviewUrls)
+      uploadPreviewsRef.current = {}
+      return {}
+    })
   }
+
+  const handleFormChange = (event) => {
+    const { name, type, checked, value } = event.target
+    setFormData((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }))
+  }
+
+  const handleUploadChange = (name, files) => {
+    const selectedFiles = Array.from(files || [])
+    const fileNames = selectedFiles.map((file) => file.name).join(', ')
+
+    setUploadPreviews((current) => {
+      revokeUploadPreviewUrls(current[name])
+      const nextPreviews = {
+        ...current,
+        [name]: selectedFiles.map(createUploadPreview),
+      }
+      uploadPreviewsRef.current = nextPreviews
+      return nextPreviews
+    })
+    setFormData((current) => ({ ...current, [name]: fileNames }))
+  }
+
+  const handleUploadRemove = (name) => {
+    setUploadPreviews((current) => {
+      revokeUploadPreviewUrls(current[name])
+      const { [name]: removed, ...remaining } = current
+      void removed
+      uploadPreviewsRef.current = remaining
+      return remaining
+    })
+    setFormData((current) => ({ ...current, [name]: '' }))
+  }
+
+  useEffect(() => () => {
+    Object.values(uploadPreviewsRef.current).forEach(revokeUploadPreviewUrls)
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -139,8 +527,23 @@ export default function UserManagement() {
     e.preventDefault()
     setFormError('')
 
+    if (formData.password !== formData.confirmPassword) {
+      setFormError('Password and confirm password must match.')
+      return
+    }
+
+    const displayName = formData.name.trim() || `${formData.firstName} ${formData.lastName}`.trim()
+    const selectedRole = effectiveRoleSelectOptions.find((role) => role.value === formData.role)
+    const payload = {
+      ...formData,
+      name: displayName,
+      email: formData.email,
+      phone: formData.mobileNumber,
+      role_id: formData.role_id || selectedRole?.roleId || '',
+    }
+
     setIsSaving(true)
-    const result = await createUser(formData)
+    const result = await createUser(payload)
     setIsSaving(false)
 
     if (!result.success) {
@@ -151,7 +554,7 @@ export default function UserManagement() {
     if (result.user) {
       setUsers([...users, normalizeApiUser(result.user)])
     } else {
-      const newUser = { ...formData, id: Date.now(), status: 'active' }
+      const newUser = { ...payload, id: Date.now(), status: payload.systemStatus || 'active' }
       setUsers([...users, newUser])
     }
 
@@ -209,6 +612,7 @@ export default function UserManagement() {
 
     return matchesRole && matchesSearch
   })
+  const activeStaffFormSection = staffFormSections.find((section) => section.number === activeStaffSection) || staffFormSections[0]
 
   if (isModalOpen) {
     return (
@@ -216,136 +620,274 @@ export default function UserManagement() {
         <div>
           <form
             onSubmit={handleSubmit}
-            className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-[1.75rem] border border-neutral-100 bg-white p-6 shadow-(--shadow-card)"
+            className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-[1.75rem] border border-neutral-100 bg-white shadow-(--shadow-card)"
           >
-            <div className="flex flex-col gap-4 border-b border-neutral-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-lg font-semibold text-neutral-900">Add a user for a new role</p>
-                <p className="mt-1 text-sm text-neutral-500">Enter contact details, upload a profile image, and choose a workspace role.</p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-[#063B00] text-[#063B00] hover:border-[#063B00] hover:bg-primary-50 hover:text-[#063B00]"
-                onClick={handleCloseModal}
-              >
-                Back to Staff
-              </Button>
-            </div>
+            <div className="grid flex-1 lg:grid-cols-[17rem_minmax(0,1fr)]">
+              <aside className="border-b border-neutral-100 p-6 lg:border-b-0 lg:border-r">
+                <nav className="space-y-2">
+                  {staffFormSections.map((section) => {
+                    const Icon = section.icon
+                    const isActive = section.number === activeStaffSection
+                    return (
+                      <button
+                        key={section.number}
+                        type="button"
+                        onClick={() => setActiveStaffSection(section.number)}
+                        className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium transition-all ${
+                          isActive
+                            ? 'border border-neutral-100 bg-neutral-50 text-primary-700 shadow-(--shadow-xs)'
+                            : 'text-neutral-500 hover:bg-neutral-50 hover:text-primary-700'
+                        }`}
+                      >
+                        <Icon className="size-4 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{section.title}</span>
+                      </button>
+                    )
+                  })}
+                </nav>
+              </aside>
 
-            <div className="mt-6 grid flex-1 content-start gap-6 xl:grid-cols-[18rem_minmax(0,1fr)]">
-              <div className="rounded-2xl border border-primary-100 bg-linear-to-br from-white to-[#eef6eb] p-4">
-                <p className="text-sm font-semibold text-neutral-900">Profile Picture</p>
-                <p className="mt-1 text-xs leading-5 text-neutral-500">Add an optional image to make staff records easier to scan.</p>
-                <label className="mt-4 flex aspect-square cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-primary-200 bg-white text-center text-primary-700 transition-all hover:-translate-y-0.5 hover:border-primary-300 hover:bg-primary-50/70 hover:shadow-(--shadow-card)">
-                  <span className="flex size-12 items-center justify-center rounded-full bg-primary-50 ring-1 ring-primary-100">
-                    <Camera className="size-6" aria-hidden="true" />
-                  </span>
-                  <span className="text-sm font-semibold">Upload Photo</span>
-                  <span className="max-w-36 truncate text-xs text-neutral-500">
-                    {formData.profilePictureName || 'PNG or JPG'}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      setFormData({ ...formData, profilePictureName: file?.name || '' })
-                    }}
-                  />
-                </label>
-                {formData.profilePictureName && (
+              <div className="min-w-0 p-6">
+                <div className="flex flex-col gap-4 border-b border-neutral-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-lg font-semibold text-neutral-900">{activeStaffFormSection.title}</p>
+                    <p className="mt-1 text-sm text-neutral-500">{activeStaffFormSection.description}</p>
+                  </div>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="mt-3 w-full"
-                    onClick={() => setFormData({ ...formData, profilePictureName: '' })}
+                    className="border-[#063B00] text-[#063B00] hover:border-[#063B00] hover:bg-primary-50 hover:text-[#063B00]"
+                    onClick={handleCloseModal}
                   >
-                    <X className="size-4" aria-hidden="true" />
-                    Remove
+                    Back to Staff
                   </Button>
-                )}
-              </div>
-
-              <div className="space-y-5">
-                <div>
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">1</span>
-                    <p className="text-sm font-semibold text-neutral-900">Basic information</p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <Input
-                      label="Name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      required
-                    />
-                    <Input
-                      label="Email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      required
-                    />
-                    <Input
-                      label="Username"
-                      value={formData.username}
-                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                      required
-                    />
-                    <Input
-                      label="Phone Number"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      required
-                    />
-                    <Input
-                      label="Password"
-                      type="password"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      required
-                    />
-                  </div>
                 </div>
 
-                <div>
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">2</span>
-                    <p className="text-sm font-semibold text-neutral-900">Role and invitation</p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-1">
-                    <Select
-                      label="Role"
-                      options={effectiveRoleSelectOptions}
-                      placeholder="Select role"
-                      name="role"
-                      className="w-[50%]"
-                      value={formData.role}
-                      onChange={(e) => {
-                        const selectedRole = effectiveRoleSelectOptions.find((role) => role.value === e.target.value)
-                        setFormData({
-                          ...formData,
-                          role: e.target.value,
-                          role_id: selectedRole?.roleId || '',
-                        })
-                      }}
-                    />
-                    <label className="flex w-[50%] items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-3.5 text-sm text-neutral-600">
-                      <input
-                        type="checkbox"
-                        defaultChecked
-                        className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500/20"
-                      />
-                      Send a notification to the user for this new role.
-                    </label>
-                  </div>
-                </div>
-              </div>
+                <div className="mt-6 space-y-5">
+              {activeStaffSection === '1' && (
+              <StaffSection number="1" title="Basic Information" description="Employee identity and personal profile details.">
+                <StaffUploadField
+                  label="Profile Photo"
+                  name="profilePictureName"
+                  value={formData.profilePictureName}
+                  previews={uploadPreviews.profilePictureName}
+                  description="Employee profile picture."
+                  format="Image upload"
+                  accept="image/png,image/jpeg,image/jpg"
+                  onChange={handleUploadChange}
+                  onRemove={handleUploadRemove}
+                />
+                <StaffField description="Unique employee identifier." format="Text or auto number" required>
+                  <Input label="Employee ID" name="employeeId" value={formData.employeeId} onChange={handleFormChange} required />
+                </StaffField>
+                <StaffField description="Employee's first name." format="Text, max 50 characters" required>
+                  <Input label="First Name" name="firstName" maxLength={50} value={formData.firstName} onChange={handleFormChange} required />
+                </StaffField>
+                <StaffField description="Employee's surname." format="Text, max 50 characters" required>
+                  <Input label="Last Name" name="lastName" maxLength={50} value={formData.lastName} onChange={handleFormChange} required />
+                </StaffField>
+                <StaffField description="Name displayed in the application." format="Text" required={false}>
+                  <Input label="Display Name" name="name" value={formData.name} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Gender of the employee." format="Dropdown" required={false}>
+                  <Select label="Gender" name="gender" options={genderOptions} value={formData.gender} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Employee's birth date." format="Date picker" required={false}>
+                  <Input label="Date of Birth" name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Employee's marital status." format="Dropdown" required={false}>
+                  <Select label="Marital Status" name="maritalStatus" options={maritalStatusOptions} value={formData.maritalStatus} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Blood group for emergency purposes." format="Dropdown" required={false}>
+                  <Select label="Blood Group" name="bloodGroup" options={bloodGroupOptions} value={formData.bloodGroup} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Employee nationality." format="Dropdown" required={false}>
+                  <Select label="Nationality" name="nationality" options={countryOptions} value={formData.nationality} onChange={handleFormChange} />
+                </StaffField>
+              </StaffSection>
+              )}
+
+              {activeStaffSection === '2' && (
+              <StaffSection number="2" title="Contact Information" description="Primary, secondary, and emergency contact details.">
+                <StaffField description="Primary contact number." format="Phone number" required>
+                  <Input label="Mobile Number" name="mobileNumber" type="tel" value={formData.mobileNumber} onChange={handleFormChange} required />
+                </StaffField>
+                <StaffField description="Secondary contact number." format="Phone number" required={false}>
+                  <Input label="Alternate Mobile Number" name="alternateMobileNumber" type="tel" value={formData.alternateMobileNumber} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Personal email address." format="Email" required={false}>
+                  <Input label="Personal Email" name="personalEmail" type="email" value={formData.personalEmail} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Company email address." format="Email" required>
+                  <Input label="Official Email" name="email" type="email" value={formData.email} onChange={handleFormChange} required />
+                </StaffField>
+                <StaffField description="Emergency contact person." format="Text" required={false}>
+                  <Input label="Emergency Contact Name" name="emergencyContactName" value={formData.emergencyContactName} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Emergency contact phone number." format="Phone number" required={false}>
+                  <Input label="Emergency Contact Number" name="emergencyContactNumber" type="tel" value={formData.emergencyContactNumber} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Relationship with employee." format="Dropdown or text" required={false}>
+                  <Input label="Emergency Contact Relationship" name="emergencyContactRelationship" value={formData.emergencyContactRelationship} onChange={handleFormChange} />
+                </StaffField>
+              </StaffSection>
+              )}
+
+              {activeStaffSection === '3' && (
+              <StaffSection number="3" title="Address Information" description="Residential and regional address details.">
+                <StaffField description="Current residential address." format="Multi-line text" required={false}>
+                  <Input label="Current Address" name="currentAddress" as="textarea" value={formData.currentAddress} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Permanent address." format="Multi-line text" required={false}>
+                  <Input label="Permanent Address" name="permanentAddress" as="textarea" value={formData.permanentAddress} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="City." format="Text" required={false}>
+                  <Input label="City" name="city" value={formData.city} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="State or province." format="Text or dropdown" required={false}>
+                  <Input label="State" name="state" value={formData.state} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Country." format="Dropdown" required={false}>
+                  <Select label="Country" name="country" options={countryOptions} value={formData.country} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Postal code." format="Text" required={false}>
+                  <Input label="PIN/ZIP Code" name="pinCode" value={formData.pinCode} onChange={handleFormChange} />
+                </StaffField>
+              </StaffSection>
+              )}
+
+              {activeStaffSection === '4' && (
+              <StaffSection number="4" title="Employment Information" description="Role, reporting, joining, location, and employee status.">
+                <StaffField description="Job title or designation." format="Dropdown" required>
+                  <Select
+                    label="Designation"
+                    name="role"
+                    options={effectiveRoleSelectOptions}
+                    value={formData.role}
+                    onChange={(e) => {
+                      const selectedRole = effectiveRoleSelectOptions.find((role) => role.value === e.target.value)
+                      setFormData((current) => ({
+                        ...current,
+                        role: e.target.value,
+                        role_id: selectedRole?.roleId || '',
+                      }))
+                    }}
+                    required
+                  />
+                </StaffField>
+                <StaffField description="Employee's manager." format="Searchable dropdown" required={false}>
+                  <Select
+                    label="Reporting Manager"
+                    name="reportingManager"
+                    options={users.map((user) => ({ value: String(user.id), label: user.name }))}
+                    value={formData.reportingManager}
+                    onChange={handleFormChange}
+                  />
+                </StaffField>
+                <StaffField description="Full-time, part-time, contract, intern, etc." format="Dropdown" required>
+                  <Select label="Employment Type" name="employmentType" options={employmentTypeOptions} value={formData.employmentType} onChange={handleFormChange} required />
+                </StaffField>
+                <StaffField description="Employment start date." format="Date picker" required>
+                  <Input label="Date of Joining" name="dateOfJoining" type="date" value={formData.dateOfJoining} onChange={handleFormChange} required />
+                </StaffField>
+                <StaffField description="Last working day." format="Date picker" required={false}>
+                  <Input label="Date of Exit" name="dateOfExit" type="date" value={formData.dateOfExit} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Office or branch location." format="Dropdown" required={false}>
+                  <Input label="Work Location" name="workLocation" value={formData.workLocation} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Assigned work shift." format="Dropdown" required={false}>
+                  <Select label="Shift" name="shift" options={shiftOptions} value={formData.shift} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Current employment state." format="Dropdown" required>
+                  <Select label="Employee Status" name="employeeStatus" options={employeeStatusOptions} value={formData.employeeStatus} onChange={handleFormChange} required />
+                </StaffField>
+              </StaffSection>
+              )}
+
+              {activeStaffSection === '5' && (
+              <StaffSection number="5" title="Login & Security" description="Authentication credentials and invitation settings.">
+                <StaffField description="Login username. Must be unique." format="Text" required>
+                  <Input label="Username" name="username" value={formData.username} onChange={handleFormChange} required />
+                </StaffField>
+                <StaffField description="Initial login password." format="Password" required>
+                  <Input label="Password" name="password" type="password" value={formData.password} onChange={handleFormChange} required minLength={8} />
+                </StaffField>
+                <StaffField description="Password confirmation." format="Password" required>
+                  <Input label="Confirm Password" name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleFormChange} required minLength={8} />
+                </StaffField>
+                <label className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-3.5 text-sm text-neutral-600">
+                  <input
+                    type="checkbox"
+                    name="sendNotification"
+                    checked={formData.sendNotification}
+                    onChange={handleFormChange}
+                    className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500/20"
+                  />
+                  Send a notification to the user for this new role.
+                </label>
+              </StaffSection>
+              )}
+
+              {activeStaffSection === '6' && (
+              <StaffSection number="6" title="Payroll Information" description="Salary bank and payment details.">
+                <StaffField description="Base salary amount." format="Decimal" required={false}>
+                  <Input label="Basic Salary" name="basicSalary" type="number" step="0.01" value={formData.basicSalary} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Salary bank." format="Text" required={false}>
+                  <Input label="Bank Name" name="bankName" value={formData.bankName} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Salary account number." format="Text" required={false}>
+                  <Input label="Account Number" name="accountNumber" value={formData.accountNumber} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Bank routing code." format="Text" required={false}>
+                  <Input label="IFSC/SWIFT Code" name="ifscSwiftCode" value={formData.ifscSwiftCode} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Bank account holder." format="Text" required={false}>
+                  <Input label="Account Holder Name" name="accountHolderName" value={formData.accountHolderName} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="UPI payment ID." format="Text" required={false}>
+                  <Input label="UPI ID" name="upiId" value={formData.upiId} onChange={handleFormChange} />
+                </StaffField>
+              </StaffSection>
+              )}
+
+              {activeStaffSection === '7' && (
+              <StaffSection number="7" title="Uploads" description="Compliance, onboarding, and qualification documents.">
+                <IdentityProofUploadField
+                  proofValue={formData.identityProofType}
+                  fileValue={formData.identityDocumentsName}
+                  previews={uploadPreviews.identityDocumentsName}
+                  options={identityProofOptions}
+                  onProofChange={handleFormChange}
+                  onFileChange={handleUploadChange}
+                  onRemove={handleUploadRemove}
+                />
+                <StaffUploadField label="Resume/CV" name="resumeCvName" value={formData.resumeCvName} previews={uploadPreviews.resumeCvName} description="Employee resume." format="PDF or DOCX upload" accept="application/pdf,.doc,.docx" onChange={handleUploadChange} onRemove={handleUploadRemove} />
+                <StaffUploadField label="Offer Letter" name="offerLetterName" value={formData.offerLetterName} previews={uploadPreviews.offerLetterName} description="Employment offer letter." format="PDF upload" accept="application/pdf" onChange={handleUploadChange} onRemove={handleUploadRemove} />
+                <StaffUploadField label="Appointment Letter" name="appointmentLetterName" value={formData.appointmentLetterName} previews={uploadPreviews.appointmentLetterName} description="Appointment letter." format="PDF upload" accept="application/pdf" onChange={handleUploadChange} onRemove={handleUploadRemove} />
+                <StaffUploadField label="Experience Certificates" name="experienceCertificatesName" value={formData.experienceCertificatesName} previews={uploadPreviews.experienceCertificatesName} description="Previous employment certificates." format="Multiple file upload" accept="application/pdf,.doc,.docx,image/*" multiple onChange={handleUploadChange} onRemove={handleUploadRemove} />
+                <StaffUploadField label="Educational Certificates" name="educationalCertificatesName" value={formData.educationalCertificatesName} previews={uploadPreviews.educationalCertificatesName} description="Academic certificates." format="Multiple file upload" accept="application/pdf,.doc,.docx,image/*" multiple onChange={handleUploadChange} onRemove={handleUploadRemove} />
+                <StaffField description="Employee skills." format="Multi-select or tags" required={false} className="lg:col-span-2">
+                  <Input label="Skills" name="skills" placeholder="Separate skills with commas" value={formData.skills} onChange={handleFormChange} />
+                </StaffField>
+              </StaffSection>
+              )}
+
+              {activeStaffSection === '8' && (
+              <StaffSection number="8" title="System Preferences" description="Application language, timezone, and account status.">
+                <StaffField description="Preferred application language." format="Dropdown" required={false}>
+                  <Select label="Language" name="language" options={languageOptions} value={formData.language} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Preferred application timezone." format="Dropdown" required={false}>
+                  <Select label="Time Zone" name="timeZone" options={timeZoneOptions} value={formData.timeZone} onChange={handleFormChange} />
+                </StaffField>
+                <StaffField description="Active, inactive, suspended, or locked." format="Dropdown" required>
+                  <Select label="Status" name="systemStatus" options={systemStatusOptions} value={formData.systemStatus} onChange={handleFormChange} required />
+                </StaffField>
+              </StaffSection>
+              )}
             </div>
 
             {formError && (
@@ -361,6 +903,8 @@ export default function UserManagement() {
               <Button type="submit" loading={isSaving}>
                 Add New User
               </Button>
+            </div>
+              </div>
             </div>
           </form>
         </div>
@@ -436,30 +980,28 @@ export default function UserManagement() {
       </Modal>
       <Card className="p-0">
         <div className="border-b border-neutral-100 px-5 py-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-5">
-                {effectiveFilterTabs.map((tab) => {
-                  const isActive = activeRoleFilter === tab.value
-
-                  return (
-                    <button
-                      key={tab.value}
-                      type="button"
-                      onClick={() => setActiveRoleFilter(tab.value)}
-                      className={`relative py-2 text-sm font-medium transition-colors ${
-                        isActive ? 'text-primary-700' : 'text-neutral-500 hover:text-neutral-900'
-                      }`}
-                    >
-                      {tab.label}
-                      {isActive && (
-                        <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-600" aria-hidden="true" />
-                      )}
-                    </button>
-                  )
-                })}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[12rem_1fr_auto] lg:items-center">
+            <div className="w-full">
+              <Select
+                options={effectiveFilterTabs}
+                value={activeRoleFilter}
+                onChange={(event) => setActiveRoleFilter(event.target.value)}
+                className="w-full"
+              />
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full lg:mx-auto lg:max-w-md">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search staff"
+                className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               <Button onClick={handleOpenModal} size="sm">
                 <Plus className="size-4" />
                 Add Staff
@@ -468,29 +1010,6 @@ export default function UserManagement() {
                 <CalendarDays className="size-4" aria-hidden="true" />
                 This Month
               </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-b border-neutral-100 px-5 py-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative w-full sm:w-72">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search staff"
-                  className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                />
-              </div>
-              <Select
-                options={effectiveFilterTabs}
-                value={activeRoleFilter}
-                onChange={(event) => setActiveRoleFilter(event.target.value)}
-                className="sm:w-48"
-              />
             </div>
           </div>
         </div>

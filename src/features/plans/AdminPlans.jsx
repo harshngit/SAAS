@@ -5,10 +5,10 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Modal from '../../components/ui/Modal'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/Tabs'
 import { listActivePlans } from '../../api/plans'
-import { requestPlanUpgrade } from '../../api/organizations'
-import { getCurrentProfile } from '../../api/auth'
+import { getCurrentOrganizationState, requestPlanUpgrade } from '../../api/organizations'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 
@@ -66,11 +66,13 @@ export default function AdminPlans() {
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const [billingCycle, setBillingCycle] = useState('monthly')
   const [plans, setPlans] = useState([])
+  const [organizationState, setOrganizationState] = useState(currentOrganization)
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
 
   const [requestingPlanId, setRequestingPlanId] = useState(null)
   const [requestedPlanId, setRequestedPlanId] = useState(null)
+  const [selectedPlan, setSelectedPlan] = useState(null)
   const [requestError, setRequestError] = useState('')
 
   const plansGridRef = useRef(null)
@@ -82,11 +84,24 @@ export default function AdminPlans() {
       setIsLoading(true)
       setListError('')
 
-      const [profileResult, plansResult] = await Promise.all([getCurrentProfile(), listActivePlans()])
+      const [organizationResult, plansResult] = await Promise.all([
+        getCurrentOrganizationState(),
+        listActivePlans(),
+      ])
 
       if (!isMounted) return
 
       setIsLoading(false)
+
+      if (organizationResult.success) {
+        setOrganizationState(organizationResult.organization)
+        if (organizationResult.organization?.billing_cycle) {
+          setBillingCycle(organizationResult.organization.billing_cycle)
+        }
+        if (organizationResult.organization?.upgrade_status === 'pending') {
+          setRequestedPlanId(organizationResult.organization.requested_plan_id)
+        }
+      }
 
       if (!plansResult.success) {
         setListError(plansResult.error)
@@ -95,8 +110,8 @@ export default function AdminPlans() {
 
       setPlans(plansResult.plans)
 
-      if (!profileResult.success) {
-        setListError((current) => current || profileResult.error)
+      if (!organizationResult.success) {
+        setListError((current) => current || organizationResult.error)
       }
     }
 
@@ -107,18 +122,32 @@ export default function AdminPlans() {
     }
   }, [])
 
-  const currentPlanId = currentOrganization?.plan?.id
-  const currentPlanName = currentOrganization?.plan?.name
-  const trialDaysLeft = currentOrganization?.trial_days_left
-  const isOnTrial = currentOrganization?.status === 'trial' && typeof trialDaysLeft === 'number'
-  const hasPendingUpgrade = currentOrganization?.upgrade_status === 'pending'
+  const currentPlanId = organizationState?.plan_id || organizationState?.plan?.id
+  const currentPlanName = organizationState?.plan?.name
+  const trialDaysLeft = organizationState?.trial_days_left ?? organizationState?.trialDaysLeft
+  const isOnTrial = organizationState?.status === 'trial' && typeof trialDaysLeft === 'number'
+  const hasPendingUpgrade = organizationState?.upgrade_status === 'pending'
+  const pendingRequestedPlanId = requestedPlanId || organizationState?.requested_plan_id || organizationState?.requested_plan?.id
 
   const scrollToPlans = () => {
     plansGridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const handleChoosePlan = async (plan) => {
+  const handleChoosePlan = (plan) => {
     setRequestError('')
+    setSelectedPlan(plan)
+  }
+
+  const handleCloseConfirmUpgrade = () => {
+    if (requestingPlanId) return
+    setSelectedPlan(null)
+  }
+
+  const handleConfirmUpgrade = async () => {
+    if (!selectedPlan) return
+
+    setRequestError('')
+    const plan = selectedPlan
     setRequestingPlanId(plan.id)
 
     const result = await requestPlanUpgrade({ requestedPlanId: plan.id, billingCycle })
@@ -131,10 +160,57 @@ export default function AdminPlans() {
     }
 
     setRequestedPlanId(plan.id)
+    setSelectedPlan(null)
+
+    const organizationResult = await getCurrentOrganizationState()
+    if (organizationResult.success) {
+      setOrganizationState(organizationResult.organization)
+      setRequestedPlanId(organizationResult.organization?.requested_plan_id || plan.id)
+      if (organizationResult.organization?.billing_cycle) {
+        setBillingCycle(organizationResult.organization.billing_cycle)
+      }
+    }
   }
 
   return (
     <div className="space-y-8 pb-6">
+      <Modal
+        isOpen={Boolean(selectedPlan)}
+        onClose={handleCloseConfirmUpgrade}
+        title="Confirm Upgrade"
+        footer={
+          <>
+            <Button variant="outline" onClick={handleCloseConfirmUpgrade} disabled={Boolean(requestingPlanId)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmUpgrade} loading={Boolean(requestingPlanId)}>
+              Confirm Upgrade
+            </Button>
+          </>
+        }
+      >
+        {selectedPlan && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-primary-100 bg-primary-50/60 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-900">{selectedPlan.name}</p>
+                  <p className="mt-1 text-sm text-neutral-500">
+                    {billingCycle === 'monthly' ? 'Monthly billing' : 'Yearly billing'}
+                  </p>
+                </div>
+                <Badge variant="primary">
+                  {formatCurrency(billingCycle === 'monthly' ? selectedPlan.price_monthly : selectedPlan.price_yearly)}
+                </Badge>
+              </div>
+            </div>
+            <p className="text-sm leading-6 text-neutral-600">
+              Your request will be sent to the Super Admin for approval.
+            </p>
+          </div>
+        )}
+      </Modal>
+
       <section className="rounded-[1.75rem] border border-neutral-100 bg-linear-to-br from-white via-white to-[#eef6eb] p-5 shadow-(--shadow-card)">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-4">
@@ -197,7 +273,7 @@ export default function AdminPlans() {
               const originalPrice = billingCycle === 'monthly' ? plan.original_price_monthly : plan.original_price_yearly
               const cycleLabel = billingCycle === 'monthly' ? 'month' : 'year'
               const isRequesting = requestingPlanId === plan.id
-              const isRequested = requestedPlanId === plan.id
+              const isRequested = pendingRequestedPlanId === plan.id
 
               return (
                 <div
@@ -296,7 +372,7 @@ export default function AdminPlans() {
                         loading={isRequesting}
                         onClick={() => handleChoosePlan(plan)}
                       >
-                        {isCurrent ? 'Current Plan' : isRequested ? 'Requested' : 'Choose Plan'}
+                        {isCurrent ? 'Current Plan' : isRequested ? 'Requested' : 'Select Plan'}
                       </Button>
                     </div>
                   </div>

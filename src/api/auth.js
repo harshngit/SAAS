@@ -107,6 +107,27 @@ export async function resetPasswordDirect({ email, newPassword }) {
   }
 }
 
+export async function changePassword({ currentPassword, newPassword }) {
+  try {
+    const { data } = await apiClient.post('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    }, {
+      headers: authHeader(),
+    })
+
+    return { success: true, detail: data?.detail || 'Password changed successfully.' }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to change password. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function getCurrentProfile() {
   try {
     const { data } = await apiClient.get('/auth/me', {

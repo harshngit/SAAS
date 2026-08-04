@@ -22,7 +22,7 @@ import { users as seedUsers } from '../../mockData/users'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import CustomerForm from './CustomerForm'
-import { customerBasePathByRole, customerTypeOptions } from './customerConstants'
+import { customerTypeOptions } from './customerConstants'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 
 const customerStatusTabs = [
@@ -72,7 +72,7 @@ export default function CustomerList() {
   const currentUser = useAuthStore((state) => state.currentUser)
   const isAdmin = currentUser?.role === ROLES.ADMIN
   const isSalesOfficer = currentUser?.role === ROLES.SALES_OFFICER
-  const basePath = customerBasePathByRole[currentUser?.role] || '/sales/customers'
+  const basePath = isAdmin ? '/admin/customers' : '/sales/customers'
 
   const [customers, setCustomers] = useState([])
   const [staffUsers, setStaffUsers] = useState(seedUsers.map(normalizeUser))
@@ -427,18 +427,7 @@ export default function CustomerList() {
                       <ActionMenu
                         items={[
                           { label: 'View Details', icon: UserCheck, onClick: () => navigate(`${basePath}/${customer.id}`) },
-                          {
-                            label: 'Edit',
-                            icon: Edit,
-                            onClick: () => {
-                              if (isAdmin) {
-                                navigate(`/admin/customers/edit/${customer.id}`)
-                                return
-                              }
-
-                              handleOpenForm(customer)
-                            },
-                          },
+                          { label: 'Edit', icon: Edit, onClick: () => handleOpenForm(customer) },
                           // { label: 'Reassign Sales Officer', icon: UserCheck, onClick: () => handleOpenForm(customer) },
                           {
                             label: 'Delete',

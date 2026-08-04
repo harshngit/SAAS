@@ -1,4 +1,5 @@
-import { apiClient } from './client'
+import axios from 'axios'
+import { apiClient, API_BASE_URL } from './client'
 import { useAuthStore } from '../store/authStore'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
@@ -55,22 +56,31 @@ export async function getOrganizationSettings() {
   }
 }
 
+export async function getCurrentOrganizationState() {
+  try {
+    const { data } = await apiClient.get('/organizations/me', {
+      headers: authHeader(),
+    })
+
+    return { success: true, organization: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load current organization details. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function updateOrganizationSettings(payload) {
   try {
-    const requestBody = {}
-
-    if (payload.name !== undefined) requestBody.name = payload.name || null
-    if (payload.legalName !== undefined) requestBody.legal_name = payload.legalName || null
-    if (payload.industry !== undefined) requestBody.industry = payload.industry || null
-    if (payload.businessType !== undefined) requestBody.business_type = payload.businessType || null
-    if (payload.gstNumber !== undefined) requestBody.gst_number = payload.gstNumber || null
-    if (payload.panNumber !== undefined) requestBody.pan_number = payload.panNumber || null
-    if (payload.address !== undefined) requestBody.address = payload.address || null
-    if (payload.phone !== undefined) requestBody.phone = payload.phone || null
-    if (payload.email !== undefined) requestBody.email = payload.email || null
-    if (payload.financialYear !== undefined) requestBody.financial_year = payload.financialYear || null
-    if (payload.logoUrl !== undefined) requestBody.logo_url = payload.logoUrl || null
-    if (payload.signatureUrl !== undefined) requestBody.signature_url = payload.signatureUrl || null
+    const requestBody = Object.fromEntries(
+      Object.entries(payload)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => [key, value === '' ? null : value]),
+    )
 
     const { data } = await apiClient.put('/organizations/settings', requestBody, {
       headers: authHeader(),
@@ -82,6 +92,69 @@ export async function updateOrganizationSettings(payload) {
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to save company settings. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function uploadOrganizationLogo(file) {
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const { data } = await axios.post(`${API_BASE_URL}organizations/settings/logo`, formData, {
+      headers: authHeader(),
+    })
+
+    return { success: true, url: data?.url }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to upload company logo. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function uploadOrganizationSignature(file) {
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const { data } = await axios.post(`${API_BASE_URL}organizations/settings/signature`, formData, {
+      headers: authHeader(),
+    })
+
+    return { success: true, url: data?.url }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to upload company signature. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function uploadOrganizationSettingsFile(file) {
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const { data } = await axios.post(`${API_BASE_URL}organizations/settings/upload-file`, formData, {
+      headers: authHeader(),
+    })
+
+    return { success: true, url: data?.url }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to upload file. Please try again.',
     )
 
     return { success: false, error: message }
