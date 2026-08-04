@@ -41,7 +41,6 @@ export async function createUser(payload) {
   try {
     const normalizedEmail = payload.email.trim().toLowerCase()
     const username = (payload.username || normalizedEmail.split('@')[0] || payload.name).trim()
-    const selectedRole = payload.role
 
     const requestBody = {
       name: payload.name.trim(),
@@ -49,12 +48,13 @@ export async function createUser(payload) {
       username,
       phone: payload.phone.trim(),
       password: payload.password,
-      role: selectedRole,
     }
 
     const selectedRoleId = payload.role_id || payload.roleId
-    if (selectedRoleId && selectedRoleId !== selectedRole) {
+    if (selectedRoleId) {
       requestBody.role_id = selectedRoleId
+    } else if (payload.role) {
+      requestBody.role = payload.role
     }
 
     const { data } = await apiClient.post('/users', requestBody, {

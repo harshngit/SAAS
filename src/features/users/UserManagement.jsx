@@ -66,16 +66,14 @@ export default function UserManagement() {
     profilePictureName: '',
   })
 
-  const apiRoleOptions = roles
-    .map((role) => {
-      const systemRole = getSystemRoleFromRoleName(role.name)
-      return {
-        value: systemRole,
-        label: role.name,
-        roleId: role.id,
-      }
-    })
-    .filter((role) => staffRoleOptions.includes(role.value))
+  const apiRoleOptions = roles.map((role) => {
+    const systemRole = getSystemRoleFromRoleName(role.name)
+    return {
+      value: systemRole,
+      label: role.name,
+      roleId: role.id,
+    }
+  })
 
   const effectiveRoleSelectOptions = apiRoleOptions.length > 0 ? apiRoleOptions : staffRoleSelectOptions
   const effectiveFilterTabs = [
