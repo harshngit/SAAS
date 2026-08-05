@@ -4,6 +4,7 @@ import {
   Building2,
   ChevronDown,
   CreditCard,
+  FileText,
   KeyRound,
   LifeBuoy,
   Pencil,
@@ -18,9 +19,12 @@ import Card from "../../components/ui/Card";
 import Select from "../../components/ui/Select";
 import { changePassword, getCurrentProfile } from "../../api/auth";
 import {
+  clearOrganizationOtherDocuments,
+  getOrganizationOtherDocuments,
   getOrganizationSettings,
   updateOrganizationSettings,
   uploadOrganizationLogo,
+  uploadOrganizationOtherDocuments,
   uploadOrganizationSettingsFile,
   uploadOrganizationSignature,
 } from "../../api/organizations";
@@ -35,6 +39,12 @@ const supportedCompanyDocumentTypes = new Set([
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
+const supportedOtherBusinessDocumentTypes = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
 
 function isSupportedCompanyFile(file) {
   return (
@@ -42,6 +52,131 @@ function isSupportedCompanyFile(file) {
     supportedCompanyDocumentTypes.has(file.type) ||
     supportedCompanyFileExtensions.test(file.name)
   );
+}
+
+function isSupportedOtherBusinessDocumentFile(file) {
+  return (
+    supportedOtherBusinessDocumentTypes.has(file.type) ||
+    /\.(pdf|png|jpe?g|docx)$/i.test(file.name)
+  );
+}
+
+function splitStoredFiles(value) {
+  const storedValue = String(value || "").trim();
+
+  if (!storedValue) return [];
+  if (storedValue.startsWith("data:")) return [storedValue];
+
+  return storedValue
+    .split(",")
+    .map((fileUrl) => fileUrl.trim())
+    .filter(Boolean);
+}
+
+function splitStoredFileNames(displayName, fileCount) {
+  const names = String(displayName || "")
+    .split(", ")
+    .map((name) => name.trim())
+    .filter(Boolean);
+
+  return Array.from({ length: fileCount }, (_, index) => names[index] || "");
+}
+
+function getFileNameFromUrl(url) {
+  try {
+    const parsedUrl = new URL(url, window.location.origin);
+    const pathName = parsedUrl.pathname.split("/").filter(Boolean).pop();
+    return pathName ? decodeURIComponent(pathName) : "Uploaded document";
+  } catch {
+    const pathName = String(url).split("?")[0].split("/").filter(Boolean).pop();
+    return pathName ? decodeURIComponent(pathName) : "Uploaded document";
+  }
+}
+
+function getPreviewFileKind({ name = "", type = "", url = "" }) {
+  const fileHint = `${name} ${url}`.toLowerCase();
+
+  if (
+    type.startsWith("image/") ||
+    /\.(png|jpe?g|gif|webp|bmp|svg)(?:$|[?#])/i.test(fileHint)
+  ) {
+    return "image";
+  }
+
+  if (type === "application/pdf" || /\.pdf(?:$|[?#])/i.test(fileHint)) {
+    return "pdf";
+  }
+
+  if (
+    type === "application/msword" ||
+    type ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    /\.(doc|docx)(?:$|[?#])/i.test(fileHint)
+  ) {
+    return "word";
+  }
+
+  return "file";
+}
+
+function buildPreviewFiles({ value, displayName, fileType }) {
+  const urls = splitStoredFiles(value);
+  const names = splitStoredFileNames(displayName, urls.length);
+
+  return urls.map((url, index) => {
+    const name = names[index] || getFileNameFromUrl(url);
+    const type = urls.length === 1 ? fileType : "";
+
+    return {
+      url,
+      name,
+      type,
+      kind: getPreviewFileKind({ name, type, url }),
+    };
+  });
+}
+
+function createObjectUrlFromDataUrl(dataUrl) {
+  const [meta = "", encodedData = ""] = dataUrl.split(",");
+  const mimeType = meta.match(/^data:([^;]+);base64$/)?.[1] || "application/octet-stream";
+  const binary = window.atob(encodedData);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+}
+
+function openFileInNewTab(fileUrl) {
+  if (!fileUrl) return;
+
+  if (fileUrl.startsWith("data:")) {
+    const objectUrl = createObjectUrlFromDataUrl(fileUrl);
+    window.open(objectUrl, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    return;
+  }
+
+  window.open(fileUrl, "_blank", "noopener,noreferrer");
+}
+
+function buildOtherDocumentsFieldState(documents = []) {
+  return {
+    urls: documents
+      .map((document) => document?.url)
+      .filter(Boolean)
+      .join(","),
+    names: documents
+      .map((document) => document?.name)
+      .filter(Boolean)
+      .join(", "),
+    types: documents
+      .map((document) => document?.content_type)
+      .filter(Boolean)
+      .join(", "),
+  };
 }
 
 const initialCompanyData = {
@@ -330,28 +465,48 @@ function FileUploadField({
   error = "",
   previewAsImage = false,
   multiple = false,
+  fileType = "",
+  onPreview,
 }) {
+  const previewFiles = buildPreviewFiles({ value, displayName, fileType });
+  const canPreview = previewFiles.length > 0;
   const isImagePreview =
     typeof value === "string" &&
     (value.startsWith("data:image") ||
       ((value.startsWith("http://") || value.startsWith("https://")) &&
         (previewAsImage || (!displayName && accept === "image/*"))));
-  const displayValue = displayName;
+  const displayValue =
+    displayName || previewFiles.map((file) => file.name).join(", ");
+  const previewContent = isImagePreview ? (
+    <img
+      src={value}
+      alt={`${label} preview`}
+      className="max-h-16 max-w-32 object-contain"
+    />
+  ) : canPreview ? (
+    <FileText className="size-6 text-neutral-500" aria-hidden="true" />
+  ) : (
+    <Upload className="size-6 text-neutral-400" aria-hidden="true" />
+  );
 
   return (
     <div className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
       <div className="grid grid-cols-[9rem_1fr] gap-4">
-        <div className="flex h-20 w-36 shrink-0 items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white text-xs font-medium text-neutral-400">
-          {isImagePreview ? (
-            <img
-              src={value}
-              alt={`${label} preview`}
-              className="max-h-16 max-w-32 object-contain"
-            />
-          ) : (
-            <Upload className="size-6 text-neutral-400" aria-hidden="true" />
-          )}
-        </div>
+        {canPreview ? (
+          <button
+            type="button"
+            onClick={() => onPreview?.({ label, files: previewFiles })}
+            className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white text-xs font-medium text-neutral-400 transition-colors hover:border-primary-300 hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+            aria-label={`Open ${label}`}
+            title={`Open ${label}`}
+          >
+            {previewContent}
+          </button>
+        ) : (
+          <div className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white text-xs font-medium text-neutral-400">
+            {previewContent}
+          </div>
+        )}
         <div className="min-w-0">
           <p className="text-sm font-semibold leading-5 text-neutral-900">
             {label}
@@ -849,12 +1004,25 @@ export default function CompanySettings() {
   const isEditableSection = editableSectionIds.includes(activeTab);
   const isActiveSectionEditing = Boolean(editingSections[activeTab]);
   const isAccountEditing = editingSections.account;
-  const getUploadFieldState = (name) => ({
-    uploading: Boolean(uploadingFiles[name]),
-    error: fileUploadErrors[name] || "",
-    displayName: uploadedFileNames[name] || "",
-    previewAsImage: Boolean(uploadedFileTypes[name]?.startsWith("image/")),
-  });
+  const getUploadFieldState = (name) => {
+    const fileCount = splitStoredFiles(companyData[name]).length;
+
+    return {
+      uploading: Boolean(uploadingFiles[name]),
+      error: fileUploadErrors[name] || "",
+      displayName: uploadedFileNames[name] || "",
+      previewAsImage: Boolean(
+        fileCount === 1 && uploadedFileTypes[name]?.startsWith("image/"),
+      ),
+      fileType: uploadedFileTypes[name] || "",
+      onPreview: handleOpenDocumentPreview,
+    };
+  };
+
+  function handleOpenDocumentPreview(preview) {
+    const fileUrl = preview?.files?.[0]?.url;
+    openFileInNewTab(fileUrl);
+  }
 
   const resetCompanyData = useCallback(() => {
     setCompanyData(buildCompanyDataFromProfile(loadedUser, loadedOrganization));
@@ -884,6 +1052,36 @@ export default function CompanySettings() {
       setLoadedUser(nextUser);
       setLoadedOrganization(nextOrganization);
       setCompanyData(buildCompanyDataFromProfile(nextUser, nextOrganization));
+
+      const otherDocumentsResult = await getOrganizationOtherDocuments();
+      if (!isMounted) return;
+
+      if (otherDocumentsResult.success) {
+        const otherDocuments = buildOtherDocumentsFieldState(
+          otherDocumentsResult.documents,
+        );
+        setCompanyData((prev) => ({
+          ...prev,
+          otherBusinessDocumentsFile: otherDocuments.urls,
+        }));
+        setUploadedFileNames((prev) => ({
+          ...prev,
+          otherBusinessDocumentsFile: otherDocuments.names,
+        }));
+        setUploadedFileTypes((prev) => ({
+          ...prev,
+          otherBusinessDocumentsFile: otherDocuments.types,
+        }));
+        setFileUploadErrors((prev) => ({
+          ...prev,
+          otherBusinessDocumentsFile: "",
+        }));
+      } else {
+        setFileUploadErrors((prev) => ({
+          ...prev,
+          otherBusinessDocumentsFile: otherDocumentsResult.error,
+        }));
+      }
     }
 
     loadCompanySettings();
@@ -981,12 +1179,14 @@ export default function CompanySettings() {
       return;
     }
 
-    const unsupportedFile = files.find((file) => !isSupportedCompanyFile(file));
+    const unsupportedFile = files.find(
+      (file) => !isSupportedOtherBusinessDocumentFile(file),
+    );
 
     if (unsupportedFile) {
       setFileUploadErrors((prev) => ({
         ...prev,
-        [name]: `${unsupportedFile.name} is not supported. Upload images, PDFs, or Word documents only.`,
+        [name]: `${unsupportedFile.name} is not supported. Upload PDF, PNG, JPG, or DOCX files only.`,
       }));
       return;
     }
@@ -994,51 +1194,19 @@ export default function CompanySettings() {
     setFileUploadErrors((prev) => ({ ...prev, [name]: "" }));
     setUploadingFiles((prev) => ({ ...prev, [name]: true }));
 
-    const uploadedUrls = [];
+    const result = await uploadOrganizationOtherDocuments(files);
+    setUploadingFiles((prev) => ({ ...prev, [name]: false }));
 
-    for (const file of files) {
-      const result = await uploadOrganizationSettingsFile(file);
-
-      if (!result.success) {
-        setUploadingFiles((prev) => ({ ...prev, [name]: false }));
-        setFileUploadErrors((prev) => ({ ...prev, [name]: result.error }));
-        return;
-      }
-
-      if (!result.url) {
-        setUploadingFiles((prev) => ({ ...prev, [name]: false }));
-        setFileUploadErrors((prev) => ({
-          ...prev,
-          [name]: "File uploaded, but the server did not return a file URL.",
-        }));
-        return;
-      }
-
-      uploadedUrls.push(result.url);
+    if (!result.success) {
+      setFileUploadErrors((prev) => ({ ...prev, [name]: result.error }));
+      return;
     }
 
-    setUploadingFiles((prev) => ({ ...prev, [name]: false }));
-    setUploadedFileNames((prev) => {
-      const existingNames = prev[name]
-        ? prev[name].split(", ").filter(Boolean)
-        : [];
-      return {
-        ...prev,
-        [name]: [...existingNames, ...files.map((file) => file.name)].join(
-          ", ",
-        ),
-      };
-    });
-    setUploadedFileTypes((prev) => ({ ...prev, [name]: "" }));
-    setCompanyData((prev) => {
-      const existingUrls = prev[name]
-        ? String(prev[name])
-            .split(",")
-            .map((url) => url.trim())
-            .filter(Boolean)
-        : [];
-      return { ...prev, [name]: [...existingUrls, ...uploadedUrls].join(",") };
-    });
+    const otherDocuments = buildOtherDocumentsFieldState(result.documents);
+
+    setUploadedFileNames((prev) => ({ ...prev, [name]: otherDocuments.names }));
+    setUploadedFileTypes((prev) => ({ ...prev, [name]: otherDocuments.types }));
+    setCompanyData((prev) => ({ ...prev, [name]: otherDocuments.urls }));
   };
 
   const handleLogoFileSelect = (name, e) => {
@@ -1104,6 +1272,26 @@ export default function CompanySettings() {
     setUploadedFileNames((prev) => ({ ...prev, [name]: "" }));
     setUploadedFileTypes((prev) => ({ ...prev, [name]: "" }));
     setFileUploadErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleRemoveOtherBusinessDocuments = async (name) => {
+    setFileUploadErrors((prev) => ({ ...prev, [name]: "" }));
+    setUploadingFiles((prev) => ({ ...prev, [name]: true }));
+
+    const result = await clearOrganizationOtherDocuments();
+
+    setUploadingFiles((prev) => ({ ...prev, [name]: false }));
+
+    if (!result.success) {
+      setFileUploadErrors((prev) => ({ ...prev, [name]: result.error }));
+      return;
+    }
+
+    handleRemoveFile(name);
+    showToast({
+      title: "Documents removed",
+      message: "Other business documents removed successfully.",
+    });
   };
 
   const handleRemoveLogo = (name) => {
@@ -2100,9 +2288,9 @@ export default function CompanySettings() {
                     label="Other Business Documents"
                     name="otherBusinessDocumentsFile"
                     value={companyData.otherBusinessDocumentsFile}
-                    accept="application/pdf,.doc,.docx,image/*"
+                    accept="application/pdf,image/png,image/jpeg,.docx"
                     onChange={handleMultipleFileUpload}
-                    onRemove={handleRemoveFile}
+                    onRemove={handleRemoveOtherBusinessDocuments}
                     disabled={!isActiveSectionEditing}
                     uploadLabel="Upload Files"
                     multiple

@@ -228,7 +228,7 @@ const revokeUploadPreviewUrls = (previews = []) => {
 function UploadPreview({ previews = [] }) {
   if (!previews.length) {
     return (
-      <div className="flex h-12 min-w-24 items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-400">
+      <div className="flex h-16 min-w-28 cursor-pointer items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-400">
         Preview
       </div>
     )
@@ -250,7 +250,7 @@ function UploadPreview({ previews = [] }) {
             target="_blank"
             rel="noreferrer"
             title={`Preview ${preview.name}`}
-            className="group relative flex size-12 shrink-0 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
+              className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
           >
             {isImage ? (
               <img src={preview.url} alt={preview.name} className="size-full object-cover" />
@@ -268,7 +268,7 @@ function UploadPreview({ previews = [] }) {
         )
       })}
       {remainingCount > 0 && (
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-xs font-semibold text-neutral-500">
+        <span className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-xs font-semibold text-neutral-500">
           +{remainingCount}
         </span>
       )}
@@ -288,17 +288,19 @@ function StaffUploadField({
   onRemove,
 }) {
   return (
-    <div className="flex min-h-[4.625rem] items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
-      <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex min-h-28 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+      <div className="grid w-full grid-cols-1 gap-3 xl:grid-cols-[minmax(10rem,1fr)_auto_auto] xl:items-center">
         <div className="min-w-0 pr-2">
-          <p className="truncate text-sm font-semibold text-neutral-900">
+          <p className="text-sm font-semibold leading-5 text-neutral-900">
             {label}
             {required && <span className="text-red-500"> *</span>}
           </p>
           {value && <p className="mt-1 truncate text-xs font-medium text-primary-700">{value}</p>}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex shrink-0 items-center justify-center">
           <UploadPreview previews={previews} />
+        </div>
+        <div className="flex shrink-0 flex-col items-start gap-2">
           <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
             <Upload className="size-3.5" aria-hidden="true" />
             Upload
@@ -341,8 +343,8 @@ function IdentityProofUploadField({
   onRemove,
 }) {
   return (
-    <div className="flex min-h-[4.625rem] items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5">
-      <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+    <div className="flex min-h-28 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+      <div className="grid w-full grid-cols-1 gap-3 xl:grid-cols-[minmax(10rem,1fr)_auto_auto] xl:items-center">
         <Select
           label="Identity Proofs"
           name="identityProofType"
@@ -351,36 +353,35 @@ function IdentityProofUploadField({
           onChange={onProofChange}
           required
         />
-        <div className="flex flex-col gap-1.5">
-          <p className="text-sm font-semibold text-neutral-900">Upload Documents</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <UploadPreview previews={previews} />
-            <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
-              <Upload className="size-3.5" aria-hidden="true" />
-              Upload
-              <input
-                type="file"
-                accept="application/pdf,image/*"
-                className="sr-only"
-                onChange={(event) => {
-                  const files = Array.from(event.target.files || [])
-                  onFileChange('identityDocumentsName', files)
-                  event.target.value = ''
-                }}
-              />
-            </label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-full px-3 text-xs"
-              disabled={!fileValue}
-              onClick={() => onRemove('identityDocumentsName')}
-            >
-              <Trash2 className="size-3.5" aria-hidden="true" />
-              Remove
-            </Button>
-          </div>
+        <div className="flex shrink-0 items-center justify-center">
+          <UploadPreview previews={previews} />
+        </div>
+        <div className="flex shrink-0 flex-col items-start gap-2">
+          <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+            <Upload className="size-3.5" aria-hidden="true" />
+            Upload
+            <input
+              type="file"
+              accept="application/pdf,image/*"
+              className="sr-only"
+              onChange={(event) => {
+                const files = Array.from(event.target.files || [])
+                onFileChange('identityDocumentsName', files)
+                event.target.value = ''
+              }}
+            />
+          </label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-full px-3 text-xs"
+            disabled={!fileValue}
+            onClick={() => onRemove('identityDocumentsName')}
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            Remove
+          </Button>
           {fileValue && <p className="max-w-80 truncate text-xs font-medium text-primary-700">{fileValue}</p>}
         </div>
       </div>
@@ -613,6 +614,19 @@ export default function UserManagement() {
     return matchesRole && matchesSearch
   })
   const activeStaffFormSection = staffFormSections.find((section) => section.number === activeStaffSection) || staffFormSections[0]
+  const activeStaffSectionIndex = staffFormSections.findIndex((section) => section.number === activeStaffSection)
+  const isFirstStaffSection = activeStaffSectionIndex <= 0
+  const isLastStaffSection = activeStaffSectionIndex === staffFormSections.length - 1
+
+  const goToPreviousStaffSection = () => {
+    if (isFirstStaffSection) return
+    setActiveStaffSection(staffFormSections[activeStaffSectionIndex - 1].number)
+  }
+
+  const goToNextStaffSection = () => {
+    if (isLastStaffSection) return
+    setActiveStaffSection(staffFormSections[activeStaffSectionIndex + 1].number)
+  }
 
   if (isModalOpen) {
     return (
@@ -897,12 +911,18 @@ export default function UserManagement() {
             )}
 
             <div className="mt-6 flex flex-col-reverse gap-3 border-t border-neutral-100 pt-5 sm:flex-row sm:justify-end">
-              <Button type="button" variant="secondary" onClick={handleCloseModal}>
-                Cancel
+              <Button type="button" variant="secondary" onClick={goToPreviousStaffSection} disabled={isSaving || isFirstStaffSection}>
+                Back
               </Button>
-              <Button type="submit" loading={isSaving}>
-                Add New User
-              </Button>
+              {isLastStaffSection ? (
+                <Button type="submit" loading={isSaving}>
+                  Add New User
+                </Button>
+              ) : (
+                <Button type="button" onClick={goToNextStaffSection} disabled={isSaving}>
+                  Next
+                </Button>
+              )}
             </div>
               </div>
             </div>

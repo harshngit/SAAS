@@ -161,6 +161,66 @@ export async function uploadOrganizationSettingsFile(file) {
   }
 }
 
+export async function uploadOrganizationOtherDocuments(files) {
+  try {
+    const formData = new FormData()
+
+    files.forEach((file) => {
+      formData.append('files', file)
+    })
+
+    const { data } = await axios.post(`${API_BASE_URL}organizations/settings/documents/other`, formData, {
+      headers: authHeader(),
+    })
+
+    return { success: true, documents: Array.isArray(data) ? data : [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to upload other business documents. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function getOrganizationOtherDocuments() {
+  try {
+    const { data } = await apiClient.get('/organizations/settings/documents/other', {
+      headers: authHeader(),
+    })
+
+    return { success: true, documents: Array.isArray(data) ? data : [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load other business documents. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function clearOrganizationOtherDocuments() {
+  try {
+    await apiClient.delete('/organizations/settings/documents/other', {
+      headers: authHeader(),
+    })
+
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to remove other business documents. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function requestPlanUpgrade({ requestedPlanId, billingCycle }) {
   try {
     const { data } = await apiClient.post('/organizations/upgrade-request', {

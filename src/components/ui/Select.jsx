@@ -16,6 +16,8 @@ const Select = forwardRef(function Select(
     defaultValue = '',
     value,
     disabled = false,
+    triggerClassName = '',
+    required = false,
     ...rest
   },
   ref,
@@ -106,6 +108,7 @@ const Select = forwardRef(function Select(
       {label && (
         <label htmlFor={selectId} className="text-sm font-medium text-neutral-700">
           {label}
+          {required && <span className="text-red-500"> *</span>}
         </label>
       )}
       <div ref={wrapperRef} className="relative">
@@ -127,11 +130,11 @@ const Select = forwardRef(function Select(
           onClick={() => !disabled && setIsOpen((current) => !current)}
           onKeyDown={handleKeyDown}
           onBlur={onBlur}
-          className={`flex w-full cursor-pointer items-center justify-between rounded-xl border bg-neutral-50 py-2.5 pl-3.5 pr-3 text-sm text-neutral-900 transition-all focus:bg-white focus:outline-none focus:ring-4 ${
+          className={`flex w-full max-w-full cursor-pointer items-center justify-between rounded-xl border bg-neutral-50 py-2.5 pl-3.5 pr-3 text-sm text-neutral-900 transition-all focus:bg-white focus:outline-none focus:ring-4 ${
             error
               ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15'
               : 'border-neutral-200 focus:border-primary-400 focus:ring-primary-500/12'
-          } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+          } ${disabled ? 'cursor-not-allowed opacity-60' : ''} ${triggerClassName}`}
         >
           <span className={selectedOption ? 'truncate' : 'truncate text-neutral-400'}>
             {selectedOption?.label || placeholder}

@@ -2,7 +2,7 @@ import { forwardRef, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 
 const Input = forwardRef(function Input(
-  { label, error, as = 'input', type = 'text', className = '', ...rest },
+  { label, error, as = 'input', type = 'text', className = '', required = false, ...rest },
   ref,
 ) {
   const Component = as
@@ -11,10 +11,16 @@ const Input = forwardRef(function Input(
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      {label && <label className="text-sm font-medium text-neutral-700">{label}</label>}
+      {label && (
+        <label className="text-sm font-medium text-neutral-700">
+          {label}
+          {required && <span className="text-red-500"> *</span>}
+        </label>
+      )}
       <div className="relative">
         <Component
           ref={ref}
+          required={required}
           type={isPassword ? (showPassword ? 'text' : 'password') : type}
           className={`w-full rounded-xl border bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition-all placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:placeholder:text-neutral-300 ${
             isPassword ? 'pr-10' : ''
