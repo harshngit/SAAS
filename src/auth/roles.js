@@ -93,7 +93,7 @@ export const roleMenus = {
       ],
     },
     {
-      section: 'Sales & Catalog',
+      section: 'Sales Operation',
       items: [
         { label: 'Customers', path: '/admin/customers', icon: UsersRound },
         { label: 'Leads', path: '/admin/leads', icon: UserPlus },

@@ -1,8 +1,33 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight, Crown, Droplet, Sparkles, X } from 'lucide-react'
+import {
+  BarChart3,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Crown,
+  Droplet,
+  LayoutDashboard,
+  Package,
+  Receipt,
+  Settings,
+  Sparkles,
+  UserCog,
+  Warehouse,
+  X,
+} from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { roleMenus, roleLabels } from '../../auth/roles'
+
+const sectionIcons = {
+  Overview: LayoutDashboard,
+  'Sales Operation': Package,
+  Operations: Warehouse,
+  Finance: Receipt,
+  Administration: UserCog,
+  System: Settings,
+  'Main menu': BarChart3,
+}
 
 function CollapsedTooltip({ label }) {
   return (
@@ -22,6 +47,7 @@ export default function Sidebar({
   isMobileOpen,
   onCloseMobile,
 }) {
+  const location = useLocation()
   const currentUser = useAuthStore((state) => state.currentUser)
   const currentRole = currentUser?.role
   const menuGroups = currentRole ? roleMenus[currentRole] || [] : []
@@ -33,7 +59,7 @@ export default function Sidebar({
       Object.fromEntries(
         nextMenuGroups.map((group) => [
           group.section,
-          group.section === 'Overview' || group.section === 'Sales & Catalog',
+          group.section === 'Overview' || group.section === 'Sales Operation',
         ]),
       ),
     )
@@ -50,9 +76,16 @@ export default function Sidebar({
   const sectionLabelVisibilityClass = isExpanded
     ? 'visible max-w-48 whitespace-nowrap opacity-100 delay-150'
     : 'invisible max-w-0 opacity-0 delay-0'
+  const useCollapsedSectionNav = !isExpanded && menuGroups.length > 1
 
   const toggleSection = (section) => {
     setOpenSections((current) => ({ ...current, [section]: !current[section] }))
+  }
+
+  const handleCollapsedSectionClick = (section) => {
+    setOpenSections((current) => ({ ...current, [section]: true }))
+    onToggleExpanded()
+    onCloseMobile()
   }
 
   return (
@@ -126,84 +159,117 @@ export default function Sidebar({
         <div className="mx-5 h-px bg-neutral-100 md:hidden" />
 
         <nav className={`sidebar-nav min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? 'py-5 md:px-3' : 'py-3 md:px-2.5 md:pt-0'} px-3`}>
-          {menuGroups.map((group, groupIndex) => (
-            <div key={group.section} className={groupIndex > 0 ? `mt-5 ${!isExpanded ? 'md:mt-2' : ''}` : ''}>
-              {group.section !== 'Overview' && (
-                <>
-              {groupIndex > 0 && (
-                <div
-                  className={`mx-2 mb-2 hidden h-px bg-neutral-100 md:block ${isExpanded ? 'md:hidden' : ''}`}
-                  aria-hidden="true"
-                />
-              )}
-              <button
-                type="button"
-                onClick={() => toggleSection(group.section)}
-                aria-expanded={openSections[group.section] !== false}
-                className={`hidden w-full items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition-all duration-150 hover:text-neutral-600 md:flex ${
-                  isExpanded ? sectionLabelVisibilityClass : 'invisible h-0 max-w-0 pb-0 opacity-0'
-                }`}
-              >
-                <span className="truncate">{group.section}</span>
-                <ChevronDown
-                  className={`size-3.5 shrink-0 transition-transform ${openSections[group.section] === false ? '-rotate-90' : ''}`}
-                  aria-hidden="true"
-                />
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleSection(group.section)}
-                aria-expanded={openSections[group.section] !== false}
-                className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition-colors hover:text-neutral-600 md:hidden"
-              >
-                <span>{group.section}</span>
-                <ChevronDown
-                  className={`size-3.5 shrink-0 transition-transform ${openSections[group.section] === false ? '-rotate-90' : ''}`}
-                  aria-hidden="true"
-                />
-              </button>
-                </>
-              )}
-              <div className={`space-y-1 ${openSections[group.section] === false && isExpanded ? 'md:hidden' : ''} ${openSections[group.section] === false ? 'hidden md:block' : ''}`}>
-                {group.items.map((item) => (
+          {menuGroups.map((group, groupIndex) => {
+            const SectionIcon = sectionIcons[group.section] || group.items[0]?.icon
+            const sectionPath = group.items[0]?.path || '#'
+            const isSectionActive = group.items.some(
+              (item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`),
+            )
+
+            return (
+              <div key={group.section} className={groupIndex > 0 ? `mt-5 ${!isExpanded ? 'md:mt-2' : ''}` : ''}>
+                {useCollapsedSectionNav && SectionIcon && (
                   <NavLink
-                    key={item.path}
-                    to={item.path}
-                    onClick={onCloseMobile}
-                    aria-label={!isExpanded ? item.label : undefined}
-                    title={!isExpanded ? item.label : undefined}
-                    className={({ isActive }) =>
-                      `group relative flex items-center rounded-[0.9rem] py-2.5 text-sm font-medium transition-all duration-150 ${
-                        isExpanded
-                          ? 'gap-3 px-3.5 md:justify-start'
-                          : 'gap-3 px-3.5 md:gap-0 md:px-0 md:justify-center'
-                      } ${
-                        isActive
-                          ? 'bg-[#bdeaa5] text-primary-700 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
-                          : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
-                      }`
-                    }
+                    to={sectionPath}
+                    onClick={() => handleCollapsedSectionClick(group.section)}
+                    aria-label={group.section}
+                    title={group.section}
+                    className={`group relative hidden items-center justify-center rounded-[0.9rem] py-2.5 text-sm font-medium transition-all duration-150 md:flex ${
+                      isSectionActive
+                        ? 'bg-[#bdeaa5] text-primary-700 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
+                        : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
+                    }`}
                   >
-                    {({ isActive }) => (
-                      <>
-                        <span
-                          className={`absolute left-1 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-linear-to-b from-primary-500 to-primary-700 transition-opacity ${
-                            isActive ? 'opacity-100' : 'opacity-0'
-                          }`}
+                    <span
+                      className={`absolute left-1 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-linear-to-b from-primary-500 to-primary-700 transition-opacity ${
+                        isSectionActive ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <SectionIcon className="size-4.5 shrink-0" aria-hidden="true" />
+                    <CollapsedTooltip label={group.section} />
+                  </NavLink>
+                )}
+
+                <div className={useCollapsedSectionNav ? 'md:hidden' : ''}>
+                  {group.section !== 'Overview' && (
+                    <>
+                      {groupIndex > 0 && (
+                        <div
+                          className={`mx-2 mb-2 hidden h-px bg-neutral-100 md:block ${isExpanded ? 'md:hidden' : ''}`}
                           aria-hidden="true"
                         />
-                        <item.icon className="size-4.5 shrink-0" aria-hidden="true" />
-                        <span className={`visible max-w-44 overflow-hidden whitespace-nowrap opacity-100 transition-all duration-150 ${desktopLabelVisibilityClass}`}>
-                          {item.label}
-                        </span>
-                        {!isExpanded && <CollapsedTooltip label={item.label} />}
-                      </>
-                    )}
-                  </NavLink>
-                ))}
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(group.section)}
+                        aria-expanded={openSections[group.section] !== false}
+                        className={`hidden w-full items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition-all duration-150 hover:text-neutral-600 md:flex ${
+                          isExpanded ? sectionLabelVisibilityClass : 'invisible h-0 max-w-0 pb-0 opacity-0'
+                        }`}
+                      >
+                        <span className="truncate">{group.section}</span>
+                        <ChevronDown
+                          className={`size-3.5 shrink-0 transition-transform ${openSections[group.section] === false ? '-rotate-90' : ''}`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(group.section)}
+                        aria-expanded={openSections[group.section] !== false}
+                        className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition-colors hover:text-neutral-600 md:hidden"
+                      >
+                        <span>{group.section}</span>
+                        <ChevronDown
+                          className={`size-3.5 shrink-0 transition-transform ${openSections[group.section] === false ? '-rotate-90' : ''}`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    </>
+                  )}
+                  <div className={`space-y-1 ${openSections[group.section] === false && isExpanded ? 'md:hidden' : ''} ${openSections[group.section] === false ? 'hidden md:block' : ''}`}>
+                    {group.items.map((item) => (
+                      <NavLink
+                        key={item.path}
+                        to={item.path}
+                        onClick={onCloseMobile}
+                        aria-label={!isExpanded ? item.label : undefined}
+                        title={!isExpanded ? item.label : undefined}
+                        className={({ isActive }) =>
+                          `group relative flex items-center rounded-[0.9rem] py-2.5 text-sm font-medium transition-all duration-150 ${
+                            isExpanded
+                              ? 'gap-3 px-3.5 md:justify-start'
+                              : 'gap-3 px-3.5 md:gap-0 md:px-0 md:justify-center'
+                          } ${
+                            isActive
+                              ? 'bg-[#bdeaa5] text-primary-700 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
+                              : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
+                          }`
+                        }
+                      >
+                        {({ isActive }) => (
+                          <>
+                            <span
+                              className={`absolute left-1 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-linear-to-b from-primary-500 to-primary-700 transition-opacity ${
+                                isActive ? 'opacity-100' : 'opacity-0'
+                              }`}
+                              aria-hidden="true"
+                            />
+                            <item.icon className="size-4.5 shrink-0" aria-hidden="true" />
+                            <span className={`visible max-w-44 overflow-hidden whitespace-nowrap opacity-100 transition-all duration-150 ${desktopLabelVisibilityClass}`}>
+                              {item.label}
+                            </span>
+                            {!isExpanded && <CollapsedTooltip label={item.label} />}
+                          </>
+                        )}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </nav>
 
         <div className="border-t border-neutral-100 p-3">

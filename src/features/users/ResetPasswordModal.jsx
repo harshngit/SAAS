@@ -45,7 +45,7 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
 
     setNewPassword('')
     setConfirmPassword('')
-    onSuccess(user)
+    onSuccess(user, result.detail)
   }
 
   return (

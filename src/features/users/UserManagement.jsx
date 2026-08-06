@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Banknote,
   BriefcaseBusiness,
@@ -29,21 +29,30 @@ import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/toastContext'
 import { ROLES, roleLabels } from '../../auth/roles'
 import { useAuthStore } from '../../store/authStore'
-import { createUser, listRoles, listUsers, updateUserStatus } from '../../api/users'
+import { createUser, deleteUser, getEmployeeOptions, listRoles, listUsers, updateUserStatus, uploadEmployeeDocuments, uploadEmployeeFile, uploadIdentityProof } from '../../api/users'
 import { getSystemRoleFromRoleName, normalizeApiUser, staffRoleOptions } from './userRoleUtils'
 import ResetPasswordModal from './ResetPasswordModal'
-
-const initialUsers = [
-  { id: 1, name: 'Amit Sharma', email: 'amit@aquapure.com', role: ROLES.ADMIN, status: 'active' },
-  { id: 2, name: 'Priya Patel', email: 'priya@aquapure.com', role: ROLES.SALES_OFFICER, status: 'active' },
-  { id: 3, name: 'Rajesh Kumar', email: 'rajesh@aquapure.com', role: ROLES.DELIVERY_PARTNER, status: 'active' },
-  { id: 4, name: 'Sneha Desai', email: 'sneha@aquapure.com', role: ROLES.ACCOUNTANT, status: 'active' },
-]
 
 const staffRoleSelectOptions = staffRoleOptions.map((role) => ({
   value: role,
   label: roleLabels[role],
 }))
+
+const formatOptionLabel = (value = '') =>
+  String(value)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase())
+
+const toSelectOptions = (values = [], fallbackOptions = []) => {
+  if (!values.length) {
+    return fallbackOptions
+  }
+
+  return values.map((value) => ({
+    value,
+    label: formatOptionLabel(value),
+  }))
+}
 
 const genderOptions = [
   { value: 'male', label: 'Male' },
@@ -68,19 +77,20 @@ const countryOptions = [
 ]
 
 const employmentTypeOptions = [
-  { value: 'full-time', label: 'Full-time' },
-  { value: 'part-time', label: 'Part-time' },
+  { value: 'full_time', label: 'Full Time' },
+  { value: 'part_time', label: 'Part Time' },
   { value: 'contract', label: 'Contract' },
   { value: 'intern', label: 'Intern' },
+  { value: 'temporary', label: 'Temporary' },
 ]
 
 const employeeStatusOptions = [
   { value: 'active', label: 'Active' },
   { value: 'probation', label: 'Probation' },
-  { value: 'notice-period', label: 'Notice Period' },
+  { value: 'on_leave', label: 'On Leave' },
+  { value: 'notice_period', label: 'Notice Period' },
   { value: 'resigned', label: 'Resigned' },
   { value: 'terminated', label: 'Terminated' },
-  { value: 'relieved', label: 'Relieved' },
 ]
 
 const shiftOptions = [
@@ -117,6 +127,24 @@ const systemStatusOptions = [
   { value: 'locked', label: 'Locked' },
 ]
 
+const emptyEmployeeOptions = {
+  employment_types: [],
+  employee_statuses: [],
+  account_statuses: [],
+  genders: [],
+  marital_statuses: [],
+  blood_groups: [],
+  identity_proof_types: [],
+  emergency_contact_relationships: [],
+  countries: [],
+  nationalities: [],
+  states: [],
+  designations: [],
+  work_locations: [],
+  shifts: [],
+  employee_id_prefix: '',
+}
+
 const initialStaffFormData = {
   employeeId: '',
   firstName: '',
@@ -143,6 +171,7 @@ const initialStaffFormData = {
   pinCode: '',
   role: ROLES.SALES_OFFICER,
   role_id: '',
+  designation: '',
   reportingManager: '',
   employmentType: '',
   dateOfJoining: '',
@@ -183,6 +212,28 @@ const staffFormSections = [
   { number: '7', title: 'Uploads', description: 'Compliance, onboarding, and qualification documents.', icon: FileText },
   { number: '8', title: 'System Preferences', description: 'Application language, timezone, and account status.', icon: Settings },
 ]
+
+const requiredCreateUserFields = [
+  { key: 'designation', label: 'Designation' },
+  { key: 'employmentType', label: 'Employment Type' },
+  { key: 'dateOfJoining', label: 'Date of Joining' },
+  { key: 'employeeStatus', label: 'Employee Status' },
+  { key: 'identityProofType', label: 'Identity Proof Type' },
+  { key: 'identityDocumentsName', label: 'Identity Proof File' },
+  { key: 'systemStatus', label: 'Status' },
+]
+
+const employeeFileFields = {
+  profilePictureName: 'profile_photo',
+  resumeCvName: 'resume_cv',
+  offerLetterName: 'offer_letter',
+  appointmentLetterName: 'appointment_letter',
+}
+
+const employeeDocumentCollections = {
+  experienceCertificatesName: 'experience_certificates',
+  educationalCertificatesName: 'educational_certificates',
+}
 
 const getInitials = (name = '') =>
   name
@@ -394,8 +445,11 @@ export default function UserManagement() {
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
   const isAdmin = currentUser?.role === ROLES.ADMIN
-  const [users, setUsers] = useState(initialUsers)
+  const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
+  const [employeeOptions, setEmployeeOptions] = useState(emptyEmployeeOptions)
+  const [isLoadingEmployeeOptions, setIsLoadingEmployeeOptions] = useState(false)
+  const [employeeOptionsError, setEmployeeOptionsError] = useState('')
   const [activeRoleFilter, setActiveRoleFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
@@ -408,9 +462,14 @@ export default function UserManagement() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [resetPasswordUser, setResetPasswordUser] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteError, setDeleteError] = useState('')
+  const [isDeletingUser, setIsDeletingUser] = useState(false)
   const [formData, setFormData] = useState(initialStaffFormData)
   const [uploadPreviews, setUploadPreviews] = useState({})
+  const [uploadFiles, setUploadFiles] = useState({})
   const uploadPreviewsRef = useRef({})
+  const staffRequestIdRef = useRef(0)
+  const isMountedRef = useRef(true)
   const [activeStaffSection, setActiveStaffSection] = useState('1')
 
   const apiRoleOptions = roles.map((role) => {
@@ -423,19 +482,66 @@ export default function UserManagement() {
   })
 
   const effectiveRoleSelectOptions = apiRoleOptions.length > 0 ? apiRoleOptions : staffRoleSelectOptions
+  const effectiveGenderOptions = toSelectOptions(employeeOptions.genders, genderOptions)
+  const effectiveMaritalStatusOptions = toSelectOptions(employeeOptions.marital_statuses, maritalStatusOptions)
+  const effectiveBloodGroupOptions = toSelectOptions(employeeOptions.blood_groups, bloodGroupOptions)
+  const effectiveCountryOptions = toSelectOptions(employeeOptions.countries, countryOptions)
+  const effectiveNationalityOptions = toSelectOptions(employeeOptions.nationalities, effectiveCountryOptions)
+  const effectiveEmploymentTypeOptions = toSelectOptions(employeeOptions.employment_types, employmentTypeOptions)
+  const effectiveEmployeeStatusOptions = toSelectOptions(employeeOptions.employee_statuses, employeeStatusOptions)
+  const effectiveShiftOptions = toSelectOptions(employeeOptions.shifts, shiftOptions)
+  const effectiveIdentityProofOptions = toSelectOptions(employeeOptions.identity_proof_types, identityProofOptions)
+  const effectiveSystemStatusOptions = toSelectOptions(employeeOptions.account_statuses, systemStatusOptions)
+  const effectiveEmergencyRelationshipOptions = toSelectOptions(employeeOptions.emergency_contact_relationships)
+  const effectiveStateOptions = toSelectOptions(employeeOptions.states)
+  const effectiveDesignationOptions = toSelectOptions(employeeOptions.designations)
+  const effectiveWorkLocationOptions = toSelectOptions(employeeOptions.work_locations)
   const effectiveFilterTabs = [
     { value: 'all', label: 'All' },
     ...effectiveRoleSelectOptions.map((role) => ({ value: role.value, label: role.label })),
   ]
+  const refreshUsers = useCallback(async ({ showLoading = true } = {}) => {
+    const requestId = staffRequestIdRef.current + 1
+    staffRequestIdRef.current = requestId
+
+    if (showLoading) {
+      setIsLoadingUsers(true)
+    }
+    setListError('')
+
+    const selectedRole = activeRoleFilter === 'all'
+      ? null
+      : roles.find((role) => getSystemRoleFromRoleName(role.name) === activeRoleFilter)
+    const usersResult = await listUsers({
+      role_id: selectedRole?.id,
+      search: searchTerm.trim(),
+    })
+
+    if (!isMountedRef.current || requestId !== staffRequestIdRef.current) {
+      return usersResult
+    }
+
+    setIsLoadingUsers(false)
+
+    if (!usersResult.success) {
+      setListError(usersResult.error)
+      return usersResult
+    }
+
+    setUsers((usersResult.users || []).map(normalizeApiUser))
+    return usersResult
+  }, [activeRoleFilter, roles, searchTerm])
 
   const handleOpenModal = () => {
     setFormError('')
+    setEmployeeOptionsError('')
     setActiveStaffSection('1')
     setUploadPreviews((current) => {
       Object.values(current).forEach(revokeUploadPreviewUrls)
       uploadPreviewsRef.current = {}
       return {}
     })
+    setUploadFiles({})
     setFormData(
       {
         ...initialStaffFormData,
@@ -454,6 +560,7 @@ export default function UserManagement() {
       uploadPreviewsRef.current = {}
       return {}
     })
+    setUploadFiles({})
   }
 
   const handleFormChange = (event) => {
@@ -474,6 +581,7 @@ export default function UserManagement() {
       uploadPreviewsRef.current = nextPreviews
       return nextPreviews
     })
+    setUploadFiles((current) => ({ ...current, [name]: selectedFiles }))
     setFormData((current) => ({ ...current, [name]: fileNames }))
   }
 
@@ -485,39 +593,86 @@ export default function UserManagement() {
       uploadPreviewsRef.current = remaining
       return remaining
     })
+    setUploadFiles((current) => {
+      const { [name]: removed, ...remaining } = current
+      void removed
+      return remaining
+    })
     setFormData((current) => ({ ...current, [name]: '' }))
   }
 
-  useEffect(() => () => {
-    Object.values(uploadPreviewsRef.current).forEach(revokeUploadPreviewUrls)
+  useEffect(() => {
+    isMountedRef.current = true
+
+    return () => {
+      isMountedRef.current = false
+      Object.values(uploadPreviewsRef.current).forEach(revokeUploadPreviewUrls)
+    }
   }, [])
+
+  useEffect(() => {
+    if (!isModalOpen) return undefined
+
+    let isMounted = true
+
+    async function loadEmployeeOptions() {
+      setIsLoadingEmployeeOptions(true)
+      setEmployeeOptionsError('')
+
+      const result = await getEmployeeOptions()
+
+      if (!isMounted) return
+
+      setIsLoadingEmployeeOptions(false)
+
+      if (!result.success) {
+        setEmployeeOptionsError(result.error)
+        return
+      }
+
+      setEmployeeOptions({ ...emptyEmployeeOptions, ...(result.options || {}) })
+    }
+
+    loadEmployeeOptions()
+
+    return () => {
+      isMounted = false
+    }
+  }, [isModalOpen])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(async () => {
+      await refreshUsers()
+    }, searchTerm.trim() ? 300 : 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [refreshUsers, searchTerm])
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      refreshUsers({ showLoading: false })
+    }
+
+    window.addEventListener('focus', handleWindowFocus)
+    return () => window.removeEventListener('focus', handleWindowFocus)
+  }, [refreshUsers])
 
   useEffect(() => {
     let isMounted = true
 
-    async function loadStaffData() {
-      setIsLoadingUsers(true)
-      setListError('')
-
-      const [usersResult, rolesResult] = await Promise.all([listUsers(), listRoles()])
+    async function loadStaffRoles() {
+      const rolesResult = await listRoles()
 
       if (!isMounted) return
-
-      setIsLoadingUsers(false)
 
       if (rolesResult.success) {
         setRoles(rolesResult.roles || [])
       }
-
-      if (!usersResult.success) {
-        setListError(usersResult.error)
-        return
-      }
-
-      setUsers((usersResult.users || []).map(normalizeApiUser))
     }
 
-    loadStaffData()
+    loadStaffRoles()
 
     return () => {
       isMounted = false
@@ -533,6 +688,15 @@ export default function UserManagement() {
       return
     }
 
+    const missingRequiredFields = requiredCreateUserFields
+      .filter((field) => !String(formData[field.key] || '').trim())
+      .map((field) => field.label)
+
+    if (missingRequiredFields.length > 0) {
+      setFormError(`Please complete required fields: ${missingRequiredFields.join(', ')}.`)
+      return
+    }
+
     const displayName = formData.name.trim() || `${formData.firstName} ${formData.lastName}`.trim()
     const selectedRole = effectiveRoleSelectOptions.find((role) => role.value === formData.role)
     const payload = {
@@ -541,31 +705,113 @@ export default function UserManagement() {
       email: formData.email,
       phone: formData.mobileNumber,
       role_id: formData.role_id || selectedRole?.roleId || '',
+      role: selectedRole?.label || formData.role,
     }
 
     setIsSaving(true)
     const result = await createUser(payload)
-    setIsSaving(false)
 
     if (!result.success) {
+      setIsSaving(false)
       setFormError(result.error)
       return
     }
 
-    if (result.user) {
-      setUsers([...users, normalizeApiUser(result.user)])
-    } else {
-      const newUser = { ...payload, id: Date.now(), status: payload.systemStatus || 'active' }
-      setUsers([...users, newUser])
+    const createdUser = result.user
+    const createdUserId = createdUser?.id
+    let finalUser = createdUser
+
+    if (createdUserId) {
+      const identityProofFile = uploadFiles.identityDocumentsName?.[0]
+
+      if (identityProofFile) {
+        const identityProofResult = await uploadIdentityProof(createdUserId, identityProofFile)
+
+        if (!identityProofResult.success) {
+          setIsSaving(false)
+          setFormError(`Staff created, but identity proof could not be uploaded: ${identityProofResult.error}`)
+          if (finalUser) {
+            setUsers((currentUsers) => [...currentUsers, normalizeApiUser(finalUser)])
+          }
+          await refreshUsers({ showLoading: false })
+          return
+        }
+
+        finalUser = finalUser
+          ? { ...finalUser, identity_proof_file: identityProofResult.url || finalUser.identity_proof_file }
+          : finalUser
+      }
+
+      for (const [formField, apiField] of Object.entries(employeeFileFields)) {
+        const file = uploadFiles[formField]?.[0]
+
+        if (!file) continue
+
+        const uploadResult = await uploadEmployeeFile(createdUserId, apiField, file)
+
+        if (!uploadResult.success) {
+          setIsSaving(false)
+          setFormError(`Staff created, but ${file.name} could not be uploaded: ${uploadResult.error}`)
+          if (finalUser) {
+            setUsers((currentUsers) => [...currentUsers, normalizeApiUser(finalUser)])
+          }
+          await refreshUsers({ showLoading: false })
+          return
+        }
+
+        finalUser = uploadResult.user || finalUser
+      }
+
+      for (const [formField, collection] of Object.entries(employeeDocumentCollections)) {
+        const files = uploadFiles[formField] || []
+
+        if (files.length === 0) continue
+
+        const documentsResult = await uploadEmployeeDocuments(createdUserId, collection, files)
+
+        if (!documentsResult.success) {
+          setIsSaving(false)
+          setFormError(`Staff created, but ${formData[formField]} could not be uploaded: ${documentsResult.error}`)
+          if (finalUser) {
+            setUsers((currentUsers) => [...currentUsers, normalizeApiUser(finalUser)])
+          }
+          await refreshUsers({ showLoading: false })
+          return
+        }
+
+        finalUser = finalUser
+          ? { ...finalUser, [collection]: documentsResult.documents || finalUser[collection] }
+          : finalUser
+      }
     }
 
+    setIsSaving(false)
+
+    await refreshUsers({ showLoading: false })
     handleCloseModal()
   }
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteTarget) return
-    setUsers(users.filter(u => u.id !== deleteTarget.id))
+
+    setIsDeletingUser(true)
+    setDeleteError('')
+
+    const result = await deleteUser(deleteTarget.id)
+
+    setIsDeletingUser(false)
+
+    if (!result.success) {
+      setDeleteError(result.error)
+      return
+    }
+
+    await refreshUsers({ showLoading: false })
     setDeleteTarget(null)
+    showToast({
+      title: 'Staff deleted',
+      message: `${deleteTarget.name || 'Staff member'} deleted successfully.`,
+    })
   }
 
   const handleOpenStatusModal = (user) => {
@@ -582,7 +828,7 @@ export default function UserManagement() {
   const handleChangeStatus = async () => {
     if (!statusUser) return
 
-    const nextIsActive = statusUser.status !== 'active'
+    const nextIsActive = !statusUser.isActive
     setIsUpdatingStatus(true)
     setStatusError('')
 
@@ -594,11 +840,7 @@ export default function UserManagement() {
       return
     }
 
-    const updatedUser = result.user
-      ? normalizeApiUser(result.user)
-      : { ...statusUser, status: nextIsActive ? 'active' : 'inactive' }
-
-    setUsers((currentUsers) => currentUsers.map((user) => (user.id === statusUser.id ? updatedUser : user)))
+    await refreshUsers({ showLoading: false })
     setStatusUser(null)
   }
 
@@ -607,7 +849,7 @@ export default function UserManagement() {
     const normalizedSearch = searchTerm.trim().toLowerCase()
     const matchesSearch =
       !normalizedSearch ||
-      [user.name, user.email, user.phone, roleLabels[user.role], user.status]
+      [user.name, user.email, user.phone, roleLabels[user.role], user.isActive ? 'active' : 'inactive']
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedSearch))
 
@@ -666,6 +908,12 @@ export default function UserManagement() {
                   <div>
                     <p className="text-lg font-semibold text-neutral-900">{activeStaffFormSection.title}</p>
                     <p className="mt-1 text-sm text-neutral-500">{activeStaffFormSection.description}</p>
+                    {isLoadingEmployeeOptions && (
+                      <p className="mt-2 text-xs font-medium text-primary-600">Loading form options...</p>
+                    )}
+                    {employeeOptionsError && (
+                      <p className="mt-2 text-xs font-medium text-amber-600">{employeeOptionsError}</p>
+                    )}
                   </div>
                   <Button
                     type="button"
@@ -693,7 +941,14 @@ export default function UserManagement() {
                   onRemove={handleUploadRemove}
                 />
                 <StaffField description="Unique employee identifier." format="Text or auto number" required>
-                  <Input label="Employee ID" name="employeeId" value={formData.employeeId} onChange={handleFormChange} required />
+                  <Input
+                    label="Employee ID"
+                    name="employeeId"
+                    placeholder={employeeOptions.employee_id_prefix ? `${employeeOptions.employee_id_prefix}...` : undefined}
+                    value={formData.employeeId}
+                    onChange={handleFormChange}
+                    required
+                  />
                 </StaffField>
                 <StaffField description="Employee's first name." format="Text, max 50 characters" required>
                   <Input label="First Name" name="firstName" maxLength={50} value={formData.firstName} onChange={handleFormChange} required />
@@ -705,19 +960,19 @@ export default function UserManagement() {
                   <Input label="Display Name" name="name" value={formData.name} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="Gender of the employee." format="Dropdown" required={false}>
-                  <Select label="Gender" name="gender" options={genderOptions} value={formData.gender} onChange={handleFormChange} />
+                  <Select label="Gender" name="gender" options={effectiveGenderOptions} value={formData.gender} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="Employee's birth date." format="Date picker" required={false}>
                   <Input label="Date of Birth" name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="Employee's marital status." format="Dropdown" required={false}>
-                  <Select label="Marital Status" name="maritalStatus" options={maritalStatusOptions} value={formData.maritalStatus} onChange={handleFormChange} />
+                  <Select label="Marital Status" name="maritalStatus" options={effectiveMaritalStatusOptions} value={formData.maritalStatus} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="Blood group for emergency purposes." format="Dropdown" required={false}>
-                  <Select label="Blood Group" name="bloodGroup" options={bloodGroupOptions} value={formData.bloodGroup} onChange={handleFormChange} />
+                  <Select label="Blood Group" name="bloodGroup" options={effectiveBloodGroupOptions} value={formData.bloodGroup} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="Employee nationality." format="Dropdown" required={false}>
-                  <Select label="Nationality" name="nationality" options={countryOptions} value={formData.nationality} onChange={handleFormChange} />
+                  <Select label="Nationality" name="nationality" options={effectiveNationalityOptions} value={formData.nationality} onChange={handleFormChange} />
                 </StaffField>
               </StaffSection>
               )}
@@ -743,7 +998,17 @@ export default function UserManagement() {
                   <Input label="Emergency Contact Number" name="emergencyContactNumber" type="tel" value={formData.emergencyContactNumber} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="Relationship with employee." format="Dropdown or text" required={false}>
-                  <Input label="Emergency Contact Relationship" name="emergencyContactRelationship" value={formData.emergencyContactRelationship} onChange={handleFormChange} />
+                  {effectiveEmergencyRelationshipOptions.length > 0 ? (
+                    <Select
+                      label="Emergency Contact Relationship"
+                      name="emergencyContactRelationship"
+                      options={effectiveEmergencyRelationshipOptions}
+                      value={formData.emergencyContactRelationship}
+                      onChange={handleFormChange}
+                    />
+                  ) : (
+                    <Input label="Emergency Contact Relationship" name="emergencyContactRelationship" value={formData.emergencyContactRelationship} onChange={handleFormChange} />
+                  )}
                 </StaffField>
               </StaffSection>
               )}
@@ -760,10 +1025,14 @@ export default function UserManagement() {
                   <Input label="City" name="city" value={formData.city} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="State or province." format="Text or dropdown" required={false}>
-                  <Input label="State" name="state" value={formData.state} onChange={handleFormChange} />
+                  {effectiveStateOptions.length > 0 ? (
+                    <Select label="State" name="state" options={effectiveStateOptions} value={formData.state} onChange={handleFormChange} />
+                  ) : (
+                    <Input label="State" name="state" value={formData.state} onChange={handleFormChange} />
+                  )}
                 </StaffField>
                 <StaffField description="Country." format="Dropdown" required={false}>
-                  <Select label="Country" name="country" options={countryOptions} value={formData.country} onChange={handleFormChange} />
+                  <Select label="Country" name="country" options={effectiveCountryOptions} value={formData.country} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="Postal code." format="Text" required={false}>
                   <Input label="PIN/ZIP Code" name="pinCode" value={formData.pinCode} onChange={handleFormChange} />
@@ -773,9 +1042,9 @@ export default function UserManagement() {
 
               {activeStaffSection === '4' && (
               <StaffSection number="4" title="Employment Information" description="Role, reporting, joining, location, and employee status.">
-                <StaffField description="Job title or designation." format="Dropdown" required>
+                <StaffField description="Application access role." format="Dropdown" required>
                   <Select
-                    label="Designation"
+                    label="Role"
                     name="role"
                     options={effectiveRoleSelectOptions}
                     value={formData.role}
@@ -790,6 +1059,13 @@ export default function UserManagement() {
                     required
                   />
                 </StaffField>
+                <StaffField description="Job title or designation." format="Dropdown" required={false}>
+                  {effectiveDesignationOptions.length > 0 ? (
+                    <Select label="Designation" name="designation" options={effectiveDesignationOptions} value={formData.designation} onChange={handleFormChange} />
+                  ) : (
+                    <Input label="Designation" name="designation" value={formData.designation} onChange={handleFormChange} />
+                  )}
+                </StaffField>
                 <StaffField description="Employee's manager." format="Searchable dropdown" required={false}>
                   <Select
                     label="Reporting Manager"
@@ -800,7 +1076,7 @@ export default function UserManagement() {
                   />
                 </StaffField>
                 <StaffField description="Full-time, part-time, contract, intern, etc." format="Dropdown" required>
-                  <Select label="Employment Type" name="employmentType" options={employmentTypeOptions} value={formData.employmentType} onChange={handleFormChange} required />
+                  <Select label="Employment Type" name="employmentType" options={effectiveEmploymentTypeOptions} value={formData.employmentType} onChange={handleFormChange} required />
                 </StaffField>
                 <StaffField description="Employment start date." format="Date picker" required>
                   <Input label="Date of Joining" name="dateOfJoining" type="date" value={formData.dateOfJoining} onChange={handleFormChange} required />
@@ -809,13 +1085,17 @@ export default function UserManagement() {
                   <Input label="Date of Exit" name="dateOfExit" type="date" value={formData.dateOfExit} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="Office or branch location." format="Dropdown" required={false}>
-                  <Input label="Work Location" name="workLocation" value={formData.workLocation} onChange={handleFormChange} />
+                  {effectiveWorkLocationOptions.length > 0 ? (
+                    <Select label="Work Location" name="workLocation" options={effectiveWorkLocationOptions} value={formData.workLocation} onChange={handleFormChange} />
+                  ) : (
+                    <Input label="Work Location" name="workLocation" value={formData.workLocation} onChange={handleFormChange} />
+                  )}
                 </StaffField>
                 <StaffField description="Assigned work shift." format="Dropdown" required={false}>
-                  <Select label="Shift" name="shift" options={shiftOptions} value={formData.shift} onChange={handleFormChange} />
+                  <Select label="Shift" name="shift" options={effectiveShiftOptions} value={formData.shift} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="Current employment state." format="Dropdown" required>
-                  <Select label="Employee Status" name="employeeStatus" options={employeeStatusOptions} value={formData.employeeStatus} onChange={handleFormChange} required />
+                  <Select label="Employee Status" name="employeeStatus" options={effectiveEmployeeStatusOptions} value={formData.employeeStatus} onChange={handleFormChange} required />
                 </StaffField>
               </StaffSection>
               )}
@@ -873,7 +1153,7 @@ export default function UserManagement() {
                   proofValue={formData.identityProofType}
                   fileValue={formData.identityDocumentsName}
                   previews={uploadPreviews.identityDocumentsName}
-                  options={identityProofOptions}
+                  options={effectiveIdentityProofOptions}
                   onProofChange={handleFormChange}
                   onFileChange={handleUploadChange}
                   onRemove={handleUploadRemove}
@@ -898,7 +1178,7 @@ export default function UserManagement() {
                   <Select label="Time Zone" name="timeZone" options={timeZoneOptions} value={formData.timeZone} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="Active, inactive, suspended, or locked." format="Dropdown" required>
-                  <Select label="Status" name="systemStatus" options={systemStatusOptions} value={formData.systemStatus} onChange={handleFormChange} required />
+                  <Select label="Status" name="systemStatus" options={effectiveSystemStatusOptions} value={formData.systemStatus} onChange={handleFormChange} required />
                 </StaffField>
               </StaffSection>
               )}
@@ -944,7 +1224,7 @@ export default function UserManagement() {
               Cancel
             </Button>
             <Button type="button" onClick={handleChangeStatus} loading={isUpdatingStatus}>
-              {statusUser?.status === 'active' ? 'Set Inactive' : 'Set Active'}
+              {statusUser?.isActive ? 'Set Inactive' : 'Set Active'}
             </Button>
           </>
         }
@@ -957,13 +1237,13 @@ export default function UserManagement() {
                 <p className="font-medium text-neutral-900">{statusUser?.name}</p>
                 <p className="mt-0.5 text-xs text-neutral-500">{statusUser?.email}</p>
               </div>
-              <Badge variant={statusUser?.status === 'active' ? 'success' : 'danger'}>
-                {statusUser?.status === 'active' ? 'active' : 'inactive'}
+              <Badge variant={statusUser?.isActive ? 'success' : 'danger'}>
+                {statusUser?.isActive ? 'active' : 'inactive'}
               </Badge>
             </div>
           </div>
           <p className="text-sm leading-6 text-neutral-600">
-            This will change the user to {statusUser?.status === 'active' ? 'inactive' : 'active'}.
+            This will change the user to {statusUser?.isActive ? 'inactive' : 'active'}.
           </p>
           {statusError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -975,24 +1255,45 @@ export default function UserManagement() {
       <ResetPasswordModal
         user={resetPasswordUser}
         onClose={() => setResetPasswordUser(null)}
-        onSuccess={(resetUser) => {
+        onSuccess={(resetUser, detail) => {
           setResetPasswordUser(null)
           showToast({
             title: 'Password reset',
-            message: `Password reset for ${resetUser.name}.`,
+            message: detail || `Password reset for ${resetUser.name}.`,
           })
         }}
       />
-      <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Staff Member">
+      <Modal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => {
+          if (isDeletingUser) return
+          setDeleteTarget(null)
+          setDeleteError('')
+        }}
+        title="Delete Staff Member"
+      >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-neutral-600">
             Delete {deleteTarget?.name || 'this staff member'}? This cannot be undone.
           </p>
+          {deleteError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {deleteError}
+            </div>
+          )}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setDeleteTarget(null)}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isDeletingUser}
+              onClick={() => {
+                setDeleteTarget(null)
+                setDeleteError('')
+              }}
+            >
               Cancel
             </Button>
-            <Button type="button" variant="danger" onClick={handleConfirmDelete}>
+            <Button type="button" variant="danger" onClick={handleConfirmDelete} loading={isDeletingUser}>
               Delete
             </Button>
           </div>
@@ -1045,22 +1346,13 @@ export default function UserManagement() {
                 variant="outline"
                 className="mt-4"
                 onClick={async () => {
-                  setIsLoadingUsers(true)
-                  setListError('')
-                  const result = await listUsers()
                   const rolesResult = await listRoles()
-                  setIsLoadingUsers(false)
 
                   if (rolesResult.success) {
                     setRoles(rolesResult.roles || [])
                   }
 
-                  if (!result.success) {
-                    setListError(result.error)
-                    return
-                  }
-
-                  setUsers((result.users || []).map(normalizeApiUser))
+                  await refreshUsers()
                 }}
               >
                 Retry
@@ -1107,8 +1399,8 @@ export default function UserManagement() {
                       <Badge variant="primary">{roleLabels[user.role] || user.roleDetail?.name || user.role}</Badge>
                     </td>
                     <td className="px-4 py-3.5">
-                      <Badge variant={user.status === 'active' ? 'success' : 'danger'}>
-                        {user.status}
+                      <Badge variant={user.isActive ? 'success' : 'danger'}>
+                        {user.isActive ? 'active' : 'inactive'}
                       </Badge>
                     </td>
                     <td className="px-4 py-3.5 text-neutral-500">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</td>
@@ -1120,7 +1412,15 @@ export default function UserManagement() {
                           ...(isAdmin
                             ? [{ label: 'Reset Password', icon: KeyRound, onClick: () => setResetPasswordUser(user) }]
                             : []),
-                          { label: 'Delete', icon: Trash2, danger: true, onClick: () => setDeleteTarget(user) },
+                          {
+                            label: 'Delete',
+                            icon: Trash2,
+                            danger: true,
+                            onClick: () => {
+                              setDeleteError('')
+                              setDeleteTarget(user)
+                            },
+                          },
                         ]}
                       />
                     </td>
