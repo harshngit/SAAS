@@ -28,6 +28,10 @@ import AuditLogList from '../features/auditLogs/AuditLogList'
 import CustomerList from '../features/customers/CustomerList'
 import CustomerDetail from '../features/customers/CustomerDetail'
 import CustomerEdit from '../features/customers/CustomerEdit'
+import LeadList from '../features/leads/LeadList'
+import LeadFormPage from '../features/leads/LeadFormPage'
+import QuotationList from '../features/quotations/QuotationList'
+import QuotationFormPage from '../features/quotations/QuotationFormPage'
 import SupplierList from '../features/suppliers/SupplierList'
 import SupplierDetail from '../features/suppliers/SupplierDetail'
 import CategoryList from '../features/categories/CategoryList'
@@ -124,6 +128,10 @@ export default function AppRoutes() {
           <Route path="/admin/customers" element={<CustomerList />} />
           <Route path="/admin/customers/edit/:customer_id" element={<CustomerEdit />} />
           <Route path="/admin/customers/:id" element={<CustomerDetail />} />
+          <Route path="/admin/leads" element={<LeadList />} />
+          <Route path="/admin/leads/new" element={<LeadFormPage />} />
+          <Route path="/admin/quotations" element={<QuotationList />} />
+          <Route path="/admin/quotations/new" element={<QuotationFormPage />} />
           <Route path="/admin/suppliers" element={<SupplierList />} />
           <Route path="/admin/suppliers/:id" element={<SupplierDetail />} />
           <Route path="/admin/categories" element={<CategoryList />} />
@@ -152,6 +160,10 @@ export default function AppRoutes() {
           <Route path="/sales/dashboard" element={<SalesOfficerDashboard />} />
           <Route path="/sales/customers" element={<CustomerList />} />
           <Route path="/sales/customers/:id" element={<CustomerDetail />} />
+          <Route path="/sales/leads" element={<LeadList />} />
+          <Route path="/sales/leads/new" element={<LeadFormPage />} />
+          <Route path="/sales/quotations" element={<QuotationList />} />
+          <Route path="/sales/quotations/new" element={<QuotationFormPage />} />
           <Route path="/sales/orders/create" element={<CreateSalesOrder />} />
           <Route path="/sales/stock" element={<StockBoard readOnly />} />
           <Route path="/sales/visits" element={<VisitCheckIn />} />

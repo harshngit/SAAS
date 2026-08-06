@@ -96,6 +96,8 @@ export const roleMenus = {
       section: 'Sales & Catalog',
       items: [
         { label: 'Customers', path: '/admin/customers', icon: UsersRound },
+        { label: 'Leads', path: '/admin/leads', icon: UserPlus },
+        { label: 'Quotations', path: '/admin/quotations', icon: FileText },
         { label: 'Suppliers', path: '/admin/suppliers', icon: Factory },
         { label: 'Categories', path: '/admin/categories', icon: Tags },
         { label: 'Products', path: '/admin/products', icon: Package },
@@ -127,8 +129,13 @@ export const roleMenus = {
         { label: 'Staff', path: '/admin/users', icon: Users },
         { label: 'Roles & Permissions', path: '/admin/roles', icon: ShieldCheck },
         { label: 'Attendance', path: '/admin/attendance', icon: ClipboardCheck },
-        { label: 'Notifications', path: '/admin/notifications', icon: Bell },
         { label: 'Audit Logs', path: '/admin/audit-logs', icon: History },
+      ],
+    },
+    {
+      section: 'System',
+      items: [
+        { label: 'Notifications', path: '/admin/notifications', icon: Bell },
         { label: 'Settings', path: '/admin/settings', icon: Settings },
       ],
     },
@@ -139,6 +146,8 @@ export const roleMenus = {
       items: [
         { label: 'Dashboard', path: '/sales/dashboard', icon: LayoutDashboard },
         { label: 'Customers', path: '/sales/customers', icon: Users },
+        { label: 'Leads', path: '/sales/leads', icon: UserPlus },
+        { label: 'Quotations', path: '/sales/quotations', icon: FileText },
         { label: 'Create Order', path: '/sales/orders/create', icon: ShoppingCart },
         { label: 'Stock', path: '/sales/stock', icon: Boxes },
         { label: 'Visits', path: '/sales/visits', icon: MapPin },

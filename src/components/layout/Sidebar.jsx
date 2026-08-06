@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Crown, Droplet, Sparkles, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ChevronDown, ChevronLeft, ChevronRight, Crown, Droplet, Sparkles, X } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { roleMenus, roleLabels } from '../../auth/roles'
 
@@ -22,10 +23,24 @@ export default function Sidebar({
   onCloseMobile,
 }) {
   const currentUser = useAuthStore((state) => state.currentUser)
+  const currentRole = currentUser?.role
+  const menuGroups = currentRole ? roleMenus[currentRole] || [] : []
+  const [openSections, setOpenSections] = useState({})
+
+  useEffect(() => {
+    const nextMenuGroups = currentRole ? roleMenus[currentRole] || [] : []
+    setOpenSections(
+      Object.fromEntries(
+        nextMenuGroups.map((group) => [
+          group.section,
+          group.section === 'Overview' || group.section === 'Sales & Catalog',
+        ]),
+      ),
+    )
+  }, [currentRole])
 
   if (!currentUser) return null
 
-  const menuGroups = roleMenus[currentUser.role] || []
   const labelVisibilityClass = isExpanded
     ? 'visible max-w-36 opacity-100 delay-150'
     : 'invisible max-w-0 opacity-0 delay-0'
@@ -35,6 +50,10 @@ export default function Sidebar({
   const sectionLabelVisibilityClass = isExpanded
     ? 'visible max-w-48 whitespace-nowrap opacity-100 delay-150'
     : 'invisible max-w-0 opacity-0 delay-0'
+
+  const toggleSection = (section) => {
+    setOpenSections((current) => ({ ...current, [section]: !current[section] }))
+  }
 
   return (
     <>
@@ -109,23 +128,43 @@ export default function Sidebar({
         <nav className={`sidebar-nav min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? 'py-5 md:px-3' : 'py-3 md:px-2.5 md:pt-0'} px-3`}>
           {menuGroups.map((group, groupIndex) => (
             <div key={group.section} className={groupIndex > 0 ? `mt-5 ${!isExpanded ? 'md:mt-2' : ''}` : ''}>
+              {group.section !== 'Overview' && (
+                <>
               {groupIndex > 0 && (
                 <div
                   className={`mx-2 mb-2 hidden h-px bg-neutral-100 md:block ${isExpanded ? 'md:hidden' : ''}`}
                   aria-hidden="true"
                 />
               )}
-              <p
-                className={`hidden overflow-hidden px-3 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition-all duration-150 md:block ${
-                  isExpanded ? `${sectionLabelVisibilityClass} pb-2` : 'invisible h-0 max-w-0 pb-0 opacity-0'
+              <button
+                type="button"
+                onClick={() => toggleSection(group.section)}
+                aria-expanded={openSections[group.section] !== false}
+                className={`hidden w-full items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition-all duration-150 hover:text-neutral-600 md:flex ${
+                  isExpanded ? sectionLabelVisibilityClass : 'invisible h-0 max-w-0 pb-0 opacity-0'
                 }`}
               >
-                {group.section}
-              </p>
-              <p className="px-3 pb-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 md:hidden">
-                {group.section}
-              </p>
-              <div className="space-y-1">
+                <span className="truncate">{group.section}</span>
+                <ChevronDown
+                  className={`size-3.5 shrink-0 transition-transform ${openSections[group.section] === false ? '-rotate-90' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleSection(group.section)}
+                aria-expanded={openSections[group.section] !== false}
+                className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition-colors hover:text-neutral-600 md:hidden"
+              >
+                <span>{group.section}</span>
+                <ChevronDown
+                  className={`size-3.5 shrink-0 transition-transform ${openSections[group.section] === false ? '-rotate-90' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+                </>
+              )}
+              <div className={`space-y-1 ${openSections[group.section] === false && isExpanded ? 'md:hidden' : ''} ${openSections[group.section] === false ? 'hidden md:block' : ''}`}>
                 {group.items.map((item) => (
                   <NavLink
                     key={item.path}
