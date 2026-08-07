@@ -22,9 +22,11 @@ const getInitials = (name = '') =>
 
 function DetailItem({ label, value }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-xs font-medium uppercase tracking-[0.12em] text-neutral-400">{label}</p>
-      <p className="mt-1 text-sm font-medium text-neutral-900">{value || '-'}</p>
+      <p className="mt-1 max-w-full truncate text-sm font-medium text-neutral-900" title={value || '-'}>
+        {value || '-'}
+      </p>
     </div>
   )
 }
@@ -91,7 +93,7 @@ function DocumentList({ title, documents = [], isClearing = false, deletingDocum
 
 function FileItem({ label, value, isClearing = false, onClear }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-xs font-medium uppercase tracking-[0.12em] text-neutral-400">{label}</p>
       <div className="mt-1 flex items-center gap-2">
         {value ? (
@@ -440,8 +442,6 @@ export default function UserDetail() {
               key={fileField.field}
               label={fileField.label}
               value={user[fileField.userKey]}
-              isClearing={clearingFileField === fileField.field}
-              onClear={isAdmin ? () => handleClearFile(fileField) : undefined}
             />
           ))}
           <DetailItem label="Identity Proof Type" value={user.identityProofType} />

@@ -37,17 +37,45 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
+function normalizeVariantInventory(variant = {}) {
+  const inventory = variant.inventory && typeof variant.inventory === 'object' ? variant.inventory : {}
+
+  return {
+    openingStock: Number(inventory.openingStock ?? variant.inventory ?? variant.stock) || 0,
+    minimumStockLevel: Number(inventory.minimumStockLevel ?? variant.minimumStockLevel ?? variant.minimum_stock_level) || 0,
+    maximumStockLevel: Number(inventory.maximumStockLevel ?? variant.maximumStockLevel ?? variant.maximum_stock_level) || 0,
+    reorderLevel: Number(inventory.reorderLevel ?? variant.reorderLevel ?? variant.reorder_level) || 0,
+    reorderQuantity: Number(inventory.reorderQuantity ?? variant.reorderQuantity ?? variant.reorder_quantity) || 0,
+  }
+}
+
+function toVariationPayload(variant, includeId = false) {
+  const inventory = normalizeVariantInventory(variant)
+  const variation = {
+    name: variant.size || variant.name || 'Default',
+    length: Number(variant.length) || 0,
+    width: Number(variant.width) || 0,
+    height: Number(variant.height) || 0,
+    weight: Number(variant.weight) || 0,
+    price: Number(variant.sellingPrice ?? variant.price) || 0,
+    mrp: Number(variant.mrp) || 0,
+    inventory: inventory.openingStock,
+    minimum_stock_level: inventory.minimumStockLevel,
+    maximum_stock_level: inventory.maximumStockLevel,
+    reorder_level: inventory.reorderLevel,
+    reorder_quantity: inventory.reorderQuantity,
+  }
+
+  if (includeId && variant.id) {
+    variation.id = variant.id
+  }
+
+  return variation
+}
+
 export async function createProduct(payload) {
   try {
-    const variations = (payload.variants || []).map((variant) => ({
-      name: variant.size || variant.name || 'Default',
-      length: Number(variant.length) || 0,
-      width: Number(variant.width) || 0,
-      height: Number(variant.height) || 0,
-      weight: Number(variant.weight) || 0,
-      price: Number(variant.sellingPrice ?? variant.price) || 0,
-      inventory: Number(variant.inventory ?? variant.stock) || 0,
-    }))
+    const variations = (payload.variants || []).map((variant) => toVariationPayload(variant))
 
     const requestBody = {
       name: payload.name.trim(),
@@ -125,15 +153,7 @@ export async function updateProduct(productId, payload) {
       requestBody.total_inventory = Number(payload.totalInventory ?? payload.total_inventory) || 0
     }
     if (payload.variants !== undefined) {
-      requestBody.variations = payload.variants.map((variant) => ({
-        name: variant.size || variant.name || 'Default',
-        length: Number(variant.length) || 0,
-        width: Number(variant.width) || 0,
-        height: Number(variant.height) || 0,
-        weight: Number(variant.weight) || 0,
-        price: Number(variant.sellingPrice ?? variant.price) || 0,
-        inventory: Number(variant.inventory ?? variant.stock) || 0,
-      }))
+      requestBody.variations = payload.variants.map((variant) => toVariationPayload(variant, true))
 
       if (requestBody.total_inventory === undefined) {
         requestBody.total_inventory = requestBody.variations.reduce((sum, variant) => sum + variant.inventory, 0)

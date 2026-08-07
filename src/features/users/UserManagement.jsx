@@ -213,15 +213,35 @@ const staffFormSections = [
   { number: '8', title: 'System Preferences', description: 'Application language, timezone, and account status.', icon: Settings },
 ]
 
-const requiredCreateUserFields = [
-  { key: 'designation', label: 'Designation' },
-  { key: 'employmentType', label: 'Employment Type' },
-  { key: 'dateOfJoining', label: 'Date of Joining' },
-  { key: 'employeeStatus', label: 'Employee Status' },
-  { key: 'identityProofType', label: 'Identity Proof Type' },
-  { key: 'identityDocumentsName', label: 'Identity Proof File' },
-  { key: 'systemStatus', label: 'Status' },
-]
+const staffRequiredFieldsBySection = {
+  1: [
+    { key: 'firstName', label: 'First Name' },
+    { key: 'lastName', label: 'Last Name' },
+  ],
+  2: [
+    { key: 'mobileNumber', label: 'Mobile Number' },
+    { key: 'email', label: 'Official Email' },
+  ],
+  4: [
+    { key: 'role', label: 'Role' },
+    { key: 'designation', label: 'Designation' },
+    { key: 'employmentType', label: 'Employment Type' },
+    { key: 'dateOfJoining', label: 'Date of Joining' },
+    { key: 'employeeStatus', label: 'Employee Status' },
+  ],
+  5: [
+    { key: 'username', label: 'Username' },
+    { key: 'password', label: 'Password' },
+    { key: 'confirmPassword', label: 'Confirm Password' },
+  ],
+  7: [
+    { key: 'identityProofType', label: 'Identity Proof Type' },
+    { key: 'identityDocumentsName', label: 'Identity Proof File' },
+  ],
+  8: [
+    { key: 'systemStatus', label: 'Status' },
+  ],
+}
 
 const employeeFileFields = {
   profilePictureName: 'profile_photo',
@@ -494,7 +514,6 @@ export default function UserManagement() {
   const effectiveSystemStatusOptions = toSelectOptions(employeeOptions.account_statuses, systemStatusOptions)
   const effectiveEmergencyRelationshipOptions = toSelectOptions(employeeOptions.emergency_contact_relationships)
   const effectiveStateOptions = toSelectOptions(employeeOptions.states)
-  const effectiveDesignationOptions = toSelectOptions(employeeOptions.designations)
   const effectiveWorkLocationOptions = toSelectOptions(employeeOptions.work_locations)
   const effectiveFilterTabs = [
     { value: 'all', label: 'All' },
@@ -565,6 +584,7 @@ export default function UserManagement() {
 
   const handleFormChange = (event) => {
     const { name, type, checked, value } = event.target
+    setFormError('')
     setFormData((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }))
   }
 
@@ -572,6 +592,7 @@ export default function UserManagement() {
     const selectedFiles = Array.from(files || [])
     const fileNames = selectedFiles.map((file) => file.name).join(', ')
 
+    setFormError('')
     setUploadPreviews((current) => {
       revokeUploadPreviewUrls(current[name])
       const nextPreviews = {
@@ -586,6 +607,7 @@ export default function UserManagement() {
   }
 
   const handleUploadRemove = (name) => {
+    setFormError('')
     setUploadPreviews((current) => {
       revokeUploadPreviewUrls(current[name])
       const { [name]: removed, ...remaining } = current
@@ -679,21 +701,43 @@ export default function UserManagement() {
     }
   }, [])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setFormError('')
+  const validateStaffSections = (sectionNumbers) => {
+    const sectionsToValidate = sectionNumbers.map(String)
 
-    if (formData.password !== formData.confirmPassword) {
-      setFormError('Password and confirm password must match.')
-      return
+    for (const sectionNumber of sectionsToValidate) {
+      const missingRequiredFields = (staffRequiredFieldsBySection[sectionNumber] || [])
+        .filter((field) => !String(formData[field.key] || '').trim())
+        .map((field) => field.label)
+
+      if (missingRequiredFields.length > 0) {
+        setActiveStaffSection(sectionNumber)
+        setFormError(`Please complete required fields: ${missingRequiredFields.join(', ')}.`)
+        return false
+      }
+
+      if (sectionNumber === '5') {
+        if (formData.password.length > 0 && formData.password.length < 8) {
+          setActiveStaffSection(sectionNumber)
+          setFormError('Password must be at least 8 characters.')
+          return false
+        }
+
+        if (formData.password !== formData.confirmPassword) {
+          setActiveStaffSection(sectionNumber)
+          setFormError('Password and confirm password must match.')
+          return false
+        }
+      }
     }
 
-    const missingRequiredFields = requiredCreateUserFields
-      .filter((field) => !String(formData[field.key] || '').trim())
-      .map((field) => field.label)
+    setFormError('')
+    return true
+  }
 
-    if (missingRequiredFields.length > 0) {
-      setFormError(`Please complete required fields: ${missingRequiredFields.join(', ')}.`)
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!validateStaffSections(staffFormSections.map((section) => section.number))) {
       return
     }
 
@@ -862,12 +906,31 @@ export default function UserManagement() {
 
   const goToPreviousStaffSection = () => {
     if (isFirstStaffSection) return
+    setFormError('')
     setActiveStaffSection(staffFormSections[activeStaffSectionIndex - 1].number)
   }
 
   const goToNextStaffSection = () => {
     if (isLastStaffSection) return
+    if (!validateStaffSections([activeStaffSection])) return
     setActiveStaffSection(staffFormSections[activeStaffSectionIndex + 1].number)
+  }
+
+  const goToStaffSection = (sectionNumber) => {
+    const targetSectionIndex = staffFormSections.findIndex((section) => section.number === sectionNumber)
+
+    if (targetSectionIndex <= activeStaffSectionIndex) {
+      setFormError('')
+      setActiveStaffSection(sectionNumber)
+      return
+    }
+
+    const requiredPreviousSections = staffFormSections
+      .slice(0, targetSectionIndex)
+      .map((section) => section.number)
+
+    if (!validateStaffSections(requiredPreviousSections)) return
+    setActiveStaffSection(sectionNumber)
   }
 
   if (isModalOpen) {
@@ -888,7 +951,7 @@ export default function UserManagement() {
                       <button
                         key={section.number}
                         type="button"
-                        onClick={() => setActiveStaffSection(section.number)}
+                        onClick={() => goToStaffSection(section.number)}
                         className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium transition-all ${
                           isActive
                             ? 'border border-neutral-100 bg-neutral-50 text-primary-700 shadow-(--shadow-xs)'
@@ -940,16 +1003,7 @@ export default function UserManagement() {
                   onChange={handleUploadChange}
                   onRemove={handleUploadRemove}
                 />
-                <StaffField description="Unique employee identifier." format="Text or auto number" required>
-                  <Input
-                    label="Employee ID"
-                    name="employeeId"
-                    placeholder={employeeOptions.employee_id_prefix ? `${employeeOptions.employee_id_prefix}...` : undefined}
-                    value={formData.employeeId}
-                    onChange={handleFormChange}
-                    required
-                  />
-                </StaffField>
+                <div className="hidden lg:block" aria-hidden="true" />
                 <StaffField description="Employee's first name." format="Text, max 50 characters" required>
                   <Input label="First Name" name="firstName" maxLength={50} value={formData.firstName} onChange={handleFormChange} required />
                 </StaffField>
@@ -1059,12 +1113,8 @@ export default function UserManagement() {
                     required
                   />
                 </StaffField>
-                <StaffField description="Job title or designation." format="Dropdown" required={false}>
-                  {effectiveDesignationOptions.length > 0 ? (
-                    <Select label="Designation" name="designation" options={effectiveDesignationOptions} value={formData.designation} onChange={handleFormChange} />
-                  ) : (
-                    <Input label="Designation" name="designation" value={formData.designation} onChange={handleFormChange} />
-                  )}
+                <StaffField description="Job title or designation." format="Text" required>
+                  <Input label="Designation" name="designation" value={formData.designation} onChange={handleFormChange} required />
                 </StaffField>
                 <StaffField description="Employee's manager." format="Searchable dropdown" required={false}>
                   <Select

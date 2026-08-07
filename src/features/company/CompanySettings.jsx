@@ -396,6 +396,66 @@ const editableSectionIds = [
   "additional-info",
 ];
 
+const companyRequiredFieldsByTab = {
+  account: {
+    details: [
+      { key: "legalName", label: "Legal Name" },
+      { key: "industry", label: "Industry" },
+      { key: "status", label: "Status" },
+    ],
+    authorizedPerson: [
+      { key: "ownerDirectorName", label: "Owner/Director Name" },
+      { key: "designation", label: "Designation" },
+      { key: "mobileNumber", label: "Mobile Number" },
+      { key: "adminEmail", label: "Email" },
+    ],
+  },
+  general: {
+    basic: [
+      { key: "name", label: "Company Name" },
+      { key: "legalName", label: "Legal Name" },
+      { key: "businessType", label: "Business Type" },
+      { key: "industry", label: "Industry" },
+    ],
+    contact: [
+      { key: "phone", label: "Primary Mobile Number" },
+      { key: "email", label: "Official Email Address" },
+    ],
+    address: [
+      { key: "registeredAddress", label: "Registered Address" },
+      { key: "city", label: "City" },
+      { key: "state", label: "State" },
+      { key: "country", label: "Country" },
+      { key: "pincode", label: "PIN/ZIP Code" },
+    ],
+  },
+  branding: {
+    main: [
+      { key: "logoUrl", label: "Company Logo" },
+      { key: "signatureUrl", label: "Authorized Signature" },
+    ],
+  },
+  billings: {
+    main: [
+      { key: "qrCodeUrl", label: "Google Pay / PhonePe / Paytm QR Code" },
+    ],
+  },
+  "business-settings": {
+    main: [
+      { key: "currency", label: "Currency" },
+      { key: "timeZone", label: "Time Zone" },
+      { key: "language", label: "Language" },
+      { key: "taxConfiguration", label: "Tax Configuration" },
+      { key: "invoiceSettings", label: "Invoice Settings" },
+    ],
+  },
+};
+
+const companyTabSectionOrder = {
+  account: ["details", "authorizedPerson"],
+  general: ["basic", "contact", "address"],
+};
+
 const currencyOptions = [
   { value: "INR", label: "INR" },
   { value: "USD", label: "USD" },
@@ -1094,6 +1154,7 @@ export default function CompanySettings() {
   const handleChange = (e) => {
     const { name, type, checked, value } = e.target;
     const nextValue = type === "checkbox" ? checked : value;
+    setSaveError("");
     setCompanyData((prev) => ({ ...prev, [name]: nextValue }));
   };
 
@@ -1102,7 +1163,61 @@ export default function CompanySettings() {
     setPasswordData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const getRequiredCompanyValue = (key) => {
+    if (key === "logoUrl") {
+      return pendingLogoPreview || companyData.logoUrl;
+    }
+
+    if (key === "signatureUrl") {
+      return pendingSignaturePreview || companyData.signatureUrl;
+    }
+
+    return companyData[key];
+  };
+
+  const validateCompanyRequiredFields = (tabId, sectionIds) => {
+    const sections = companyRequiredFieldsByTab[tabId];
+
+    if (!sections) {
+      setSaveError("");
+      return true;
+    }
+
+    const sectionsToValidate = sectionIds || Object.keys(sections);
+
+    for (const sectionId of sectionsToValidate) {
+      const missingRequiredFields = (sections[sectionId] || [])
+        .filter((field) => !String(getRequiredCompanyValue(field.key) || "").trim())
+        .map((field) => field.label);
+
+      if (missingRequiredFields.length > 0) {
+        if (tabId === "account") {
+          setOpenAccountSections((prev) => ({ ...prev, [sectionId]: true }));
+        }
+
+        if (tabId === "general") {
+          setOpenGeneralSections((prev) => ({ ...prev, [sectionId]: true }));
+        }
+
+        setSaveError(`Please complete required fields: ${missingRequiredFields.join(", ")}.`);
+        return false;
+      }
+    }
+
+    setSaveError("");
+    return true;
+  };
+
   const toggleGeneralSection = (sectionId) => {
+    const isOpeningSection = !openGeneralSections[sectionId];
+
+    if (isOpeningSection && isActiveSectionEditing) {
+      const targetSectionIndex = companyTabSectionOrder.general.indexOf(sectionId);
+      const requiredPreviousSections = companyTabSectionOrder.general.slice(0, targetSectionIndex);
+
+      if (!validateCompanyRequiredFields("general", requiredPreviousSections)) return;
+    }
+
     setOpenGeneralSections((prev) => ({
       ...prev,
       [sectionId]: !prev[sectionId],
@@ -1110,10 +1225,28 @@ export default function CompanySettings() {
   };
 
   const toggleAccountSection = (sectionId) => {
+    const isOpeningSection = !openAccountSections[sectionId];
+
+    if (isOpeningSection && isAccountEditing) {
+      const targetSectionIndex = companyTabSectionOrder.account.indexOf(sectionId);
+      const requiredPreviousSections = companyTabSectionOrder.account.slice(0, targetSectionIndex);
+
+      if (!validateCompanyRequiredFields("account", requiredPreviousSections)) return;
+    }
+
     setOpenAccountSections((prev) => ({
       ...prev,
       [sectionId]: !prev[sectionId],
     }));
+  };
+
+  const handleTabChange = (tabId) => {
+    if (activeTab !== tabId && isActiveSectionEditing && !validateCompanyRequiredFields(activeTab)) {
+      return;
+    }
+
+    setSaveError("");
+    setActiveTab(tabId);
   };
 
   const handleFileUpload = async (name, e) => {
@@ -1138,6 +1271,7 @@ export default function CompanySettings() {
       return;
     }
 
+    setSaveError("");
     setFileUploadErrors((prev) => ({ ...prev, [name]: "" }));
     setUploadingFiles((prev) => ({ ...prev, [name]: true }));
 
@@ -1191,6 +1325,7 @@ export default function CompanySettings() {
       return;
     }
 
+    setSaveError("");
     setFileUploadErrors((prev) => ({ ...prev, [name]: "" }));
     setUploadingFiles((prev) => ({ ...prev, [name]: true }));
 
@@ -1222,6 +1357,7 @@ export default function CompanySettings() {
     }
 
     setLogoUploadError("");
+    setSaveError("");
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -1252,6 +1388,7 @@ export default function CompanySettings() {
     }
 
     setSignatureUploadError("");
+    setSaveError("");
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -1268,6 +1405,7 @@ export default function CompanySettings() {
   };
 
   const handleRemoveFile = (name) => {
+    setSaveError("");
     setCompanyData((prev) => ({ ...prev, [name]: "" }));
     setUploadedFileNames((prev) => ({ ...prev, [name]: "" }));
     setUploadedFileTypes((prev) => ({ ...prev, [name]: "" }));
@@ -1335,6 +1473,11 @@ export default function CompanySettings() {
     setSaveError("");
     setLogoUploadError("");
     setSignatureUploadError("");
+
+    if (!validateCompanyRequiredFields(activeTab)) {
+      setIsSaving(false);
+      return;
+    }
 
     let result;
     let nextUser = loadedUser;
@@ -1518,7 +1661,7 @@ export default function CompanySettings() {
                     type="button"
                     role="tab"
                     aria-selected={isActive}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => handleTabChange(item.id)}
                     className={`flex shrink-0 items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-sm font-medium transition-colors lg:w-full ${
                       isActive
                         ? "bg-primary-50 text-primary-700 ring-1 ring-primary-100"
@@ -1591,6 +1734,7 @@ export default function CompanySettings() {
                       value={companyData.legalName}
                       onChange={handleChange}
                       disabled={!isAccountEditing}
+                      required
                     />
                     <Select
                       label="Industry"
@@ -1600,6 +1744,7 @@ export default function CompanySettings() {
                       options={industryOptions}
                       onChange={handleChange}
                       disabled={!isAccountEditing}
+                      required
                     />
                     <Select
                       label="Status"
@@ -1609,6 +1754,7 @@ export default function CompanySettings() {
                       options={statusOptions}
                       onChange={handleChange}
                       disabled={!isAccountEditing}
+                      required
                     />
                   </div>
                 </CompanySection>
@@ -1627,6 +1773,7 @@ export default function CompanySettings() {
                       value={companyData.ownerDirectorName}
                       onChange={handleChange}
                       disabled={!isAccountEditing}
+                      required
                     />
                     <Select
                       label="Designation"
@@ -1636,6 +1783,7 @@ export default function CompanySettings() {
                       options={designationOptions}
                       onChange={handleChange}
                       disabled={!isAccountEditing}
+                      required
                     />
                     <Input
                       label="Mobile Number"
@@ -1643,6 +1791,7 @@ export default function CompanySettings() {
                       value={companyData.mobileNumber}
                       onChange={handleChange}
                       disabled={!isAccountEditing}
+                      required
                     />
                     <Input
                       label="Email"
@@ -1651,6 +1800,7 @@ export default function CompanySettings() {
                       value={companyData.adminEmail}
                       onChange={handleChange}
                       disabled={!isAccountEditing}
+                      required
                     />
                     <FileUploadField
                       label="Profile Picture"
@@ -1691,6 +1841,7 @@ export default function CompanySettings() {
                       value={companyData.name}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
+                      required
                     />
                     <Input
                       label="Legal Name"
@@ -1698,6 +1849,7 @@ export default function CompanySettings() {
                       value={companyData.legalName}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
+                      required
                     />
                     <Select
                       label="Business Type"
@@ -1707,6 +1859,7 @@ export default function CompanySettings() {
                       options={businessTypeOptions}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
+                      required
                     />
                     <Select
                       label="Industry"
@@ -1716,6 +1869,7 @@ export default function CompanySettings() {
                       options={industryOptions}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
+                      required
                     />
                     <Input
                       label="Date of Incorporation"
@@ -1772,6 +1926,7 @@ export default function CompanySettings() {
                       value={companyData.phone}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
+                      required
                     />
                     <Input
                       label="Alternate Mobile Number"
@@ -1794,6 +1949,7 @@ export default function CompanySettings() {
                       value={companyData.email}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
+                      required
                     />
                     <Input
                       label="Website"
@@ -1827,6 +1983,7 @@ export default function CompanySettings() {
                       value={companyData.registeredAddress}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
+                      required
                     />
                     <Input
                       label="Branch/Office Address(es)"
@@ -1843,6 +2000,7 @@ export default function CompanySettings() {
                         value={companyData.city}
                         onChange={handleChange}
                         disabled={!isActiveSectionEditing}
+                        required
                       />
                       <Select
                         label="State"
@@ -1852,6 +2010,7 @@ export default function CompanySettings() {
                         options={stateOptions}
                         onChange={handleChange}
                         disabled={!isActiveSectionEditing}
+                        required
                       />
                     </div>
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -1863,6 +2022,7 @@ export default function CompanySettings() {
                         options={countryOptions}
                         onChange={handleChange}
                         disabled={!isActiveSectionEditing}
+                        required
                       />
                       <Input
                         label="PIN/ZIP Code"
@@ -1870,6 +2030,7 @@ export default function CompanySettings() {
                         value={companyData.pincode}
                         onChange={handleChange}
                         disabled={!isActiveSectionEditing}
+                        required
                       />
                     </div>
                     <CheckboxField
@@ -2174,6 +2335,7 @@ export default function CompanySettings() {
                     options={currencyOptions}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
+                    required
                   />
                   <Select
                     label="Time Zone"
@@ -2183,6 +2345,7 @@ export default function CompanySettings() {
                     options={timeZoneOptions}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
+                    required
                   />
                   <Select
                     label="Language"
@@ -2192,6 +2355,7 @@ export default function CompanySettings() {
                     options={languageOptions}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
+                    required
                   />
                   <Select
                     label="Tax Configuration"
@@ -2201,6 +2365,7 @@ export default function CompanySettings() {
                     options={taxConfigurationOptions}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
+                    required
                   />
                   <Input
                     label="Invoice Prefix"
@@ -2218,6 +2383,7 @@ export default function CompanySettings() {
                     value={companyData.invoiceSettings}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
+                    required
                   />
                 </div>
               </section>

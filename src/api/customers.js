@@ -155,3 +155,85 @@ export async function deleteCustomer(customerId) {
     return { success: false, error: message }
   }
 }
+
+export async function recordCustomerPayment(customerId, payload) {
+  try {
+    const requestBody = {
+      amount: Number(payload.amount),
+      payment_mode: payload.paymentMode || payload.payment_mode || 'cash',
+      reference: payload.reference || '',
+      note: payload.note || '',
+      order_id: payload.orderId || payload.order_id || '',
+      invoice_id: payload.invoiceId || payload.invoice_id || '',
+      received_on: payload.receivedOn || payload.received_on || new Date().toISOString(),
+    }
+
+    const { data } = await apiClient.post(`/customers/${customerId}/payments`, requestBody, {
+      headers: authHeader(),
+    })
+
+    return { success: true, customer: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to record customer payment. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function getCustomerPayments(customerId) {
+  try {
+    const { data } = await apiClient.get(`/customers/${customerId}/payments`, {
+      headers: authHeader(),
+    })
+
+    return { success: true, payments: Array.isArray(data) ? data : data?.payments || [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load customer payments. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function getCustomerPaymentReceipt(customerId, paymentId) {
+  try {
+    const { data } = await apiClient.get(`/customers/${customerId}/payments/receipt/${paymentId}`, {
+      headers: authHeader(),
+    })
+
+    return { success: true, receipt: data?.url || data?.receipt_url || data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to download customer payment receipt. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function voidCustomerPayment(customerId, paymentId) {
+  try {
+    const { data } = await apiClient.delete(`/customers/${customerId}/payments/${paymentId}`, {
+      headers: authHeader(),
+    })
+
+    return { success: true, customer: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to void customer payment. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}

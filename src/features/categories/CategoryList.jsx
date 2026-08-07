@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Edit, Eye, ImageIcon, Plus, RotateCw, Search, Tags, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Check, Edit, Eye, ImageIcon, Plus, RotateCw, Search, Tags, Trash2, Upload } from 'lucide-react'
 import {
   createCategory,
   deleteCategoriesBulk,
@@ -14,6 +15,7 @@ import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
+import { readImageAsDataUrl } from '../../utils/imageFile'
 
 const emptyForm = {
   name: '',
@@ -43,6 +45,7 @@ const normalizeCategory = (category) => ({
   name: category.name || category.category_name || '',
   image: category.image || category.category_image || '',
   description: category.description || category.category_description || '',
+  subcategories: category.subcategories || category.sub_categories || [],
   createdAt: category.created_at || category.createdAt || '',
   updatedAt: category.updated_at || category.updatedAt || '',
 })
@@ -58,10 +61,12 @@ const getInitials = (name = '') =>
 function CategoryForm({ category, existingCategories, saving, formError, onClose, onSave }) {
   const [formData, setFormData] = useState(emptyForm)
   const [errors, setErrors] = useState({})
+  const [imageError, setImageError] = useState('')
 
   useEffect(() => {
     setFormData(category ? { ...emptyForm, ...category } : emptyForm)
     setErrors({})
+    setImageError('')
   }, [category])
 
   const validate = () => {
@@ -83,6 +88,21 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
     return Object.keys(nextErrors).length === 0
   }
 
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setImageError('')
+
+    try {
+      const dataUrl = await readImageAsDataUrl(file)
+      setFormData((current) => ({ ...current, image: dataUrl }))
+    } catch (error) {
+      setImageError(error.message)
+    }
+  }
+
   const handleSubmit = (event) => {
     event.preventDefault()
     if (!validate()) return
@@ -91,38 +111,62 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {formError && (
+      {(formError || imageError) && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {formError}
+          {formError || imageError}
         </div>
       )}
 
       <Input
         label="Category Name"
+        placeholder="Enter category name"
         value={formData.name}
         onChange={(event) => setFormData((current) => ({ ...current, name: event.target.value }))}
         error={errors.name}
         required
       />
-      <Input
-        label="Category Image"
-        placeholder="Paste image URL"
-        value={formData.image}
-        onChange={(event) => setFormData((current) => ({ ...current, image: event.target.value }))}
-      />
-      <Input
-        as="textarea"
-        label="Category Description"
-        value={formData.description}
-        onChange={(event) => setFormData((current) => ({ ...current, description: event.target.value }))}
-      />
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-neutral-700">Category Image</label>
+        <p className="text-xs font-medium text-neutral-400">Paste image URL or upload an image</p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <Input
+            placeholder="https://example.com/image.jpg"
+            value={formData.image}
+            onChange={(event) => setFormData((current) => ({ ...current, image: event.target.value }))}
+          />
+          <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-medium tracking-tight text-primary-700 transition-all hover:border-primary-300 hover:bg-primary-50/60">
+            <Upload className="size-4" aria-hidden="true" />
+            Upload
+            <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={handleImageUpload} />
+          </label>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Input
+          as="textarea"
+          label="Category Description"
+          placeholder="Enter a short description about this category..."
+          maxLength={500}
+          value={formData.description}
+          onChange={(event) => setFormData((current) => ({ ...current, description: event.target.value }))}
+          inputClassName="min-h-24"
+        />
+        <p className="text-right text-xs font-medium text-neutral-400">{formData.description.length} / 500</p>
+      </div>
 
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
         <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>
           Cancel
         </Button>
         <Button type="submit" loading={saving}>
-          {category ? 'Save Changes' : 'Add Category'}
+          {category ? (
+            'Save Changes'
+          ) : (
+            <>
+              <Check className="size-4" aria-hidden="true" />
+              Save Category
+            </>
+          )}
         </Button>
       </div>
     </form>
@@ -130,6 +174,7 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
 }
 
 export default function CategoryList() {
+  const navigate = useNavigate()
   const [categories, setCategories] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
@@ -294,7 +339,7 @@ export default function CategoryList() {
                   Delete Selected
                 </Button>
               )}
-              <Button type="button" size="sm" onClick={() => openForm()}>
+              <Button type="button" size="sm" onClick={() => navigate('/admin/categories/new')}>
                 <Plus className="size-4" aria-hidden="true" />
                 Add Category
               </Button>
@@ -333,7 +378,7 @@ export default function CategoryList() {
             <div className="py-8 text-center">
               <p className="text-sm font-medium text-neutral-900">No categories yet</p>
               <p className="mt-1 text-sm text-neutral-500">Add your first category to organize products.</p>
-              <Button type="button" className="mt-4" onClick={() => openForm()}>
+              <Button type="button" className="mt-4" onClick={() => navigate('/admin/categories/new')}>
                 <Plus className="size-4" aria-hidden="true" />
                 Add Category
               </Button>

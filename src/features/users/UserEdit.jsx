@@ -162,12 +162,15 @@ export default function UserEdit() {
   const [employeeOptionsError, setEmployeeOptionsError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [isSavingRole, setIsSavingRole] = useState(false)
   const [isSavingAccountStatus, setIsSavingAccountStatus] = useState(false)
-  const [isClearingProfilePhoto, setIsClearingProfilePhoto] = useState(false)
   const [error, setError] = useState('')
   const [profilePictureFile, setProfilePictureFile] = useState(null)
-  const roleChanged = Boolean(formData.role_id && formData.role_id !== user?.role_id)
+  const [profilePictureRemoved, setProfilePictureRemoved] = useState(false)
+  const roleChanged = Boolean(user) && (
+    formData.role_id
+      ? formData.role_id !== (user.role_id || user.roleId || '')
+      : formData.role !== (user.role || '')
+  )
   const accountStatusChanged = Boolean(user) && (formData.systemStatus === 'active') !== Boolean(user.isActive)
   const basicInformationChanged = Boolean(user) && (
     formData.name !== (user.name || '') ||
@@ -212,8 +215,8 @@ export default function UserEdit() {
     formData.language !== (user.language || '') ||
     formData.timeZone !== (user.timeZone || '')
   )
-  const profilePictureChanged = Boolean(profilePictureFile)
-  const userProfileChanged = basicInformationChanged || profilePictureChanged
+  const profilePictureChanged = Boolean(profilePictureFile) || profilePictureRemoved
+  const userProfileChanged = basicInformationChanged || profilePictureChanged || roleChanged
 
   const apiRoleOptions = roles
     .map((role) => {
@@ -234,7 +237,6 @@ export default function UserEdit() {
   const effectiveEmergencyRelationshipOptions = toSelectOptions(employeeOptions.emergency_contact_relationships)
   const effectiveCountryOptions = toSelectOptions(employeeOptions.countries)
   const effectiveStateOptions = toSelectOptions(employeeOptions.states)
-  const effectiveDesignationOptions = toSelectOptions(employeeOptions.designations)
   const effectiveEmploymentTypeOptions = toSelectOptions(employeeOptions.employment_types, employmentTypeOptions)
   const effectiveEmployeeStatusOptions = toSelectOptions(employeeOptions.employee_statuses, employeeStatusOptions)
   const effectiveWorkLocationOptions = toSelectOptions(employeeOptions.work_locations)
@@ -275,6 +277,8 @@ export default function UserEdit() {
 
       const nextUser = normalizeApiUser(userResult.user)
       setUser(nextUser)
+      setProfilePictureFile(null)
+      setProfilePictureRemoved(false)
       setFormData({
         name: nextUser.name || '',
         email: nextUser.email || '',
@@ -351,7 +355,37 @@ export default function UserEdit() {
       }
     }
 
-    if (profilePictureFile) {
+    if (roleChanged) {
+      const selectedRole = effectiveRoleSelectOptions.find((role) => role.value === formData.role)
+      const rolePayload = {
+        role_id: formData.role_id || selectedRole?.roleId || '',
+        role: selectedRole?.label || formData.role,
+      }
+
+      if (!rolePayload.role_id && !rolePayload.role) {
+        setIsSaving(false)
+        setError('Select a role before saving.')
+        return
+      }
+
+      const roleResult = await changeUserRole(userId, rolePayload)
+
+      if (!roleResult.success) {
+        setIsSaving(false)
+        setError(roleResult.error)
+        return
+      }
+    }
+
+    if (profilePictureRemoved) {
+      const clearResult = await clearEmployeeFile(userId, 'profile_photo')
+
+      if (!clearResult.success) {
+        setIsSaving(false)
+        setError(clearResult.error)
+        return
+      }
+    } else if (profilePictureFile) {
       const uploadResult = await uploadEmployeeFile(userId, 'profile_photo', profilePictureFile)
 
       if (!uploadResult.success) {
@@ -363,37 +397,6 @@ export default function UserEdit() {
 
     setIsSaving(false)
     navigate('/admin/users')
-  }
-
-  const handleSaveRole = async () => {
-    setError('')
-    const selectedRole = effectiveRoleSelectOptions.find((role) => role.value === formData.role)
-    const rolePayload = {
-      role_id: formData.role_id || selectedRole?.roleId || '',
-      role: selectedRole?.label || formData.role,
-    }
-
-    if (!rolePayload.role_id && !rolePayload.role) {
-      setError('Select a role before saving.')
-      return
-    }
-
-    setIsSavingRole(true)
-    const roleResult = await changeUserRole(userId, rolePayload)
-    setIsSavingRole(false)
-
-    if (!roleResult.success) {
-      setError(roleResult.error)
-      return
-    }
-
-    const updatedUser = normalizeApiUser(roleResult.user)
-    setUser(updatedUser)
-    setFormData((currentFormData) => ({
-      ...currentFormData,
-      role: updatedUser.role || currentFormData.role,
-      role_id: updatedUser.role_id || currentFormData.role_id,
-    }))
   }
 
   const handleSaveAccountStatus = async () => {
@@ -421,27 +424,8 @@ export default function UserEdit() {
   const handleRemoveProfilePhoto = async () => {
     setError('')
     setProfilePictureFile(null)
-
-    if (!user?.profilePhoto) {
-      setFormData({ ...formData, profilePictureName: '' })
-      return
-    }
-
-    setIsClearingProfilePhoto(true)
-    const result = await clearEmployeeFile(userId, 'profile_photo')
-    setIsClearingProfilePhoto(false)
-
-    if (!result.success) {
-      setError(result.error)
-      return
-    }
-
-    const updatedUser = result.user ? normalizeApiUser(result.user) : null
-    setUser((currentUser) => updatedUser || (currentUser ? { ...currentUser, profilePhoto: '' } : currentUser))
-    setFormData((currentFormData) => ({
-      ...currentFormData,
-      profilePictureName: updatedUser?.profilePhoto || '',
-    }))
+    setProfilePictureRemoved(Boolean(user?.profilePhoto))
+    setFormData((currentFormData) => ({ ...currentFormData, profilePictureName: '' }))
   }
 
   if (isLoading) {
@@ -502,6 +486,7 @@ export default function UserEdit() {
               onChange={(event) => {
                 const file = event.target.files?.[0]
                 setProfilePictureFile(file || null)
+                setProfilePictureRemoved(false)
                 setFormData({ ...formData, profilePictureName: file?.name || '' })
               }}
             />
@@ -513,7 +498,6 @@ export default function UserEdit() {
               size="sm"
               className="mt-3 w-full"
               onClick={handleRemoveProfilePhoto}
-              loading={isClearingProfilePhoto}
             >
               <X className="size-4" aria-hidden="true" />
               Remove
@@ -752,11 +736,6 @@ export default function UserEdit() {
                     })
                   }}
                 />
-                {roleChanged && (
-                  <Button type="button" size="md" onClick={handleSaveRole} loading={isSavingRole}>
-                    Save
-                  </Button>
-                )}
               </div>
               <label className="flex w-[50%] items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-3.5 text-sm text-neutral-600">
                 <input
@@ -775,20 +754,11 @@ export default function UserEdit() {
               <p className="text-sm font-semibold text-neutral-900">Employment details</p>
             </div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {effectiveDesignationOptions.length > 0 ? (
-                <Select
-                  label="Designation"
-                  options={effectiveDesignationOptions}
-                  value={formData.designation}
-                  onChange={(event) => setFormData({ ...formData, designation: event.target.value })}
-                />
-              ) : (
-                <Input
-                  label="Designation"
-                  value={formData.designation}
-                  onChange={(event) => setFormData({ ...formData, designation: event.target.value })}
-                />
-              )}
+              <Input
+                label="Designation"
+                value={formData.designation}
+                onChange={(event) => setFormData({ ...formData, designation: event.target.value })}
+              />
               <Select
                 label="Employment Type"
                 options={effectiveEmploymentTypeOptions}

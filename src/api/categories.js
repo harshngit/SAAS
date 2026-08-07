@@ -42,6 +42,7 @@ function buildCategoryBody(payload) {
     name: payload.name?.trim() || payload.category_name?.trim() || '',
     image: payload.image?.trim() || payload.category_image?.trim() || '',
     description: payload.description?.trim() || payload.category_description?.trim() || '',
+    subcategories: payload.subcategories || payload.sub_categories || [],
   }
 }
 

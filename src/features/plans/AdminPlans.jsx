@@ -71,7 +71,6 @@ export default function AdminPlans() {
   const [listError, setListError] = useState('')
 
   const [requestingPlanId, setRequestingPlanId] = useState(null)
-  const [requestedPlanId, setRequestedPlanId] = useState(null)
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [requestError, setRequestError] = useState('')
 
@@ -98,9 +97,6 @@ export default function AdminPlans() {
         if (organizationResult.organization?.billing_cycle) {
           setBillingCycle(organizationResult.organization.billing_cycle)
         }
-        if (organizationResult.organization?.upgrade_status === 'pending') {
-          setRequestedPlanId(organizationResult.organization.requested_plan_id)
-        }
       }
 
       if (!plansResult.success) {
@@ -126,8 +122,6 @@ export default function AdminPlans() {
   const currentPlanName = organizationState?.plan?.name
   const trialDaysLeft = organizationState?.trial_days_left ?? organizationState?.trialDaysLeft
   const isOnTrial = organizationState?.status === 'trial' && typeof trialDaysLeft === 'number'
-  const hasPendingUpgrade = organizationState?.upgrade_status === 'pending'
-  const pendingRequestedPlanId = requestedPlanId || organizationState?.requested_plan_id || organizationState?.requested_plan?.id
 
   const scrollToPlans = () => {
     plansGridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -159,13 +153,11 @@ export default function AdminPlans() {
       return
     }
 
-    setRequestedPlanId(plan.id)
     setSelectedPlan(null)
 
     const organizationResult = await getCurrentOrganizationState()
     if (organizationResult.success) {
       setOrganizationState(organizationResult.organization)
-      setRequestedPlanId(organizationResult.organization?.requested_plan_id || plan.id)
       if (organizationResult.organization?.billing_cycle) {
         setBillingCycle(organizationResult.organization.billing_cycle)
       }
@@ -221,7 +213,6 @@ export default function AdminPlans() {
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-xl font-semibold tracking-tight text-neutral-900">{currentPlanName || 'No active plan'}</h2>
                 <Badge variant="primary" dot>Current plan</Badge>
-                {hasPendingUpgrade && <Badge variant="warning">Upgrade requested</Badge>}
               </div>
               {isOnTrial && (
                 <p className="mt-1.5 text-sm text-neutral-500">{trialDaysLeft} days Free Trial left</p>
@@ -273,7 +264,6 @@ export default function AdminPlans() {
               const originalPrice = billingCycle === 'monthly' ? plan.original_price_monthly : plan.original_price_yearly
               const cycleLabel = billingCycle === 'monthly' ? 'month' : 'year'
               const isRequesting = requestingPlanId === plan.id
-              const isRequested = pendingRequestedPlanId === plan.id
 
               return (
                 <div
@@ -358,7 +348,7 @@ export default function AdminPlans() {
                       </div>
 
                       <Button
-                        variant={isFeatured ? 'outline' : isRequested ? 'secondary' : 'primary'}
+                        variant={isFeatured ? 'outline' : 'primary'}
                         className={`mt-5 w-full transition-transform duration-200 group-hover:scale-[1.01] ${
                           isCurrent
                             ? 'disabled:opacity-100 disabled:hover:from-primary-500 disabled:hover:to-primary-600'
@@ -368,11 +358,11 @@ export default function AdminPlans() {
                             ? 'border-primary-200 bg-[#bdeaa5] text-primary-700 shadow-[0_10px_24px_-12px_rgb(6_59_0/0.35)] hover:border-primary-300 hover:bg-[#aee391] hover:text-primary-900'
                             : ''
                         }`}
-                        disabled={isCurrent || isRequested}
+                        disabled={isCurrent}
                         loading={isRequesting}
                         onClick={() => handleChoosePlan(plan)}
                       >
-                        {isCurrent ? 'Current Plan' : isRequested ? 'Requested' : 'Select Plan'}
+                        {isCurrent ? 'Current Plan' : 'Select Plan'}
                       </Button>
                     </div>
                   </div>

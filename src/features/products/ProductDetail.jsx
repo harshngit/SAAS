@@ -272,7 +272,9 @@ export default function ProductDetail() {
                     <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">
                       {formatCurrency(variant.sellingPrice)}
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{variant.inventory}</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">
+                      {variant.inventory?.openingStock ?? variant.inventory ?? 0}
+                    </td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-500">{margin}%</td>
                   </tr>
                 )

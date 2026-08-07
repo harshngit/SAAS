@@ -2,7 +2,7 @@ import { forwardRef, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 
 const Input = forwardRef(function Input(
-  { label, error, as = 'input', type = 'text', className = '', required = false, ...rest },
+  { label, error, as = 'input', type = 'text', className = '', inputClassName = '', compact = false, required = false, ...rest },
   ref,
 ) {
   const Component = as
@@ -22,13 +22,15 @@ const Input = forwardRef(function Input(
           ref={ref}
           required={required}
           type={isPassword ? (showPassword ? 'text' : 'password') : type}
-          className={`w-full rounded-xl border bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition-all placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:placeholder:text-neutral-300 ${
+          className={`w-full rounded-xl border bg-neutral-50 px-3.5 text-sm text-neutral-900 transition-all placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:placeholder:text-neutral-300 ${
+            compact ? 'py-1.5' : 'py-2.5'
+          } ${
             isPassword ? 'pr-10' : ''
           } ${
             error
               ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15'
               : 'border-neutral-200 focus:border-primary-400 focus:ring-primary-500/12'
-          } ${as === 'textarea' ? 'min-h-20 resize-y' : ''}`}
+          } ${as === 'textarea' ? 'min-h-20 resize-y' : ''} ${inputClassName}`}
           {...rest}
         />
         {isPassword && (

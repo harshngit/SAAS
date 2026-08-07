@@ -1,27 +1,59 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   BadgeInfo,
+  Barcode,
   Boxes,
+  ChevronDown,
   ClipboardList,
   DollarSign,
   FileText,
   ImagePlus,
   Layers3,
   PackageCheck,
+  Plus,
   Ruler,
   ShoppingBag,
-  Tags,
   Trash2,
   Upload,
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
+import { formatCurrency } from '../../utils/format'
 import { readImageAsDataUrl } from '../../utils/imageFile'
 
 const MAX_TOTAL_IMAGES = 5
 
-const emptyVariant = { size: '', sku: '', hsn: '', unit: 'Piece', gstRate: '', purchasePrice: '', sellingPrice: '', inventory: '' }
+const emptyVariantInventory = {
+  openingStock: '',
+  minimumStockLevel: '',
+  maximumStockLevel: '',
+  reorderLevel: '',
+  reorderQuantity: '',
+}
+
+function makeVariantId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return `variant-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function makeEmptyVariant(overrides = {}) {
+  return {
+    size: '',
+    sku: '',
+    hsn: '',
+    unit: 'Piece',
+    gstRate: '',
+    purchasePrice: '',
+    sellingPrice: '',
+    mrp: '',
+    inventory: { ...emptyVariantInventory },
+    ...overrides,
+    id: overrides.id || makeVariantId(),
+  }
+}
 
 const emptyForm = {
   productId: '',
@@ -103,7 +135,7 @@ const emptyForm = {
   complianceCertificateName: '',
   warrantyDocumentName: '',
   otherAttachmentsName: '',
-  variants: [{ ...emptyVariant }],
+  variants: [],
 }
 
 const options = {
@@ -132,9 +164,8 @@ const sectionMeta = {
   'Inventory Information': { icon: Boxes, description: 'Stock tracking, UOM, levels, locations, and inventory controls.' },
   'Tax Information': { icon: ClipboardList, description: 'Tax category, rates, HSN/SAC, and inclusive tax settings.' },
   'Purchase Information': { icon: ShoppingBag, description: 'Supplier, purchase unit, lead time, and order quantities.' },
-  'Sales Information': { icon: Tags, description: 'Sales unit, commission, and discount details.' },
-  'Physical Specifications': { icon: Ruler, description: 'Weight, dimensions, color, size, and material.' },
   'Variants & Attributes': { icon: Layers3, description: 'Variant settings, attributes, SKU, barcode, and pricing.' },
+  'Physical Specifications': { icon: Ruler, description: 'Weight, dimensions, color, size, and material.' },
   'Digital Product Information': { icon: PackageCheck, description: 'Downloadable product file and license settings.' },
   'Additional Information': { icon: FileText, description: 'Warranty, lifecycle, origin, tags, and internal notes.' },
   Documents: { icon: FileText, description: 'Datasheets, certificates, warranty documents, and attachments.' },
@@ -158,9 +189,8 @@ function section(title, fields) {
 
 const productSections = [
   section('Basic Information', [
-    { name: 'productId', label: 'Product ID', input: 'readonly', required: true },
     { name: 'productCode', label: 'Product Code / SKU', required: true, maxLength: 50 },
-    { name: 'barcode', label: 'Barcode' },
+    { name: 'barcodeAction', label: 'Barcode', input: 'button' },
     { name: 'name', label: 'Product Name', required: true, maxLength: 150 },
     { name: 'shortName', label: 'Short Name' },
     { name: 'productType', label: 'Product Type', input: 'select' },
@@ -179,6 +209,13 @@ const productSections = [
     { name: 'catalogBrochureName', label: 'Product Catalog/Brochure', input: 'file', accept: '.pdf' },
     { name: 'productManualName', label: 'Product Manual', input: 'file', accept: '.pdf' },
   ]),
+  section('Variants & Attributes', [
+    { name: 'variants', label: 'Variants', input: 'variants', wide: true },
+  ]),
+  section('Inventory Information', [
+    { name: 'unitOfMeasure', label: 'Unit of Measure (UOM)', input: 'select', required: true },
+    { name: 'variantInventory', label: 'Variant Inventory', input: 'variantInventory', wide: true },
+  ]),
   section('Pricing Information', [
     { name: 'purchasePrice', label: 'Purchase Price', input: 'number', required: true },
     { name: 'sellingPrice', label: 'Selling Price', input: 'number', required: true },
@@ -188,19 +225,6 @@ const productSections = [
     { name: 'discountPercent', label: 'Discount (%)', input: 'number' },
     { name: 'taxInclusivePrice', label: 'Tax Inclusive Price', input: 'checkbox' },
     { name: 'currency', label: 'Currency', input: 'select' },
-  ]),
-  section('Inventory Information', [
-    { name: 'unitOfMeasure', label: 'Unit of Measure (UOM)', input: 'select', required: true },
-    { name: 'inventoryTracking', label: 'Inventory Tracking', input: 'checkbox', required: true },
-    { name: 'openingStock', label: 'Opening Stock', input: 'number' },
-    { name: 'minimumStockLevel', label: 'Minimum Stock Level', input: 'number' },
-    { name: 'maximumStockLevel', label: 'Maximum Stock Level', input: 'number' },
-    { name: 'reorderLevel', label: 'Reorder Level', input: 'number' },
-    { name: 'reorderQuantity', label: 'Reorder Quantity', input: 'number' },
-    { name: 'binShelfLocation', label: 'Bin/Shelf Location' },
-    { name: 'batchTracking', label: 'Batch Tracking', input: 'checkbox' },
-    { name: 'serialNumberTracking', label: 'Serial Number Tracking', input: 'checkbox' },
-    { name: 'expiryTracking', label: 'Expiry Tracking', input: 'checkbox' },
   ]),
   section('Tax Information', [
     { name: 'taxCategory', label: 'Tax Category', input: 'select' },
@@ -215,12 +239,6 @@ const productSections = [
     { name: 'minimumOrderQuantity', label: 'Minimum Order Quantity', input: 'number' },
     { name: 'purchaseUnit', label: 'Purchase Unit', input: 'select' },
   ]),
-  section('Sales Information', [
-    { name: 'salesUnit', label: 'Sales Unit', input: 'select' },
-    { name: 'commissionPercent', label: 'Commission (%)', input: 'number' },
-    { name: 'defaultDiscount', label: 'Default Discount', input: 'number' },
-    { name: 'commissionEligible', label: 'Commission Eligible', input: 'checkbox' },
-  ]),
   section('Physical Specifications', [
     { name: 'weight', label: 'Weight', input: 'number' },
     { name: 'length', label: 'Length', input: 'number' },
@@ -230,13 +248,6 @@ const productSections = [
     { name: 'color', label: 'Color' },
     { name: 'size', label: 'Size' },
     { name: 'material', label: 'Material' },
-  ]),
-  section('Variants & Attributes', [
-    { name: 'variantAttributes', label: 'Variant Attributes' },
-    { name: 'variantSku', label: 'Variant SKU' },
-    { name: 'variantBarcode', label: 'Variant Barcode' },
-    { name: 'variantPrice', label: 'Variant Price', input: 'number' },
-    { name: 'hasVariants', label: 'Has Variants', input: 'checkbox' },
   ]),
   section('Digital Product Information', [
     { name: 'downloadableProduct', label: 'Downloadable Product', input: 'checkbox' },
@@ -265,9 +276,33 @@ function makeProductId() {
   return `PROD-${new Date().getFullYear()}-AUTO`
 }
 
+function normalizeVariantInventory(variant = {}, fallbackOpeningStock = '') {
+  const inventory = variant.inventory && typeof variant.inventory === 'object' ? variant.inventory : {}
+
+  return {
+    ...emptyVariantInventory,
+    ...inventory,
+    openingStock: inventory.openingStock ?? variant.inventory ?? variant.stock ?? fallbackOpeningStock ?? '',
+    minimumStockLevel: inventory.minimumStockLevel ?? variant.minimumStockLevel ?? variant.minimum_stock_level ?? '',
+    maximumStockLevel: inventory.maximumStockLevel ?? variant.maximumStockLevel ?? variant.maximum_stock_level ?? '',
+    reorderLevel: inventory.reorderLevel ?? variant.reorderLevel ?? variant.reorder_level ?? '',
+    reorderQuantity: inventory.reorderQuantity ?? variant.reorderQuantity ?? variant.reorder_quantity ?? '',
+  }
+}
+
+function getVariantName(variant, index) {
+  return variant.size || variant.name || variant.sku || `Variant ${index + 1}`
+}
+
+function getVariantInventoryNumber(variant, field) {
+  const inventory = normalizeVariantInventory(variant)
+  return Number(inventory[field]) || 0
+}
+
 function hydrateProduct(product) {
   const firstVariant = product?.variants?.[0] || {}
   const productCode = product?.productCode || product?.sku || firstVariant.sku || ''
+  const firstVariantInventory = normalizeVariantInventory(firstVariant)
 
   return {
     ...emptyForm,
@@ -279,13 +314,22 @@ function hydrateProduct(product) {
     purchasePrice: product?.purchasePrice ?? firstVariant.purchasePrice ?? '',
     sellingPrice: product?.sellingPrice ?? firstVariant.sellingPrice ?? '',
     unitOfMeasure: product?.unitOfMeasure || firstVariant.unit || 'Piece',
-    openingStock: product?.openingStock ?? firstVariant.inventory ?? '',
+    openingStock: product?.openingStock ?? firstVariantInventory.openingStock ?? '',
     hsnSacCode: product?.hsnSacCode || firstVariant.hsn || '',
     gstVatRate: product?.gstVatRate ?? firstVariant.gstRate ?? '',
     coverImage: product?.coverImage || '',
     images: product?.images || [],
     status: product?.status || 'active',
-    variants: product?.variants?.length ? product.variants.map((variant) => ({ ...emptyVariant, ...variant })) : [{ ...emptyVariant }],
+    variants: product?.variants?.length
+      ? product.variants.map((variant, index) => ({
+        ...makeEmptyVariant(),
+        ...variant,
+        id: variant.id || variant.variantId || variant.variant_id || `${product?.id || productCode || 'product'}-${index + 1}`,
+        sellingPrice: variant.sellingPrice ?? variant.price ?? '',
+        mrp: variant.mrp ?? '',
+        inventory: normalizeVariantInventory(variant, index === 0 ? product?.openingStock : ''),
+      }))
+      : [],
   }
 }
 
@@ -339,6 +383,7 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
   const [activeSection, setActiveSection] = useState(productSections[0].id)
   const [errors, setErrors] = useState({})
   const [imageError, setImageError] = useState('')
+  const [openVariantIndex, setOpenVariantIndex] = useState(-1)
 
   const activeFormSection = useMemo(
     () => productSections.find((sectionItem) => sectionItem.id === activeSection) || productSections[0],
@@ -359,6 +404,7 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
     setActiveSection(productSections[0].id)
     setErrors({})
     setImageError('')
+    setOpenVariantIndex(-1)
   }, [product, isOpen])
 
   if (!isOpen) return null
@@ -381,6 +427,24 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
     if (Number(formData.sellingPrice) < 0) nextErrors.sellingPrice = 'Selling price cannot be negative.'
     if (!formData.sellingPrice && formData.sellingPrice !== 0) nextErrors.sellingPrice = 'Selling price is required.'
     if (formData.inventoryTracking && !formData.unitOfMeasure) nextErrors.unitOfMeasure = 'UOM is required for inventory-managed products.'
+    formData.variants.forEach((variant, index) => {
+      const inventory = normalizeVariantInventory(variant, index === 0 ? formData.openingStock : '')
+      const variantLabel = getVariantName(variant, index)
+
+      Object.entries(inventory).forEach(([field, value]) => {
+        if (value !== '' && Number(value) < 0) {
+          nextErrors[`variantInventory.${variant.id}.${field}`] = `${variantLabel}: stock values cannot be negative.`
+        }
+      })
+
+      if (
+        inventory.minimumStockLevel !== ''
+        && inventory.maximumStockLevel !== ''
+        && Number(inventory.minimumStockLevel) > Number(inventory.maximumStockLevel)
+      ) {
+        nextErrors[`variantInventory.${variant.id}.minimumStockLevel`] = `${variantLabel}: Min must be less than or equal to Max.`
+      }
+    })
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -437,19 +501,24 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
   }
 
   const syncVariants = (nextData) => {
-    const nextVariant = {
-      ...emptyVariant,
-      ...nextData.variants[0],
-      sku: nextData.productCode,
-      hsn: nextData.hsnSacCode,
-      unit: nextData.unitOfMeasure,
-      gstRate: nextData.gstVatRate,
-      purchasePrice: nextData.purchasePrice,
-      sellingPrice: nextData.sellingPrice,
-      inventory: nextData.openingStock,
-    }
+    const variants = nextData.variants
 
-    return { ...nextData, variants: [nextVariant] }
+    return {
+      ...nextData,
+      variants: variants.map((variant, index) => ({
+        ...makeEmptyVariant(),
+        ...variant,
+        id: variant.id || makeVariantId(),
+        size: variant.size || variant.name || `Variant ${index + 1}`,
+        sku: variant.sku || (index === 0 ? nextData.productCode : `${nextData.productCode}-${index + 1}`),
+        hsn: variant.hsn || nextData.hsnSacCode,
+        unit: variant.unit || nextData.unitOfMeasure,
+        gstRate: variant.gstRate || nextData.gstVatRate,
+        purchasePrice: variant.purchasePrice || nextData.purchasePrice,
+        sellingPrice: variant.sellingPrice || nextData.sellingPrice,
+        inventory: normalizeVariantInventory(variant, index === 0 ? nextData.openingStock : ''),
+      })),
+    }
   }
 
   const handleSubmit = (event) => {
@@ -457,6 +526,8 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
     if (!validate()) return
 
     const syncedData = syncVariants(formData)
+
+    const totalVariantInventory = syncedData.variants.reduce((sum, variant) => sum + getVariantInventoryNumber(variant, 'openingStock'), 0)
 
     onSave({
       ...syncedData,
@@ -467,7 +538,7 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
       categoryId: syncedData.category,
       productType: syncedData.productType || syncedData.category,
       price: Number(syncedData.sellingPrice) || 0,
-      totalInventory: Number(syncedData.openingStock) || 0,
+      totalInventory: totalVariantInventory || Number(syncedData.openingStock) || 0,
       isActive: syncedData.status === 'active',
       variants: syncedData.variants.map((variant) => ({
         ...variant,
@@ -478,7 +549,16 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
         gstRate: Number(variant.gstRate) || 0,
         purchasePrice: Number(variant.purchasePrice) || 0,
         sellingPrice: Number(variant.sellingPrice) || 0,
-        inventory: Number(variant.inventory) || 0,
+        mrp: Number(variant.mrp) || 0,
+        inventory: {
+          ...emptyVariantInventory,
+          ...variant.inventory,
+          openingStock: getVariantInventoryNumber(variant, 'openingStock'),
+          minimumStockLevel: getVariantInventoryNumber(variant, 'minimumStockLevel'),
+          maximumStockLevel: getVariantInventoryNumber(variant, 'maximumStockLevel'),
+          reorderLevel: getVariantInventoryNumber(variant, 'reorderLevel'),
+          reorderQuantity: getVariantInventoryNumber(variant, 'reorderQuantity'),
+        },
       })),
     })
   }
@@ -491,6 +571,80 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
   const goToNextSection = () => {
     if (isLastSection) return
     setActiveSection(productSections[activeSectionIndex + 1].id)
+  }
+
+  const updateVariant = (index, field, value) => {
+    setFormData((current) => ({
+      ...current,
+      variants: current.variants.map((variant, variantIndex) => (
+        variantIndex === index
+          ? {
+            ...variant,
+            [field]: field === 'inventory'
+              ? { ...normalizeVariantInventory(variant), openingStock: value }
+              : value,
+          }
+          : variant
+      )),
+    }))
+  }
+
+  const updateVariantInventory = (variantId, field, value) => {
+    setFormData((current) => ({
+      ...current,
+      variants: current.variants.map((variant) => (
+        variant.id === variantId
+          ? {
+            ...variant,
+            inventory: {
+              ...normalizeVariantInventory(variant),
+              [field]: value,
+            },
+          }
+          : variant
+      )),
+    }))
+    setErrors((current) => ({
+      ...current,
+      [`variantInventory.${variantId}.${field}`]: '',
+    }))
+  }
+
+  const addVariant = () => {
+    setFormData((current) => ({
+      ...current,
+      hasVariants: true,
+      variants: [
+        ...current.variants,
+        {
+          ...makeEmptyVariant(),
+          unit: current.unitOfMeasure,
+          hsn: current.hsnSacCode,
+          gstRate: current.gstVatRate,
+          purchasePrice: current.purchasePrice,
+          sellingPrice: current.sellingPrice,
+        },
+      ],
+    }))
+    setOpenVariantIndex(formData.variants.length)
+  }
+
+  const removeVariant = (index) => {
+    const nextVariantCount = formData.variants.length - 1
+    setFormData((current) => ({
+      ...current,
+      hasVariants: nextVariantCount > 0,
+      variants: current.variants.filter((_, variantIndex) => variantIndex !== index),
+    }))
+    if (nextVariantCount <= 0) {
+      setOpenVariantIndex(-1)
+      return
+    }
+    setOpenVariantIndex((current) => {
+      if (current === index) return -1
+      if (current > index) return current - 1
+      return current
+    })
   }
 
   const renderField = (field) => {
@@ -535,6 +689,252 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
             {field.label}
             {field.required && <span className="text-red-500">*</span>}
           </label>
+        </div>
+      )
+    }
+
+    if (field.input === 'button') {
+      return (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-transparent select-none" aria-hidden="true">
+            {field.label}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 w-full justify-center border-neutral-200 bg-neutral-50 text-neutral-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+          >
+            <Barcode className="size-4" aria-hidden="true" />
+            {field.label}
+          </Button>
+        </div>
+      )
+    }
+
+    if (field.input === 'variantInventory') {
+      const inventoryFields = [
+        { key: 'openingStock', label: 'Opening Stock', width: 'w-32' },
+        { key: 'minimumStockLevel', label: 'Min', width: 'w-24' },
+        { key: 'maximumStockLevel', label: 'Max', width: 'w-24' },
+        { key: 'reorderLevel', label: 'Reorder Level', width: 'w-32' },
+        { key: 'reorderQuantity', label: 'Reorder Quantity', width: 'w-36' },
+      ]
+      const variantInventoryErrors = Object.entries(errors).filter(([key, value]) => key.startsWith('variantInventory.') && value)
+
+      if (formData.variants.length === 0) {
+        return (
+          <div className="rounded-2xl border border-neutral-100 bg-white shadow-[0_14px_35px_-32px_rgb(15_23_42/0.55)]">
+            <div className="border-b border-neutral-100 px-4 py-4 sm:px-5">
+              <p className="text-base font-semibold text-neutral-950">{field.label}</p>
+            </div>
+            <div className="p-3 sm:p-4">
+              <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-8 text-center">
+                <p className="text-sm font-medium text-neutral-700">No variants added yet.</p>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      return (
+        <div className="flex flex-col gap-2">
+          <div>
+            <p className="text-sm font-semibold text-neutral-900">{field.label}</p>
+          </div>
+          <div className="max-h-[350px] overflow-auto rounded-xl border border-neutral-100 bg-white shadow-(--shadow-xs)">
+            <table className="w-full min-w-[56rem] text-left text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-neutral-100 bg-neutral-50/95 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <th className="w-full min-w-72 whitespace-nowrap px-4 py-3">Variant Name</th>
+                  {inventoryFields.map((inventoryField) => (
+                    <th key={inventoryField.key} className={`whitespace-nowrap px-3 py-3 ${inventoryField.width}`}>
+                      {inventoryField.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-50">
+                {formData.variants.map((variant, index) => {
+                  const inventory = normalizeVariantInventory(variant, index === 0 ? formData.openingStock : '')
+                  const variantName = getVariantName(variant, index)
+
+                  return (
+                    <tr key={variant.id} className="transition-colors hover:bg-primary-50/35">
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-neutral-800">{variantName}</td>
+                      {inventoryFields.map((inventoryField) => {
+                        const errorKey = `variantInventory.${variant.id}.${inventoryField.key}`
+                        return (
+                          <td key={inventoryField.key} className="px-3 py-2.5">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={inventory[inventoryField.key] ?? ''}
+                              onChange={(event) => updateVariantInventory(variant.id, inventoryField.key, event.target.value)}
+                              aria-label={`${variantName} ${inventoryField.label}`}
+                              className={`h-9 ${inventoryField.width} rounded-lg border bg-neutral-50 px-2.5 text-sm text-neutral-900 transition-all focus:bg-white focus:outline-none focus:ring-4 ${
+                                errors[errorKey]
+                                  ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15'
+                                  : 'border-neutral-200 focus:border-primary-400 focus:ring-primary-500/12'
+                              }`}
+                            />
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {variantInventoryErrors.length > 0 && (
+            <div className="space-y-1">
+              {variantInventoryErrors.map(([key, value]) => (
+                <p key={key} className="text-xs text-red-600">{value}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    if (field.input === 'variants') {
+      return (
+        <div className="rounded-2xl border border-neutral-100 bg-white shadow-[0_14px_35px_-32px_rgb(15_23_42/0.55)]">
+          <div className="flex flex-col gap-4 border-b border-neutral-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-base font-semibold text-neutral-950">Variant List</p>
+                {/* <span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700">
+                  {formData.variants.length} {formData.variants.length === 1 ? 'variant' : 'variants'}
+                </span> */}
+              </div>
+              <p className="mt-1 text-sm text-neutral-500">Add every sellable variant with its stock, MRP, and selling price.</p>
+            </div>
+            <Button type="button" size="sm" className="h-10 px-4 shadow-[0_12px_26px_-14px_rgb(6_59_0/0.9)]" onClick={addVariant}>
+              <Plus className="size-4" aria-hidden="true" />
+              New Variant
+            </Button>
+          </div>
+
+          <div className="space-y-3 p-3 sm:p-4">
+            {formData.variants.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-8 text-center">
+                <p className="text-sm font-medium text-neutral-700">No variants added yet.</p>
+              </div>
+            ) : formData.variants.map((variant, index) => {
+              const isOpen = openVariantIndex === index
+              const variantTitle = getVariantName(variant, index)
+              const variantInventory = normalizeVariantInventory(variant, index === 0 ? formData.openingStock : '')
+              return (
+                <div
+                  key={variant.id}
+                  className={`overflow-hidden rounded-xl border transition-all ${
+                    isOpen
+                      ? 'border-primary-200 bg-white shadow-[0_18px_40px_-34px_rgb(6_59_0/0.65)]'
+                      : 'border-neutral-100 bg-neutral-50/70 hover:border-neutral-200'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenVariantIndex(isOpen ? -1 : index)}
+                    className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors ${
+                      isOpen ? 'bg-primary-50/60 text-primary-800' : 'text-neutral-800 hover:bg-white'
+                    }`}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <span
+                        className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                          isOpen ? 'bg-primary-600 text-white' : 'bg-white text-primary-700 ring-1 ring-neutral-200'
+                        }`}
+                      >
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{variantTitle}</p>
+                      <p className="sr-only">
+                        {variantInventory.openingStock ? `${variantInventory.openingStock} inventory` : 'No inventory'} · {variant.sellingPrice ? formatCurrency(Number(variant.sellingPrice)) : 'No selling price'}
+                      </p>
+                        {/* <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-neutral-600 ring-1 ring-neutral-200">
+                            {inventoryText}
+                          </span>
+                          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-neutral-600 ring-1 ring-neutral-200">
+                            {sellingPriceText}
+                          </span>
+                          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-neutral-600 ring-1 ring-neutral-200">
+                            {mrpText}
+                          </span>
+                        </div> */}
+                    </div>
+                    </div>
+                    <div className="ml-auto flex shrink-0 items-center justify-end pl-4">
+                      <ChevronDown className={`size-5 text-neutral-400 transition-transform ${isOpen ? 'rotate-180 text-primary-700' : ''}`} aria-hidden="true" />
+                    </div>
+                  </button>
+
+                  {isOpen && (
+                    <div className="border-t border-primary-100 bg-white p-3 sm:p-4">
+                      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm font-semibold text-neutral-900">Variant details</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeVariant(index)}
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                          Remove
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        <Input
+                          label="Variant Attributes"
+                          compact
+                          placeholder="e.g. 1L Bottle, Red / Large"
+                          value={variant.size}
+                          onChange={(event) => updateVariant(index, 'size', event.target.value)}
+                        />
+                        <Input
+                          label="Variant SKU"
+                          compact
+                          value={variant.sku}
+                          onChange={(event) => updateVariant(index, 'sku', event.target.value)}
+                        />
+                        <Input
+                          label="Variant Inventory"
+                          compact
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={variantInventory.openingStock}
+                          onChange={(event) => updateVariant(index, 'inventory', event.target.value)}
+                        />
+                        <Input
+                          label="Variant Price - Selling"
+                          compact
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={variant.sellingPrice}
+                          onChange={(event) => updateVariant(index, 'sellingPrice', event.target.value)}
+                        />
+                        <Input
+                          label="Variant MRP"
+                          compact
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={variant.mrp}
+                          onChange={(event) => updateVariant(index, 'mrp', event.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )
     }

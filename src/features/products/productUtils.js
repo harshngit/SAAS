@@ -1,6 +1,20 @@
 import { formatCurrency } from '../../utils/format'
 
+function normalizeVariantInventory(variant = {}) {
+  const inventory = variant.inventory && typeof variant.inventory === 'object' ? variant.inventory : {}
+
+  return {
+    openingStock: Number(inventory.openingStock ?? variant.inventory ?? variant.stock) || 0,
+    minimumStockLevel: Number(inventory.minimumStockLevel ?? variant.minimumStockLevel ?? variant.minimum_stock_level) || 0,
+    maximumStockLevel: Number(inventory.maximumStockLevel ?? variant.maximumStockLevel ?? variant.maximum_stock_level) || 0,
+    reorderLevel: Number(inventory.reorderLevel ?? variant.reorderLevel ?? variant.reorder_level) || 0,
+    reorderQuantity: Number(inventory.reorderQuantity ?? variant.reorderQuantity ?? variant.reorder_quantity) || 0,
+  }
+}
+
 export function normalizeApiProduct(product, fallback = {}) {
+  const sourceVariants = product.variations?.length ? product.variations : fallback.variants || []
+
   return {
     ...fallback,
     id: product.id || fallback.id,
@@ -14,16 +28,30 @@ export function normalizeApiProduct(product, fallback = {}) {
     coverImage: product.cover_image || fallback.coverImage || '',
     images: product.images || fallback.images || [],
     totalStock: product.total_stock ?? fallback.totalStock ?? 0,
-    variants: (product.variations?.length ? product.variations : fallback.variants || []).map((variant) => ({
-      size: variant.name || variant.size || '',
-      sku: variant.sku || product.sku || fallback.sku || '',
-      hsn: variant.hsn || '',
-      unit: variant.unit || 'Bottle',
-      gstRate: variant.gstRate || 0,
-      purchasePrice: variant.purchasePrice || 0,
-      sellingPrice: Number(variant.price ?? variant.sellingPrice) || 0,
-      inventory: Number(variant.inventory) || 0,
-    })),
+    variants: sourceVariants.map((variant, index) => {
+      const fallbackVariant = fallback.variants?.find((item) => item.id && item.id === (variant.id || variant.variantId || variant.variant_id)) || fallback.variants?.[index] || {}
+      const fallbackInventory = normalizeVariantInventory(fallbackVariant)
+      const mergedInventory = variant.inventory && typeof variant.inventory === 'object'
+        ? { ...fallbackInventory, ...variant.inventory }
+        : { ...fallbackInventory, openingStock: variant.inventory ?? variant.stock ?? fallbackInventory.openingStock }
+      const inventory = normalizeVariantInventory({
+        ...fallbackVariant,
+        ...variant,
+        inventory: mergedInventory,
+      })
+
+      return {
+        id: variant.id || variant.variantId || variant.variant_id || fallbackVariant.id,
+        size: variant.name || variant.size || '',
+        sku: variant.sku || product.sku || fallback.sku || '',
+        hsn: variant.hsn || '',
+        unit: variant.unit || 'Bottle',
+        gstRate: variant.gstRate || 0,
+        purchasePrice: variant.purchasePrice || 0,
+        sellingPrice: Number(variant.price ?? variant.sellingPrice) || 0,
+        inventory,
+      }
+    }),
   }
 }
 
