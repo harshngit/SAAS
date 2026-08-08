@@ -150,6 +150,7 @@ export default function SubscriptionPlans() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-semibold text-neutral-900">{plan.name}</h3>
                       <Badge variant={isActive ? 'success' : 'neutral'} dot>{isActive ? 'Active' : 'Inactive'}</Badge>
+                      {plan.is_default && <Badge variant="primary">Default</Badge>}
                     </div>
                     <p className="mt-2 text-3xl font-semibold tracking-tight text-neutral-900">
                       {formatCurrency(price)}

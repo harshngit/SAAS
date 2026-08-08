@@ -912,24 +912,12 @@ export default function UserManagement() {
 
   const goToNextStaffSection = () => {
     if (isLastStaffSection) return
-    if (!validateStaffSections([activeStaffSection])) return
+    setFormError('')
     setActiveStaffSection(staffFormSections[activeStaffSectionIndex + 1].number)
   }
 
   const goToStaffSection = (sectionNumber) => {
-    const targetSectionIndex = staffFormSections.findIndex((section) => section.number === sectionNumber)
-
-    if (targetSectionIndex <= activeStaffSectionIndex) {
-      setFormError('')
-      setActiveStaffSection(sectionNumber)
-      return
-    }
-
-    const requiredPreviousSections = staffFormSections
-      .slice(0, targetSectionIndex)
-      .map((section) => section.number)
-
-    if (!validateStaffSections(requiredPreviousSections)) return
+    setFormError('')
     setActiveStaffSection(sectionNumber)
   }
 

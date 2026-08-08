@@ -80,6 +80,7 @@ export const roleMenus = {
       items: [
         { label: 'Dashboard', path: '/superadmin/dashboard', icon: LayoutDashboard },
         { label: 'Organizations', path: '/superadmin/organizations', icon: Building2 },
+        { label: 'Upgrade Requests', path: '/superadmin/upgrade-requests', icon: TrendingUp },
         { label: 'Plans', path: '/superadmin/plans', icon: CreditCard },
         { label: 'Platform Analytics', path: '/superadmin/analytics', icon: Activity },
       ],

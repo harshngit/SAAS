@@ -200,7 +200,7 @@ export default function CategoryFormPage() {
 
           <section className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
             <div className="flex items-center gap-3 border-b border-neutral-100 px-5 py-4">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-neutral-50 text-primary-700 ring-1 ring-neutral-100">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
                 <ImageIcon className="size-4" aria-hidden="true" />
               </div>
               <div>
@@ -208,25 +208,32 @@ export default function CategoryFormPage() {
                 <p className="mt-0.5 text-sm text-neutral-500">Add a URL or upload an image file.</p>
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-              <Input
-                label="Image URL"
-                placeholder="https://example.com/image.jpg"
-                value={formData.image}
-                onChange={(event) => updateField('image', event.target.value)}
-              />
-              <div className="flex flex-wrap gap-2">
-                <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-medium tracking-tight text-primary-700 transition-all hover:border-primary-300 hover:bg-primary-50/60">
-                  <Upload className="size-4" aria-hidden="true" />
-                  Upload
-                  <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={handleImageUpload} />
-                </label>
-                {hasImage && (
-                  <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={clearImage}>
+            <div className="flex flex-col gap-4 p-5 sm:flex-row">
+              <div className="flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-neutral-200 bg-neutral-50">
+                {hasImage ? (
+                  <img src={formData.image} alt="Category" className="size-full object-cover" />
+                ) : (
+                  <ImageIcon className="size-6 text-neutral-300" aria-hidden="true" />
+                )}
+              </div>
+              <div className="flex flex-1 flex-col gap-3">
+                <Input
+                  label="Image URL"
+                  placeholder="https://example.com/image.jpg"
+                  value={formData.image}
+                  onChange={(event) => updateField('image', event.target.value)}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-linear-to-b from-primary-500 to-primary-600 px-4 text-sm font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+                    <Upload className="size-4" aria-hidden="true" />
+                    Upload
+                    <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={handleImageUpload} />
+                  </label>
+                  <Button type="button" variant="outline" className="h-10 rounded-xl" disabled={!hasImage} onClick={clearImage}>
                     <X className="size-4" aria-hidden="true" />
                     Remove
                   </Button>
-                )}
+                </div>
               </div>
             </div>
           </section>
@@ -234,7 +241,7 @@ export default function CategoryFormPage() {
           <section className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
             <div className="flex items-center justify-between gap-3 border-b border-neutral-100 px-5 py-4">
               <div className="flex items-center gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-neutral-50 text-primary-700 ring-1 ring-neutral-100">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
                   <ListTree className="size-4" aria-hidden="true" />
                 </div>
                 <div>
@@ -311,9 +318,13 @@ export default function CategoryFormPage() {
                     {item.label}
                     {item.required && <span className="text-red-500"> *</span>}
                   </span>
-                  <span className={`flex size-6 items-center justify-center rounded-full ${item.done ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-400'}`}>
-                    <Check className="size-3.5" aria-hidden="true" />
-                  </span>
+                  {item.done ? (
+                    <span className="flex size-6 items-center justify-center rounded-full bg-primary-600 text-white">
+                      <Check className="size-3.5" aria-hidden="true" />
+                    </span>
+                  ) : (
+                    <span className="size-6 rounded-full border-2 border-dashed border-neutral-200" aria-hidden="true" />
+                  )}
                 </div>
               ))}
             </div>

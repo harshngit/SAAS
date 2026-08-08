@@ -50,6 +50,81 @@ export async function listSuperAdminOrganizations(filters = {}) {
   }
 }
 
+export async function getOrganization(orgId) {
+  try {
+    const { data } = await apiClient.get(`/superadmin/organizations/${orgId}`)
+    return { success: true, organization: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load organization. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function deleteOrganization(orgId) {
+  try {
+    await apiClient.delete(`/superadmin/organizations/${orgId}`)
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to delete organization. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function approveOrganizationUpgrade(orgId) {
+  try {
+    const { data } = await apiClient.patch(`/superadmin/organizations/${orgId}/approve-upgrade`)
+    return { success: true, organization: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to approve upgrade. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function rejectOrganizationUpgrade(orgId, reason) {
+  try {
+    const { data } = await apiClient.patch(`/superadmin/organizations/${orgId}/reject-upgrade`, { reason })
+    return { success: true, organization: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to reject upgrade. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function updateOrganizationStatus(orgId, status) {
+  try {
+    const { data } = await apiClient.patch(`/superadmin/organizations/${orgId}/status`, { status })
+    return { success: true, organization: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to update organization status. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function listPlans() {
   try {
     const { data } = await apiClient.get('/superadmin/plans')

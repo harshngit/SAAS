@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BadgeInfo,
   Building2,
@@ -18,8 +18,20 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
+import { listCustomerDocuments, uploadCustomerDocument, uploadOtherCustomerDocuments } from '../../api/customers'
 import { formatCurrency } from '../../utils/format'
-import { customerTypeOptions } from './customerConstants'
+
+const documentTypeByField = {
+  gstCertificate: 'gst_certificate',
+  panCard: 'pan_card',
+  businessRegistrationCertificate: 'business_registration_certificate',
+  addressProof: 'address_proof',
+  purchaseAgreement: 'purchase_agreement',
+}
+
+const fieldByDocumentType = Object.fromEntries(
+  Object.entries(documentTypeByField).map(([field, type]) => [type, field]),
+)
 
 const gstNumberPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
 
@@ -89,10 +101,24 @@ const baseFields = {
 
 const makeCustomerId = () => `CUS-${new Date().getFullYear()}-AUTO`
 
+function toDateInputValue(value) {
+  if (!value) return ''
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10)
+
+  return date.toISOString().slice(0, 10)
+}
+
 const optionValues = {
+  // The API enforces this exact lowercase enum — do not add/relabel values here.
   customerType: [
-    ...customerTypeOptions,
-    ...['Individual', 'Business', 'Government', 'Dealer', 'Distributor', 'Vendor'].map((value) => ({ value, label: value })),
+    { value: 'individual', label: 'Individual' },
+    { value: 'business', label: 'Business' },
+    { value: 'government', label: 'Government' },
+    { value: 'dealer', label: 'Dealer' },
+    { value: 'distributor', label: 'Distributor' },
+    { value: 'vendor', label: 'Vendor' },
   ],
   industry: ['Food & Beverage', 'Retail', 'Wholesale', 'Corporate', 'Healthcare', 'Education', 'Hospitality', 'Manufacturing', 'Services'],
   customerCategory: ['Retail', 'Wholesale', 'Corporate', 'VIP', 'Dealer', 'Distributor'],
@@ -201,12 +227,12 @@ const formSections = [
     { name: 'youtube', label: 'YouTube', description: 'YouTube channel.', type: 'URL', input: 'url' },
   ]),
   section('Documents (Uploads)', [
-    { name: 'gstCertificate', label: 'GST Certificate', description: 'Tax registration certificate.', type: 'PDF/Image Upload', input: 'file' },
-    { name: 'panCard', label: 'PAN Card', description: 'PAN document.', type: 'PDF/Image Upload', input: 'file' },
-    { name: 'businessRegistrationCertificate', label: 'Business Registration Certificate', description: 'Registration proof.', type: 'PDF Upload', input: 'file' },
-    { name: 'addressProof', label: 'Address Proof', description: 'Utility bill, lease agreement, etc.', type: 'PDF/Image Upload', input: 'file' },
-    { name: 'purchaseAgreement', label: 'Purchase Agreement', description: 'Signed contract.', type: 'PDF Upload', input: 'file' },
-    { name: 'otherDocuments', label: 'Other Documents', description: 'Additional files.', type: 'Multiple File Upload', input: 'file', multiple: true },
+    { name: 'gstCertificate', label: 'GST Certificate', description: 'Tax registration certificate.', type: 'PDF/Image Upload', input: 'file', wide: true, icon: ReceiptText },
+    { name: 'panCard', label: 'PAN Card', description: 'PAN document.', type: 'PDF/Image Upload', input: 'file', wide: true, icon: CreditCard },
+    { name: 'businessRegistrationCertificate', label: 'Business Registration Certificate', description: 'Registration proof.', type: 'PDF Upload', input: 'file', wide: true, icon: Building2 },
+    { name: 'addressProof', label: 'Address Proof', description: 'Utility bill, lease agreement, etc.', type: 'PDF/Image Upload', input: 'file', wide: true, icon: MapPin },
+    { name: 'purchaseAgreement', label: 'Purchase Agreement', description: 'Signed contract.', type: 'PDF Upload', input: 'file', wide: true, icon: Handshake },
+    { name: 'otherDocuments', label: 'Other Documents', description: 'Additional files.', type: 'Multiple File Upload', input: 'file', multiple: true, wide: true, icon: FileText },
   ]),
   section('Additional Information', [
     { name: 'dateOfBirth', label: 'Date of Birth', description: 'For individual customers.', type: 'Date Picker', input: 'date' },
@@ -216,6 +242,40 @@ const formSections = [
     { name: 'notes', label: 'Notes', description: 'Internal remarks.', type: 'Multi-line Text', input: 'textarea', wide: true },
   ]),
 ]
+
+function findSectionForFormField(fieldName) {
+  return formSections.find((sectionItem) => sectionItem.fields.some((field) => field.name === fieldName))
+}
+
+// Most-specific keys first so e.g. "business_name" is matched before the generic "name".
+const backendFieldToFormField = {
+  assigned_sales_officer_id: 'assignedSalesOfficerId',
+  primary_contact_person: 'primaryContactPerson',
+  business_name: 'legalBusinessName',
+  billing_address: 'billingAddress',
+  delivery_address: 'shippingAddress',
+  customer_since: 'customerSince',
+  maps_latitude: 'googleMapsLocation',
+  maps_longitude: 'googleMapsLocation',
+  credit_limit: 'creditLimit',
+  gst_number: 'gstNumber',
+  is_active: 'status',
+  category: 'customerType',
+  status: 'status',
+  notes: 'notes',
+  email: 'email',
+  phone: 'mobileNumber',
+  name: 'customerName',
+}
+
+function findSectionForApiError(message) {
+  if (!message) return null
+
+  const matchedKey = Object.keys(backendFieldToFormField).find((key) => new RegExp(`\\b${key}\\b`).test(message))
+  if (!matchedKey) return null
+
+  return findSectionForFormField(backendFieldToFormField[matchedKey])
+}
 
 function normalizeComparableForm(data = {}) {
   return Object.keys(baseFields).reduce((result, key) => {
@@ -237,6 +297,8 @@ function hydrateCustomer(formCustomer, isSalesOfficer, currentUser, salesOfficer
   const billingAddress = formCustomer?.billingAddress || formCustomer?.billing_address || formCustomer?.address || ''
   const shippingAddress = formCustomer?.shippingAddress || formCustomer?.deliveryAddress || formCustomer?.delivery_address || ''
   const customerType = formCustomer?.customerType || formCustomer?.type || formCustomer?.category || ''
+  const mapsLatitude = formCustomer?.mapsLatitude ?? formCustomer?.maps_latitude
+  const mapsLongitude = formCustomer?.mapsLongitude ?? formCustomer?.maps_longitude
 
   return {
     ...baseFields,
@@ -246,7 +308,7 @@ function hydrateCustomer(formCustomer, isSalesOfficer, currentUser, salesOfficer
     customerName,
     legalBusinessName: formCustomer?.legalBusinessName || formCustomer?.businessName || formCustomer?.business_name || '',
     displayName: formCustomer?.displayName || customerName,
-    primaryContactPerson: formCustomer?.primaryContactPerson || customerName,
+    primaryContactPerson: formCustomer?.primaryContactPerson || formCustomer?.primary_contact_person || customerName,
     mobileNumber: formCustomer?.mobileNumber || formCustomer?.phone || '',
     gstNumber: formCustomer?.gstNumber || formCustomer?.gst_number || '',
     billingAddress,
@@ -255,7 +317,12 @@ function hydrateCustomer(formCustomer, isSalesOfficer, currentUser, salesOfficer
     assignedSalesOfficerId,
     creditLimit: formCustomer?.creditLimit ?? formCustomer?.credit_limit ?? 0,
     outstandingBalance: formCustomer?.outstandingBalance ?? formCustomer?.outstanding_balance ?? 0,
+    customerSince: toDateInputValue(formCustomer?.customerSince || formCustomer?.customer_since) || today,
     status: formCustomer?.status || (formCustomer?.is_active === false ? 'inactive' : 'active'),
+    googleMapsLocation:
+      typeof mapsLatitude === 'number' && typeof mapsLongitude === 'number'
+        ? `${mapsLatitude}, ${mapsLongitude}`
+        : formCustomer?.googleMapsLocation || '',
     notes: formCustomer?.notes || '',
   }
 }
@@ -264,34 +331,115 @@ function CustomerField({ children, className = '' }) {
   return <div className={className}>{children}</div>
 }
 
-function CustomerUploadField({ field, value, onChange, onRemove, error }) {
+const createUploadPreview = (file) => ({
+  name: file.name,
+  type: file.type,
+  url: URL.createObjectURL(file),
+})
+
+const revokeUploadPreviewUrls = (previews = []) => {
+  previews.forEach((preview) => URL.revokeObjectURL(preview.url))
+}
+
+function UploadPreview({ previews = [] }) {
+  if (!previews.length) {
+    return null
+  }
+
+  const visiblePreviews = previews.slice(0, 2)
+  const remainingCount = previews.length - visiblePreviews.length
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      {visiblePreviews.map((preview) => {
+        const isImage = (preview.type || '').startsWith('image/')
+        const isPdf = preview.type === 'application/pdf'
+
+        return (
+          <a
+            key={`${preview.name}-${preview.url}`}
+            href={preview.url}
+            target="_blank"
+            rel="noreferrer"
+            title={`Preview ${preview.name}`}
+            className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
+          >
+            {isImage ? (
+              <img src={preview.url} alt={preview.name} className="size-full object-cover" />
+            ) : isPdf ? (
+              <iframe src={preview.url} title={preview.name} className="size-full pointer-events-none border-0 bg-white" />
+            ) : (
+              <span className="flex size-full items-center justify-center text-neutral-500">
+                <FileText className="size-5" aria-hidden="true" />
+              </span>
+            )}
+            <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1 py-0.5 text-[9px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+              {preview.name}
+            </span>
+          </a>
+        )
+      })}
+      {remainingCount > 0 && (
+        <span className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-xs font-semibold text-neutral-500">
+          +{remainingCount}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function CustomerUploadField({ field, value, previews, onChange, onRemove, error, uploading = false }) {
+  const Icon = field.icon || FileText
+  const hasValue = Boolean(value)
+
   return (
     <div>
-      <div className="flex min-h-28 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
-        <div className="grid w-full grid-cols-1 gap-3 xl:grid-cols-[minmax(10rem,1fr)_auto_auto] xl:items-center">
-          <div className="min-w-0 pr-2">
-            <p className="text-sm font-semibold leading-5 text-neutral-900">
-              {field.label}
-              {field.required && <span className="text-red-500"> *</span>}
-            </p>
-            {value && <p className="mt-1 truncate text-xs font-medium text-primary-700">{value}</p>}
-          </div>
-          <div className="flex shrink-0 items-center justify-center">
-            <div className="flex h-16 min-w-28 cursor-pointer items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-400">
-              Preview
+      <div
+        className={`flex flex-col gap-4 rounded-2xl border p-4 transition-all sm:flex-row sm:items-center sm:justify-between ${
+          hasValue ? 'border-primary-100 bg-primary-50/40' : 'border-neutral-100 bg-neutral-50 hover:border-neutral-200'
+        }`}
+      >
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${
+              hasValue ? 'bg-primary-100 text-primary-700' : 'bg-white text-neutral-400 ring-1 ring-neutral-200'
+            }`}
+          >
+            <Icon className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold leading-5 text-neutral-900">
+                {field.label}
+                {field.required && <span className="text-red-500"> *</span>}
+              </p>
+              <Badge variant={uploading ? 'info' : hasValue ? 'success' : 'neutral'}>
+                {uploading ? 'Uploading…' : hasValue ? 'Uploaded' : 'Not uploaded'}
+              </Badge>
             </div>
+            {field.description && <p className="mt-0.5 text-xs text-neutral-500">{field.description}</p>}
+            {hasValue && !uploading && <p className="mt-1 truncate text-xs font-medium text-primary-700">{value}</p>}
           </div>
-          <div className="flex shrink-0 flex-col items-start gap-2">
-            <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+        </div>
+
+        <div className="flex shrink-0 items-center gap-3 sm:pl-4">
+          <UploadPreview previews={previews} />
+          <div className="flex shrink-0 items-center gap-2">
+            <label
+              className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3.5 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700 ${
+                uploading ? 'pointer-events-none opacity-60' : 'cursor-pointer'
+              }`}
+            >
               <Upload className="size-3.5" aria-hidden="true" />
-              Upload
+              {uploading ? 'Uploading…' : 'Upload'}
               <input
                 type="file"
                 multiple={field.multiple}
                 accept=".pdf,.png,.jpg,.jpeg,.docx"
                 className="sr-only"
+                disabled={uploading}
                 onChange={(event) => {
-                  onChange(Array.from(event.target.files || []).map((file) => file.name).join(', '))
+                  onChange(Array.from(event.target.files || []))
                   event.target.value = ''
                 }}
               />
@@ -300,8 +448,8 @@ function CustomerUploadField({ field, value, onChange, onRemove, error }) {
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 rounded-full px-3 text-xs"
-              disabled={!value}
+              className="h-9 shrink-0 whitespace-nowrap rounded-full px-3 text-xs"
+              disabled={!hasValue || uploading}
               onClick={onRemove}
             >
               <Trash2 className="size-3.5" aria-hidden="true" />
@@ -330,7 +478,12 @@ export default function CustomerForm({
   const [formData, setFormData] = useState(baseFields)
   const [initialFormData, setInitialFormData] = useState(baseFields)
   const [errors, setErrors] = useState({})
+  const [submitError, setSubmitError] = useState('')
   const [activeSection, setActiveSection] = useState(formSections[0].id)
+  const [uploadPreviews, setUploadPreviews] = useState({})
+  const uploadPreviewsRef = useRef({})
+  const [uploadingField, setUploadingField] = useState('')
+  const [documentsError, setDocumentsError] = useState('')
 
   const salesOfficerOptions = useMemo(
     () => salesOfficers.map((user) => ({ value: user.id, label: user.name })),
@@ -358,8 +511,145 @@ export default function CustomerForm({
     setFormData(nextFormData)
     setInitialFormData(nextFormData)
     setErrors({})
+    setSubmitError('')
+    setDocumentsError('')
     setActiveSection(formSections[0].id)
+    setUploadPreviews((current) => {
+      Object.values(current).forEach(revokeUploadPreviewUrls)
+      uploadPreviewsRef.current = {}
+      return {}
+    })
   }, [customer, currentUser, initialCustomer, isOpen, isSalesOfficer, salesOfficerOptions])
+
+  useEffect(() => {
+    if (!formError) return
+
+    const sectionWithError = findSectionForApiError(formError)
+    if (sectionWithError) setActiveSection(sectionWithError.id)
+  }, [formError])
+
+  useEffect(() => {
+    if (!isOpen || !customer?.id) return
+
+    let isMounted = true
+
+    async function loadDocuments() {
+      const result = await listCustomerDocuments(customer.id)
+      if (!isMounted || !result.success) return
+
+      const grouped = {}
+      result.documents.forEach((doc) => {
+        const field = doc.document_type === 'other' ? 'otherDocuments' : fieldByDocumentType[doc.document_type]
+        if (!field) return
+        if (!grouped[field]) grouped[field] = []
+        grouped[field].push(doc)
+      })
+
+      if (Object.keys(grouped).length === 0) return
+
+      setUploadPreviews((current) => {
+        const next = { ...current }
+        Object.entries(grouped).forEach(([field, docs]) => {
+          next[field] = docs.map((doc) => ({ name: doc.name, type: doc.content_type, url: doc.url }))
+        })
+        uploadPreviewsRef.current = next
+        return next
+      })
+
+      setFormData((current) => {
+        const next = { ...current }
+        Object.entries(grouped).forEach(([field, docs]) => {
+          next[field] = field === 'otherDocuments' ? `${docs.length} file(s)` : docs[docs.length - 1].name
+        })
+        return next
+      })
+    }
+
+    loadDocuments()
+
+    return () => {
+      isMounted = false
+    }
+  }, [isOpen, customer?.id])
+
+  useEffect(() => {
+    return () => {
+      Object.values(uploadPreviewsRef.current).forEach(revokeUploadPreviewUrls)
+    }
+  }, [])
+
+  const applyServerDocumentPreviews = (name, documents) => {
+    setUploadPreviews((current) => {
+      revokeUploadPreviewUrls(current[name])
+      const nextPreviews = {
+        ...current,
+        [name]: documents.map((doc) => ({ name: doc.name, type: doc.content_type, url: doc.url })),
+      }
+      uploadPreviewsRef.current = nextPreviews
+      return nextPreviews
+    })
+  }
+
+  const handleUploadChange = async (name, files) => {
+    const selectedFiles = Array.from(files || [])
+    if (selectedFiles.length === 0) return
+
+    const customerId = customer?.id
+
+    // No customer to attach documents to yet (still creating) — keep a local-only preview;
+    // real uploads only happen once the customer exists.
+    if (!customerId) {
+      const fileNames = selectedFiles.map((file) => file.name).join(', ')
+
+      setUploadPreviews((current) => {
+        revokeUploadPreviewUrls(current[name])
+        const nextPreviews = { ...current, [name]: selectedFiles.map(createUploadPreview) }
+        uploadPreviewsRef.current = nextPreviews
+        return nextPreviews
+      })
+      updateField(name, fileNames)
+      return
+    }
+
+    setDocumentsError('')
+    setUploadingField(name)
+
+    if (name === 'otherDocuments') {
+      const result = await uploadOtherCustomerDocuments(customerId, selectedFiles)
+      setUploadingField('')
+
+      if (!result.success) {
+        setDocumentsError(result.error)
+        return
+      }
+
+      applyServerDocumentPreviews(name, result.documents)
+      updateField(name, `${result.documents.length} file(s)`)
+      return
+    }
+
+    const result = await uploadCustomerDocument(customerId, documentTypeByField[name], selectedFiles[0])
+    setUploadingField('')
+
+    if (!result.success) {
+      setDocumentsError(result.error)
+      return
+    }
+
+    applyServerDocumentPreviews(name, [result.document])
+    updateField(name, result.document.name || 'Uploaded')
+  }
+
+  const handleUploadRemove = (name) => {
+    setUploadPreviews((current) => {
+      revokeUploadPreviewUrls(current[name])
+      const { [name]: removed, ...remaining } = current
+      void removed
+      uploadPreviewsRef.current = remaining
+      return remaining
+    })
+    updateField(name, '')
+  }
 
   const hasChanges = !customer || JSON.stringify(normalizeComparableForm(formData)) !== JSON.stringify(normalizeComparableForm(initialFormData))
 
@@ -387,6 +677,7 @@ export default function CustomerForm({
     })
 
     setErrors((current) => ({ ...current, [field]: '' }))
+    setSubmitError('')
   }
 
   const validate = () => {
@@ -408,7 +699,22 @@ export default function CustomerForm({
     if (Number(formData.creditLimit) < 0) nextErrors.creditLimit = 'Credit limit cannot be negative.'
 
     setErrors(nextErrors)
-    return Object.keys(nextErrors).length === 0
+
+    const errorFieldNames = Object.keys(nextErrors)
+    if (errorFieldNames.length > 0) {
+      const sectionWithError = formSections.find((sectionItem) =>
+        sectionItem.fields.some((field) => errorFieldNames.includes(field.name)),
+      )
+
+      if (sectionWithError) setActiveSection(sectionWithError.id)
+      setSubmitError(
+        `Can't save yet — ${errorFieldNames.length} required field${errorFieldNames.length > 1 ? 's need' : ' needs'} attention on the "${sectionWithError?.title || 'form'}" tab.`,
+      )
+      return false
+    }
+
+    setSubmitError('')
+    return true
   }
 
   const handleSubmit = (event) => {
@@ -527,9 +833,11 @@ export default function CustomerForm({
         <CustomerUploadField
           field={field}
           value={formData[field.name]}
-          onChange={(value) => updateField(field.name, value)}
-          onRemove={() => updateField(field.name, '')}
+          previews={uploadPreviews[field.name]}
+          onChange={(files) => handleUploadChange(field.name, files)}
+          onRemove={() => handleUploadRemove(field.name)}
           error={errors[field.name]}
+          uploading={uploadingField === field.name}
         />
       )
     }
@@ -639,9 +947,9 @@ export default function CustomerForm({
               </div>
             </section>
 
-            {formError && (
+            {(formError || submitError || documentsError) && (
               <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {formError}
+                {formError || submitError || documentsError}
               </div>
             )}
 

@@ -166,6 +166,8 @@ export default function UserEdit() {
   const [error, setError] = useState('')
   const [profilePictureFile, setProfilePictureFile] = useState(null)
   const [profilePictureRemoved, setProfilePictureRemoved] = useState(false)
+  const [profilePicturePreviewUrl, setProfilePicturePreviewUrl] = useState('')
+  const effectivePhotoUrl = profilePicturePreviewUrl || (!profilePictureRemoved ? user?.profilePhoto : '')
   const roleChanged = Boolean(user) && (
     formData.role_id
       ? formData.role_id !== (user.role_id || user.roleId || '')
@@ -244,6 +246,12 @@ export default function UserEdit() {
   const effectiveSystemStatusOptions = systemStatusOptions
 
   useEffect(() => {
+    return () => {
+      if (profilePicturePreviewUrl) URL.revokeObjectURL(profilePicturePreviewUrl)
+    }
+  }, [profilePicturePreviewUrl])
+
+  useEffect(() => {
     let isMounted = true
 
     async function loadEditData() {
@@ -279,6 +287,7 @@ export default function UserEdit() {
       setUser(nextUser)
       setProfilePictureFile(null)
       setProfilePictureRemoved(false)
+      setProfilePicturePreviewUrl('')
       setFormData({
         name: nextUser.name || '',
         email: nextUser.email || '',
@@ -324,7 +333,7 @@ export default function UserEdit() {
         language: nextUser.language || '',
         timeZone: nextUser.timeZone || '',
         systemStatus: nextUser.isActive ? 'active' : 'inactive',
-        profilePictureName: nextUser.profilePhoto || '',
+        profilePictureName: '',
       })
     }
 
@@ -424,6 +433,7 @@ export default function UserEdit() {
   const handleRemoveProfilePhoto = async () => {
     setError('')
     setProfilePictureFile(null)
+    setProfilePicturePreviewUrl('')
     setProfilePictureRemoved(Boolean(user?.profilePhoto))
     setFormData((currentFormData) => ({ ...currentFormData, profilePictureName: '' }))
   }
@@ -471,14 +481,32 @@ export default function UserEdit() {
         <div className="rounded-2xl border border-primary-100 bg-linear-to-br from-white to-[#eef6eb] p-4">
           <p className="text-sm font-semibold text-neutral-900">Profile Picture</p>
           <p className="mt-1 text-xs leading-5 text-neutral-500">Add an optional image to make staff records easier to scan.</p>
-          <label className="mt-4 flex aspect-square cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-primary-200 bg-white text-center text-primary-700 transition-all hover:-translate-y-0.5 hover:border-primary-300 hover:bg-primary-50/70 hover:shadow-(--shadow-card)">
-            <span className="flex size-12 items-center justify-center rounded-full bg-primary-50 ring-1 ring-primary-100">
-              <Camera className="size-6" aria-hidden="true" />
-            </span>
-            <span className="text-sm font-semibold">Upload Photo</span>
-            <span className="max-w-36 truncate text-xs text-neutral-500">
-              {formData.profilePictureName || 'PNG or JPG'}
-            </span>
+          <label
+            className={`group relative mt-4 flex aspect-square cursor-pointer flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border text-center transition-all hover:-translate-y-0.5 hover:shadow-(--shadow-card) ${
+              effectivePhotoUrl
+                ? 'border-primary-100 bg-neutral-900'
+                : 'border-dashed border-primary-200 bg-white text-primary-700 hover:border-primary-300 hover:bg-primary-50/70'
+            }`}
+          >
+            {effectivePhotoUrl ? (
+              <>
+                <img src={effectivePhotoUrl} alt="Profile" className="absolute inset-0 size-full object-cover" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-neutral-900/0 opacity-0 transition-all group-hover:bg-neutral-900/60 group-hover:opacity-100">
+                  <span className="flex size-12 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/30">
+                    <Camera className="size-6 text-white" aria-hidden="true" />
+                  </span>
+                  <span className="text-sm font-semibold text-white">Change Photo</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="flex size-12 items-center justify-center rounded-full bg-primary-50 ring-1 ring-primary-100">
+                  <Camera className="size-6" aria-hidden="true" />
+                </span>
+                <span className="text-sm font-semibold">Upload Photo</span>
+                <span className="max-w-36 truncate text-xs text-neutral-500">PNG or JPG</span>
+              </>
+            )}
             <input
               type="file"
               accept="image/*"
@@ -487,11 +515,15 @@ export default function UserEdit() {
                 const file = event.target.files?.[0]
                 setProfilePictureFile(file || null)
                 setProfilePictureRemoved(false)
+                setProfilePicturePreviewUrl(file ? URL.createObjectURL(file) : '')
                 setFormData({ ...formData, profilePictureName: file?.name || '' })
               }}
             />
           </label>
           {formData.profilePictureName && (
+            <p className="mt-2 truncate text-center text-xs font-medium text-neutral-500">{formData.profilePictureName}</p>
+          )}
+          {effectivePhotoUrl && (
             <Button
               type="button"
               variant="ghost"

@@ -13,9 +13,10 @@ import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
 import { ROLES } from '../../auth/roles'
 import { getCustomer, getCustomerPaymentReceipt, getCustomerPayments, recordCustomerPayment, updateCustomer, voidCustomerPayment } from '../../api/customers'
+import { listUsers } from '../../api/users'
 import { orders } from '../../mockData/orders'
-import { users } from '../../mockData/users'
 import { useAuthStore } from '../../store/authStore'
+import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 import { formatCurrency } from '../../utils/format'
 import CustomerForm from './CustomerForm'
 import { customerBasePathByRole } from './customerConstants'
@@ -103,6 +104,13 @@ const normalizeCustomer = (customer) => ({
   status: customer.is_active === false || customer.status === 'inactive' ? 'inactive' : 'active',
 })
 
+const normalizeUser = (user) => ({
+  id: user.id,
+  name: user.name,
+  role: user.role || user.system_role || getSystemRoleFromRoleName(user.role_detail?.name),
+  status: user.is_active === false || user.status === 'inactive' ? 'inactive' : 'active',
+})
+
 const normalizeCustomerPayment = (payment) => ({
   id: payment.id,
   customerId: payment.customer_id,
@@ -141,6 +149,7 @@ export default function CustomerDetail() {
   const [voidTarget, setVoidTarget] = useState(null)
   const [isVoiding, setIsVoiding] = useState(false)
   const [voidError, setVoidError] = useState('')
+  const [staffUsers, setStaffUsers] = useState([])
 
   useEffect(() => {
     let isMounted = true
@@ -151,15 +160,20 @@ export default function CustomerDetail() {
       setIsLoadingPayments(true)
       setPaymentsError('')
 
-      const [result, paymentsResult] = await Promise.all([
+      const [result, paymentsResult, usersResult] = await Promise.all([
         getCustomer(id),
         getCustomerPayments(id),
+        listUsers(),
       ])
 
       if (!isMounted) return
 
       setIsLoading(false)
       setIsLoadingPayments(false)
+
+      if (usersResult.success) {
+        setStaffUsers(usersResult.users.map(normalizeUser))
+      }
 
       if (!result.success) {
         setCustomer(null)
@@ -191,11 +205,12 @@ export default function CustomerDetail() {
   )
 
   const salesOfficers = useMemo(
-    () => users.filter((user) => user.role === ROLES.SALES_OFFICER && user.status === 'active'),
-    [],
+    () => staffUsers.filter((user) => user.role === ROLES.SALES_OFFICER && user.status === 'active'),
+    [staffUsers],
   )
 
-  const assignedSalesOfficer = customer?.assignedSalesOfficer || users.find((user) => user.id === customer?.assignedSalesOfficerId)
+  const assignedSalesOfficer =
+    customer?.assignedSalesOfficer || staffUsers.find((user) => user.id === customer?.assignedSalesOfficerId)
 
   const loadPayments = async () => {
     setIsLoadingPayments(true)

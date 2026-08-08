@@ -16,7 +16,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import { createCustomer, deleteCustomer as deleteCustomerApi, listCustomers, updateCustomer } from '../../api/customers'
+import { createCustomer, deleteCustomer as deleteCustomerApi, getCustomer, listCustomers, updateCustomer } from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { users as seedUsers } from '../../mockData/users'
 import { useAuthStore } from '../../store/authStore'
@@ -84,6 +84,7 @@ export default function CustomerList() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState(null)
+  const [isLoadingEditCustomer, setIsLoadingEditCustomer] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [deleteCustomer, setDeleteCustomer] = useState(null)
@@ -175,9 +176,32 @@ export default function CustomerList() {
     })
   }, [currentUser?.id, customers, isAdmin, isSalesOfficer, salesOfficerFilter, searchTerm, statusFilter, typeFilter])
 
-  const handleOpenForm = (customer = null) => {
-    setEditingCustomer(customer)
+  const handleOpenForm = async (customer = null) => {
     setFormError('')
+
+    if (!customer) {
+      setEditingCustomer(null)
+      setIsFormOpen(true)
+      return
+    }
+
+    // The row only carries the flat list fields — fetch the full sectioned profile
+    // so editing doesn't blank out tax/payment/CRM/social/additional data on save.
+    if (isLoadingEditCustomer) return
+    setIsLoadingEditCustomer(true)
+
+    const result = await getCustomer(customer.id)
+
+    setIsLoadingEditCustomer(false)
+
+    if (!result.success) {
+      setEditingCustomer(customer)
+      setFormError(result.error)
+      setIsFormOpen(true)
+      return
+    }
+
+    setEditingCustomer(result.customer)
     setIsFormOpen(true)
   }
 

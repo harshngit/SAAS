@@ -58,11 +58,14 @@ const Select = forwardRef(function Select(
       const menuHeight = Math.min(224, options.length * 41 + 8)
       const spaceBelow = window.innerHeight - rect.bottom
       const shouldOpenUp = spaceBelow < menuHeight + 12 && rect.top > menuHeight
+      // Menus must be at least as wide as the trigger, but a narrow trigger (sized to
+      // whatever option happens to be selected) shouldn't force other option labels to overflow.
+      const menuWidth = Math.min(Math.max(rect.width, 160), window.innerWidth - rect.left - 16)
 
       setMenuStyle({
         left: rect.left,
         top: shouldOpenUp ? rect.top - menuHeight - 4 : rect.bottom + 4,
-        width: rect.width,
+        width: menuWidth,
         maxHeight: menuHeight,
       })
     }
@@ -150,7 +153,7 @@ const Select = forwardRef(function Select(
             ref={menuRef}
             role="listbox"
             style={menuStyle}
-            className="fixed z-50 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-1 text-sm text-neutral-900 shadow-popover"
+            className="fixed z-50 overflow-x-hidden overflow-y-auto rounded-xl border border-neutral-200 bg-white p-1 text-sm text-neutral-900 shadow-popover"
           >
             {options.map((option) => {
               const isSelected = option.value === selectedValue
@@ -162,7 +165,8 @@ const Select = forwardRef(function Select(
                   aria-selected={isSelected}
                   tabIndex={-1}
                   onClick={() => handleSelect(option.value)}
-                  className={`cursor-pointer rounded-lg px-3 py-2 transition-colors ${
+                  title={option.label}
+                  className={`cursor-pointer truncate rounded-lg px-3 py-2 transition-colors ${
                     isSelected
                       ? 'bg-primary-600 text-white'
                       : 'text-neutral-700 hover:bg-primary-50 hover:text-primary-700'

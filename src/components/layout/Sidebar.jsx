@@ -17,7 +17,12 @@ import {
   X,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
-import { roleMenus, roleLabels } from '../../auth/roles'
+import { roleMenus, roleLabels, ROLES } from '../../auth/roles'
+import { listSuperAdminOrganizations } from '../../api/superadmin'
+
+const NAV_BADGE_COUNTS = {
+  '/superadmin/upgrade-requests': 'pendingUpgrades',
+}
 
 const sectionIcons = {
   Overview: LayoutDashboard,
@@ -52,6 +57,30 @@ export default function Sidebar({
   const currentRole = currentUser?.role
   const menuGroups = currentRole ? roleMenus[currentRole] || [] : []
   const [openSections, setOpenSections] = useState({})
+  const [navBadgeCounts, setNavBadgeCounts] = useState({})
+
+  useEffect(() => {
+    if (currentRole !== ROLES.SUPER_ADMIN) {
+      setNavBadgeCounts({})
+      return
+    }
+
+    let isMounted = true
+
+    async function loadPendingUpgradeCount() {
+      const result = await listSuperAdminOrganizations({ upgrade_status: 'pending' })
+      if (!isMounted || !result.success) return
+
+      setNavBadgeCounts((current) => ({ ...current, pendingUpgrades: result.organizations?.length || 0 }))
+    }
+
+    loadPendingUpgradeCount()
+
+    return () => {
+      isMounted = false
+    }
+    // Re-check whenever the route changes so an approve/reject elsewhere clears the badge promptly.
+  }, [currentRole, location.pathname])
 
   useEffect(() => {
     const nextMenuGroups = currentRole ? roleMenus[currentRole] || [] : []
@@ -229,7 +258,10 @@ export default function Sidebar({
                     </>
                   )}
                   <div className={`space-y-1 ${openSections[group.section] === false && isExpanded ? 'md:hidden' : ''} ${openSections[group.section] === false ? 'hidden md:block' : ''}`}>
-                    {group.items.map((item) => (
+                    {group.items.map((item) => {
+                      const badgeCount = navBadgeCounts[NAV_BADGE_COUNTS[item.path]] || 0
+
+                      return (
                       <NavLink
                         key={item.path}
                         to={item.path}
@@ -256,15 +288,31 @@ export default function Sidebar({
                               }`}
                               aria-hidden="true"
                             />
-                            <item.icon className="size-4.5 shrink-0" aria-hidden="true" />
-                            <span className={`visible max-w-44 overflow-hidden whitespace-nowrap opacity-100 transition-all duration-150 ${desktopLabelVisibilityClass}`}>
-                              {item.label}
+                            <span className="relative shrink-0">
+                              <item.icon className="size-4.5" aria-hidden="true" />
+                              {!isExpanded && badgeCount > 0 && (
+                                <span
+                                  className="absolute -right-1 -top-1 size-2 rounded-full bg-red-500 ring-2 ring-[#eef6eb]"
+                                  aria-hidden="true"
+                                />
+                              )}
                             </span>
-                            {!isExpanded && <CollapsedTooltip label={item.label} />}
+                            <span className={`visible flex max-w-44 items-center gap-2 overflow-hidden whitespace-nowrap opacity-100 transition-all duration-150 ${desktopLabelVisibilityClass}`}>
+                              {item.label}
+                              {badgeCount > 0 && (
+                                <span className="inline-flex min-w-4.5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1 py-0.5 text-[0.6rem] font-semibold leading-none text-white">
+                                  {badgeCount}
+                                </span>
+                              )}
+                            </span>
+                            {!isExpanded && (
+                              <CollapsedTooltip label={badgeCount > 0 ? `${item.label} (${badgeCount})` : item.label} />
+                            )}
                           </>
                         )}
                       </NavLink>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               </div>

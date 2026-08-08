@@ -1,14 +1,22 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { getCustomer, updateCustomer } from '../../api/customers'
+import { listUsers } from '../../api/users'
 import { ROLES } from '../../auth/roles'
-import { users } from '../../mockData/users'
+import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import CustomerForm from './CustomerForm'
 import { UsersRound } from 'lucide-react'
+
+const normalizeUser = (user) => ({
+  id: user.id,
+  name: user.name,
+  role: user.role || user.system_role || getSystemRoleFromRoleName(user.role_detail?.name),
+  status: user.is_active === false || user.status === 'inactive' ? 'inactive' : 'active',
+})
 
 const normalizeCustomer = (customer) => ({
   ...customer,
@@ -38,11 +46,7 @@ export default function CustomerEdit() {
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [formError, setFormError] = useState('')
-
-  const salesOfficers = useMemo(
-    () => users.filter((user) => user.role === ROLES.SALES_OFFICER && user.status === 'active'),
-    [],
-  )
+  const [salesOfficers, setSalesOfficers] = useState([])
 
   useEffect(() => {
     let isMounted = true
@@ -51,19 +55,27 @@ export default function CustomerEdit() {
       setIsLoading(true)
       setLoadError('')
 
-      const result = await getCustomer(customerId)
+      const [customerResult, usersResult] = await Promise.all([getCustomer(customerId), listUsers()])
 
       if (!isMounted) return
 
       setIsLoading(false)
 
-      if (!result.success) {
+      if (usersResult.success) {
+        setSalesOfficers(
+          usersResult.users
+            .map(normalizeUser)
+            .filter((user) => user.role === ROLES.SALES_OFFICER && user.status === 'active'),
+        )
+      }
+
+      if (!customerResult.success) {
         setCustomer(null)
-        setLoadError(result.error)
+        setLoadError(customerResult.error)
         return
       }
 
-      setCustomer(normalizeCustomer(result.customer))
+      setCustomer(normalizeCustomer(customerResult.customer))
     }
 
     loadCustomer()

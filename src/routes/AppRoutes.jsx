@@ -58,6 +58,7 @@ import GSTSummary from '../features/gst/GSTSummary'
 import FinancialReports from '../features/reports/FinancialReports'
 import OrganizationsList from '../features/superadmin/OrganizationsList'
 import OrganizationDetail from '../features/superadmin/OrganizationDetail'
+import UpgradeRequests from '../features/superadmin/UpgradeRequests'
 import SubscriptionPlans from '../features/superadmin/SubscriptionPlans'
 import PlatformAnalytics from '../features/superadmin/PlatformAnalytics'
 import AdminPlans from '../features/plans/AdminPlans'
@@ -102,6 +103,7 @@ export default function AppRoutes() {
           <Route path="/superadmin/dashboard" element={<SuperAdminDashboard />} />
           <Route path="/superadmin/organizations" element={<OrganizationsList />} />
           <Route path="/superadmin/organizations/:id" element={<OrganizationDetail />} />
+          <Route path="/superadmin/upgrade-requests" element={<UpgradeRequests />} />
           <Route path="/superadmin/plans" element={<SubscriptionPlans />} />
           <Route path="/superadmin/analytics" element={<PlatformAnalytics />} />
         </Route>

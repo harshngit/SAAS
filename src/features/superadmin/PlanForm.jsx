@@ -30,6 +30,7 @@ function buildFormState(plan) {
     max_users: plan?.max_users ?? '',
     max_orders: plan?.max_orders ?? '',
     features: featuresToText(plan?.features),
+    is_default: Boolean(plan?.is_default),
   }
 }
 
@@ -52,6 +53,10 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
     setFormData((prev) => ({ ...prev, [field]: event.target.value }))
   }
 
+  const handleCheckboxChange = (field) => (event) => {
+    setFormData((prev) => ({ ...prev, [field]: event.target.checked }))
+  }
+
   const handleSubmit = (event) => {
     event.preventDefault()
 
@@ -64,6 +69,7 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
       max_users: toNullableNumber(formData.max_users),
       max_orders: toNullableNumber(formData.max_orders),
       features: featuresFromText(formData.features),
+      is_default: formData.is_default,
     }
 
     if (!plan) {
@@ -81,6 +87,7 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
       max_users: plan.max_users ?? null,
       max_orders: plan.max_orders ?? null,
       features: Array.isArray(plan.features) ? plan.features : [],
+      is_default: Boolean(plan.is_default),
     }
 
     const changedFields = Object.fromEntries(
@@ -150,6 +157,19 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
           value={formData.features}
           onChange={handleChange('features')}
         />
+
+        <label className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">
+          <input
+            type="checkbox"
+            checked={formData.is_default}
+            onChange={handleCheckboxChange('is_default')}
+            className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500/20"
+          />
+          <span>
+            Set as default plan
+            <span className="block text-xs text-neutral-500">Shown as the recommended plan for new organizations.</span>
+          </span>
+        </label>
 
         {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
