@@ -33,16 +33,17 @@ export const buildOrder = ({
   discountPercent = 0,
   lines,
 }) => {
-  const items = lines.map(({ productId, qty }) => {
+  const items = lines.map(({ productId, qty, price }) => {
     const product = findProduct(productId)
-    const lineTotal = product.sellingPrice * qty
+    const effectivePrice = price ?? product.sellingPrice
+    const lineTotal = effectivePrice * qty
     const gstAmount = lineTotal * product.gstRate
     return {
       productId,
       name: product.name,
       variant: product.variant,
       qty,
-      price: product.sellingPrice,
+      price: effectivePrice,
       gstRate: product.gstRate,
       lineTotal,
       gstAmount,

@@ -32,6 +32,7 @@ import LeadList from '../features/leads/LeadList'
 import LeadFormPage from '../features/leads/LeadFormPage'
 import QuotationList from '../features/quotations/QuotationList'
 import QuotationFormPage from '../features/quotations/QuotationFormPage'
+import QuotationDetail from '../features/quotations/QuotationDetail'
 import SupplierList from '../features/suppliers/SupplierList'
 import SupplierDetail from '../features/suppliers/SupplierDetail'
 import CategoryList from '../features/categories/CategoryList'
@@ -67,6 +68,7 @@ import AdminExpenses from '../features/expenses/AdminExpenses'
 import AdminInvoices from '../features/invoices/AdminInvoices'
 import AdminSettings from '../features/settings/AdminSettings'
 import AdminAttendance from '../features/attendance/AdminAttendance'
+import AttendanceDetail from '../features/attendance/AttendanceDetail'
 import Profile from '../features/profile/Profile'
 
 function RootRedirect() {
@@ -128,6 +130,7 @@ export default function AppRoutes() {
           <Route path="/admin/roles/new" element={<RoleForm />} />
           <Route path="/admin/roles/edit/:role_id" element={<RoleForm />} />
           <Route path="/admin/attendance" element={<AdminAttendance />} />
+          <Route path="/admin/attendance/:userId" element={<AttendanceDetail />} />
           <Route path="/admin/customers" element={<CustomerList />} />
           <Route path="/admin/customers/edit/:customer_id" element={<CustomerEdit />} />
           <Route path="/admin/customers/:id" element={<CustomerDetail />} />
@@ -135,6 +138,7 @@ export default function AppRoutes() {
           <Route path="/admin/leads/new" element={<LeadFormPage />} />
           <Route path="/admin/quotations" element={<QuotationList />} />
           <Route path="/admin/quotations/new" element={<QuotationFormPage />} />
+          <Route path="/admin/quotations/:id" element={<QuotationDetail />} />
           <Route path="/admin/suppliers" element={<SupplierList />} />
           <Route path="/admin/suppliers/:id" element={<SupplierDetail />} />
           <Route path="/admin/categories" element={<CategoryList />} />
@@ -168,6 +172,7 @@ export default function AppRoutes() {
           <Route path="/sales/leads/new" element={<LeadFormPage />} />
           <Route path="/sales/quotations" element={<QuotationList />} />
           <Route path="/sales/quotations/new" element={<QuotationFormPage />} />
+          <Route path="/sales/quotations/:id" element={<QuotationDetail />} />
           <Route path="/sales/orders/create" element={<CreateSalesOrder />} />
           <Route path="/sales/stock" element={<StockBoard readOnly />} />
           <Route path="/sales/visits" element={<VisitCheckIn />} />

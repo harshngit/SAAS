@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Check, Folder, ImageIcon, Info, ListTree, Upload, X } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, ClipboardList, ImageIcon, Info, Plus, Upload, X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { createCategory, listCategories } from '../../api/categories'
+import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import { readImageAsDataUrl } from '../../utils/imageFile'
@@ -27,15 +28,7 @@ export default function CategoryFormPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [subcategoryName, setSubcategoryName] = useState('')
 
-  const descriptionCount = formData.description.length
-  const descriptionProgress = Math.min(100, (descriptionCount / 500) * 100)
   const hasImage = Boolean(formData.image)
-  const completionItems = [
-    { label: 'Name', done: Boolean(formData.name.trim()), required: true },
-    { label: 'Image', done: hasImage },
-    { label: 'Description', done: Boolean(formData.description.trim()) },
-    { label: 'Subcategories', done: formData.subcategories.length > 0 },
-  ]
 
   const loadCategories = useCallback(async () => {
     const result = await listCategories()
@@ -98,10 +91,6 @@ export default function CategoryFormPage() {
     }))
   }
 
-  const clearImage = () => {
-    updateField('image', '')
-  }
-
   const validate = () => {
     const nextErrors = {}
     const name = formData.name.trim()
@@ -138,214 +127,188 @@ export default function CategoryFormPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-primary-700">Product Catalog</p>
-          <h2 className="mt-1 text-2xl font-semibold text-neutral-900">Add Category</h2>
-          <p className="mt-1 text-sm text-neutral-500">Create a category, add media, and group products with optional subcategories.</p>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => navigate('/admin/categories')}>
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/admin/categories')}
+          aria-label="Back to Categories"
+          className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-500 transition-colors hover:border-primary-300 hover:text-primary-700"
+        >
           <ArrowLeft className="size-4" aria-hidden="true" />
-          Back to Categories
-        </Button>
+        </button>
+        <nav className="flex items-center gap-1.5 text-sm text-neutral-400">
+          <Link to="/admin/products" className="hover:text-primary-700">Catalog</Link>
+          <span aria-hidden="true">/</span>
+          <Link to="/admin/categories" className="hover:text-primary-700">Categories</Link>
+          <span aria-hidden="true">/</span>
+          <span className="text-neutral-600">Create Category</span>
+        </nav>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-semibold text-neutral-900">Create Category</h2>
+        <p className="mt-0.5 text-xs text-neutral-500">Add a new category and organize products with optional subcategories.</p>
       </div>
 
       {formError && (
-        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm text-red-700">
           {formError}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="space-y-5">
-          <section className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
-            <div className="flex items-center gap-3 border-b border-neutral-100 px-5 py-4">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
-                <Folder className="size-4" aria-hidden="true" />
-              </div>
-              <div>
-                <p className="text-base font-semibold text-neutral-900">Basic Details</p>
-                <p className="mt-0.5 text-sm text-neutral-500">Name the category and describe what belongs inside it.</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-5 p-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <section className="space-y-3.5 rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+          <p className="text-sm font-semibold text-neutral-900">Category Details</p>
+
+          <div className="flex flex-col gap-1">
+            <Input
+              label="Category Name"
+              placeholder="e.g. Mineral Water"
+              value={formData.name}
+              onChange={(event) => updateField('name', event.target.value)}
+              error={errors.name}
+              required
+              compact
+            />
+            <p className="text-xs text-neutral-400">Choose a clear and descriptive name for the category.</p>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-neutral-700">Image URL</label>
+            <div className="flex items-center gap-2">
               <Input
-                label="Category Name"
-                placeholder="Enter category name"
-                value={formData.name}
-                onChange={(event) => updateField('name', event.target.value)}
-                error={errors.name}
-                required
+                placeholder="Paste image URL"
+                value={formData.image}
+                onChange={(event) => updateField('image', event.target.value)}
+                className="flex-1"
+                compact
               />
-              <div className="flex flex-col gap-1.5 lg:col-span-2">
-                <Input
-                  as="textarea"
-                  label="Category Description"
-                  placeholder="Describe where this category appears in the catalog..."
-                  maxLength={500}
-                  value={formData.description}
-                  onChange={(event) => updateField('description', event.target.value)}
-                  inputClassName="min-h-28"
-                />
-                <div className="flex items-center gap-3">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100">
-                    <div className="h-full rounded-full bg-primary-600 transition-all" style={{ width: `${descriptionProgress}%` }} />
-                  </div>
-                  <p className="w-16 text-right text-xs font-medium text-neutral-400">{descriptionCount} / 500</p>
-                </div>
-              </div>
+              <label className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-linear-to-b from-primary-500 to-primary-600 px-3.5 text-sm font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+                <Upload className="size-4" aria-hidden="true" />
+                Upload
+                <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={handleImageUpload} />
+              </label>
             </div>
-          </section>
+            <p className="text-xs text-neutral-400">Add a link to an image or upload a file from your device.</p>
+          </div>
 
-          <section className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
-            <div className="flex items-center gap-3 border-b border-neutral-100 px-5 py-4">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
-                <ImageIcon className="size-4" aria-hidden="true" />
-              </div>
-              <div>
-                <p className="text-base font-semibold text-neutral-900">Category Image</p>
-                <p className="mt-0.5 text-sm text-neutral-500">Add a URL or upload an image file.</p>
-              </div>
-            </div>
-            <div className="flex flex-col gap-4 p-5 sm:flex-row">
-              <div className="flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-neutral-200 bg-neutral-50">
-                {hasImage ? (
-                  <img src={formData.image} alt="Category" className="size-full object-cover" />
-                ) : (
-                  <ImageIcon className="size-6 text-neutral-300" aria-hidden="true" />
-                )}
-              </div>
-              <div className="flex flex-1 flex-col gap-3">
-                <Input
-                  label="Image URL"
-                  placeholder="https://example.com/image.jpg"
-                  value={formData.image}
-                  onChange={(event) => updateField('image', event.target.value)}
-                />
-                <div className="flex flex-wrap gap-2">
-                  <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-linear-to-b from-primary-500 to-primary-600 px-4 text-sm font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
-                    <Upload className="size-4" aria-hidden="true" />
-                    Upload
-                    <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={handleImageUpload} />
-                  </label>
-                  <Button type="button" variant="outline" className="h-10 rounded-xl" disabled={!hasImage} onClick={clearImage}>
-                    <X className="size-4" aria-hidden="true" />
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </section>
+          <div className="flex flex-col gap-1">
+            <Input
+              as="textarea"
+              label="Category Description"
+              placeholder="Write a short description about this category..."
+              maxLength={500}
+              value={formData.description}
+              onChange={(event) => updateField('description', event.target.value)}
+              inputClassName="min-h-16"
+              compact
+            />
+            <p className="text-xs text-neutral-400">This description will help your team and customers understand this category.</p>
+          </div>
 
-          <section className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
-            <div className="flex items-center justify-between gap-3 border-b border-neutral-100 px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
-                  <ListTree className="size-4" aria-hidden="true" />
-                </div>
-                <div>
-                  <p className="text-base font-semibold text-neutral-900">Subcategories</p>
-                  <p className="mt-0.5 text-sm text-neutral-500">Create optional child groups for this category.</p>
-                </div>
-              </div>
-              <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">
-                {formData.subcategories.length} added
-              </span>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-neutral-700">Subcategories</label>
+            <p className="text-xs text-neutral-400">Press Enter or click Add to include a subcategory.</p>
+            <div className="mt-0.5 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <Input
+                placeholder="Type a subcategory name"
+                value={subcategoryName}
+                onChange={(event) => {
+                  setSubcategoryName(event.target.value)
+                  setErrors((current) => ({ ...current, subcategories: '' }))
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    addSubcategory()
+                  }
+                }}
+                error={errors.subcategories}
+                compact
+              />
+              <Button type="button" variant="outline" size="sm" className="h-9 min-w-24 rounded-xl" onClick={addSubcategory}>
+                Add
+              </Button>
             </div>
-            <div className="space-y-4 p-5">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <Input
-                  placeholder="Enter subcategory name"
-                  value={subcategoryName}
-                  onChange={(event) => {
-                    setSubcategoryName(event.target.value)
-                    setErrors((current) => ({ ...current, subcategories: '' }))
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      addSubcategory()
-                    }
-                  }}
-                  error={errors.subcategories}
-                />
-                <Button type="button" className="h-11 min-w-24 rounded-xl" onClick={addSubcategory}>
-                  Add
-                </Button>
-              </div>
 
-              {formData.subcategories.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {formData.subcategories.map((subcategory) => (
-                    <span
-                      key={subcategory}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-neutral-50 px-3 py-1.5 text-xs font-semibold text-primary-700 ring-1 ring-primary-100 transition-colors hover:bg-primary-50"
+            {formData.subcategories.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {formData.subcategories.map((subcategory) => (
+                  <span
+                    key={subcategory}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 ring-1 ring-primary-100 transition-colors hover:bg-primary-100"
+                  >
+                    {subcategory}
+                    <button
+                      type="button"
+                      aria-label={`Remove ${subcategory}`}
+                      className="rounded-full text-primary-500 hover:text-primary-800"
+                      onClick={() => removeSubcategory(subcategory)}
                     >
-                      {subcategory}
-                      <button
-                        type="button"
-                        aria-label={`Remove ${subcategory}`}
-                        className="rounded-full text-primary-500 hover:text-primary-800"
-                        onClick={() => removeSubcategory(subcategory)}
-                      >
-                        <X className="size-3.5" aria-hidden="true" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-5 text-center">
-                  <p className="text-sm font-medium text-neutral-700">No subcategories added.</p>
-                </div>
-              )}
-
-              <p className="inline-flex items-center gap-1.5 text-xs text-neutral-400">
-                <Info className="size-3.5" aria-hidden="true" />
-                Press Enter or click Add to include a subcategory.
-              </p>
-            </div>
-          </section>
-        </div>
-
-        <aside className="space-y-4">
-          <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
-            <p className="text-sm font-semibold text-neutral-900">Save Readiness</p>
-            <div className="mt-4 space-y-3">
-              {completionItems.map((item) => (
-                <div key={item.label} className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-neutral-600">
-                    {item.label}
-                    {item.required && <span className="text-red-500"> *</span>}
+                      <X className="size-3.5" aria-hidden="true" />
+                    </button>
                   </span>
-                  {item.done ? (
-                    <span className="flex size-6 items-center justify-center rounded-full bg-primary-600 text-white">
-                      <Check className="size-3.5" aria-hidden="true" />
-                    </span>
-                  ) : (
-                    <span className="size-6 rounded-full border-2 border-dashed border-neutral-200" aria-hidden="true" />
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">
+          <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-semibold text-neutral-900">Image Preview</p>
+              <Info className="size-3.5 text-neutral-300" aria-hidden="true" />
+            </div>
+            <div className="mt-3 flex h-40 flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border border-dashed border-neutral-200 bg-neutral-50 p-3 text-center">
+              {hasImage ? (
+                <img src={formData.image} alt="Category preview" className="size-full rounded-lg object-cover" />
+              ) : (
+                <>
+                  <span className="flex size-12 items-center justify-center rounded-full bg-white text-neutral-300 ring-1 ring-neutral-200">
+                    <ImageIcon className="size-6" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-700">No image yet</p>
+                    <p className="mt-0.5 text-xs text-neutral-400">Add an image URL to see preview</p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
-          <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-4">
-            <p className="text-sm font-semibold text-neutral-900">Quick Tip</p>
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              Keep category names short and use subcategories only for groups customers or staff need to filter.
-            </p>
+
+          <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="size-4 text-primary-600" aria-hidden="true" />
+              <p className="text-sm font-semibold text-neutral-900">Preview Summary</p>
+            </div>
+            <div className="mt-3 divide-y divide-neutral-100">
+              <div className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
+                <span className="text-sm text-neutral-600">Status</span>
+                <Badge variant="warning">Draft</Badge>
+              </div>
+              <div className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
+                <span className="text-sm text-neutral-600">Subcategories</span>
+                <span className="text-sm font-semibold text-neutral-900">{formData.subcategories.length}</span>
+              </div>
+              <div className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
+                <span className="text-sm text-neutral-600">Products</span>
+                <span className="text-sm font-semibold text-neutral-900">0</span>
+              </div>
+            </div>
           </div>
         </aside>
       </div>
 
-      <div className="sticky bottom-0 z-10 -mx-4 border-t border-neutral-100 bg-white/90 px-4 py-3 backdrop-blur sm:-mx-5 sm:px-5 lg:-mx-7 lg:px-7">
+      <div className="sticky bottom-0 z-10 -mx-4 border-t border-neutral-100 bg-white/90 px-4 py-2.5 backdrop-blur sm:-mx-5 sm:px-5 lg:-mx-7 lg:px-7">
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button type="button" variant="secondary" disabled={isSaving} onClick={() => navigate('/admin/categories')}>
+          <Button type="button" variant="secondary" size="sm" disabled={isSaving} onClick={() => navigate('/admin/categories')}>
             Cancel
           </Button>
-          <Button type="submit" loading={isSaving} disabled={!hasChanges}>
-            <Check className="size-4" aria-hidden="true" />
-            Save Category
+          <Button type="submit" size="sm" loading={isSaving} disabled={!hasChanges}>
+            <Plus className="size-4" aria-hidden="true" />
+            Add Category
           </Button>
         </div>
       </div>

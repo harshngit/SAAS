@@ -5,9 +5,8 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Select from '../../components/ui/Select'
-import { quotations as seedQuotations } from '../../mockData/quotations'
 import { formatCurrency } from '../../utils/format'
-import { readStoredQuotations } from './quotationStorage'
+import { getAllQuotations } from './quotationStorage'
 
 const statusOptions = [
   { value: 'all', label: 'All status' },
@@ -50,7 +49,7 @@ function formatDate(value) {
 export default function QuotationList() {
   const navigate = useNavigate()
   const basePath = window.location.pathname.startsWith('/sales') ? '/sales/quotations' : '/admin/quotations'
-  const [quotations] = useState(() => [...readStoredQuotations(), ...seedQuotations])
+  const [quotations] = useState(() => getAllQuotations())
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
@@ -125,7 +124,11 @@ export default function QuotationList() {
               </thead>
               <tbody>
                 {filteredQuotations.map((quotation) => (
-                  <tr key={quotation.id} className="bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35">
+                  <tr
+                    key={quotation.id}
+                    onClick={() => navigate(`${basePath}/${encodeURIComponent(quotation.id)}`)}
+                    className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                  >
                     <td className="px-4 py-3.5">
                       <p className="font-semibold text-neutral-900">{quotation.id}</p>
                       <p className="mt-0.5 text-xs text-neutral-400">{quotation.items?.length || 0} item(s)</p>
