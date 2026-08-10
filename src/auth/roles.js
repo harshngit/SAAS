@@ -43,6 +43,7 @@ import {
   ShieldCheck,
   Boxes,
   ClipboardCheck,
+  SlidersHorizontal,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -129,6 +130,7 @@ export const roleMenus = {
         { label: 'Plans', path: '/admin/plans', icon: CreditCard },
         { label: 'Staff', path: '/admin/users', icon: Users },
         { label: 'Roles & Permissions', path: '/admin/roles', icon: ShieldCheck },
+        { label: 'Object Field Settings', path: '/admin/object-fields', icon: SlidersHorizontal },
         { label: 'Attendance', path: '/admin/attendance', icon: ClipboardCheck },
         { label: 'Audit Logs', path: '/admin/audit-logs', icon: History },
       ],

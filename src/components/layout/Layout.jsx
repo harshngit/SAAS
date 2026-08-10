@@ -46,7 +46,7 @@ export default function Layout() {
   }, [location.pathname])
 
   return (
-    <div className="h-svh bg-[#eef6eb]">
+    <div className="h-svh overflow-hidden bg-[#eef6eb]">
       <div className="flex h-full overflow-hidden">
         <Sidebar
           id="dashboard-sidebar"

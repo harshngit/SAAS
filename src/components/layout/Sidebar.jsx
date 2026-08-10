@@ -54,6 +54,7 @@ export default function Sidebar({
 }) {
   const location = useLocation()
   const currentUser = useAuthStore((state) => state.currentUser)
+  const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const currentRole = currentUser?.role
   const menuGroups = currentRole ? roleMenus[currentRole] || [] : []
   const [openSections, setOpenSections] = useState({})
@@ -106,6 +107,13 @@ export default function Sidebar({
     ? 'visible max-w-48 whitespace-nowrap opacity-100 delay-150'
     : 'invisible max-w-0 opacity-0 delay-0'
   const useCollapsedSectionNav = !isExpanded && menuGroups.length > 1
+  const currentPlanName =
+    currentOrganization?.plan?.name ||
+    (typeof currentOrganization?.plan === 'string' ? currentOrganization.plan : '') ||
+    currentOrganization?.plan_name ||
+    currentOrganization?.planName ||
+    ''
+  const showUpgradeCard = currentRole === ROLES.ADMIN && currentPlanName.toLowerCase() === 'free'
 
   const toggleSection = (section) => {
     setOpenSections((current) => ({ ...current, [section]: !current[section] }))
@@ -320,6 +328,7 @@ export default function Sidebar({
           })}
         </nav>
 
+        {showUpgradeCard && (
         <div className="border-t border-neutral-100 p-3">
           <div className="hidden md:block">
             {isExpanded ? (
@@ -327,46 +336,50 @@ export default function Sidebar({
                 <div className="mx-auto flex size-6 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/20">
                   <Sparkles className="size-3" aria-hidden="true" />
                 </div>
-                <p className="mt-1 text-[0.7rem] font-semibold">Upgrade Pro</p>
+                <p className="mt-1 text-[0.7rem] font-semibold">Upgrade Plan</p>
                 <p className="mt-0.5 text-[0.62rem] leading-3 text-primary-100">
                   Higher productivity with better organization
                 </p>
-                <button
-                  type="button"
+                <NavLink
+                  to="/admin/plans"
+                  onClick={onCloseMobile}
                   className="mt-1.5 inline-flex w-full items-center justify-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[0.62rem] font-semibold text-primary-700 shadow-(--shadow-xs) transition-colors hover:bg-primary-50"
                 >
                   <Crown className="size-3" aria-hidden="true" />
                   Upgrade
-                </button>
+                </NavLink>
               </div>
             ) : (
-              <button
-                type="button"
+              <NavLink
+                to="/admin/plans"
+                onClick={onCloseMobile}
                 aria-label="Upgrade plan"
                 title="Upgrade plan"
                 className="flex size-9 w-full items-center justify-center rounded-[0.85rem] bg-primary-50 text-primary-700 ring-1 ring-primary-100 transition-colors hover:bg-primary-100"
               >
                 <Crown className="size-4.5" aria-hidden="true" />
-              </button>
+              </NavLink>
             )}
           </div>
           <div className="overflow-hidden rounded-[0.85rem] bg-linear-to-br from-primary-500 to-primary-700 px-2.5 py-2.5 text-center text-white shadow-(--shadow-glow-primary) md:hidden">
             <div className="mx-auto flex size-6 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/20">
               <Sparkles className="size-3" aria-hidden="true" />
             </div>
-            <p className="mt-1 text-[0.7rem] font-semibold">Upgrade Pro</p>
+            <p className="mt-1 text-[0.7rem] font-semibold">Upgrade Plan</p>
             <p className="mt-0.5 text-[0.62rem] leading-3 text-primary-100">
               Higher productivity with better organization
             </p>
-            <button
-              type="button"
+            <NavLink
+              to="/admin/plans"
+              onClick={onCloseMobile}
               className="mt-1.5 inline-flex w-full items-center justify-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[0.62rem] font-semibold text-primary-700 shadow-(--shadow-xs) transition-colors hover:bg-primary-50"
             >
               <Crown className="size-3" aria-hidden="true" />
               Upgrade
-            </button>
+            </NavLink>
           </div>
         </div>
+        )}
       </aside>
     </>
   )

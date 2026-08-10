@@ -67,6 +67,7 @@ import AdminDeliveries from '../features/deliveries/AdminDeliveries'
 import AdminExpenses from '../features/expenses/AdminExpenses'
 import AdminInvoices from '../features/invoices/AdminInvoices'
 import AdminSettings from '../features/settings/AdminSettings'
+import ObjectFieldsSettings from '../features/settings/ObjectFieldsSettings'
 import AdminAttendance from '../features/attendance/AdminAttendance'
 import AttendanceDetail from '../features/attendance/AttendanceDetail'
 import Profile from '../features/profile/Profile'
@@ -155,6 +156,7 @@ export default function AppRoutes() {
           <Route path="/admin/reports" element={<ReportsHub />} />
           <Route path="/admin/notifications" element={<NotificationsList />} />
           <Route path="/admin/audit-logs" element={<AuditLogList />} />
+          <Route path="/admin/object-fields" element={<ObjectFieldsSettings />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
         </Route>
 

@@ -1,17 +1,31 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
+  BarChart3,
   Building2,
   ChevronDown,
+  CheckCircle2,
+  CircleUserRound,
+  ClipboardList,
   CreditCard,
+  Eye,
   FileText,
+  HardDrive,
   KeyRound,
   LifeBuoy,
+  Mail,
+  MapPin,
+  Phone,
   Pencil,
   Save,
+  ShieldCheck,
   Trash2,
   Upload,
+  UploadCloud,
   UserRound,
+  UserPlus,
+  Users,
+  XCircle,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
@@ -385,8 +399,109 @@ const countryOptions = [
   { value: "singapore", label: "Singapore" },
 ];
 
+const dashboardDocumentFields = [
+  { key: "gstCertificateFile", label: "GST Certificate" },
+  { key: "panCardFile", label: "PAN Card" },
+  { key: "incorporationCertificateFile", label: "Incorporation Certificate" },
+  { key: "tradeLicenseFile", label: "Trade License" },
+  { key: "msmeCertificateFile", label: "MSME Certificate" },
+  { key: "fssaiLicenseFile", label: "FSSAI License" },
+  { key: "otherBusinessDocumentsFile", label: "Other Documents" },
+];
+
+const dashboardCompletionFields = [
+  { key: "name", label: "Company Name" },
+  { key: "legalName", label: "Legal Name" },
+  { key: "businessType", label: "Business Type" },
+  { key: "industry", label: "Industry" },
+  { key: "status", label: "Status" },
+  { key: "ownerDirectorName", label: "Authorized Person" },
+  { key: "designation", label: "Designation" },
+  { key: "mobileNumber", label: "Authorized Mobile" },
+  { key: "adminEmail", label: "Authorized Email" },
+  { key: "phone", label: "Primary Mobile" },
+  { key: "email", label: "Official Email" },
+  { key: "registeredAddress", label: "Registered Address" },
+  { key: "city", label: "City" },
+  { key: "state", label: "State" },
+  { key: "country", label: "Country" },
+  { key: "pincode", label: "PIN/ZIP Code" },
+  { key: "gstCertificateFile", label: "GST Certificate" },
+  { key: "panCardFile", label: "PAN Card" },
+];
+
+function getOptionLabel(options, value, fallback = "Not set") {
+  if (!value) return fallback;
+
+  return options.find((option) => option.value === value)?.label || value;
+}
+
+function titleCase(value, fallback = "Not set") {
+  if (!value) return fallback;
+
+  return String(value)
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function getInitials(value) {
+  const words = String(value || "Company")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  return words
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join("") || "CO";
+}
+
+function getStoredFileCount(value) {
+  return splitStoredFiles(value).length;
+}
+
+function buildDocumentOverview(companyData) {
+  return dashboardDocumentFields.map((field) => {
+    const count = getStoredFileCount(companyData[field.key]);
+
+    return {
+      ...field,
+      count,
+      status: count > 0 ? "uploaded" : "pending",
+    };
+  });
+}
+
+function buildCompletionSummary(companyData) {
+  const missingFields = dashboardCompletionFields.filter(
+    (field) => !String(companyData[field.key] || "").trim(),
+  );
+  const completedCount = dashboardCompletionFields.length - missingFields.length;
+  const percent = Math.round(
+    (completedCount / dashboardCompletionFields.length) * 100,
+  );
+
+  return {
+    percent,
+    missingFields: missingFields.slice(0, 4),
+  };
+}
+
+function getBranchCount(companyData) {
+  return String(companyData.branchOfficeAddresses || "")
+    .split(/\n|,/)
+    .map((address) => address.trim())
+    .filter(Boolean).length;
+}
+
+function getStoredFileTotal(companyData) {
+  return dashboardDocumentFields.reduce(
+    (total, field) => total + getStoredFileCount(companyData[field.key]),
+    0,
+  );
+}
+
 const editableSectionIds = [
-  "account",
   "general",
   "billings",
   "branding",
@@ -397,9 +512,11 @@ const editableSectionIds = [
 ];
 
 const companyRequiredFieldsByTab = {
-  account: {
-    details: [
+  general: {
+    basic: [
+      { key: "name", label: "Company Name" },
       { key: "legalName", label: "Legal Name" },
+      { key: "businessType", label: "Business Type" },
       { key: "industry", label: "Industry" },
       { key: "status", label: "Status" },
     ],
@@ -408,14 +525,6 @@ const companyRequiredFieldsByTab = {
       { key: "designation", label: "Designation" },
       { key: "mobileNumber", label: "Mobile Number" },
       { key: "adminEmail", label: "Email" },
-    ],
-  },
-  general: {
-    basic: [
-      { key: "name", label: "Company Name" },
-      { key: "legalName", label: "Legal Name" },
-      { key: "businessType", label: "Business Type" },
-      { key: "industry", label: "Industry" },
     ],
     contact: [
       { key: "phone", label: "Primary Mobile Number" },
@@ -452,8 +561,7 @@ const companyRequiredFieldsByTab = {
 };
 
 const companyTabSectionOrder = {
-  account: ["details", "authorizedPerson"],
-  general: ["basic", "contact", "address"],
+  general: ["basic", "authorizedPerson", "contact", "address"],
 };
 
 const currencyOptions = [
@@ -537,6 +645,16 @@ function FileUploadField({
         (previewAsImage || (!displayName && accept === "image/*"))));
   const displayValue =
     displayName || previewFiles.map((file) => file.name).join(", ");
+  const handlePreview = () => {
+    if (!canPreview) return;
+
+    if (onPreview) {
+      onPreview({ label, files: previewFiles });
+      return;
+    }
+
+    openFileInNewTab(previewFiles[0]?.url);
+  };
   const previewContent = isImagePreview ? (
     <img
       src={value}
@@ -555,7 +673,7 @@ function FileUploadField({
         {canPreview ? (
           <button
             type="button"
-            onClick={() => onPreview?.({ label, files: previewFiles })}
+            onClick={handlePreview}
             className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white text-xs font-medium text-neutral-400 transition-colors hover:border-primary-300 hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
             aria-label={`Open ${label}`}
             title={`Open ${label}`}
@@ -578,6 +696,17 @@ function FileUploadField({
             </p>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            {canPreview && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handlePreview}
+              >
+                <Eye className="size-4" />
+                Preview
+              </Button>
+            )}
             <label
               className={`inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium tracking-tight transition-all ${
                 disabled || uploading
@@ -657,6 +786,506 @@ function CompanySection({
         </div>
       )}
       {(!isCollapsible || isOpen) && children}
+    </section>
+  );
+}
+
+function CompanyOverviewDashboard({ companyData, organization, onNavigate }) {
+  const documents = buildDocumentOverview(companyData);
+  const uploadedDocuments = documents.filter(
+    (document) => document.status === "uploaded",
+  ).length;
+  const completion = buildCompletionSummary(companyData);
+  const branchCount = getBranchCount(companyData);
+  const companyName = companyData.legalName || companyData.name || "Company";
+  const displayName = companyData.name || companyName;
+  const statusLabel = titleCase(companyData.status, "Active");
+  const statusIsActive = String(companyData.status || "active").toLowerCase() === "active";
+  const companyCode =
+    organization?.code ||
+    organization?.company_code ||
+    organization?.companyCode ||
+    (organization?.id ? `CMP-${String(organization.id).padStart(5, "0")}` : "CMP-10012");
+  const employeeCount =
+    companyData.numberOfEmployees ||
+    organization?.employee_count ||
+    organization?.employeeCount ||
+    0;
+  const activeUsers =
+    organization?.active_users ||
+    organization?.activeUsers ||
+    organization?.user_count ||
+    organization?.userCount ||
+    (employeeCount ? Math.max(1, Math.round(Number(employeeCount) * 0.4)) : 0);
+  const registrationDate =
+    companyData.dateOfIncorporation ||
+    organization?.created_at ||
+    organization?.createdAt ||
+    "";
+  const formattedRegistrationDate = registrationDate
+    ? new Date(registrationDate).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "Not set";
+  const industryLabel = getOptionLabel(industryOptions, companyData.industry);
+  const companyTypeLabel = getOptionLabel(
+    businessTypeOptions,
+    companyData.businessType,
+  );
+  const planLabel = titleCase(
+    organization?.plan_name ||
+      organization?.planName ||
+      organization?.subscription_plan ||
+      organization?.subscriptionPlan ||
+      "Enterprise",
+  );
+  const addressLine =
+    companyData.registeredAddress ||
+    companyData.address ||
+    "Registered address not added.";
+  const locationLine = [companyData.city, companyData.state, getOptionLabel(countryOptions, companyData.country, "")]
+    .filter(Boolean)
+    .join(", ");
+  const branchAddress =
+    companyData.branchOfficeAddresses ||
+    companyData.billingAddress ||
+    "Branch or warehouse address not added.";
+  const authorizedDesignation = getOptionLabel(
+    designationOptions,
+    companyData.designation,
+    titleCase(companyData.designation, "Not set"),
+  );
+  const metricCards = [
+    {
+      label: "Employees",
+      value: employeeCount || "0",
+      caption: "Total Employees",
+      icon: Users,
+      tone: "green",
+    },
+    {
+      label: "Branches",
+      value: branchCount || "0",
+      caption: "Total Branches",
+      icon: Building2,
+      tone: "orange",
+    },
+    {
+      label: "Active Users",
+      value: activeUsers || "0",
+      caption: "System Users",
+      icon: CircleUserRound,
+      tone: "sky",
+    },
+    {
+      label: "Documents",
+      value: uploadedDocuments,
+      caption: "Uploaded Files",
+      icon: FileText,
+      tone: "amber",
+    },
+    {
+      label: "Storage Used",
+      value: `${getStoredFileTotal(companyData)} files`,
+      caption: "Company Documents",
+      icon: HardDrive,
+      tone: "violet",
+    },
+  ];
+  const recentActivity = [
+    {
+      title: "Company profile updated",
+      caption: `${displayName} profile is available`,
+      icon: CheckCircle2,
+      tone: "green",
+      time: "Today",
+    },
+    {
+      title: "Billing information checked",
+      caption: companyData.bankName ? "Bank details added" : "Bank details pending",
+      icon: CreditCard,
+      tone: "blue",
+      time: "Recent",
+    },
+    {
+      title: "Authorized person updated",
+      caption: companyData.ownerDirectorName || "Authorized person pending",
+      icon: CircleUserRound,
+      tone: "sky",
+      time: "Recent",
+    },
+    {
+      title: "Documents reviewed",
+      caption: `${uploadedDocuments} of ${documents.length} document groups uploaded`,
+      icon: FileText,
+      tone: "amber",
+      time: "Recent",
+    },
+  ];
+  const quickActions = [
+    { label: "Edit Profile", icon: Pencil, tab: "general", tone: "green" },
+    { label: "Upload Document", icon: UploadCloud, tab: "documents", tone: "blue" },
+    { label: "Invite User", icon: UserPlus, tab: "additional-info", tone: "violet" },
+    { label: "View Reports", icon: BarChart3, tab: "business-settings", tone: "orange" },
+  ];
+  const companyFacts = [
+    { label: "Company Code", value: companyCode },
+    { label: "Industry", value: industryLabel },
+    { label: "Company Type", value: companyTypeLabel },
+    { label: "Registration Date", value: formattedRegistrationDate, icon: CheckCircle2 },
+    { label: "Plan", value: planLabel },
+  ];
+  const toneClasses = {
+    green: "bg-green-50 text-green-700",
+    orange: "bg-orange-50 text-orange-700",
+    sky: "bg-sky-50 text-sky-700",
+    amber: "bg-amber-50 text-amber-700",
+    violet: "bg-violet-50 text-violet-700",
+    blue: "bg-blue-50 text-blue-700",
+  };
+
+  return (
+    <section className="space-y-4 pb-5">
+      <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
+          <div className="flex shrink-0 items-center gap-5 xl:w-[22rem]">
+            <div className="grid size-28 shrink-0 place-items-center rounded-full border border-neutral-100 bg-white text-2xl font-bold text-primary-700 shadow-sm">
+              {companyData.logoUrl ? (
+                <img
+                  src={companyData.logoUrl}
+                  alt={`${displayName} logo`}
+                  className="size-24 rounded-full object-contain"
+                />
+              ) : (
+                getInitials(displayName)
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="truncate text-lg font-semibold text-neutral-900">
+                  {companyName}
+                </h2>
+                <span
+                  className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    statusIsActive
+                      ? "bg-green-50 text-green-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {statusLabel}
+                </span>
+              </div>
+              <p className="mt-2 line-clamp-2 text-sm leading-6 text-neutral-500">
+                {companyData.companyDescription ||
+                  "Company profile and organization information."}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1.15fr_1.35fr_1fr]">
+            {companyFacts.map((fact) => {
+              const Icon = fact.icon;
+
+              return (
+                <div
+                  key={fact.label}
+                  className="min-w-0 border-neutral-100 px-0 sm:px-4 sm:[&:not(:first-child)]:border-l"
+                >
+                  <p className="whitespace-nowrap text-xs font-medium text-neutral-500">
+                    {fact.label}
+                  </p>
+                  <p
+                    className="mt-2 flex min-w-0 items-center gap-2 truncate font-semibold text-neutral-900"
+                    title={String(fact.value)}
+                  >
+                    {Icon && <Icon className="size-4 shrink-0 text-neutral-500" />}
+                    <span className="truncate">{fact.value}</span>
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {metricCards.map((metric) => {
+          const Icon = metric.icon;
+
+          return (
+            <div
+              key={metric.label}
+              className="rounded-xl border border-neutral-100 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <span className={`flex size-12 items-center justify-center rounded-full ${toneClasses[metric.tone]}`}>
+                  <Icon className="size-5" />
+                </span>
+                <div>
+                  <p className="text-xs font-semibold text-neutral-500">
+                    {metric.label}
+                  </p>
+                  <p className="text-xl font-bold text-neutral-900">
+                    {metric.value}
+                  </p>
+                  <p className="text-xs text-neutral-500">{metric.caption}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-neutral-900">
+            Profile Completion
+          </h3>
+          <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-center">
+            <div
+              className="grid size-28 shrink-0 place-items-center rounded-full"
+              style={{
+                background: `conic-gradient(#22a447 ${completion.percent}%, #e5e7eb 0)`,
+              }}
+            >
+              <div className="grid size-20 place-items-center rounded-full bg-white text-2xl font-bold text-neutral-900">
+                {completion.percent}%
+              </div>
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-neutral-900">
+                {completion.percent >= 90 ? "Almost Complete!" : "Profile Needs Attention"}
+              </p>
+              <p className="mt-1 text-sm text-neutral-500">
+                {completion.percent >= 90
+                  ? "Great job. Your company profile is almost complete."
+                  : "Complete the missing items to improve company readiness."}
+              </p>
+              {completion.missingFields.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-xs font-semibold text-neutral-700">
+                    Missing Information
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-neutral-600">
+                    {completion.missingFields.map((field) => (
+                      <li key={field.key}>- {field.label}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => onNavigate("general")}
+                className="mt-4 text-sm font-semibold text-primary-700 hover:text-primary-800"
+              >
+                Complete Now
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-neutral-900">
+              Authorized Person
+            </h3>
+            <span className="inline-flex items-center gap-1 rounded-md bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">
+              <ShieldCheck className="size-3.5" />
+              Verified
+            </span>
+          </div>
+          <div className="mt-5 flex items-center gap-4">
+            <div className="grid size-16 shrink-0 place-items-center rounded-full bg-neutral-100 text-lg font-bold text-neutral-600">
+              {companyData.profilePhotoUrl ? (
+                <img
+                  src={companyData.profilePhotoUrl}
+                  alt={companyData.ownerDirectorName || "Authorized person"}
+                  className="size-16 rounded-full object-cover"
+                />
+              ) : (
+                getInitials(companyData.ownerDirectorName || companyData.adminName)
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-neutral-900">
+                {companyData.ownerDirectorName || companyData.adminName || "Not set"}
+              </p>
+              <p className="text-sm text-neutral-500">{authorizedDesignation}</p>
+              <p className="mt-2 flex items-center gap-2 text-xs text-neutral-600">
+                <Mail className="size-3.5" />
+                {companyData.adminEmail || companyData.email || "Email not set"}
+              </p>
+              <p className="mt-1 flex items-center gap-2 text-xs text-neutral-600">
+                <Phone className="size-3.5" />
+                {companyData.mobileNumber || companyData.phone || "Phone not set"}
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <Button type="button" variant="outline" onClick={() => onNavigate("general")}>
+              View Details
+            </Button>
+            <Button type="button" onClick={() => onNavigate("general")}>
+              Edit
+            </Button>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-neutral-900">
+              Documents Overview
+            </h3>
+            <ClipboardList className="size-4 text-neutral-400" />
+          </div>
+          <div className="mt-4 space-y-3">
+            {documents.slice(0, 5).map((document) => (
+              <div key={document.key} className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <FileText className="size-4 shrink-0 text-neutral-500" />
+                  <span className="truncate text-sm text-neutral-700">
+                    {document.label}
+                  </span>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-1 text-xs font-semibold ${
+                    document.status === "uploaded"
+                      ? "text-green-700"
+                      : "text-amber-600"
+                  }`}
+                >
+                  {document.status === "uploaded" ? (
+                    <CheckCircle2 className="size-3.5" />
+                  ) : (
+                    <XCircle className="size-3.5" />
+                  )}
+                  {document.status === "uploaded" ? "Uploaded" : "Pending"}
+                </span>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate("documents")}
+            className="mt-5 w-full border-t border-neutral-100 pt-4 text-sm font-semibold text-primary-700 hover:text-primary-800"
+          >
+            View All Documents
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.25fr_1fr_.75fr]">
+        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <MapPin className="size-4 text-neutral-500" />
+            <h3 className="text-sm font-semibold text-neutral-900">
+              Company Addresses
+            </h3>
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_14rem]">
+            <div className="space-y-4 text-sm">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-primary-700">
+                    Registered Office
+                  </p>
+                  <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                    Primary
+                  </span>
+                </div>
+                <p className="mt-2 text-neutral-700">{addressLine}</p>
+                {locationLine && (
+                  <p className="mt-1 text-neutral-500">{locationLine}</p>
+                )}
+              </div>
+              <div>
+                <p className="font-semibold text-blue-700">
+                  Branch/Warehouse Address
+                </p>
+                <p className="mt-2 text-neutral-700">{branchAddress}</p>
+              </div>
+            </div>
+            <div className="relative min-h-44 overflow-hidden rounded-xl border border-neutral-100 bg-[linear-gradient(135deg,#e8f3ff_25%,transparent_25%),linear-gradient(225deg,#e8f3ff_25%,transparent_25%),linear-gradient(45deg,#edf7ef_25%,transparent_25%),linear-gradient(315deg,#edf7ef_25%,#f8fafc_25%)] bg-[length:36px_36px]">
+              <div className="absolute left-1/2 top-1/2 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-red-500 text-white shadow-lg">
+                <MapPin className="size-5" />
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate("general")}
+                className="absolute bottom-3 right-3 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-primary-700 shadow-sm ring-1 ring-neutral-100"
+              >
+                View on Map
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-neutral-900">
+              Recent Activity
+            </h3>
+            <button
+              type="button"
+              onClick={() => onNavigate("additional-info")}
+              className="text-xs font-semibold text-primary-700"
+            >
+              View All
+            </button>
+          </div>
+          <div className="mt-4 space-y-4">
+            {recentActivity.map((activity) => {
+              const Icon = activity.icon;
+
+              return (
+                <div key={activity.title} className="flex gap-3">
+                  <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full ${toneClasses[activity.tone]}`}>
+                    <Icon className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-semibold text-neutral-900">
+                        {activity.title}
+                      </p>
+                      <span className="shrink-0 text-xs text-neutral-400">
+                        {activity.time}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-500">{activity.caption}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-neutral-900">
+            Quick Actions
+          </h3>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+
+              return (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => onNavigate(action.tab)}
+                  className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border border-neutral-100 bg-white p-3 text-center text-xs font-semibold text-neutral-700 transition-colors hover:border-primary-100 hover:bg-primary-50/40"
+                >
+                  <span className={`flex size-9 items-center justify-center rounded-lg ${toneClasses[action.tone]}`}>
+                    <Icon className="size-4" />
+                  </span>
+                  {action.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
@@ -1027,17 +1656,13 @@ export default function CompanySettings() {
     useState(currentOrganization);
   const [activeTab, setActiveTab] = useState("account");
   const [editingSections, setEditingSections] = useState({
-    account: false,
     general: false,
   });
   const [openGeneralSections, setOpenGeneralSections] = useState({
     basic: true,
+    authorizedPerson: false,
     contact: false,
     address: false,
-  });
-  const [openAccountSections, setOpenAccountSections] = useState({
-    details: true,
-    authorizedPerson: false,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [profileError, setProfileError] = useState("");
@@ -1063,7 +1688,6 @@ export default function CompanySettings() {
     settingsNav.find((item) => item.id === activeTab) || settingsNav[0];
   const isEditableSection = editableSectionIds.includes(activeTab);
   const isActiveSectionEditing = Boolean(editingSections[activeTab]);
-  const isAccountEditing = editingSections.account;
   const getUploadFieldState = (name) => {
     const fileCount = splitStoredFiles(companyData[name]).length;
 
@@ -1191,10 +1815,6 @@ export default function CompanySettings() {
         .map((field) => field.label);
 
       if (missingRequiredFields.length > 0) {
-        if (tabId === "account") {
-          setOpenAccountSections((prev) => ({ ...prev, [sectionId]: true }));
-        }
-
         if (tabId === "general") {
           setOpenGeneralSections((prev) => ({ ...prev, [sectionId]: true }));
         }
@@ -1219,22 +1839,6 @@ export default function CompanySettings() {
     }
 
     setOpenGeneralSections((prev) => ({
-      ...prev,
-      [sectionId]: !prev[sectionId],
-    }));
-  };
-
-  const toggleAccountSection = (sectionId) => {
-    const isOpeningSection = !openAccountSections[sectionId];
-
-    if (isOpeningSection && isAccountEditing) {
-      const targetSectionIndex = companyTabSectionOrder.account.indexOf(sectionId);
-      const requiredPreviousSections = companyTabSectionOrder.account.slice(0, targetSectionIndex);
-
-      if (!validateCompanyRequiredFields("account", requiredPreviousSections)) return;
-    }
-
-    setOpenAccountSections((prev) => ({
       ...prev,
       [sectionId]: !prev[sectionId],
     }));
@@ -1677,154 +2281,55 @@ export default function CompanySettings() {
           </aside>
 
           <div className="p-5 sm:p-7">
-            <div className="border-b border-neutral-100 pb-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h2 className="font-(--font-display) text-xl font-semibold tracking-tight text-neutral-900">
-                    {activeNavItem.label}
-                  </h2>
-                  <p className="mt-1 text-sm text-neutral-500">
-                    {activeNavItem.description}
-                  </p>
-                </div>
-                {isEditableSection && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {isActiveSectionEditing ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCancel}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSave}
-                          loading={isSaving}
-                        >
-                          <Save className="size-3.5" />
-                          Save Changes
-                        </Button>
-                      </>
-                    ) : (
-                      <Button size="sm" onClick={handleEditProfile}>
-                        <Pencil className="size-3.5" />
-                        Edit Profile
-                      </Button>
-                    )}
+            {activeTab !== "account" && (
+              <div className="border-b border-neutral-100 pb-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="font-(--font-display) text-xl font-semibold tracking-tight text-neutral-900">
+                      {activeNavItem.label}
+                    </h2>
+                    <p className="mt-1 text-sm text-neutral-500">
+                      {activeNavItem.description}
+                    </p>
                   </div>
-                )}
+                  {isEditableSection && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isActiveSectionEditing ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCancel}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleSave}
+                            loading={isSaving}
+                          >
+                            <Save className="size-3.5" />
+                            Save Changes
+                          </Button>
+                        </>
+                      ) : (
+                        <Button size="sm" onClick={handleEditProfile}>
+                          <Pencil className="size-3.5" />
+                          Edit Profile
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {activeTab === "account" ? (
-              <section className="space-y-1.5 pb-5 pt-3">
-                <CompanySection
-                  number="1"
-                  title="Account Details"
-                  description="Company account classification and status."
-                  isOpen={openAccountSections.details}
-                  onToggle={() => toggleAccountSection("details")}
-                >
-                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                      label="Legal Name"
-                      name="legalName"
-                      value={companyData.legalName}
-                      onChange={handleChange}
-                      disabled={!isAccountEditing}
-                      required
-                    />
-                    <Select
-                      label="Industry"
-                      name="industry"
-                      placeholder="Select industry"
-                      value={companyData.industry}
-                      options={industryOptions}
-                      onChange={handleChange}
-                      disabled={!isAccountEditing}
-                      required
-                    />
-                    <Select
-                      label="Status"
-                      name="status"
-                      placeholder="Select status"
-                      value={companyData.status}
-                      options={statusOptions}
-                      onChange={handleChange}
-                      disabled={!isAccountEditing}
-                      required
-                    />
-                  </div>
-                </CompanySection>
-
-                <CompanySection
-                  number="2"
-                  title="Authorized Person"
-                  description="Authorized representative contact and identity."
-                  isOpen={openAccountSections.authorizedPerson}
-                  onToggle={() => toggleAccountSection("authorizedPerson")}
-                >
-                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                      label="Owner/Director Name"
-                      name="ownerDirectorName"
-                      value={companyData.ownerDirectorName}
-                      onChange={handleChange}
-                      disabled={!isAccountEditing}
-                      required
-                    />
-                    <Select
-                      label="Designation"
-                      name="designation"
-                      placeholder="Select designation"
-                      value={companyData.designation}
-                      options={designationOptions}
-                      onChange={handleChange}
-                      disabled={!isAccountEditing}
-                      required
-                    />
-                    <Input
-                      label="Mobile Number"
-                      name="mobileNumber"
-                      value={companyData.mobileNumber}
-                      onChange={handleChange}
-                      disabled={!isAccountEditing}
-                      required
-                    />
-                    <Input
-                      label="Email"
-                      name="adminEmail"
-                      type="email"
-                      value={companyData.adminEmail}
-                      onChange={handleChange}
-                      disabled={!isAccountEditing}
-                      required
-                    />
-                    <FileUploadField
-                      label="Profile Picture"
-                      name="profilePhotoUrl"
-                      value={companyData.profilePhotoUrl}
-                      onChange={handleFileUpload}
-                      onRemove={handleRemoveFile}
-                      disabled={!isAccountEditing}
-                      uploadLabel="Upload Photo"
-                      {...getUploadFieldState("profilePhotoUrl")}
-                    />
-                    <FileUploadField
-                      label="Digital Signature"
-                      name="digitalSignatureUrl"
-                      value={companyData.digitalSignatureUrl}
-                      onChange={handleFileUpload}
-                      onRemove={handleRemoveFile}
-                      disabled={!isAccountEditing}
-                      uploadLabel="Upload Signature"
-                      {...getUploadFieldState("digitalSignatureUrl")}
-                    />
-                  </div>
-                </CompanySection>
-              </section>
+              <CompanyOverviewDashboard
+                companyData={companyData}
+                organization={loadedOrganization}
+                onNavigate={handleTabChange}
+              />
             ) : activeTab === "general" ? (
               <section className="space-y-1.5 pb-5 pt-3">
                 <CompanySection
@@ -1867,6 +2372,16 @@ export default function CompanySettings() {
                       placeholder="Select industry"
                       value={companyData.industry}
                       options={industryOptions}
+                      onChange={handleChange}
+                      disabled={!isActiveSectionEditing}
+                      required
+                    />
+                    <Select
+                      label="Status"
+                      name="status"
+                      placeholder="Select status"
+                      value={companyData.status}
+                      options={statusOptions}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
@@ -1914,6 +2429,72 @@ export default function CompanySettings() {
 
                 <CompanySection
                   number="2"
+                  title="Authorized Person"
+                  description="Authorized representative contact and identity."
+                  isOpen={openGeneralSections.authorizedPerson}
+                  onToggle={() => toggleGeneralSection("authorizedPerson")}
+                >
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <Input
+                      label="Owner/Director Name"
+                      name="ownerDirectorName"
+                      value={companyData.ownerDirectorName}
+                      onChange={handleChange}
+                      disabled={!isActiveSectionEditing}
+                      required
+                    />
+                    <Select
+                      label="Designation"
+                      name="designation"
+                      placeholder="Select designation"
+                      value={companyData.designation}
+                      options={designationOptions}
+                      onChange={handleChange}
+                      disabled={!isActiveSectionEditing}
+                      required
+                    />
+                    <Input
+                      label="Mobile Number"
+                      name="mobileNumber"
+                      value={companyData.mobileNumber}
+                      onChange={handleChange}
+                      disabled={!isActiveSectionEditing}
+                      required
+                    />
+                    <Input
+                      label="Email"
+                      name="adminEmail"
+                      type="email"
+                      value={companyData.adminEmail}
+                      onChange={handleChange}
+                      disabled={!isActiveSectionEditing}
+                      required
+                    />
+                    <FileUploadField
+                      label="Profile Picture"
+                      name="profilePhotoUrl"
+                      value={companyData.profilePhotoUrl}
+                      onChange={handleFileUpload}
+                      onRemove={handleRemoveFile}
+                      disabled={!isActiveSectionEditing}
+                      uploadLabel="Upload Photo"
+                      {...getUploadFieldState("profilePhotoUrl")}
+                    />
+                    <FileUploadField
+                      label="Digital Signature"
+                      name="digitalSignatureUrl"
+                      value={companyData.digitalSignatureUrl}
+                      onChange={handleFileUpload}
+                      onRemove={handleRemoveFile}
+                      disabled={!isActiveSectionEditing}
+                      uploadLabel="Upload Signature"
+                      {...getUploadFieldState("digitalSignatureUrl")}
+                    />
+                  </div>
+                </CompanySection>
+
+                <CompanySection
+                  number="3"
                   title="Contact Information"
                   description="Primary business contact details."
                   isOpen={openGeneralSections.contact}
@@ -1969,7 +2550,7 @@ export default function CompanySettings() {
                 </CompanySection>
 
                 <CompanySection
-                  number="3"
+                  number="4"
                   title="Address Information"
                   description="Registered, billing, and shipping addresses."
                   isOpen={openGeneralSections.address}

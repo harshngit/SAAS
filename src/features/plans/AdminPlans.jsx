@@ -71,6 +71,7 @@ export default function AdminPlans() {
   const [listError, setListError] = useState('')
 
   const [requestingPlanId, setRequestingPlanId] = useState(null)
+  const [requestedPlanId, setRequestedPlanId] = useState(null)
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [requestError, setRequestError] = useState('')
 
@@ -94,6 +95,11 @@ export default function AdminPlans() {
 
       if (organizationResult.success) {
         setOrganizationState(organizationResult.organization)
+        setRequestedPlanId(
+          organizationResult.organization?.upgrade_status === 'pending'
+            ? organizationResult.organization?.requested_plan_id || organizationResult.organization?.requested_plan?.id || null
+            : null,
+        )
         if (organizationResult.organization?.billing_cycle) {
           setBillingCycle(organizationResult.organization.billing_cycle)
         }
@@ -154,10 +160,16 @@ export default function AdminPlans() {
     }
 
     setSelectedPlan(null)
+    setRequestedPlanId(plan.id)
 
     const organizationResult = await getCurrentOrganizationState()
     if (organizationResult.success) {
       setOrganizationState(organizationResult.organization)
+      setRequestedPlanId(
+        organizationResult.organization?.upgrade_status === 'pending'
+          ? organizationResult.organization?.requested_plan_id || organizationResult.organization?.requested_plan?.id || plan.id
+          : plan.id,
+      )
       if (organizationResult.organization?.billing_cycle) {
         setBillingCycle(organizationResult.organization.billing_cycle)
       }
@@ -258,8 +270,9 @@ export default function AdminPlans() {
         ) : (
           <div className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-5 xl:grid-cols-[22.5rem_25rem_22.5rem] xl:justify-center">
             {plans.map((plan, index) => {
-              const isCurrent = plan.id === currentPlanId
-              const isFeatured = index === 1 && !isCurrent
+              const isCurrent = String(plan.id) === String(currentPlanId)
+              const isFeatured = index === 1
+              const isRequested = !isCurrent && String(requestedPlanId || '') === String(plan.id)
               const price = billingCycle === 'monthly' ? plan.price_monthly : plan.price_yearly
               const originalPrice = billingCycle === 'monthly' ? plan.original_price_monthly : plan.original_price_yearly
               const cycleLabel = billingCycle === 'monthly' ? 'month' : 'year'
@@ -298,6 +311,7 @@ export default function AdminPlans() {
                         </p>
                       </div>
                       {isCurrent && <Badge variant="primary">Active</Badge>}
+                      {isRequested && <Badge variant="warning">Requested</Badge>}
                     </div>
 
                     <ul className="mt-7 flex-1 space-y-3.5">
@@ -357,12 +371,16 @@ export default function AdminPlans() {
                           isFeatured
                             ? 'border-primary-200 bg-[#bdeaa5] text-primary-700 shadow-[0_10px_24px_-12px_rgb(6_59_0/0.35)] hover:border-primary-300 hover:bg-[#aee391] hover:text-primary-900'
                             : ''
+                        } ${
+                          isRequested && !isFeatured
+                            ? 'border-amber-200 bg-amber-50 text-amber-700 disabled:opacity-100'
+                            : ''
                         }`}
-                        disabled={isCurrent}
+                        disabled={isCurrent || isRequested}
                         loading={isRequesting}
                         onClick={() => handleChoosePlan(plan)}
                       >
-                        {isCurrent ? 'Current Plan' : 'Select Plan'}
+                        {isCurrent ? 'Current Plan' : isRequested ? 'Requested' : 'Select Plan'}
                       </Button>
                     </div>
                   </div>
