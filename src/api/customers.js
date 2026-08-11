@@ -1,5 +1,6 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { getFileUrl } from './files'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -79,13 +80,55 @@ function toStringArray(value) {
     .filter(Boolean)
 }
 
+function cleanObject(payload) {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => (
+      value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0)
+    )),
+  )
+}
+
+function isFileUrl(value) {
+  return /^https?:\/\//i.test(String(value || '').trim())
+}
+
+function isFileId(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || '').trim())
+}
+
+function toFileUrl(value) {
+  return isFileUrl(value) || isFileId(value) ? getFileUrl(value) : ''
+}
+
+function toFileUrlArray(value) {
+  const values = Array.isArray(value) ? value : toStringArray(value)
+  return values.map(toFileUrl).filter(Boolean)
+}
+
+function normalizeUploadedDocument(document) {
+  if (!document) return document
+
+  return {
+    ...document,
+    url: getFileUrl(document),
+  }
+}
+
 // The API takes a "sectioned" body (basic_information, contact_information, address_information, ...).
 // CustomerForm keeps working with a flat camelCase shape, so this is the only place that knows the split.
 function buildCustomerRequestBody(payload) {
   const customerName = (payload.customerName || payload.name || '').trim()
   const coordinates = parseMapsCoordinates(payload.googleMapsLocation || payload.google_maps_location)
+  const documents = cleanObject({
+    gst_certificate_url: toFileUrl(payload.gstCertificate),
+    pan_card_url: toFileUrl(payload.panCard),
+    business_registration_certificate_url: toFileUrl(payload.businessRegistrationCertificate),
+    address_proof_url: toFileUrl(payload.addressProof),
+    purchase_agreement_url: toFileUrl(payload.purchaseAgreement),
+    other_document_urls: toFileUrlArray(payload.otherDocuments),
+  })
 
-  return {
+  const requestBody = {
     basic_information: {
       customer_type: payload.customerType || payload.type || payload.category || '',
       customer_name: customerName,
@@ -155,6 +198,12 @@ function buildCustomerRequestBody(payload) {
       notes: payload.notes?.trim() || '',
     },
   }
+
+  if (Object.keys(documents).length > 0) {
+    requestBody.documents = documents
+  }
+
+  return requestBody
 }
 
 // GET/POST/PATCH all return the same "sectioned" customer profile — flatten it back to the
@@ -241,12 +290,12 @@ function normalizeSectionedCustomer(data) {
     twitter: social.x_twitter_url || '',
     youtube: social.youtube_url || '',
 
-    gstCertificate: documents.gst_certificate_id ? 'Uploaded' : '',
-    panCard: documents.pan_card_id ? 'Uploaded' : '',
-    businessRegistrationCertificate: documents.business_registration_certificate_id ? 'Uploaded' : '',
-    addressProof: documents.address_proof_id ? 'Uploaded' : '',
-    purchaseAgreement: documents.purchase_agreement_id ? 'Uploaded' : '',
-    otherDocuments: documents.other_document_ids?.length ? `${documents.other_document_ids.length} file(s)` : '',
+    gstCertificate: getFileUrl(documents.gst_certificate_url || documents.gst_certificate_id),
+    panCard: getFileUrl(documents.pan_card_url || documents.pan_card_id),
+    businessRegistrationCertificate: getFileUrl(documents.business_registration_certificate_url || documents.business_registration_certificate_id),
+    addressProof: getFileUrl(documents.address_proof_url || documents.address_proof_id),
+    purchaseAgreement: getFileUrl(documents.purchase_agreement_url || documents.purchase_agreement_id),
+    otherDocuments: toFileUrlArray(documents.other_document_urls || documents.other_document_ids),
     documentIds: documents,
 
     dateOfBirth: toDateOnly(additional.date_of_birth),
@@ -387,7 +436,7 @@ export async function uploadCustomerDocument(customerId, documentType, file) {
       },
     })
 
-    return { success: true, document: data }
+    return { success: true, document: normalizeUploadedDocument(data) }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
@@ -411,7 +460,7 @@ export async function uploadOtherCustomerDocuments(customerId, files) {
       },
     })
 
-    return { success: true, documents: Array.isArray(data) ? data : [] }
+    return { success: true, documents: Array.isArray(data) ? data.map(normalizeUploadedDocument) : [] }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
@@ -430,7 +479,7 @@ export async function listCustomerDocuments(customerId, documentType) {
       params: documentType ? { document_type: documentType } : undefined,
     })
 
-    return { success: true, documents: Array.isArray(data) ? data : [] }
+    return { success: true, documents: Array.isArray(data) ? data.map(normalizeUploadedDocument) : [] }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

@@ -29,7 +29,8 @@ import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/toastContext'
 import { ROLES, roleLabels } from '../../auth/roles'
 import { useAuthStore } from '../../store/authStore'
-import { createUser, deleteUser, getEmployeeOptions, listRoles, listUsers, updateUserStatus, uploadEmployeeDocuments, uploadEmployeeFile, uploadIdentityProof } from '../../api/users'
+import { uploadFiles as uploadGenericFiles } from '../../api/files'
+import { createUser, deleteUser, getEmployeeOptions, listRoles, listUsers, updateUserStatus } from '../../api/users'
 import { getSystemRoleFromRoleName, normalizeApiUser, staffRoleOptions } from './userRoleUtils'
 import ResetPasswordModal from './ResetPasswordModal'
 
@@ -243,18 +244,6 @@ const staffRequiredFieldsBySection = {
   ],
 }
 
-const employeeFileFields = {
-  profilePictureName: 'profile_photo',
-  resumeCvName: 'resume_cv',
-  offerLetterName: 'offer_letter',
-  appointmentLetterName: 'appointment_letter',
-}
-
-const employeeDocumentCollections = {
-  experienceCertificatesName: 'experience_certificates',
-  educationalCertificatesName: 'educational_certificates',
-}
-
 const getInitials = (name = '') =>
   name
     .split(' ')
@@ -355,6 +344,7 @@ function StaffUploadField({
   required = false,
   accept,
   multiple = false,
+  uploading = false,
   onChange,
   onRemove,
 }) {
@@ -372,14 +362,17 @@ function StaffUploadField({
           <UploadPreview previews={previews} />
         </div>
         <div className="flex shrink-0 flex-col items-start gap-2">
-          <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+          <label className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700 ${
+            uploading ? 'pointer-events-none opacity-60' : 'cursor-pointer'
+          }`}>
             <Upload className="size-3.5" aria-hidden="true" />
-            Upload
+            {uploading ? 'Uploading...' : 'Upload'}
             <input
               type="file"
               accept={accept}
               multiple={multiple}
               className="sr-only"
+              disabled={uploading}
               onChange={(event) => {
                 const files = Array.from(event.target.files || [])
                 onChange(name, files)
@@ -392,7 +385,7 @@ function StaffUploadField({
             variant="outline"
             size="sm"
             className="h-8 rounded-full px-3 text-xs"
-            disabled={!value}
+            disabled={!value || uploading}
             onClick={() => onRemove(name)}
           >
             <Trash2 className="size-3.5" aria-hidden="true" />
@@ -412,6 +405,7 @@ function IdentityProofUploadField({
   onProofChange,
   onFileChange,
   onRemove,
+  uploading = false,
 }) {
   return (
     <div className="flex min-h-28 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
@@ -428,13 +422,16 @@ function IdentityProofUploadField({
           <UploadPreview previews={previews} />
         </div>
         <div className="flex shrink-0 flex-col items-start gap-2">
-          <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+          <label className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700 ${
+            uploading ? 'pointer-events-none opacity-60' : 'cursor-pointer'
+          }`}>
             <Upload className="size-3.5" aria-hidden="true" />
-            Upload
+            {uploading ? 'Uploading...' : 'Upload'}
             <input
               type="file"
               accept="application/pdf,image/*"
               className="sr-only"
+              disabled={uploading}
               onChange={(event) => {
                 const files = Array.from(event.target.files || [])
                 onFileChange('identityDocumentsName', files)
@@ -447,7 +444,7 @@ function IdentityProofUploadField({
             variant="outline"
             size="sm"
             className="h-8 rounded-full px-3 text-xs"
-            disabled={!fileValue}
+            disabled={!fileValue || uploading}
             onClick={() => onRemove('identityDocumentsName')}
           >
             <Trash2 className="size-3.5" aria-hidden="true" />
@@ -486,7 +483,8 @@ export default function UserManagement() {
   const [isDeletingUser, setIsDeletingUser] = useState(false)
   const [formData, setFormData] = useState(initialStaffFormData)
   const [uploadPreviews, setUploadPreviews] = useState({})
-  const [uploadFiles, setUploadFiles] = useState({})
+  const [uploadedFileUrls, setUploadedFileUrls] = useState({})
+  const [uploadingField, setUploadingField] = useState('')
   const uploadPreviewsRef = useRef({})
   const staffRequestIdRef = useRef(0)
   const isMountedRef = useRef(true)
@@ -560,7 +558,8 @@ export default function UserManagement() {
       uploadPreviewsRef.current = {}
       return {}
     })
-    setUploadFiles({})
+    setUploadedFileUrls({})
+    setUploadingField('')
     setFormData(
       {
         ...initialStaffFormData,
@@ -579,7 +578,8 @@ export default function UserManagement() {
       uploadPreviewsRef.current = {}
       return {}
     })
-    setUploadFiles({})
+    setUploadedFileUrls({})
+    setUploadingField('')
   }
 
   const handleFormChange = (event) => {
@@ -588,7 +588,7 @@ export default function UserManagement() {
     setFormData((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }))
   }
 
-  const handleUploadChange = (name, files) => {
+  const handleUploadChange = async (name, files) => {
     const selectedFiles = Array.from(files || [])
     const fileNames = selectedFiles.map((file) => file.name).join(', ')
 
@@ -602,8 +602,50 @@ export default function UserManagement() {
       uploadPreviewsRef.current = nextPreviews
       return nextPreviews
     })
-    setUploadFiles((current) => ({ ...current, [name]: selectedFiles }))
     setFormData((current) => ({ ...current, [name]: fileNames }))
+
+    if (selectedFiles.length === 0) {
+      setUploadedFileUrls((current) => {
+        const { [name]: removed, ...remaining } = current
+        void removed
+        return remaining
+      })
+      return
+    }
+
+    setUploadingField(name)
+    const result = await uploadGenericFiles(selectedFiles)
+    setUploadingField('')
+
+    if (!result.success) {
+      setFormError(`${fileNames || 'File'} could not be uploaded: ${result.error}`)
+      setUploadedFileUrls((current) => {
+        const { [name]: removed, ...remaining } = current
+        void removed
+        return remaining
+      })
+      setFormData((current) => ({ ...current, [name]: '' }))
+      return
+    }
+
+    const urls = result.files.map((file) => file.url).filter(Boolean)
+    setUploadPreviews((current) => {
+      revokeUploadPreviewUrls(current[name])
+      const nextPreviews = {
+        ...current,
+        [name]: result.files.map((file, index) => ({
+          name: file.name || selectedFiles[index]?.name || 'Uploaded file',
+          type: file.content_type || selectedFiles[index]?.type || '',
+          url: file.url,
+        })),
+      }
+      uploadPreviewsRef.current = nextPreviews
+      return nextPreviews
+    })
+    setUploadedFileUrls((current) => ({
+      ...current,
+      [name]: selectedFiles.length > 1 ? urls : urls[0] || '',
+    }))
   }
 
   const handleUploadRemove = (name) => {
@@ -615,7 +657,7 @@ export default function UserManagement() {
       uploadPreviewsRef.current = remaining
       return remaining
     })
-    setUploadFiles((current) => {
+    setUploadedFileUrls((current) => {
       const { [name]: removed, ...remaining } = current
       void removed
       return remaining
@@ -737,6 +779,11 @@ export default function UserManagement() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
+    if (uploadingField) {
+      setFormError('Please wait for the file upload to finish before saving.')
+      return
+    }
+
     if (!validateStaffSections(staffFormSections.map((section) => section.number))) {
       return
     }
@@ -745,6 +792,11 @@ export default function UserManagement() {
     const selectedRole = effectiveRoleSelectOptions.find((role) => role.value === formData.role)
     const payload = {
       ...formData,
+      ...Object.fromEntries(
+        Object.entries(uploadedFileUrls).filter(([, value]) => (
+          value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0)
+        )),
+      ),
       name: displayName,
       email: formData.email,
       phone: formData.mobileNumber,
@@ -759,74 +811,6 @@ export default function UserManagement() {
       setIsSaving(false)
       setFormError(result.error)
       return
-    }
-
-    const createdUser = result.user
-    const createdUserId = createdUser?.id
-    let finalUser = createdUser
-
-    if (createdUserId) {
-      const identityProofFile = uploadFiles.identityDocumentsName?.[0]
-
-      if (identityProofFile) {
-        const identityProofResult = await uploadIdentityProof(createdUserId, identityProofFile)
-
-        if (!identityProofResult.success) {
-          setIsSaving(false)
-          setFormError(`Staff created, but identity proof could not be uploaded: ${identityProofResult.error}`)
-          if (finalUser) {
-            setUsers((currentUsers) => [...currentUsers, normalizeApiUser(finalUser)])
-          }
-          await refreshUsers({ showLoading: false })
-          return
-        }
-
-        finalUser = finalUser
-          ? { ...finalUser, identity_proof_file: identityProofResult.url || finalUser.identity_proof_file }
-          : finalUser
-      }
-
-      for (const [formField, apiField] of Object.entries(employeeFileFields)) {
-        const file = uploadFiles[formField]?.[0]
-
-        if (!file) continue
-
-        const uploadResult = await uploadEmployeeFile(createdUserId, apiField, file)
-
-        if (!uploadResult.success) {
-          setIsSaving(false)
-          setFormError(`Staff created, but ${file.name} could not be uploaded: ${uploadResult.error}`)
-          if (finalUser) {
-            setUsers((currentUsers) => [...currentUsers, normalizeApiUser(finalUser)])
-          }
-          await refreshUsers({ showLoading: false })
-          return
-        }
-
-        finalUser = uploadResult.user || finalUser
-      }
-
-      for (const [formField, collection] of Object.entries(employeeDocumentCollections)) {
-        const files = uploadFiles[formField] || []
-
-        if (files.length === 0) continue
-
-        const documentsResult = await uploadEmployeeDocuments(createdUserId, collection, files)
-
-        if (!documentsResult.success) {
-          setIsSaving(false)
-          setFormError(`Staff created, but ${formData[formField]} could not be uploaded: ${documentsResult.error}`)
-          if (finalUser) {
-            setUsers((currentUsers) => [...currentUsers, normalizeApiUser(finalUser)])
-          }
-          await refreshUsers({ showLoading: false })
-          return
-        }
-
-        finalUser = finalUser
-          ? { ...finalUser, [collection]: documentsResult.documents || finalUser[collection] }
-          : finalUser
-      }
     }
 
     setIsSaving(false)
@@ -988,6 +972,7 @@ export default function UserManagement() {
                   description="Employee profile picture."
                   format="Image upload"
                   accept="image/png,image/jpeg,image/jpg"
+                  uploading={uploadingField === 'profilePictureName'}
                   onChange={handleUploadChange}
                   onRemove={handleUploadRemove}
                 />
@@ -1195,12 +1180,13 @@ export default function UserManagement() {
                   onProofChange={handleFormChange}
                   onFileChange={handleUploadChange}
                   onRemove={handleUploadRemove}
+                  uploading={uploadingField === 'identityDocumentsName'}
                 />
-                <StaffUploadField label="Resume/CV" name="resumeCvName" value={formData.resumeCvName} previews={uploadPreviews.resumeCvName} description="Employee resume." format="PDF or DOCX upload" accept="application/pdf,.doc,.docx" onChange={handleUploadChange} onRemove={handleUploadRemove} />
-                <StaffUploadField label="Offer Letter" name="offerLetterName" value={formData.offerLetterName} previews={uploadPreviews.offerLetterName} description="Employment offer letter." format="PDF upload" accept="application/pdf" onChange={handleUploadChange} onRemove={handleUploadRemove} />
-                <StaffUploadField label="Appointment Letter" name="appointmentLetterName" value={formData.appointmentLetterName} previews={uploadPreviews.appointmentLetterName} description="Appointment letter." format="PDF upload" accept="application/pdf" onChange={handleUploadChange} onRemove={handleUploadRemove} />
-                <StaffUploadField label="Experience Certificates" name="experienceCertificatesName" value={formData.experienceCertificatesName} previews={uploadPreviews.experienceCertificatesName} description="Previous employment certificates." format="Multiple file upload" accept="application/pdf,.doc,.docx,image/*" multiple onChange={handleUploadChange} onRemove={handleUploadRemove} />
-                <StaffUploadField label="Educational Certificates" name="educationalCertificatesName" value={formData.educationalCertificatesName} previews={uploadPreviews.educationalCertificatesName} description="Academic certificates." format="Multiple file upload" accept="application/pdf,.doc,.docx,image/*" multiple onChange={handleUploadChange} onRemove={handleUploadRemove} />
+                <StaffUploadField label="Resume/CV" name="resumeCvName" value={formData.resumeCvName} previews={uploadPreviews.resumeCvName} description="Employee resume." format="PDF or DOCX upload" accept="application/pdf,.doc,.docx" uploading={uploadingField === 'resumeCvName'} onChange={handleUploadChange} onRemove={handleUploadRemove} />
+                <StaffUploadField label="Offer Letter" name="offerLetterName" value={formData.offerLetterName} previews={uploadPreviews.offerLetterName} description="Employment offer letter." format="PDF upload" accept="application/pdf" uploading={uploadingField === 'offerLetterName'} onChange={handleUploadChange} onRemove={handleUploadRemove} />
+                <StaffUploadField label="Appointment Letter" name="appointmentLetterName" value={formData.appointmentLetterName} previews={uploadPreviews.appointmentLetterName} description="Appointment letter." format="PDF upload" accept="application/pdf" uploading={uploadingField === 'appointmentLetterName'} onChange={handleUploadChange} onRemove={handleUploadRemove} />
+                <StaffUploadField label="Experience Certificates" name="experienceCertificatesName" value={formData.experienceCertificatesName} previews={uploadPreviews.experienceCertificatesName} description="Previous employment certificates." format="Multiple file upload" accept="application/pdf,.doc,.docx,image/*" multiple uploading={uploadingField === 'experienceCertificatesName'} onChange={handleUploadChange} onRemove={handleUploadRemove} />
+                <StaffUploadField label="Educational Certificates" name="educationalCertificatesName" value={formData.educationalCertificatesName} previews={uploadPreviews.educationalCertificatesName} description="Academic certificates." format="Multiple file upload" accept="application/pdf,.doc,.docx,image/*" multiple uploading={uploadingField === 'educationalCertificatesName'} onChange={handleUploadChange} onRemove={handleUploadRemove} />
                 <StaffField description="Employee skills." format="Multi-select or tags" required={false} className="lg:col-span-2">
                   <Input label="Skills" name="skills" placeholder="Separate skills with commas" value={formData.skills} onChange={handleFormChange} />
                 </StaffField>
@@ -1233,7 +1219,7 @@ export default function UserManagement() {
                 Back
               </Button>
               {isLastStaffSection ? (
-                <Button type="submit" loading={isSaving}>
+                <Button type="submit" loading={isSaving} disabled={Boolean(uploadingField)}>
                   Add New User
                 </Button>
               ) : (

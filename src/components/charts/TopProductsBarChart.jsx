@@ -16,19 +16,19 @@ function ChartTooltip({ active, payload }) {
 export default function TopProductsBarChart({ data, dataKey = 'value', nameKey = 'name', height = 280 }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 56, left: 0, bottom: 4 }} barCategoryGap={12}>
+      <BarChart data={data} layout="vertical" margin={{ top: 8, right: 60, left: 8, bottom: 8 }} barCategoryGap={18}>
         <CartesianGrid horizontal={false} stroke={CHART_INK.grid} />
         <XAxis type="number" hide />
         <YAxis
           type="category"
           dataKey={nameKey}
-          tick={{ fontSize: 12, fill: CHART_INK.secondary }}
+          tick={{ fontSize: 11, fill: CHART_INK.secondary }}
           axisLine={false}
           tickLine={false}
-          width={120}
+          width={132}
         />
         <Tooltip content={<ChartTooltip />} cursor={{ fill: CHART_INK.grid, opacity: 0.4 }} />
-        <Bar dataKey={dataKey} fill={CHART_PRIMARY} radius={[0, 4, 4, 0]} barSize={20}>
+        <Bar dataKey={dataKey} fill={CHART_PRIMARY} radius={[0, 4, 4, 0]} barSize={22}>
           <LabelList
             dataKey={dataKey}
             position="right"

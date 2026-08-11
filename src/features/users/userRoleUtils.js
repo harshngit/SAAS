@@ -1,4 +1,5 @@
 import { ROLES } from '../../auth/roles'
+import { getFileUrl } from '../../api/files'
 
 export const staffRoleOptions = [
   ROLES.SALES_OFFICER,
@@ -78,17 +79,26 @@ export function normalizeApiUser(user) {
     ifscSwiftCode: user.ifsc_swift_code,
     accountHolderName: user.account_holder_name,
     upiId: user.upi_id,
-    profilePhoto: user.profile_photo,
+    profilePhoto: getFileUrl(user.profile_photo),
     identityProofType: user.identity_proof_type,
-    identityProofFile: user.identity_proof_file,
-    resumeCv: user.resume_cv,
-    offerLetter: user.offer_letter,
-    appointmentLetter: user.appointment_letter,
-    uploadedDocuments: user.uploaded_documents || [],
-    experienceCertificates: user.experience_certificates || [],
-    educationalCertificates: user.educational_certificates || [],
+    identityProofFile: getFileUrl(user.identity_proof_file),
+    resumeCv: getFileUrl(user.resume_cv),
+    offerLetter: getFileUrl(user.offer_letter),
+    appointmentLetter: getFileUrl(user.appointment_letter),
+    uploadedDocuments: normalizeDocuments(user.uploaded_documents),
+    experienceCertificates: normalizeDocuments(user.experience_certificates),
+    educationalCertificates: normalizeDocuments(user.educational_certificates),
     skills: user.skills || [],
     language: user.language,
     timeZone: user.time_zone,
   }
+}
+
+function normalizeDocuments(documents = []) {
+  if (!Array.isArray(documents)) return []
+
+  return documents.map((document) => ({
+    ...document,
+    url: getFileUrl(document),
+  }))
 }

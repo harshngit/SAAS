@@ -1,5 +1,6 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { getFileUrl } from './files'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (errorData?.code === 'ECONNABORTED') {
@@ -78,6 +79,15 @@ function toStringList(value) {
     .filter(Boolean)
 }
 
+function normalizeUploadedDocument(document) {
+  if (!document) return document
+
+  return {
+    ...document,
+    url: getFileUrl(document),
+  }
+}
+
 export async function createUser(payload) {
   try {
     const normalizedEmail = payload.email.trim().toLowerCase()
@@ -125,6 +135,8 @@ export async function createUser(payload) {
       resume_cv: payload.resumeCvName,
       offer_letter: payload.offerLetterName,
       appointment_letter: payload.appointmentLetterName,
+      experience_certificates: payload.experienceCertificatesName,
+      educational_certificates: payload.educationalCertificatesName,
       skills: toStringList(payload.skills),
       language: payload.language,
       time_zone: payload.timeZone,
@@ -297,7 +309,7 @@ export async function uploadEmployeeDocuments(userId, collection, files) {
       },
     })
 
-    return { success: true, documents: data }
+    return { success: true, documents: Array.isArray(data) ? data.map(normalizeUploadedDocument) : data }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

@@ -19,6 +19,7 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
 import { listCustomerDocuments, uploadCustomerDocument, uploadOtherCustomerDocuments } from '../../api/customers'
+import { uploadFiles as uploadGenericFiles } from '../../api/files'
 import { formatCurrency } from '../../utils/format'
 
 const documentTypeByField = {
@@ -481,6 +482,7 @@ export default function CustomerForm({
   const [submitError, setSubmitError] = useState('')
   const [activeSection, setActiveSection] = useState(formSections[0].id)
   const [uploadPreviews, setUploadPreviews] = useState({})
+  const [uploadedFileUrls, setUploadedFileUrls] = useState({})
   const uploadPreviewsRef = useRef({})
   const [uploadingField, setUploadingField] = useState('')
   const [documentsError, setDocumentsError] = useState('')
@@ -519,6 +521,7 @@ export default function CustomerForm({
       uploadPreviewsRef.current = {}
       return {}
     })
+    setUploadedFileUrls({})
   }, [customer, currentUser, initialCustomer, isOpen, isSalesOfficer, salesOfficerOptions])
 
   useEffect(() => {
@@ -601,6 +604,8 @@ export default function CustomerForm({
     if (!customerId) {
       const fileNames = selectedFiles.map((file) => file.name).join(', ')
 
+      setDocumentsError('')
+      setUploadingField(name)
       setUploadPreviews((current) => {
         revokeUploadPreviewUrls(current[name])
         const nextPreviews = { ...current, [name]: selectedFiles.map(createUploadPreview) }
@@ -608,6 +613,39 @@ export default function CustomerForm({
         return nextPreviews
       })
       updateField(name, fileNames)
+
+      const result = await uploadGenericFiles(selectedFiles)
+      setUploadingField('')
+
+      if (!result.success) {
+        setDocumentsError(result.error)
+        setUploadedFileUrls((current) => {
+          const { [name]: removed, ...remaining } = current
+          void removed
+          return remaining
+        })
+        updateField(name, '')
+        return
+      }
+
+      const urls = result.files.map((file) => file.url).filter(Boolean)
+      setUploadPreviews((current) => {
+        revokeUploadPreviewUrls(current[name])
+        const nextPreviews = {
+          ...current,
+          [name]: result.files.map((file, index) => ({
+            name: file.name || selectedFiles[index]?.name || 'Uploaded file',
+            type: file.content_type || selectedFiles[index]?.type || '',
+            url: file.url,
+          })),
+        }
+        uploadPreviewsRef.current = nextPreviews
+        return nextPreviews
+      })
+      setUploadedFileUrls((current) => ({
+        ...current,
+        [name]: name === 'otherDocuments' ? urls : urls[0] || '',
+      }))
       return
     }
 
@@ -646,6 +684,11 @@ export default function CustomerForm({
       const { [name]: removed, ...remaining } = current
       void removed
       uploadPreviewsRef.current = remaining
+      return remaining
+    })
+    setUploadedFileUrls((current) => {
+      const { [name]: removed, ...remaining } = current
+      void removed
       return remaining
     })
     updateField(name, '')
@@ -720,10 +763,15 @@ export default function CustomerForm({
   const handleSubmit = (event) => {
     event.preventDefault()
     if (!hasChanges) return
+    if (uploadingField) {
+      setSubmitError('Please wait for the file upload to finish before saving.')
+      return
+    }
     if (!validate()) return
 
     onSave({
       ...formData,
+      ...uploadedFileUrls,
       name: formData.customerName.trim(),
       type: formData.customerType,
       phone: formData.mobileNumber.trim(),

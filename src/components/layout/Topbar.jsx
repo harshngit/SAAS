@@ -79,14 +79,16 @@ export default function Topbar() {
         {pageTitle}
       </h1>
 
-      {pageTitle == "Dashboard" && <div className="relative hidden w-full max-w-md sm:block lg:mx-auto">
+      {pageTitle == 'Dashboard' && (
+        <div className="relative hidden w-full max-w-md sm:block lg:mx-auto">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
         <input
           type="text"
-          placeholder="Search placeholder"
+          placeholder="Search anything..."
           className="w-full rounded-full border border-transparent bg-neutral-100 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
         />
-      </div>}
+        </div>
+      )}
 
       <div className="ml-auto flex items-center gap-3">
         {logoutError && <p className="hidden text-sm text-red-600 md:block">{logoutError}</p>}
