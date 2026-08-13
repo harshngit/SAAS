@@ -2,7 +2,26 @@ import { useEffect, useState } from 'react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Select from '../../components/ui/Select'
 import { getRolesCatalog } from '../../api/roles'
+
+const workspaceOptions = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'sales', label: 'Sales' },
+  { value: 'delivery', label: 'Delivery' },
+  { value: 'accounts', label: 'Accounts' },
+]
+
+const dataScopeOptions = [
+  { value: 'own', label: 'Own records only' },
+  { value: 'all', label: 'All organization records' },
+]
+
+// The "products" module also gates the Categories screen, so the matrix row is relabeled
+// to make that scope clear without needing a separate backend module.
+const moduleLabelOverrides = {
+  products: 'Product & Categories',
+}
 
 function buildMatrix(permissions, moduleKeys, actionKeys) {
   return moduleKeys.reduce((matrix, moduleKey) => {
@@ -19,6 +38,9 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
   const isEditing = Boolean(role)
   const [name, setName] = useState(role?.name || '')
   const [nameError, setNameError] = useState('')
+  const [workspace, setWorkspace] = useState(role?.workspace || 'sales')
+  const [description, setDescription] = useState(role?.description || '')
+  const [dataScope, setDataScope] = useState(role?.data_scope || 'own')
   const [catalogModules, setCatalogModules] = useState([])
   const [catalogActions, setCatalogActions] = useState([])
   const [isCatalogLoading, setIsCatalogLoading] = useState(true)
@@ -119,18 +141,38 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
       return result
     }, {})
 
-    onSave({ name: name.trim(), permissions })
+    onSave({ name: name.trim(), workspace, description: description.trim(), dataScope, permissions })
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <Input
-        label="Role Name"
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        error={nameError || formError}
-        required
-      />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Input
+          label="Role Name"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          error={nameError || formError}
+          required
+        />
+        <Select
+          label="Workspace"
+          options={workspaceOptions}
+          value={workspace}
+          onChange={(event) => setWorkspace(event.target.value)}
+        />
+        <Select
+          label="Data Scope"
+          options={dataScopeOptions}
+          value={dataScope}
+          onChange={(event) => setDataScope(event.target.value)}
+        />
+        <Input
+          label="Description"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder="Optional"
+        />
+      </div>
 
       {isCatalogLoading ? (
         <LoadingSpinner label="Loading permission catalog..." />
@@ -161,17 +203,20 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
               </tr>
             </thead>
             <tbody>
-              {catalogModules.map((module) => (
+              {catalogModules.map((module) => {
+                const moduleLabel = moduleLabelOverrides[module.key] || module.label
+
+                return (
                 <tr key={module.key} className="border-b border-neutral-50 last:border-b-0">
                   <td className="sticky left-0 z-10 bg-white px-4 py-3 font-medium text-neutral-900">
-                    {module.label}
+                    {moduleLabel}
                   </td>
                   <td className="px-3 py-3 text-center">
                     <input
                       type="checkbox"
                       checked={isRowFullyChecked(module.key)}
                       onChange={() => toggleRow(module.key)}
-                      aria-label={`Toggle all actions for ${module.label}`}
+                      aria-label={`Toggle all actions for ${moduleLabel}`}
                       className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                     />
                   </td>
@@ -181,13 +226,14 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
                         type="checkbox"
                         checked={Boolean(matrix[module.key]?.[action.key])}
                         onChange={() => toggleAction(module.key, action.key)}
-                        aria-label={`${action.label} - ${module.label}`}
+                        aria-label={`${action.label} - ${moduleLabel}`}
                         className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                       />
                     </td>
                   ))}
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>

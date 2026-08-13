@@ -1,5 +1,5 @@
 import { useAuthStore } from '../store/authStore'
-import { apiClient } from './client'
+import { apiClient, normalizeTokens } from './client'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -37,6 +37,8 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
+// /auth/login only verifies credentials and returns tokens - the full session (user, role,
+// permissions, organization) comes from /auth/me, so login chains straight into it.
 export async function login({ email, phone, password, otp }) {
   if (phone || otp) {
     return { success: false, error: 'Phone login is not available yet. Please sign in with email and password.' }
@@ -49,8 +51,21 @@ export async function login({ email, phone, password, otp }) {
     }
 
     const { data } = await apiClient.post('/auth/login', requestBody)
-    useAuthStore.getState().setAuthenticatedSession(data)
-    return { success: true, ...data }
+    const tokens = normalizeTokens(data)
+
+    if (!tokens?.access_token) {
+      return { success: false, error: 'Unable to sign in. Please try again.' }
+    }
+
+    useAuthStore.getState().setAuthTokens(tokens)
+
+    const profileResult = await getCurrentProfile()
+
+    if (!profileResult.success) {
+      return profileResult
+    }
+
+    return { success: true, ...profileResult }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

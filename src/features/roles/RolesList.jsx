@@ -8,6 +8,7 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import { deleteRole, getRolesCatalog, listRoles } from '../../api/roles'
+import { RequirePermission } from '../../auth/RequirePermission'
 
 function getModuleSummary(role, catalogModuleCount, catalogActionKeys) {
   const permissions = role.permissions || {}
@@ -101,10 +102,12 @@ export default function RolesList() {
                 Create custom roles and configure module-level access for staff.
               </p>
             </div>
-            <Button type="button" size="sm" onClick={() => navigate('/admin/roles/new')}>
-              <Plus className="size-4" aria-hidden="true" />
-              New Role
-            </Button>
+            <RequirePermission module="users" action="edit">
+              <Button type="button" size="sm" onClick={() => navigate('/admin/roles/new')}>
+                <Plus className="size-4" aria-hidden="true" />
+                New Role
+              </Button>
+            </RequirePermission>
           </div>
         </div>
 

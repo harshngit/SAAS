@@ -46,13 +46,13 @@ export default function RoleForm() {
     }
   }, [roleId, isEditing])
 
-  const handleSave = async ({ name, permissions }) => {
+  const handleSave = async ({ name, workspace, description, dataScope, permissions }) => {
     setIsSaving(true)
     setFormError('')
 
     const result = isEditing
-      ? await updateRole(roleId, { name, permissions })
-      : await createRole({ name, permissions })
+      ? await updateRole(roleId, { name, workspace, description, dataScope, permissions })
+      : await createRole({ name, workspace, description, dataScope, permissions })
 
     setIsSaving(false)
 

@@ -28,9 +28,10 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/toastContext'
 import { ROLES, roleLabels } from '../../auth/roles'
+import { RequirePermission } from '../../auth/RequirePermission'
 import { useAuthStore } from '../../store/authStore'
 import { uploadFiles as uploadGenericFiles } from '../../api/files'
-import { createUser, deleteUser, getEmployeeOptions, listRoles, listUsers, updateUserStatus } from '../../api/users'
+import { createUser, deleteUser, listRoles, listUsers, updateUserStatus } from '../../api/users'
 import { getSystemRoleFromRoleName, normalizeApiUser, staffRoleOptions } from './userRoleUtils'
 import ResetPasswordModal from './ResetPasswordModal'
 
@@ -38,22 +39,6 @@ const staffRoleSelectOptions = staffRoleOptions.map((role) => ({
   value: role,
   label: roleLabels[role],
 }))
-
-const formatOptionLabel = (value = '') =>
-  String(value)
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase())
-
-const toSelectOptions = (values = [], fallbackOptions = []) => {
-  if (!values.length) {
-    return fallbackOptions
-  }
-
-  return values.map((value) => ({
-    value,
-    label: formatOptionLabel(value),
-  }))
-}
 
 const genderOptions = [
   { value: 'male', label: 'Male' },
@@ -128,23 +113,9 @@ const systemStatusOptions = [
   { value: 'locked', label: 'Locked' },
 ]
 
-const emptyEmployeeOptions = {
-  employment_types: [],
-  employee_statuses: [],
-  account_statuses: [],
-  genders: [],
-  marital_statuses: [],
-  blood_groups: [],
-  identity_proof_types: [],
-  emergency_contact_relationships: [],
-  countries: [],
-  nationalities: [],
-  states: [],
-  designations: [],
-  work_locations: [],
-  shifts: [],
-  employee_id_prefix: '',
-}
+// Purely a UI preview so the field never looks blank/confusing while filling the form - the
+// backend is free to assign its own employee_id if the admin leaves this untouched.
+const makeEmployeeId = () => `EMP-${new Date().getFullYear()}-AUTO`
 
 const initialStaffFormData = {
   employeeId: '',
@@ -251,6 +222,31 @@ const getInitials = (name = '') =>
     .join('')
     .slice(0, 2)
     .toUpperCase()
+
+function StaffAvatar({ name, photoUrl, size = 'size-9', textSize = 'text-xs' }) {
+  const [imageFailed, setImageFailed] = useState(false)
+
+  useEffect(() => {
+    setImageFailed(false)
+  }, [photoUrl])
+
+  if (photoUrl && !imageFailed) {
+    return (
+      <img
+        src={photoUrl}
+        alt={name}
+        className={`${size} shrink-0 rounded-full object-cover ring-1 ring-primary-100`}
+        onError={() => setImageFailed(true)}
+      />
+    )
+  }
+
+  return (
+    <div className={`flex ${size} shrink-0 items-center justify-center rounded-full bg-primary-50 ${textSize} font-semibold text-primary-700 ring-1 ring-primary-100`}>
+      {getInitials(name)}
+    </div>
+  )
+}
 
 function StaffSection({ number, title, description, children }) {
   void title
@@ -464,9 +460,6 @@ export default function UserManagement() {
   const isAdmin = currentUser?.role === ROLES.ADMIN
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
-  const [employeeOptions, setEmployeeOptions] = useState(emptyEmployeeOptions)
-  const [isLoadingEmployeeOptions, setIsLoadingEmployeeOptions] = useState(false)
-  const [employeeOptionsError, setEmployeeOptionsError] = useState('')
   const [activeRoleFilter, setActiveRoleFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
@@ -499,20 +492,22 @@ export default function UserManagement() {
     }
   })
 
+  // No dropdown data comes from the backend (GET /users/meta/employee-options was removed) -
+  // these option lists are entirely local now.
   const effectiveRoleSelectOptions = apiRoleOptions.length > 0 ? apiRoleOptions : staffRoleSelectOptions
-  const effectiveGenderOptions = toSelectOptions(employeeOptions.genders, genderOptions)
-  const effectiveMaritalStatusOptions = toSelectOptions(employeeOptions.marital_statuses, maritalStatusOptions)
-  const effectiveBloodGroupOptions = toSelectOptions(employeeOptions.blood_groups, bloodGroupOptions)
-  const effectiveCountryOptions = toSelectOptions(employeeOptions.countries, countryOptions)
-  const effectiveNationalityOptions = toSelectOptions(employeeOptions.nationalities, effectiveCountryOptions)
-  const effectiveEmploymentTypeOptions = toSelectOptions(employeeOptions.employment_types, employmentTypeOptions)
-  const effectiveEmployeeStatusOptions = toSelectOptions(employeeOptions.employee_statuses, employeeStatusOptions)
-  const effectiveShiftOptions = toSelectOptions(employeeOptions.shifts, shiftOptions)
-  const effectiveIdentityProofOptions = toSelectOptions(employeeOptions.identity_proof_types, identityProofOptions)
-  const effectiveSystemStatusOptions = toSelectOptions(employeeOptions.account_statuses, systemStatusOptions)
-  const effectiveEmergencyRelationshipOptions = toSelectOptions(employeeOptions.emergency_contact_relationships)
-  const effectiveStateOptions = toSelectOptions(employeeOptions.states)
-  const effectiveWorkLocationOptions = toSelectOptions(employeeOptions.work_locations)
+  const effectiveGenderOptions = genderOptions
+  const effectiveMaritalStatusOptions = maritalStatusOptions
+  const effectiveBloodGroupOptions = bloodGroupOptions
+  const effectiveCountryOptions = countryOptions
+  const effectiveNationalityOptions = effectiveCountryOptions
+  const effectiveEmploymentTypeOptions = employmentTypeOptions
+  const effectiveEmployeeStatusOptions = employeeStatusOptions
+  const effectiveShiftOptions = shiftOptions
+  const effectiveIdentityProofOptions = identityProofOptions
+  const effectiveSystemStatusOptions = systemStatusOptions
+  const effectiveEmergencyRelationshipOptions = []
+  const effectiveStateOptions = []
+  const effectiveWorkLocationOptions = []
   const effectiveFilterTabs = [
     { value: 'all', label: 'All' },
     ...effectiveRoleSelectOptions.map((role) => ({ value: role.value, label: role.label })),
@@ -551,7 +546,6 @@ export default function UserManagement() {
 
   const handleOpenModal = () => {
     setFormError('')
-    setEmployeeOptionsError('')
     setActiveStaffSection('1')
     setUploadPreviews((current) => {
       Object.values(current).forEach(revokeUploadPreviewUrls)
@@ -563,6 +557,7 @@ export default function UserManagement() {
     setFormData(
       {
         ...initialStaffFormData,
+        employeeId: makeEmployeeId(),
         role: ROLES.SALES_OFFICER,
         role_id: effectiveRoleSelectOptions.find((role) => role.value === ROLES.SALES_OFFICER)?.roleId || '',
       },
@@ -675,36 +670,6 @@ export default function UserManagement() {
   }, [])
 
   useEffect(() => {
-    if (!isModalOpen) return undefined
-
-    let isMounted = true
-
-    async function loadEmployeeOptions() {
-      setIsLoadingEmployeeOptions(true)
-      setEmployeeOptionsError('')
-
-      const result = await getEmployeeOptions()
-
-      if (!isMounted) return
-
-      setIsLoadingEmployeeOptions(false)
-
-      if (!result.success) {
-        setEmployeeOptionsError(result.error)
-        return
-      }
-
-      setEmployeeOptions({ ...emptyEmployeeOptions, ...(result.options || {}) })
-    }
-
-    loadEmployeeOptions()
-
-    return () => {
-      isMounted = false
-    }
-  }, [isModalOpen])
-
-  useEffect(() => {
     const timeoutId = window.setTimeout(async () => {
       await refreshUsers()
     }, searchTerm.trim() ? 300 : 0)
@@ -797,6 +762,8 @@ export default function UserManagement() {
           value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0)
         )),
       ),
+      // The auto-generated "EMP-YYYY-AUTO" is only a UI placeholder - never submit it as a real id.
+      employeeId: formData.employeeId === makeEmployeeId() ? '' : formData.employeeId,
       name: displayName,
       email: formData.email,
       phone: formData.mobileNumber,
@@ -943,12 +910,6 @@ export default function UserManagement() {
                   <div>
                     <p className="text-lg font-semibold text-neutral-900">{activeStaffFormSection.title}</p>
                     <p className="mt-1 text-sm text-neutral-500">{activeStaffFormSection.description}</p>
-                    {isLoadingEmployeeOptions && (
-                      <p className="mt-2 text-xs font-medium text-primary-600">Loading form options...</p>
-                    )}
-                    {employeeOptionsError && (
-                      <p className="mt-2 text-xs font-medium text-amber-600">{employeeOptionsError}</p>
-                    )}
                   </div>
                   <Button
                     type="button"
@@ -976,6 +937,10 @@ export default function UserManagement() {
                   onChange={handleUploadChange}
                   onRemove={handleUploadRemove}
                 />
+                <div className="hidden lg:block" aria-hidden="true" />
+                <StaffField description="Unique employee identifier. Auto-generated." format="Text (Auto Number)" required={false}>
+                  <Input label="Employee ID" value={formData.employeeId || 'System calculated'} readOnly disabled />
+                </StaffField>
                 <div className="hidden lg:block" aria-hidden="true" />
                 <StaffField description="Employee's first name." format="Text, max 50 characters" required>
                   <Input label="First Name" name="firstName" maxLength={50} value={formData.firstName} onChange={handleFormChange} required />
@@ -1347,10 +1312,12 @@ export default function UserManagement() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-              <Button onClick={handleOpenModal} size="sm">
-                <Plus className="size-4" />
-                Add Staff
-              </Button>
+              <RequirePermission module="users" action="create">
+                <Button onClick={handleOpenModal} size="sm">
+                  <Plus className="size-4" />
+                  Add Staff
+                </Button>
+              </RequirePermission>
               <Button type="button" variant="outline" size="sm">
                 <CalendarDays className="size-4" aria-hidden="true" />
                 This Month
@@ -1404,9 +1371,7 @@ export default function UserManagement() {
                   >
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex size-9 items-center justify-center rounded-full bg-primary-50 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">
-                          {getInitials(user.name)}
-                        </div>
+                        <StaffAvatar name={user.name} photoUrl={user.profilePhoto} />
                         <div>
                           <Link
                             to={`/admin/users/${user.id}`}

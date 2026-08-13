@@ -8,7 +8,7 @@ import Button from '../components/ui/Button'
 import AuthShowcase from '../components/auth/AuthShowcase'
 import { zodResolver } from '../utils/zodResolver'
 import { registerOrganization } from '../api/auth'
-import { roleHomePath } from './roles'
+import { resolveHomePath } from './roles'
 
 const phonePattern = /^\+?[0-9][0-9\s-]{9,14}$/
 
@@ -38,7 +38,7 @@ export default function Register() {
       setServerError(result.error)
       return
     }
-    navigate(roleHomePath[result.user.role] || '/admin/dashboard', { replace: true })
+    navigate(resolveHomePath({ fullAccess: result.full_access, role: result.role, currentUser: result.user }), { replace: true })
   }
 
   return (

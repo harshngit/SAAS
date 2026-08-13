@@ -10,7 +10,9 @@ import {
   CreditCard,
   Eye,
   FileText,
+  Globe,
   HardDrive,
+  Image as ImageIcon,
   KeyRound,
   LifeBuoy,
   Mail,
@@ -30,11 +32,13 @@ import {
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Card from "../../components/ui/Card";
+import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import Select from "../../components/ui/Select";
 import { changePassword, getCurrentProfile } from "../../api/auth";
 import {
   clearOrganizationOtherDocuments,
   getOrganizationOtherDocuments,
+  getOrganizationOverview,
   getOrganizationSettings,
   updateOrganizationSettings,
   uploadOrganizationLogo,
@@ -790,38 +794,102 @@ function CompanySection({
   );
 }
 
-function CompanyOverviewDashboard({ companyData, organization, onNavigate }) {
-  const documents = buildDocumentOverview(companyData);
-  const uploadedDocuments = documents.filter(
-    (document) => document.status === "uploaded",
-  ).length;
-  const completion = buildCompletionSummary(companyData);
-  const branchCount = getBranchCount(companyData);
-  const companyName = companyData.legalName || companyData.name || "Company";
-  const displayName = companyData.name || companyName;
-  const statusLabel = titleCase(companyData.status, "Active");
-  const statusIsActive = String(companyData.status || "active").toLowerCase() === "active";
+const activityIconByType = {
+  company_profile: CheckCircle2,
+  billing: CreditCard,
+  authorized_person: CircleUserRound,
+  address: MapPin,
+  branding: ImageIcon,
+  online_presence: Globe,
+  document: FileText,
+  employee: Users,
+};
+
+const activityToneByType = {
+  company_profile: "green",
+  billing: "blue",
+  authorized_person: "sky",
+  address: "orange",
+  branding: "violet",
+  online_presence: "blue",
+  document: "amber",
+  employee: "green",
+};
+
+function formatActivityTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+}
+
+// Sourced from GET /organizations/overview (see api/organizations.js#getOrganizationOverview) -
+// falls back to the locally-derived values only for fields the endpoint's response doesn't cover.
+function CompanyOverviewDashboard({ overview, isLoading, error, onRetry, companyData, organization, onNavigate }) {
+  if (isLoading) {
+    return (
+      <section className="pb-5">
+        <LoadingSpinner label="Loading company overview..." />
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="pb-5">
+        <div className="rounded-xl border border-red-100 bg-red-50 p-6 text-center">
+          <p className="text-sm text-red-600">{error}</p>
+          <Button type="button" variant="outline" className="mt-4" onClick={onRetry}>
+            Retry
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
+  const company = overview?.company || {};
+  const counts = overview?.counts || {};
+  const storage = overview?.storage || {};
+  const profileCompletion = overview?.profile_completion || {};
+  const authorizedPersonBlock = overview?.authorized_person || {};
+  const documentsBlock = overview?.documents || {};
+  const addressesBlock = Array.isArray(overview?.addresses) ? overview.addresses : [];
+  const recentActivityBlock = Array.isArray(overview?.recent_activity) ? overview.recent_activity : [];
+
+  const localDocuments = buildDocumentOverview(companyData);
+  const apiDocumentRows = documentsBlock.documents || documentsBlock.items || documentsBlock.rows;
+  // API rows are {key, name, status, url}; the local fallback shape is {key, label, status} - normalize both to `label`.
+  const documentRows = Array.isArray(apiDocumentRows)
+    ? apiDocumentRows.map((document) => ({ ...document, label: document.name || document.label }))
+    : localDocuments;
+  const uploadedDocuments =
+    documentsBlock.uploaded ?? documentRows.filter((document) => document.status === "uploaded").length;
+
+  const localCompletion = buildCompletionSummary(companyData);
+  const apiMissingInformation = profileCompletion.missing_information || profileCompletion.missingInformation;
+  // missing_information is an array of display labels (strings); pair each with its column
+  // name from missing_fields (same order) when available, otherwise use the label as the key.
+  const completion = {
+    percent: profileCompletion.percent ?? localCompletion.percent,
+    missingFields: Array.isArray(apiMissingInformation)
+      ? apiMissingInformation.map((label, index) => ({
+          key: profileCompletion.missing_fields?.[index] || label,
+          label,
+        }))
+      : localCompletion.missingFields,
+  };
+
+  const branchCount = counts.branches ?? getBranchCount(companyData);
+  const companyName = company.legal_name || company.name || companyData.legalName || companyData.name || "Company";
+  const displayName = company.name || companyName;
+  const statusValue = company.company_status || companyData.status;
+  const statusLabel = titleCase(statusValue, "Active");
+  const statusIsActive = String(statusValue || "active").toLowerCase() === "active";
   const companyCode =
-    organization?.code ||
-    organization?.company_code ||
-    organization?.companyCode ||
-    (organization?.id ? `CMP-${String(organization.id).padStart(5, "0")}` : "CMP-10012");
-  const employeeCount =
-    companyData.numberOfEmployees ||
-    organization?.employee_count ||
-    organization?.employeeCount ||
-    0;
-  const activeUsers =
-    organization?.active_users ||
-    organization?.activeUsers ||
-    organization?.user_count ||
-    organization?.userCount ||
-    (employeeCount ? Math.max(1, Math.round(Number(employeeCount) * 0.4)) : 0);
-  const registrationDate =
-    companyData.dateOfIncorporation ||
-    organization?.created_at ||
-    organization?.createdAt ||
-    "";
+    company.company_code || (organization?.id ? `CMP-${String(organization.id).padStart(5, "0")}` : "Not set");
+  const employeeCount = counts.employees ?? companyData.numberOfEmployees ?? 0;
+  const activeUsers = counts.active_users ?? 0;
+  const registrationDate = company.registration_date || companyData.dateOfIncorporation || "";
   const formattedRegistrationDate = registrationDate
     ? new Date(registrationDate).toLocaleDateString("en-IN", {
         day: "2-digit",
@@ -829,34 +897,46 @@ function CompanyOverviewDashboard({ companyData, organization, onNavigate }) {
         year: "numeric",
       })
     : "Not set";
-  const industryLabel = getOptionLabel(industryOptions, companyData.industry);
+  const industryLabel = getOptionLabel(industryOptions, company.industry || companyData.industry);
   const companyTypeLabel = getOptionLabel(
     businessTypeOptions,
-    companyData.businessType,
+    company.company_type || companyData.businessType,
   );
-  const planLabel = titleCase(
-    organization?.plan_name ||
-      organization?.planName ||
-      organization?.subscription_plan ||
-      organization?.subscriptionPlan ||
-      "Enterprise",
-  );
-  const addressLine =
-    companyData.registeredAddress ||
-    companyData.address ||
-    "Registered address not added.";
-  const locationLine = [companyData.city, companyData.state, getOptionLabel(countryOptions, companyData.country, "")]
-    .filter(Boolean)
-    .join(", ");
-  const branchAddress =
-    companyData.branchOfficeAddresses ||
-    companyData.billingAddress ||
-    "Branch or warehouse address not added.";
+  const planLabel = titleCase(company.plan?.name || company.plan?.plan_name || organization?.plan_name, "Not set");
+  const logoUrl = company.logo || companyData.logoUrl;
+
+  const registeredAddressEntry =
+    addressesBlock.find((address) => address.is_primary) || addressesBlock[0] || null;
+  const branchAddressEntry = addressesBlock.find((address) => !address.is_primary) || null;
+  const addressText = (address) =>
+    address?.address || address?.full_address || address?.line1 || address?.address_line1 || "";
+  const addressLine = registeredAddressEntry
+    ? addressText(registeredAddressEntry) || "Registered address not added."
+    : companyData.registeredAddress || companyData.address || "Registered address not added.";
+  const locationLine = registeredAddressEntry
+    ? [registeredAddressEntry.city, registeredAddressEntry.state, registeredAddressEntry.country].filter(Boolean).join(", ")
+    : [companyData.city, companyData.state, getOptionLabel(countryOptions, companyData.country, "")]
+        .filter(Boolean)
+        .join(", ");
+  const branchAddress = branchAddressEntry
+    ? addressText(branchAddressEntry) || "Branch or warehouse address not added."
+    : companyData.branchOfficeAddresses || companyData.billingAddress || "Branch or warehouse address not added.";
+
   const authorizedDesignation = getOptionLabel(
     designationOptions,
-    companyData.designation,
-    titleCase(companyData.designation, "Not set"),
+    authorizedPersonBlock.designation || companyData.designation,
+    titleCase(authorizedPersonBlock.designation || companyData.designation, "Not set"),
   );
+  const authorizedName = authorizedPersonBlock.name || companyData.ownerDirectorName || companyData.adminName;
+  const authorizedEmail = authorizedPersonBlock.email || companyData.adminEmail || companyData.email;
+  const authorizedMobile = authorizedPersonBlock.mobile || companyData.mobileNumber || companyData.phone;
+  const authorizedPhoto = authorizedPersonBlock.photo || companyData.profilePhotoUrl;
+  const authorizedIsComplete = authorizedPersonBlock.is_complete ?? Boolean(authorizedName && authorizedEmail);
+
+  const storageLabel = storage.files != null
+    ? `${storage.files} files`
+    : `${getStoredFileTotal(companyData)} files`;
+
   const metricCards = [
     {
       label: "Employees",
@@ -888,42 +968,29 @@ function CompanyOverviewDashboard({ companyData, organization, onNavigate }) {
     },
     {
       label: "Storage Used",
-      value: `${getStoredFileTotal(companyData)} files`,
-      caption: "Company Documents",
+      value: storageLabel,
+      caption: storage.percent_used != null ? `${storage.percent_used}% of plan limit` : "Company Documents",
       icon: HardDrive,
       tone: "violet",
     },
   ];
-  const recentActivity = [
-    {
-      title: "Company profile updated",
-      caption: `${displayName} profile is available`,
-      icon: CheckCircle2,
-      tone: "green",
-      time: "Today",
-    },
-    {
-      title: "Billing information checked",
-      caption: companyData.bankName ? "Bank details added" : "Bank details pending",
-      icon: CreditCard,
-      tone: "blue",
-      time: "Recent",
-    },
-    {
-      title: "Authorized person updated",
-      caption: companyData.ownerDirectorName || "Authorized person pending",
-      icon: CircleUserRound,
-      tone: "sky",
-      time: "Recent",
-    },
-    {
-      title: "Documents reviewed",
-      caption: `${uploadedDocuments} of ${documents.length} document groups uploaded`,
-      icon: FileText,
-      tone: "amber",
-      time: "Recent",
-    },
-  ];
+  const recentActivity = recentActivityBlock.length > 0
+    ? recentActivityBlock.map((activity, index) => ({
+        title: activity.title || "Update",
+        caption: activity.description || activity.by || "",
+        icon: activityIconByType[activity.type] || CheckCircle2,
+        tone: activityToneByType[activity.type] || "green",
+        time: formatActivityTime(activity.at) || (index === 0 ? "Today" : "Recent"),
+      }))
+    : [
+        {
+          title: "No recent activity yet",
+          caption: "Changes to your company profile will show up here.",
+          icon: CheckCircle2,
+          tone: "green",
+          time: "",
+        },
+      ];
   const quickActions = [
     { label: "Edit Profile", icon: Pencil, tab: "general", tone: "green" },
     { label: "Upload Document", icon: UploadCloud, tab: "documents", tone: "blue" },
@@ -952,9 +1019,9 @@ function CompanyOverviewDashboard({ companyData, organization, onNavigate }) {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
           <div className="flex shrink-0 items-center gap-5 xl:w-[22rem]">
             <div className="grid size-28 shrink-0 place-items-center rounded-full border border-neutral-100 bg-white text-2xl font-bold text-primary-700 shadow-sm">
-              {companyData.logoUrl ? (
+              {logoUrl ? (
                 <img
-                  src={companyData.logoUrl}
+                  src={logoUrl}
                   alt={`${displayName} logo`}
                   className="size-24 rounded-full object-contain"
                 />
@@ -1091,35 +1158,37 @@ function CompanyOverviewDashboard({ companyData, organization, onNavigate }) {
             <h3 className="text-sm font-semibold text-neutral-900">
               Authorized Person
             </h3>
-            <span className="inline-flex items-center gap-1 rounded-md bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">
-              <ShieldCheck className="size-3.5" />
-              Verified
-            </span>
+            {authorizedIsComplete && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">
+                <ShieldCheck className="size-3.5" />
+                Verified
+              </span>
+            )}
           </div>
           <div className="mt-5 flex items-center gap-4">
             <div className="grid size-16 shrink-0 place-items-center rounded-full bg-neutral-100 text-lg font-bold text-neutral-600">
-              {companyData.profilePhotoUrl ? (
+              {authorizedPhoto ? (
                 <img
-                  src={companyData.profilePhotoUrl}
-                  alt={companyData.ownerDirectorName || "Authorized person"}
+                  src={authorizedPhoto}
+                  alt={authorizedName || "Authorized person"}
                   className="size-16 rounded-full object-cover"
                 />
               ) : (
-                getInitials(companyData.ownerDirectorName || companyData.adminName)
+                getInitials(authorizedName)
               )}
             </div>
             <div className="min-w-0">
               <p className="font-semibold text-neutral-900">
-                {companyData.ownerDirectorName || companyData.adminName || "Not set"}
+                {authorizedName || "Not set"}
               </p>
               <p className="text-sm text-neutral-500">{authorizedDesignation}</p>
               <p className="mt-2 flex items-center gap-2 text-xs text-neutral-600">
                 <Mail className="size-3.5" />
-                {companyData.adminEmail || companyData.email || "Email not set"}
+                {authorizedEmail || "Email not set"}
               </p>
               <p className="mt-1 flex items-center gap-2 text-xs text-neutral-600">
                 <Phone className="size-3.5" />
-                {companyData.mobileNumber || companyData.phone || "Phone not set"}
+                {authorizedMobile || "Phone not set"}
               </p>
             </div>
           </div>
@@ -1141,7 +1210,7 @@ function CompanyOverviewDashboard({ companyData, organization, onNavigate }) {
             <ClipboardList className="size-4 text-neutral-400" />
           </div>
           <div className="mt-4 space-y-3">
-            {documents.slice(0, 5).map((document) => (
+            {documentRows.slice(0, 5).map((document) => (
               <div key={document.key} className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <FileText className="size-4 shrink-0 text-neutral-500" />
@@ -1654,6 +1723,9 @@ export default function CompanySettings() {
   const [loadedUser, setLoadedUser] = useState(currentUser);
   const [loadedOrganization, setLoadedOrganization] =
     useState(currentOrganization);
+  const [overview, setOverview] = useState(null);
+  const [isLoadingOverview, setIsLoadingOverview] = useState(true);
+  const [overviewError, setOverviewError] = useState("");
   const [activeTab, setActiveTab] = useState("account");
   const [editingSections, setEditingSections] = useState({
     general: false,
@@ -1711,6 +1783,26 @@ export default function CompanySettings() {
   const resetCompanyData = useCallback(() => {
     setCompanyData(buildCompanyDataFromProfile(loadedUser, loadedOrganization));
   }, [loadedOrganization, loadedUser]);
+
+  const loadOverview = useCallback(async () => {
+    setIsLoadingOverview(true);
+    setOverviewError("");
+
+    const result = await getOrganizationOverview();
+
+    setIsLoadingOverview(false);
+
+    if (!result.success) {
+      setOverviewError(result.error);
+      return;
+    }
+
+    setOverview(result.overview);
+  }, []);
+
+  useEffect(() => {
+    loadOverview();
+  }, [loadOverview]);
 
   useEffect(() => {
     let isMounted = true;
@@ -2326,6 +2418,10 @@ export default function CompanySettings() {
 
             {activeTab === "account" ? (
               <CompanyOverviewDashboard
+                overview={overview}
+                isLoading={isLoadingOverview}
+                error={overviewError}
+                onRetry={loadOverview}
                 companyData={companyData}
                 organization={loadedOrganization}
                 onNavigate={handleTabChange}

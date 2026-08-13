@@ -114,13 +114,17 @@ export async function getRole(roleId) {
   }
 }
 
-export async function createRole({ name, permissions }) {
+export async function createRole({ name, workspace, description, dataScope, permissions }) {
   try {
-    const { data } = await apiClient.post(
-      '/roles',
-      { name: name?.trim(), permissions },
-      { headers: authHeader() },
-    )
+    const requestBody = {
+      name: name?.trim(),
+      permissions,
+    }
+    if (workspace !== undefined) requestBody.workspace = workspace
+    if (description !== undefined) requestBody.description = description
+    if (dataScope !== undefined) requestBody.data_scope = dataScope
+
+    const { data } = await apiClient.post('/roles', requestBody, { headers: authHeader() })
 
     return { success: true, role: data }
   } catch (error) {
@@ -138,13 +142,18 @@ export async function createRole({ name, permissions }) {
   }
 }
 
-export async function updateRole(roleId, { name, permissions } = {}) {
+// PUT /roles/{id} was removed (405) - roles are now edited with PATCH, and it replaces the
+// whole permission matrix, so always send the complete set of module permissions.
+export async function updateRole(roleId, { name, workspace, description, dataScope, permissions } = {}) {
   try {
     const requestBody = {}
     if (name !== undefined) requestBody.name = name?.trim()
+    if (workspace !== undefined) requestBody.workspace = workspace
+    if (description !== undefined) requestBody.description = description
+    if (dataScope !== undefined) requestBody.data_scope = dataScope
     if (permissions !== undefined) requestBody.permissions = permissions
 
-    const { data } = await apiClient.put(`/roles/${roleId}`, requestBody, {
+    const { data } = await apiClient.patch(`/roles/${roleId}`, requestBody, {
       headers: authHeader(),
     })
 

@@ -10,6 +10,7 @@ import DatePicker from '../../components/ui/DatePicker'
 import EmptyState from '../../components/ui/EmptyState'
 import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
+import { RequirePermission } from '../../auth/RequirePermission'
 import { ORDER_STATUSES, orderStatusBadgeVariant, orders as seedOrders } from '../../mockData/orders'
 import { users } from '../../mockData/users'
 import { formatCurrency } from '../../utils/format'
@@ -87,10 +88,12 @@ export default function OrderList() {
           <h1 className="text-2xl font-semibold text-neutral-900">Sales Orders</h1>
           <p className="mt-1 text-sm text-neutral-500">Monitor, filter, and approve orders across the organization</p>
         </div>
-        <Button size="sm" onClick={() => navigate('/admin/orders/create')} className="w-full sm:w-auto">
-          <Plus className="size-4" aria-hidden="true" />
-          New Order
-        </Button>
+        <RequirePermission module="sales_orders" action="create">
+          <Button size="sm" onClick={() => navigate('/admin/orders/create')} className="w-full sm:w-auto">
+            <Plus className="size-4" aria-hidden="true" />
+            New Order
+          </Button>
+        </RequirePermission>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

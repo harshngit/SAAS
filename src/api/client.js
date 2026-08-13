@@ -30,7 +30,7 @@ function redirectToLogin() {
   window.location.replace('/login')
 }
 
-function normalizeTokens(tokenResponse) {
+export function normalizeTokens(tokenResponse) {
   if (tokenResponse?.tokens) {
     return tokenResponse.tokens
   }

@@ -2,9 +2,11 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import {
   BarChart3,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ArrowRight,
   Crown,
   Droplet,
   LayoutDashboard,
@@ -18,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { roleMenus, roleLabels, ROLES } from '../../auth/roles'
+import { usePermission } from '../../auth/usePermission'
 import { listSuperAdminOrganizations } from '../../api/superadmin'
 
 const NAV_BADGE_COUNTS = {
@@ -56,7 +59,15 @@ export default function Sidebar({
   const currentUser = useAuthStore((state) => state.currentUser)
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const currentRole = currentUser?.role
-  const menuGroups = currentRole ? roleMenus[currentRole] || [] : []
+  const { can } = usePermission()
+  // Items without a `module` tag (personal pages, or concepts the backend doesn't model yet,
+  // like Visits/Follow-ups) are always shown - only permission-mapped items get gated.
+  const menuGroups = (currentRole ? roleMenus[currentRole] || [] : [])
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.module || can(item.module, item.action || 'view')),
+    }))
+    .filter((group) => group.items.length > 0)
   const [openSections, setOpenSections] = useState({})
   const [navBadgeCounts, setNavBadgeCounts] = useState({})
 
@@ -114,6 +125,8 @@ export default function Sidebar({
     currentOrganization?.planName ||
     ''
   const showUpgradeCard = currentRole === ROLES.ADMIN && currentPlanName.toLowerCase() === 'free'
+  const showDeliveryCheckInCard = currentRole === ROLES.DELIVERY_PARTNER
+  const keepMenuAlwaysOpen = currentRole === ROLES.DELIVERY_PARTNER
 
   const toggleSection = (section) => {
     setOpenSections((current) => ({ ...current, [section]: !current[section] }))
@@ -138,8 +151,8 @@ export default function Sidebar({
 
       <aside
         id={id}
-        className={`fixed inset-y-3 left-3 z-50 flex w-72 flex-col overflow-visible rounded-[1.5rem] bg-[#eef6eb] shadow-(--shadow-card) transition-transform duration-300 md:static md:inset-auto md:h-full md:translate-x-0 md:rounded-none md:shadow-none md:transition-[width] md:duration-300 md:ease-in-out ${
-          isExpanded ? 'md:w-60' : 'md:w-[4.75rem]'
+        className={`fixed inset-y-3 left-3 z-50 flex w-[16rem] flex-col overflow-visible rounded-[1.5rem] bg-[#eef6eb] shadow-(--shadow-card) transition-transform duration-300 md:static md:inset-auto md:h-full md:translate-x-0 md:rounded-none md:shadow-none md:transition-[width] md:duration-300 md:ease-in-out ${
+          isExpanded ? 'md:w-[16rem]' : 'md:w-[4.75rem]'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'}`}
       >
         <span
@@ -163,17 +176,17 @@ export default function Sidebar({
 
         <div className={`relative flex items-center px-4 pb-4 pt-5 ${isExpanded ? 'justify-between' : 'md:justify-center'}`}>
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-[0.9rem] bg-linear-to-br from-primary-500 to-primary-700 text-white shadow-(--shadow-glow-primary)">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#0f5116] text-white shadow-[0_10px_24px_-16px_rgb(15_81_22/0.55)]">
               <Droplet className="size-5" aria-hidden="true" />
             </div>
             <div className={`hidden min-w-0 flex-col overflow-hidden transition-all duration-150 md:flex ${labelVisibilityClass}`}>
-              <span className="truncate font-(--font-display) text-lg font-semibold tracking-tight text-neutral-900">
+              <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-neutral-900">
                 SAAS CRM
               </span>
               <span className="truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
             </div>
             <div className="flex min-w-0 flex-col md:hidden">
-              <span className="truncate font-(--font-display) text-lg font-semibold tracking-tight text-neutral-900">
+              <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-neutral-900">
                 SAAS CRM
               </span>
               <span className="truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
@@ -237,35 +250,54 @@ export default function Sidebar({
                           aria-hidden="true"
                         />
                       )}
-                      <button
-                        type="button"
-                        onClick={() => toggleSection(group.section)}
-                        aria-expanded={openSections[group.section] !== false}
-                        className={`hidden w-full items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition-all duration-150 hover:text-neutral-600 md:flex ${
-                          isExpanded ? sectionLabelVisibilityClass : 'invisible h-0 max-w-0 pb-0 opacity-0'
-                        }`}
-                      >
-                        <span className="truncate">{group.section}</span>
-                        <ChevronDown
-                          className={`size-3.5 shrink-0 transition-transform ${openSections[group.section] === false ? '-rotate-90' : ''}`}
-                          aria-hidden="true"
-                        />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleSection(group.section)}
-                        aria-expanded={openSections[group.section] !== false}
-                        className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition-colors hover:text-neutral-600 md:hidden"
-                      >
-                        <span>{group.section}</span>
-                        <ChevronDown
-                          className={`size-3.5 shrink-0 transition-transform ${openSections[group.section] === false ? '-rotate-90' : ''}`}
-                          aria-hidden="true"
-                        />
-                      </button>
+                      {keepMenuAlwaysOpen ? (
+                        <>
+                          <div
+                            className={`hidden items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.34em] text-neutral-400 md:flex ${
+                              isExpanded ? sectionLabelVisibilityClass : 'invisible h-0 max-w-0 pb-0 opacity-0'
+                            }`}
+                          >
+                            <span className="truncate">MAIN MENU</span>
+                            <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
+                          </div>
+                          <div className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.34em] text-neutral-400 md:hidden">
+                            <span>MAIN MENU</span>
+                            <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => toggleSection(group.section)}
+                            aria-expanded={openSections[group.section] !== false}
+                            className={`hidden w-full items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.34em] text-neutral-400 transition-all duration-150 hover:text-neutral-600 md:flex ${
+                              isExpanded ? sectionLabelVisibilityClass : 'invisible h-0 max-w-0 pb-0 opacity-0'
+                            }`}
+                          >
+                            <span className="truncate">{group.section}</span>
+                            <ChevronDown
+                              className={`size-3.5 shrink-0 transition-transform ${openSections[group.section] === false ? '-rotate-90' : ''}`}
+                              aria-hidden="true"
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleSection(group.section)}
+                            aria-expanded={openSections[group.section] !== false}
+                            className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.34em] text-neutral-400 transition-colors hover:text-neutral-600 md:hidden"
+                          >
+                            <span>{group.section}</span>
+                            <ChevronDown
+                              className={`size-3.5 shrink-0 transition-transform ${openSections[group.section] === false ? '-rotate-90' : ''}`}
+                              aria-hidden="true"
+                            />
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
-                  <div className={`space-y-1 ${openSections[group.section] === false && isExpanded ? 'md:hidden' : ''} ${openSections[group.section] === false ? 'hidden md:block' : ''}`}>
+                  <div className={`space-y-1 ${keepMenuAlwaysOpen ? '' : `${openSections[group.section] === false && isExpanded ? 'md:hidden' : ''} ${openSections[group.section] === false ? 'hidden md:block' : ''}`}`}>
                     {group.items.map((item) => {
                       const badgeCount = navBadgeCounts[NAV_BADGE_COUNTS[item.path]] || 0
 
@@ -276,14 +308,14 @@ export default function Sidebar({
                         onClick={onCloseMobile}
                         aria-label={!isExpanded ? item.label : undefined}
                         title={!isExpanded ? item.label : undefined}
-                        className={({ isActive }) =>
+                          className={({ isActive }) =>
                           `group relative flex items-center rounded-[0.9rem] py-2.5 text-sm font-medium transition-all duration-150 ${
                             isExpanded
                               ? 'gap-3 px-3.5 md:justify-start'
                               : 'gap-3 px-3.5 md:gap-0 md:px-0 md:justify-center'
                           } ${
                             isActive
-                              ? 'bg-[#bdeaa5] text-primary-700 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
+                              ? 'bg-[#c4eba9] text-neutral-900 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
                               : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
                           }`
                         }
@@ -291,7 +323,7 @@ export default function Sidebar({
                         {({ isActive }) => (
                           <>
                             <span
-                              className={`absolute left-1 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-linear-to-b from-primary-500 to-primary-700 transition-opacity ${
+                              className={`absolute left-1 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-primary-900 transition-opacity ${
                                 isActive ? 'opacity-100' : 'opacity-0'
                               }`}
                               aria-hidden="true"
@@ -327,6 +359,25 @@ export default function Sidebar({
             )
           })}
         </nav>
+
+        {showDeliveryCheckInCard && (
+          <div className="px-3 pb-3">
+            <div className="max-w-[11rem] rounded-[1rem] bg-white px-4 py-4 shadow-[0_12px_26px_-20px_rgb(15_23_42/0.22)]">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-700 text-white">
+                  <CheckCircle2 className="size-4" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold leading-tight text-neutral-900">You're checked in</p>
+                  <p className="mt-0.5 text-xs text-neutral-500">Since 8:45 AM</p>
+                </div>
+              </div>
+              <button type="button" className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary-700 hover:underline">
+                View Attendance <ArrowRight className="size-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {showUpgradeCard && (
         <div className="border-t border-neutral-100 p-3">

@@ -86,6 +86,26 @@ export async function uploadFile(file) {
   }
 }
 
+// Discards an upload that was never attached to a record (e.g. the user picked a file then
+// cancelled/reset the form before saving) - DELETE /files/{file_id}.
+export async function deleteFile(fileId) {
+  try {
+    await apiClient.delete(`/files/${encodeURIComponent(fileId)}`, {
+      headers: authHeader(),
+    })
+
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to remove the uploaded file. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function uploadFiles(files) {
   const uploadedFiles = []
 

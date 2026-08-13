@@ -1,6 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CreditCard, Edit, FileText, Plus, ShoppingBag, Undo2, UsersRound, Wallet } from 'lucide-react'
+import {
+  ArrowLeft,
+  Banknote,
+  Building2,
+  Calendar,
+  CalendarCheck2,
+  CreditCard,
+  FileText,
+  Mail,
+  MapPin,
+  Pencil,
+  Phone,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  ShoppingBag,
+  StickyNote,
+  Trash2,
+  TrendingUp,
+  Undo2,
+  UserRound,
+  UsersRound,
+  Wallet,
+} from 'lucide-react'
+import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -10,9 +34,16 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import StatCard from '../../components/ui/StatCard'
 import { ROLES } from '../../auth/roles'
-import { getCustomer, getCustomerPaymentReceipt, getCustomerPayments, recordCustomerPayment, updateCustomer, voidCustomerPayment } from '../../api/customers'
+import {
+  deleteCustomer,
+  getCustomer,
+  getCustomerPaymentReceipt,
+  getCustomerPayments,
+  recordCustomerPayment,
+  updateCustomer,
+  voidCustomerPayment,
+} from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { orders } from '../../mockData/orders'
 import { useAuthStore } from '../../store/authStore'
@@ -125,6 +156,99 @@ const normalizeCustomerPayment = (payment) => ({
   createdAt: payment.created_at,
 })
 
+const getInitials = (name = '') =>
+  name
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
+function formatDate(value) {
+  if (!value) return ''
+
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function formatDateTime(value) {
+  if (!value) return ''
+
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : `${date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+}
+
+function formatLabel(value = '') {
+  return String(value)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase())
+}
+
+function TopInfoItem({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
+        <Icon className="size-4" aria-hidden="true" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-neutral-400">{label}</p>
+        <p className="truncate text-sm font-semibold text-neutral-900" title={value || '-'}>{value || '-'}</p>
+      </div>
+    </div>
+  )
+}
+
+function MetricCard({ icon: Icon, label, value, valueClassName = '', action }) {
+  return (
+    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-sm font-medium text-neutral-500">{label}</p>
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
+          <Icon className="size-4" aria-hidden="true" />
+        </div>
+      </div>
+      <p className={`mt-3 truncate text-xl font-semibold tracking-tight text-neutral-900 ${valueClassName}`}>{value}</p>
+      {action && (
+        <button
+          type="button"
+          onClick={action.onClick}
+          className="mt-2 text-xs font-medium text-primary-700 hover:underline"
+        >
+          {action.label} →
+        </button>
+      )}
+    </div>
+  )
+}
+
+function Field({ label, value }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-neutral-400">{label}</p>
+      <p className="mt-1 truncate text-sm font-medium text-neutral-900" title={value || '-'}>{value || '-'}</p>
+    </div>
+  )
+}
+
+function Section({ number, title, icon: Icon, actions, children, className = '' }) {
+  return (
+    <div className={`rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) ${className}`}>
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
+            <Icon className="size-4" aria-hidden="true" />
+          </div>
+          <p className="text-sm font-semibold text-neutral-900">{number}. {title}</p>
+        </div>
+        {actions}
+      </div>
+      <div className="mt-4">{children}</div>
+    </div>
+  )
+}
+
 export default function CustomerDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -150,6 +274,10 @@ export default function CustomerDetail() {
   const [isVoiding, setIsVoiding] = useState(false)
   const [voidError, setVoidError] = useState('')
   const [staffUsers, setStaffUsers] = useState([])
+  const [isStatusSaving, setIsStatusSaving] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -245,7 +373,8 @@ export default function CustomerDetail() {
     )
   }
 
-  const lifetimeValue = customerOrders.reduce((sum, order) => sum + order.total, 0)
+  const totalOrdersCount = customer.totalOrders || customerOrders.length
+  const avgOrderValue = totalOrdersCount > 0 ? (customer.totalPurchases || customer.totalBilled || 0) / totalOrdersCount : 0
 
   const handleSaveCustomer = async (customerData) => {
     setIsSaving(true)
@@ -269,6 +398,39 @@ export default function CustomerDetail() {
     }))
     setIsSaving(false)
     setIsFormOpen(false)
+  }
+
+  const handleToggleStatus = async () => {
+    setIsStatusSaving(true)
+    setLoadError('')
+
+    const nextStatus = customer.status === 'active' ? 'inactive' : 'active'
+    const result = await updateCustomer(customer.id, { ...customer, status: nextStatus })
+
+    setIsStatusSaving(false)
+
+    if (!result.success) {
+      setLoadError(result.error)
+      return
+    }
+
+    setCustomer((current) => normalizeCustomer({ ...current, ...result.customer }))
+  }
+
+  const handleConfirmDelete = async () => {
+    setDeleteError('')
+    setIsDeletingCustomer(true)
+
+    const result = await deleteCustomer(customer.id)
+
+    setIsDeletingCustomer(false)
+
+    if (!result.success) {
+      setDeleteError(result.error)
+      return
+    }
+
+    navigate(basePath)
   }
 
   const handleOpenPaymentModal = () => {
@@ -376,226 +538,326 @@ export default function CustomerDetail() {
     )
   }
 
+  const billingAddressLine = [customer.billingAddress || customer.address, customer.city, customer.state, customer.pinZipCode]
+    .filter(Boolean)
+    .join(', ')
+  const shippingAddressLine = [customer.deliveryAddress || customer.shippingAddress, customer.city, customer.state, customer.pinZipCode]
+    .filter(Boolean)
+    .join(', ')
+
+  const goToEdit = () => {
+    if (isAdmin) {
+      navigate(`/admin/customers/edit/${customer.id}`)
+      return
+    }
+
+    setIsFormOpen(true)
+  }
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="secondary" size="sm" onClick={() => navigate(basePath)}>
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Back
-          </Button>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold text-neutral-900">{customer.name}</h1>
-              <Badge variant={customer.status === 'active' ? 'success' : 'neutral'}>
-                {customer.status === 'active' ? 'Active' : 'Inactive'}
-              </Badge>
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          if (isDeletingCustomer) return
+          setIsDeleteModalOpen(false)
+          setDeleteError('')
+        }}
+        title="Delete Customer"
+      >
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-neutral-600">
+            Delete {customer.name}? This cannot be undone.
+          </p>
+          {deleteError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {deleteError}
             </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <Badge variant="primary">{customer.type}</Badge>
-            </div>
+          )}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" disabled={isDeletingCustomer} onClick={() => setIsDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" onClick={handleConfirmDelete} loading={isDeletingCustomer}>
+              Delete
+            </Button>
           </div>
         </div>
+      </Modal>
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="font-(--font-display) text-2xl font-semibold tracking-tight text-neutral-900">Customer Details</h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            <button type="button" onClick={() => navigate(basePath)} className="text-neutral-500 hover:text-primary-700">Customers</button>
+            <span className="mx-1.5">/</span>
+            <span className="text-neutral-700">{customer.name}</span>
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate(basePath)}>
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Back to Customers
+          </Button>
+          <Button size="sm" onClick={goToEdit}>
+            <Pencil className="size-4" aria-hidden="true" />
+            Edit Customer
+          </Button>
           {isAdmin && (
             <Button variant="outline" size="sm" onClick={handleOpenPaymentModal}>
               <Plus className="size-4" aria-hidden="true" />
               Record Payment
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (isAdmin) {
-                navigate(`/admin/customers/edit/${customer.id}`)
-                return
-              }
-
-              setIsFormOpen(true)
-            }}
-          >
-            <Edit className="size-4" aria-hidden="true" />
-            Edit
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={ShoppingBag} iconVariant="primary" label="Total Orders" value={customerOrders.length} />
-        <StatCard icon={Wallet} iconVariant="success" label="Total Received" value={formatCurrency(customer.totalReceived || 0)} />
-        <StatCard icon={CreditCard} iconVariant="info" label="Credit Limit" value={formatCurrency(customer.creditLimit)} />
-        <StatCard
-          icon={Wallet}
-          iconVariant={customer.outstandingBalance > 0 ? 'warning' : 'neutral'}
-          label="Outstanding Balance"
-          value={formatCurrency(customer.outstandingBalance)}
-        />
-      </div>
-      <p className="sr-only">Lifetime Value {formatCurrency(lifetimeValue)}</p>
-
-      <Card
-        title="Payments"
-        subtitle="Every payment received from this customer"
-        className="p-0"
-        bodyClassName="p-0"
-        actions={
-          isAdmin ? (
-            <Button type="button" size="sm" onClick={handleOpenPaymentModal}>
-              <Plus className="size-4" aria-hidden="true" />
-              Record Payment
-            </Button>
-          ) : null
-        }
-      >
-        <div className="px-5 pb-5">
-          {paymentsError ? (
-            <div className="py-8 text-center">
-              <p className="text-sm text-red-600">{paymentsError}</p>
-              <Button type="button" variant="outline" className="mt-4" onClick={loadPayments}>
-                Retry
-              </Button>
-            </div>
-          ) : isLoadingPayments ? (
-            <LoadingSpinner label="Loading payment history..." />
-          ) : payments.length === 0 ? (
-            <p className="py-8 text-center text-sm text-neutral-500">No payments recorded for this customer yet.</p>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-neutral-100">
-              <table className="w-full min-w-3xl text-left text-sm">
-                <thead>
-                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                    <th className="whitespace-nowrap px-5 py-3">Received On</th>
-                    <th className="whitespace-nowrap px-5 py-3">Mode</th>
-                    <th className="whitespace-nowrap px-5 py-3">Invoice</th>
-                    <th className="whitespace-nowrap px-5 py-3">Order ID</th>
-                    <th className="whitespace-nowrap px-5 py-3">Reference</th>
-                    <th className="whitespace-nowrap px-5 py-3 text-right">Amount</th>
-                    <th className="whitespace-nowrap px-5 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-50">
-                  {payments.map((payment) => (
-                    <tr key={payment.id} className="transition-colors hover:bg-primary-50/35">
-                      <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">
-                        {payment.receivedOn ? new Date(payment.receivedOn).toLocaleDateString() : '-'}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5">
-                        <Badge variant="neutral">
-                          {paymentModeOptions.find((option) => option.value === payment.paymentMode)?.label || payment.paymentMode || '-'}
-                        </Badge>
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">
-                        {payment.invoice?.invoice_number || payment.invoiceId || '-'}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{payment.orderId || '-'}</td>
-                      <td className="px-5 py-3.5 text-neutral-500">{payment.reference || '-'}</td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">
-                        {formatCurrency(payment.amount)}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenReceipt(payment)}
-                            loading={downloadingReceiptId === payment.id}
-                          >
-                            <FileText className="size-4" aria-hidden="true" />
-                            Receipt
-                          </Button>
-                          {isAdmin && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => setVoidTarget(payment)}>
-                              <Undo2 className="size-4" aria-hidden="true" />
-                              Void
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {isAdmin && (
+            <ActionMenu
+              items={[
+                { label: customer.status === 'active' ? 'Set Inactive' : 'Set Active', icon: RefreshCw, onClick: isStatusSaving ? undefined : handleToggleStatus },
+                { label: 'Delete Customer', icon: Trash2, danger: true, onClick: () => setIsDeleteModalOpen(true) },
+              ]}
+            />
           )}
         </div>
-      </Card>
+      </div>
 
-      <Card title="Contact Information">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Phone</p>
-            <p className="mt-1 text-sm text-neutral-800">{customer.phone}</p>
+      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+        <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
+          <div className="flex items-start gap-4">
+            <div className="flex size-20 shrink-0 items-center justify-center rounded-full bg-primary-50 text-lg font-semibold text-primary-700 ring-1 ring-primary-100">
+              {getInitials(customer.name)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-lg font-semibold text-neutral-900">{customer.name}</p>
+              <p className="text-sm text-neutral-500">Customer ID: {customer.customerId || '-'}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Badge variant={customer.status === 'active' ? 'success' : 'danger'}>{customer.status === 'active' ? 'Active' : 'Inactive'}</Badge>
+                {customer.type && <Badge variant="primary">{customer.type}</Badge>}
+              </div>
+              <div className="mt-3 space-y-1 text-sm text-neutral-600">
+                {customer.phone && <p className="flex items-center gap-1.5"><Phone className="size-3.5 text-neutral-400" aria-hidden="true" />{customer.phone}</p>}
+                {customer.email && <p className="flex items-center gap-1.5"><Mail className="size-3.5 text-neutral-400" aria-hidden="true" />{customer.email}</p>}
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Email</p>
-            <p className="mt-1 text-sm text-neutral-800">{customer.email || '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">GST Number</p>
-            <p className="mt-1 text-sm text-neutral-800">{customer.gstNumber || '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Assigned Sales Officer</p>
-            <p className="mt-1 text-sm text-neutral-800">{assignedSalesOfficer?.name || 'Unassigned'}</p>
-          </div>
-          <div className="sm:col-span-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Billing Address</p>
-            <p className="mt-1 text-sm text-neutral-800">{customer.billingAddress || customer.address || '—'}</p>
-          </div>
-          <div className="sm:col-span-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Delivery Address</p>
-            <p className="mt-1 text-sm text-neutral-800">{customer.deliveryAddress || customer.billingAddress || customer.address || '—'}</p>
+
+          <div className="grid gap-x-6 gap-y-4 border-t border-neutral-100 pt-5 sm:grid-cols-3 lg:border-t-0 lg:border-l lg:pl-6 lg:pt-0">
+            <TopInfoItem icon={ShieldCheck} label="GST Number" value={customer.gstNumber} />
+            <TopInfoItem icon={UserRound} label="Assigned Sales Officer" value={assignedSalesOfficer?.name} />
+            <TopInfoItem icon={CalendarCheck2} label="Credit Terms" value={customer.paymentTerms} />
+            <TopInfoItem icon={CreditCard} label="Payment Type" value={formatLabel(customer.preferredPaymentMethod)} />
+            <TopInfoItem icon={Calendar} label="Customer Since" value={formatDate(customer.customerSince)} />
+            <TopInfoItem icon={Calendar} label="Created On" value={formatDateTime(customer.createdAt)} />
           </div>
         </div>
-      </Card>
+      </div>
 
-      <Card title="Order & Transaction History" subtitle="Every sales order placed by this customer" className="p-0" bodyClassName="p-0">
-        {customerOrders.length === 0 ? (
-          <div className="p-5">
-            <p className="py-8 text-center text-sm text-neutral-500">No orders recorded for this customer yet.</p>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+        <MetricCard
+          icon={ShoppingBag}
+          label="Total Orders"
+          value={totalOrdersCount}
+          action={{ label: 'View Orders', onClick: () => document.getElementById('order-history')?.scrollIntoView({ behavior: 'smooth' }) }}
+        />
+        <MetricCard
+          icon={Wallet}
+          label="Total Received"
+          value={formatCurrency(customer.totalReceived || 0)}
+          action={{ label: 'View Payments', onClick: () => document.getElementById('payment-history')?.scrollIntoView({ behavior: 'smooth' }) }}
+        />
+        <MetricCard
+          icon={CreditCard}
+          label="Credit Limit"
+          value={formatCurrency(customer.creditLimit)}
+          action={{ label: 'Edit Limit', onClick: goToEdit }}
+        />
+        <MetricCard
+          icon={Wallet}
+          label="Outstanding Balance"
+          value={formatCurrency(customer.outstandingBalance)}
+          valueClassName={customer.outstandingBalance > 0 ? 'text-amber-600' : ''}
+          action={{ label: 'View Payments', onClick: () => document.getElementById('payment-history')?.scrollIntoView({ behavior: 'smooth' }) }}
+        />
+        <MetricCard
+          icon={Calendar}
+          label="Last Order Date"
+          value={formatDate(customer.lastPurchaseDate) || '-'}
+          action={{ label: 'View Orders', onClick: () => document.getElementById('order-history')?.scrollIntoView({ behavior: 'smooth' }) }}
+        />
+        <MetricCard icon={TrendingUp} label="Avg. Order Value" value={formatCurrency(avgOrderValue)} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Section number={1} title="Contact Information" icon={Phone}>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+            <Field label="Primary Phone" value={customer.phone} />
+            <Field label="Alternate Mobile" value={customer.alternateMobileNumber} />
+            <Field label="Email Address" value={customer.email} />
+            <Field label="Website" value={customer.website} />
+            <Field label="Primary Contact Person" value={customer.primaryContactPerson} />
+            <Field label="Designation" value={customer.designation} />
+            <Field label="Communication Preference" value={customer.preferredCommunication} />
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-3xl text-left text-sm">
-              <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                  <th className="whitespace-nowrap px-5 py-3">Order #</th>
-                  <th className="whitespace-nowrap px-5 py-3">Date</th>
-                  <th className="whitespace-nowrap px-5 py-3">Status</th>
-                  <th className="whitespace-nowrap px-5 py-3">Payment</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Total</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Balance Due</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-50">
-                {customerOrders.map((order) => (
-                  <tr key={order.id} className="transition-colors hover:bg-primary-50/35">
-                    <td className="whitespace-nowrap px-5 py-3.5 font-medium text-neutral-800">{order.orderNumber}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-neutral-500">{order.orderDate}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5">
-                      <Badge variant={statusVariant[order.status] || 'neutral'}>{order.status}</Badge>
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5">
-                      <Badge variant={paymentVariant[order.paymentStatus] || 'neutral'} dot>
-                        {order.paymentStatus}
+        </Section>
+
+        <Section number={2} title="Business & Tax Information" icon={Building2}>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+            <Field label="Business Type" value={formatLabel(customer.customerType)} />
+            <Field label="Industry" value={formatLabel(customer.industry)} />
+            <Field label="GST Number" value={customer.gstNumber} />
+            <Field label="PAN / Registration No." value={customer.panBusinessRegistrationNo} />
+            <Field label="Tax Category" value={formatLabel(customer.taxCategory)} />
+            <Field label="Tax Exempt" value={customer.taxExempt ? 'Yes' : 'No'} />
+            <Field label="Currency" value={customer.currency} />
+          </div>
+        </Section>
+
+        <Section number={3} title="Address Information" icon={MapPin}>
+          <div className="grid grid-cols-1 gap-x-4 gap-y-4">
+            <Field label="Billing Address" value={billingAddressLine} />
+            <Field label="Shipping Address" value={shippingAddressLine} />
+            <Field label="Country" value={customer.country} />
+          </div>
+        </Section>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Section number={4} title="Financial Summary" icon={Banknote}>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+            <Field label="Credit Limit" value={formatCurrency(customer.creditLimit)} />
+            <Field label="Outstanding Balance" value={formatCurrency(customer.outstandingBalance)} />
+            <Field label="Available Credit" value={formatCurrency(customer.availableCredit)} />
+            <Field label="Total Received" value={formatCurrency(customer.totalReceived || 0)} />
+            <Field label="Total Billed" value={formatCurrency(customer.totalBilled || 0)} />
+            <Field label="Opening Balance" value={formatCurrency(customer.openingBalance || 0)} />
+          </div>
+        </Section>
+
+        <Section number={5} title="Sales & Relationship Details" icon={UserRound}>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+            <Field label="Assigned Sales Officer" value={assignedSalesOfficer?.name || 'Unassigned'} />
+            <Field label="Lead Source" value={formatLabel(customer.leadSource)} />
+            <Field label="Territory" value={customer.territory} />
+            <Field label="Customer Priority" value={formatLabel(customer.customerPriority)} />
+            <Field label="Customer Since" value={formatDate(customer.customerSince)} />
+            <Field label="Customer Tags" value={customer.customerTags} />
+          </div>
+        </Section>
+
+        <Section
+          number={6}
+          title="Payment History"
+          icon={CreditCard}
+          className="xl:col-span-1"
+          actions={isAdmin && (
+            <Button type="button" variant="ghost" size="sm" onClick={handleOpenPaymentModal}>
+              <Plus className="size-4" aria-hidden="true" />
+              Record
+            </Button>
+          )}
+        >
+          <div id="payment-history" className="scroll-mt-6">
+            {paymentsError ? (
+              <div className="py-6 text-center">
+                <p className="text-sm text-red-600">{paymentsError}</p>
+                <Button type="button" variant="outline" size="sm" className="mt-3" onClick={loadPayments}>Retry</Button>
+              </div>
+            ) : isLoadingPayments ? (
+              <LoadingSpinner label="Loading payment history..." />
+            ) : payments.length === 0 ? (
+              <p className="py-6 text-center text-sm text-neutral-400">No payments recorded for this customer yet.</p>
+            ) : (
+              <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                {payments.map((payment) => (
+                  <div key={payment.id} className="rounded-xl border border-neutral-100 bg-neutral-50 px-3.5 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-neutral-900">{formatCurrency(payment.amount)}</p>
+                      <Badge variant="neutral">
+                        {paymentModeOptions.find((option) => option.value === payment.paymentMode)?.label || payment.paymentMode || '-'}
                       </Badge>
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">
-                      {formatCurrency(order.total)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">
-                      {formatCurrency(order.balanceDue)}
-                    </td>
-                  </tr>
+                    </div>
+                    <p className="mt-1 text-xs text-neutral-400">
+                      {payment.receivedOn ? new Date(payment.receivedOn).toLocaleDateString() : '-'}
+                      {payment.invoice?.invoice_number || payment.invoiceId ? ` · ${payment.invoice?.invoice_number || payment.invoiceId}` : ''}
+                    </p>
+                    <div className="mt-2 flex justify-end gap-1">
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleOpenReceipt(payment)} loading={downloadingReceiptId === payment.id}>
+                        <FileText className="size-3.5" aria-hidden="true" />
+                        Receipt
+                      </Button>
+                      {isAdmin && (
+                        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setVoidTarget(payment)}>
+                          <Undo2 className="size-3.5" aria-hidden="true" />
+                          Void
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
-        )}
-      </Card>
+        </Section>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Section number={7} title="Order & Transaction History" icon={ShoppingBag} className="xl:col-span-2">
+          <div id="order-history" className="scroll-mt-6">
+            {customerOrders.length === 0 ? (
+              <p className="py-6 text-center text-sm text-neutral-400">No orders recorded for this customer yet.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-neutral-100">
+                <table className="w-full min-w-2xl text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                      <th className="whitespace-nowrap px-4 py-2.5">Order #</th>
+                      <th className="whitespace-nowrap px-4 py-2.5">Date</th>
+                      <th className="whitespace-nowrap px-4 py-2.5">Status</th>
+                      <th className="whitespace-nowrap px-4 py-2.5">Payment</th>
+                      <th className="whitespace-nowrap px-4 py-2.5 text-right">Total</th>
+                      <th className="whitespace-nowrap px-4 py-2.5 text-right">Balance Due</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-50">
+                    {customerOrders.map((order) => (
+                      <tr key={order.id} className="transition-colors hover:bg-primary-50/35">
+                        <td className="whitespace-nowrap px-4 py-3 font-medium text-neutral-800">{order.orderNumber}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{order.orderDate}</td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <Badge variant={statusVariant[order.status] || 'neutral'}>{order.status}</Badge>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <Badge variant={paymentVariant[order.paymentStatus] || 'neutral'} dot>{order.paymentStatus}</Badge>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(order.total)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-neutral-600">{formatCurrency(order.balanceDue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </Section>
+
+        <Section number={8} title="Notes & Preferences" icon={StickyNote} actions={
+          <Button type="button" variant="ghost" size="sm" onClick={goToEdit}>Edit</Button>
+        }>
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs text-neutral-400">Customer Notes</p>
+              <p className="mt-1 whitespace-pre-line text-sm text-neutral-800">{customer.notes || 'No notes added yet.'}</p>
+            </div>
+            <div className="border-t border-neutral-100 pt-4">
+              <p className="text-xs text-neutral-400">Preferences</p>
+              <ul className="mt-2 space-y-1.5 text-sm text-neutral-700">
+                <li>Communication: {customer.preferredCommunication || '-'}</li>
+                <li>Payment Method: {formatLabel(customer.preferredPaymentMethod) || '-'}</li>
+                <li>Tags: {customer.customerTags || '-'}</li>
+              </ul>
+            </div>
+          </div>
+        </Section>
+      </div>
 
       <Modal isOpen={isPaymentModalOpen} onClose={handleClosePaymentModal} title="Record Customer Payment">
         <form onSubmit={handleRecordPayment} className="space-y-4">

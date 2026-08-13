@@ -70,6 +70,33 @@ export const roleHomePath = {
   [ROLES.ACCOUNTANT]: '/accounts/dashboard',
 }
 
+// role.workspace (from /auth/me) is free text set by whoever created the role - admins can
+// define custom roles with any workspace value via the Roles module. Only these four have an
+// actual dashboard/route tree built in this app today; anything else falls back to /profile,
+// which every authenticated user can reach, instead of a hardcoded case per workspace.
+export const workspaceHomePath = {
+  admin: '/admin/dashboard',
+  sales: '/sales/dashboard',
+  delivery: '/delivery/dashboard',
+  accounts: '/accounts/dashboard',
+}
+
+const UNIVERSAL_FALLBACK_PATH = '/profile'
+
+// Resolves where a signed-in user should land: full_access (Admin) always goes to the admin
+// dashboard; otherwise workspace drives it; falls back to the legacy role-string map for
+// sessions that predate the workspace field, and finally to a page every role can reach.
+export function resolveHomePath({ fullAccess, role, currentUser } = {}) {
+  if (fullAccess) return roleHomePath[ROLES.ADMIN]
+
+  const workspace = role?.workspace
+  if (workspace && workspaceHomePath[workspace]) {
+    return workspaceHomePath[workspace]
+  }
+
+  return roleHomePath[currentUser?.role] || UNIVERSAL_FALLBACK_PATH
+}
+
 export const roleProfileSettingsPath = {
   [ROLES.ADMIN]: '/admin/settings',
 }
@@ -91,55 +118,55 @@ export const roleMenus = {
     {
       section: 'Overview',
       items: [
-        { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+        { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard, module: 'dashboard' },
       ],
     },
     {
       section: 'Sales Operation',
       items: [
-        { label: 'Customers', path: '/admin/customers', icon: UsersRound },
-        { label: 'Leads', path: '/admin/leads', icon: UserPlus },
-        { label: 'Quotations', path: '/admin/quotations', icon: FileText },
-        { label: 'Suppliers', path: '/admin/suppliers', icon: Factory },
-        { label: 'Categories', path: '/admin/categories', icon: Tags },
-        { label: 'Products', path: '/admin/products', icon: Package },
+        { label: 'Customers', path: '/admin/customers', icon: UsersRound, module: 'customers' },
+        { label: 'Leads', path: '/admin/leads', icon: UserPlus, module: 'leads' },
+        { label: 'Quotations', path: '/admin/quotations', icon: FileText, module: 'quotations' },
+        { label: 'Suppliers', path: '/admin/suppliers', icon: Factory, module: 'suppliers' },
+        { label: 'Categories', path: '/admin/categories', icon: Tags, module: 'products' },
+        { label: 'Products', path: '/admin/products', icon: Package, module: 'products' },
       ],
     },
     {
       section: 'Operations',
       items: [
-        { label: 'Inventory', path: '/admin/inventory', icon: Warehouse },
-        { label: 'Orders', path: '/admin/orders', icon: ShoppingCart },
-        { label: 'Vehicle Stock', path: '/admin/vehicle-stock', icon: Car },
-        { label: 'Purchases', path: '/admin/purchases', icon: PackagePlus },
-        { label: 'Deliveries', path: '/admin/deliveries', icon: Truck },
+        { label: 'Inventory', path: '/admin/inventory', icon: Warehouse, module: 'inventory' },
+        { label: 'Orders', path: '/admin/orders', icon: ShoppingCart, module: 'sales_orders' },
+        { label: 'Vehicle Stock', path: '/admin/vehicle-stock', icon: Car, module: 'vehicle_stock' },
+        { label: 'Purchases', path: '/admin/purchases', icon: PackagePlus, module: 'purchases' },
+        { label: 'Deliveries', path: '/admin/deliveries', icon: Truck, module: 'deliveries' },
       ],
     },
     {
       section: 'Finance',
       items: [
-        { label: 'Invoices', path: '/admin/invoices', icon: FileText },
-        { label: 'Expenses', path: '/admin/expenses', icon: Receipt },
-        { label: 'Reports', path: '/admin/reports', icon: FileSpreadsheet },
+        { label: 'Invoices', path: '/admin/invoices', icon: FileText, module: 'invoices' },
+        { label: 'Expenses', path: '/admin/expenses', icon: Receipt, module: 'expenses' },
+        { label: 'Reports', path: '/admin/reports', icon: FileSpreadsheet, module: 'reports' },
       ],
     },
     {
       section: 'Administration',
       items: [
-        { label: 'Company Settings', path: '/admin/company-settings', icon: Store },
+        { label: 'Company Settings', path: '/admin/company-settings', icon: Store, module: 'settings' },
         { label: 'Plans', path: '/admin/plans', icon: CreditCard },
-        { label: 'Staff', path: '/admin/users', icon: Users },
-        { label: 'Roles & Permissions', path: '/admin/roles', icon: ShieldCheck },
-        { label: 'Object Field Settings', path: '/admin/object-fields', icon: SlidersHorizontal },
-        { label: 'Attendance', path: '/admin/attendance', icon: ClipboardCheck },
-        { label: 'Audit Logs', path: '/admin/audit-logs', icon: History },
+        { label: 'Staff', path: '/admin/users', icon: Users, module: 'users' },
+        { label: 'Roles & Permissions', path: '/admin/roles', icon: ShieldCheck, module: 'users', action: 'edit' },
+        { label: 'Object Field Settings', path: '/admin/object-fields', icon: SlidersHorizontal, module: 'settings' },
+        { label: 'Attendance', path: '/admin/attendance', icon: ClipboardCheck, module: 'attendance' },
+        { label: 'Audit Logs', path: '/admin/audit-logs', icon: History, module: 'reports' },
       ],
     },
     {
       section: 'System',
       items: [
         { label: 'Notifications', path: '/admin/notifications', icon: Bell },
-        { label: 'Settings', path: '/admin/settings', icon: Settings },
+        { label: 'Settings', path: '/admin/settings', icon: Settings, module: 'settings' },
       ],
     },
   ],
@@ -147,15 +174,15 @@ export const roleMenus = {
     {
       section: 'Main menu',
       items: [
-        { label: 'Dashboard', path: '/sales/dashboard', icon: LayoutDashboard },
-        { label: 'Customers', path: '/sales/customers', icon: Users },
-        { label: 'Leads', path: '/sales/leads', icon: UserPlus },
-        { label: 'Quotations', path: '/sales/quotations', icon: FileText },
-        { label: 'Create Order', path: '/sales/orders/create', icon: ShoppingCart },
-        { label: 'Stock', path: '/sales/stock', icon: Boxes },
+        { label: 'Dashboard', path: '/sales/dashboard', icon: LayoutDashboard, module: 'dashboard' },
+        { label: 'Customers', path: '/sales/customers', icon: Users, module: 'customers' },
+        { label: 'Leads', path: '/sales/leads', icon: UserPlus, module: 'leads' },
+        { label: 'Quotations', path: '/sales/quotations', icon: FileText, module: 'quotations' },
+        { label: 'Create Order', path: '/sales/orders/create', icon: ShoppingCart, module: 'sales_orders', action: 'create' },
+        { label: 'Stock', path: '/sales/stock', icon: Boxes, module: 'inventory' },
         { label: 'Visits', path: '/sales/visits', icon: MapPin },
         { label: 'Follow-ups', path: '/sales/followups', icon: ClipboardList },
-        { label: 'Attendance', path: '/sales/attendance', icon: ClipboardCheck },
+        { label: 'Attendance', path: '/sales/attendance', icon: ClipboardCheck, module: 'attendance' },
         { label: 'My Performance', path: '/sales/performance', icon: Target },
       ],
     },
@@ -164,15 +191,13 @@ export const roleMenus = {
     {
       section: 'Main menu',
       items: [
-        { label: 'Dashboard', path: '/delivery/dashboard', icon: LayoutDashboard },
-        { label: 'Customers', path: '/delivery/customers', icon: Users },
-        { label: 'Create Order', path: '/delivery/orders/create', icon: ShoppingCart },
-        { label: 'Vehicle Loading', path: '/delivery/vehicle-loading', icon: PackageCheck },
-        { label: 'Deliveries', path: '/delivery/deliveries', icon: Truck },
-        { label: 'Expenses', path: '/delivery/expenses', icon: Receipt },
-        { label: 'End of Day Return', path: '/delivery/end-of-day', icon: PackageX },
-        { label: 'Attendance', path: '/delivery/attendance', icon: Calendar },
-        { label: 'Vehicle Stock', path: '/delivery/vehicle-stock', icon: Warehouse },
+        { label: 'Dashboard', path: '/delivery/dashboard', icon: LayoutDashboard, module: 'dashboard' },
+        { label: 'Customers', path: '/delivery/customers', icon: Users, module: 'customers' },
+        { label: 'Vehicle Loading', path: '/delivery/vehicle-loading', icon: PackageCheck, module: 'vehicle_stock' },
+        { label: 'Deliveries', path: '/delivery/deliveries', icon: Truck, module: 'deliveries' },
+        { label: 'End of Day Return', path: '/delivery/end-of-day', icon: PackageX, module: 'vehicle_stock' },
+        { label: 'Attendance', path: '/delivery/attendance', icon: Calendar, module: 'attendance' },
+        { label: 'Vehicle Stock', path: '/delivery/vehicle-stock', icon: Warehouse, module: 'vehicle_stock' },
       ],
     },
   ],
@@ -180,15 +205,15 @@ export const roleMenus = {
     {
       section: 'Main menu',
       items: [
-        { label: 'Dashboard', path: '/accounts/dashboard', icon: LayoutDashboard },
-        { label: 'Purchase Invoices', path: '/accounts/invoices/purchases', icon: PackagePlus },
-        { label: 'Sales Invoices', path: '/accounts/invoices/sales', icon: ShoppingCart },
-        { label: 'Record Payment', path: '/accounts/payments/record', icon: Wallet },
-        { label: 'Expense Approval', path: '/accounts/expenses/approval', icon: Receipt },
-        { label: 'Cash Reconciliation', path: '/accounts/reconciliation/cash', icon: IndianRupee },
-        { label: 'Receivables/Payables', path: '/accounts/outstanding', icon: TrendingUp },
-        { label: 'GST Summary', path: '/accounts/gst', icon: FileCheck },
-        { label: 'Financial Reports', path: '/accounts/reports', icon: FileSpreadsheet },
+        { label: 'Dashboard', path: '/accounts/dashboard', icon: LayoutDashboard, module: 'dashboard' },
+        { label: 'Purchase Invoices', path: '/accounts/invoices/purchases', icon: PackagePlus, module: 'invoices' },
+        { label: 'Sales Invoices', path: '/accounts/invoices/sales', icon: ShoppingCart, module: 'invoices' },
+        { label: 'Record Payment', path: '/accounts/payments/record', icon: Wallet, module: 'payments' },
+        { label: 'Expense Approval', path: '/accounts/expenses/approval', icon: Receipt, module: 'expenses', action: 'approve' },
+        { label: 'Cash Reconciliation', path: '/accounts/reconciliation/cash', icon: IndianRupee, module: 'payments' },
+        { label: 'Receivables/Payables', path: '/accounts/outstanding', icon: TrendingUp, module: 'reports' },
+        { label: 'GST Summary', path: '/accounts/gst', icon: FileCheck, module: 'gst' },
+        { label: 'Financial Reports', path: '/accounts/reports', icon: FileSpreadsheet, module: 'reports' },
       ],
     },
   ],

@@ -75,18 +75,14 @@ export default function Topbar() {
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3">
-      <h1 className="mt-3 hidden min-w-[13rem] font-(--font-display) text-2xl font-semibold tracking-tight text-neutral-900 lg:block">
-        {pageTitle}
-      </h1>
-
       {pageTitle == 'Dashboard' && (
-        <div className="relative hidden w-full max-w-md sm:block lg:mx-auto">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-        <input
-          type="text"
-          placeholder="Search anything..."
-          className="w-full rounded-full border border-transparent bg-neutral-100 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-        />
+        <div className="relative hidden w-full max-w-[31rem] sm:block lg:mx-auto">
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+          <input
+            type="text"
+            placeholder="Search deliveries, customers, orders..."
+            className="w-full rounded-full border border-neutral-200 bg-white py-2.5 pl-11 pr-4 text-sm text-neutral-700 shadow-[0_10px_22px_-18px_rgb(15_23_42/0.18)] transition-all placeholder:text-neutral-400 focus:border-neutral-300 focus:outline-none focus:ring-4 focus:ring-primary-500/10"
+          />
         </div>
       )}
 

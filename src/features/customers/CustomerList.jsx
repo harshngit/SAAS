@@ -16,6 +16,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
+import { RequirePermission } from '../../auth/RequirePermission'
 import { createCustomer, deleteCustomer as deleteCustomerApi, getCustomer, listCustomers, updateCustomer } from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { users as seedUsers } from '../../mockData/users'
@@ -335,10 +336,12 @@ export default function CustomerList() {
                 )
               })}
             </div>
-            <Button onClick={() => handleOpenForm()} size="sm" className="w-full sm:w-auto">
-              <Plus className="size-4" aria-hidden="true" />
-              Add Customer
-            </Button>
+            <RequirePermission module="customers" action="create">
+              <Button onClick={() => handleOpenForm()} size="sm" className="w-full sm:w-auto">
+                <Plus className="size-4" aria-hidden="true" />
+                Add Customer
+              </Button>
+            </RequirePermission>
           </div>
         </div>
 
@@ -390,10 +393,12 @@ export default function CustomerList() {
               <p className="mt-1 text-sm text-neutral-500">
                 Create the first customer profile to begin tracking billing, delivery, and sales ownership.
               </p>
-              <Button type="button" className="mt-4" onClick={() => handleOpenForm()}>
-                <Plus className="size-4" aria-hidden="true" />
-                Add Customer
-              </Button>
+              <RequirePermission module="customers" action="create">
+                <Button type="button" className="mt-4" onClick={() => handleOpenForm()}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  Add Customer
+                </Button>
+              </RequirePermission>
             </div>
           ) : filteredCustomers.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No customers match these filters.</p>

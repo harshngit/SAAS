@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from '../components/layout/Layout'
 import ProtectedRoute from '../auth/ProtectedRoute'
+import RequirePermissionRoute from '../auth/RequirePermission'
 import Login from '../features/auth/Login'
 import Register from '../auth/Register'
 import SuperAdminDashboard from '../features/dashboard/SuperAdminDashboard'
@@ -9,7 +10,7 @@ import SalesOfficerDashboard from '../features/dashboard/SalesOfficerDashboard'
 import DeliveryPartnerDashboard from '../features/dashboard/DeliveryPartnerDashboard'
 import AccountantDashboard from '../features/dashboard/AccountantDashboard'
 import { useAuthStore } from '../store/authStore'
-import { ROLES, roleHomePath } from '../auth/roles'
+import { ROLES, resolveHomePath } from '../auth/roles'
 import CompanySettings from '../features/company/CompanySettings'
 import UserManagement from '../features/users/UserManagement'
 import UserDetail from '../features/users/UserDetail'
@@ -74,7 +75,9 @@ import Profile from '../features/profile/Profile'
 
 function RootRedirect() {
   const currentUser = useAuthStore((state) => state.currentUser)
-  if (currentUser) return <Navigate to={roleHomePath[currentUser.role]} replace />
+  const fullAccess = useAuthStore((state) => state.fullAccess)
+  const role = useAuthStore((state) => state.role)
+  if (currentUser) return <Navigate to={resolveHomePath({ fullAccess, role, currentUser })} replace />
   return <Navigate to="/login" replace />
 }
 
@@ -88,7 +91,7 @@ export default function AppRoutes() {
 
         <Route
           element={
-            <ProtectedRoute allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.SALES_OFFICER, ROLES.DELIVERY_PARTNER, ROLES.ACCOUNTANT]}>
+            <ProtectedRoute>
               <Layout />
             </ProtectedRoute>
           }
@@ -120,16 +123,58 @@ export default function AppRoutes() {
         >
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/orders" element={<OrderList />} />
-          <Route path="/admin/orders/create" element={<CreateSalesOrder />} />
+          <Route
+            path="/admin/orders/create"
+            element={
+              <RequirePermissionRoute module="sales_orders" action="create">
+                <CreateSalesOrder />
+              </RequirePermissionRoute>
+            }
+          />
           <Route path="/admin/orders/:id" element={<OrderDetail />} />
           <Route path="/admin/company-settings" element={<CompanySettings />} />
           <Route path="/admin/plans" element={<AdminPlans />} />
-          <Route path="/admin/users" element={<UserManagement />} />
-          <Route path="/admin/users/edit/:user_id" element={<UserEdit />} />
+          <Route
+            path="/admin/users"
+            element={
+              <RequirePermissionRoute module="users">
+                <UserManagement />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/users/edit/:user_id"
+            element={
+              <RequirePermissionRoute module="users" action="edit">
+                <UserEdit />
+              </RequirePermissionRoute>
+            }
+          />
           <Route path="/admin/users/:user_id" element={<UserDetail />} />
-          <Route path="/admin/roles" element={<RolesList />} />
-          <Route path="/admin/roles/new" element={<RoleForm />} />
-          <Route path="/admin/roles/edit/:role_id" element={<RoleForm />} />
+          <Route
+            path="/admin/roles"
+            element={
+              <RequirePermissionRoute module="users" action="edit">
+                <RolesList />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/roles/new"
+            element={
+              <RequirePermissionRoute module="users" action="edit">
+                <RoleForm />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/roles/edit/:role_id"
+            element={
+              <RequirePermissionRoute module="users" action="edit">
+                <RoleForm />
+              </RequirePermissionRoute>
+            }
+          />
           <Route path="/admin/attendance" element={<AdminAttendance />} />
           <Route path="/admin/attendance/:userId" element={<AttendanceDetail />} />
           <Route path="/admin/customers" element={<CustomerList />} />
@@ -175,7 +220,14 @@ export default function AppRoutes() {
           <Route path="/sales/quotations" element={<QuotationList />} />
           <Route path="/sales/quotations/new" element={<QuotationFormPage />} />
           <Route path="/sales/quotations/:id" element={<QuotationDetail />} />
-          <Route path="/sales/orders/create" element={<CreateSalesOrder />} />
+          <Route
+            path="/sales/orders/create"
+            element={
+              <RequirePermissionRoute module="sales_orders" action="create">
+                <CreateSalesOrder />
+              </RequirePermissionRoute>
+            }
+          />
           <Route path="/sales/stock" element={<StockBoard readOnly />} />
           <Route path="/sales/visits" element={<VisitCheckIn />} />
           <Route path="/sales/followups" element={<FollowUpsList />} />
@@ -193,7 +245,14 @@ export default function AppRoutes() {
           <Route path="/delivery/dashboard" element={<DeliveryPartnerDashboard />} />
           <Route path="/delivery/customers" element={<CustomerList />} />
           <Route path="/delivery/customers/:id" element={<CustomerDetail />} />
-          <Route path="/delivery/orders/create" element={<CreateSalesOrder restrictToVehicleStock />} />
+          <Route
+            path="/delivery/orders/create"
+            element={
+              <RequirePermissionRoute module="sales_orders" action="create">
+                <CreateSalesOrder restrictToVehicleStock />
+              </RequirePermissionRoute>
+            }
+          />
           <Route path="/delivery/vehicle-loading" element={<VehicleLoading />} />
           <Route path="/delivery/deliveries" element={<AssignedDeliveries />} />
           <Route path="/delivery/deliveries/:id" element={<DeliveryDetail />} />

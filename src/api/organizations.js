@@ -56,6 +56,27 @@ export async function getOrganizationSettings() {
   }
 }
 
+// Admin-only, read-only, entirely derived: company, counts, storage, profile_completion,
+// authorized_person, documents, addresses, recent_activity.
+export async function getOrganizationOverview(activityLimit = 10) {
+  try {
+    const { data } = await apiClient.get('/organizations/overview', {
+      headers: authHeader(),
+      params: { activity_limit: activityLimit },
+    })
+
+    return { success: true, overview: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load company overview. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function getCurrentOrganizationState() {
   try {
     const { data } = await apiClient.get('/organizations/me', {

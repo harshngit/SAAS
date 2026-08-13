@@ -18,8 +18,8 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import { listCustomerDocuments, uploadCustomerDocument, uploadOtherCustomerDocuments } from '../../api/customers'
-import { uploadFiles as uploadGenericFiles } from '../../api/files'
+import { listCustomerDocuments, updateCustomer } from '../../api/customers'
+import { deleteFile, uploadFile, uploadFiles as uploadGenericFiles } from '../../api/files'
 import { formatCurrency } from '../../utils/format'
 
 const documentTypeByField = {
@@ -484,6 +484,10 @@ export default function CustomerForm({
   const [uploadPreviews, setUploadPreviews] = useState({})
   const [uploadedFileUrls, setUploadedFileUrls] = useState({})
   const uploadPreviewsRef = useRef({})
+  // Tracks file_ids from POST /files/upload that aren't attached to a saved customer yet
+  // (create mode, before the record exists) - so a discarded/replaced upload can be cleaned
+  // up with DELETE /files/{file_id} instead of leaking an orphaned file.
+  const stagedFileIdsRef = useRef({})
   const [uploadingField, setUploadingField] = useState('')
   const [documentsError, setDocumentsError] = useState('')
 
@@ -522,6 +526,7 @@ export default function CustomerForm({
       return {}
     })
     setUploadedFileUrls({})
+    stagedFileIdsRef.current = {}
   }, [customer, currentUser, initialCustomer, isOpen, isSalesOfficer, salesOfficerOptions])
 
   useEffect(() => {
@@ -593,14 +598,27 @@ export default function CustomerForm({
     })
   }
 
+  // Best-effort: discard a previously staged (uploaded but never attached) file. Failures are
+  // swallowed - a leftover unattached upload isn't worth surfacing an error for.
+  const discardStagedFiles = (name) => {
+    const staged = stagedFileIdsRef.current[name]
+    if (!staged) return
+
+    const ids = Array.isArray(staged) ? staged : [staged]
+    ids.forEach((fileId) => {
+      if (fileId) deleteFile(fileId)
+    })
+    delete stagedFileIdsRef.current[name]
+  }
+
   const handleUploadChange = async (name, files) => {
     const selectedFiles = Array.from(files || [])
     if (selectedFiles.length === 0) return
 
     const customerId = customer?.id
 
-    // No customer to attach documents to yet (still creating) — keep a local-only preview;
-    // real uploads only happen once the customer exists.
+    // No customer to attach documents to yet (still creating) — upload via the generic
+    // endpoint and keep the file_id staged until the customer is actually saved.
     if (!customerId) {
       const fileNames = selectedFiles.map((file) => file.name).join(', ')
 
@@ -628,6 +646,11 @@ export default function CustomerForm({
         return
       }
 
+      discardStagedFiles(name)
+      stagedFileIdsRef.current[name] = name === 'otherDocuments'
+        ? result.files.map((file) => file.file_id).filter(Boolean)
+        : result.files[0]?.file_id
+
       const urls = result.files.map((file) => file.url).filter(Boolean)
       setUploadPreviews((current) => {
         revokeUploadPreviewUrls(current[name])
@@ -649,36 +672,56 @@ export default function CustomerForm({
       return
     }
 
+    // Editing an existing customer: upload via the generic endpoint, then persist the URL
+    // with a normal customer update (same pattern the Users module uses).
     setDocumentsError('')
     setUploadingField(name)
 
-    if (name === 'otherDocuments') {
-      const result = await uploadOtherCustomerDocuments(customerId, selectedFiles)
+    const uploadResult = name === 'otherDocuments'
+      ? await uploadGenericFiles(selectedFiles)
+      : await uploadFile(selectedFiles[0])
+
+    if (!uploadResult.success) {
       setUploadingField('')
-
-      if (!result.success) {
-        setDocumentsError(result.error)
-        return
-      }
-
-      applyServerDocumentPreviews(name, result.documents)
-      updateField(name, `${result.documents.length} file(s)`)
+      setDocumentsError(uploadResult.error)
       return
     }
 
-    const result = await uploadCustomerDocument(customerId, documentTypeByField[name], selectedFiles[0])
+    const newUrls = name === 'otherDocuments'
+      ? uploadResult.files.map((file) => file.url).filter(Boolean)
+      : [uploadResult.file.url]
+
+    const existingUrls = name === 'otherDocuments'
+      ? (uploadPreviews[name] || []).map((preview) => preview.url).filter(Boolean)
+      : []
+
+    const patchValue = name === 'otherDocuments' ? [...existingUrls, ...newUrls] : newUrls[0]
+    const patchResult = await updateCustomer(customerId, { ...formData, [name]: patchValue })
     setUploadingField('')
 
-    if (!result.success) {
-      setDocumentsError(result.error)
+    if (!patchResult.success) {
+      setDocumentsError(patchResult.error)
       return
     }
 
-    applyServerDocumentPreviews(name, [result.document])
-    updateField(name, result.document.name || 'Uploaded')
+    const existingPreviews = name === 'otherDocuments' ? (uploadPreviews[name] || []) : []
+    const newDocs = name === 'otherDocuments'
+      ? uploadResult.files.map((file, index) => ({ name: file.name || selectedFiles[index]?.name, content_type: file.content_type, url: file.url }))
+      : [{ name: uploadResult.file.name || selectedFiles[0]?.name, content_type: uploadResult.file.content_type, url: uploadResult.file.url }]
+    const allDocs = [
+      ...existingPreviews.map((preview) => ({ name: preview.name, content_type: preview.type, url: preview.url })),
+      ...newDocs,
+    ]
+
+    applyServerDocumentPreviews(name, allDocs)
+    updateField(name, name === 'otherDocuments' ? `${allDocs.length} file(s)` : newDocs[0].name || 'Uploaded')
   }
 
   const handleUploadRemove = (name) => {
+    if (!customer?.id) {
+      discardStagedFiles(name)
+    }
+
     setUploadPreviews((current) => {
       revokeUploadPreviewUrls(current[name])
       const { [name]: removed, ...remaining } = current
@@ -692,6 +735,15 @@ export default function CustomerForm({
       return remaining
     })
     updateField(name, '')
+  }
+
+  // Closing/cancelling a create-in-progress form shouldn't leave orphaned uploads behind on
+  // the server - discard anything staged but never attached to a saved customer.
+  const handleCancel = () => {
+    if (!customer?.id) {
+      Object.keys(stagedFileIdsRef.current).forEach(discardStagedFiles)
+    }
+    onClose()
   }
 
   const hasChanges = !customer || JSON.stringify(normalizeComparableForm(formData)) !== JSON.stringify(normalizeComparableForm(initialFormData))
@@ -965,7 +1017,7 @@ export default function CustomerForm({
                   variant="outline"
                   size="sm"
                   className="border-[#063B00] text-[#063B00] hover:border-[#063B00] hover:bg-primary-50 hover:text-[#063B00]"
-                  onClick={onClose}
+                  onClick={handleCancel}
                 >
                   Back to Customers
                 </Button>

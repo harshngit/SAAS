@@ -1,5 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Camera, X } from 'lucide-react'
+import {
+  Banknote,
+  BriefcaseBusiness,
+  Camera,
+  FileText,
+  MapPin,
+  Phone,
+  Settings,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  UserRound,
+  X,
+} from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -7,29 +20,20 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import { roleLabels } from '../../auth/roles'
-import { changeUserRole, clearEmployeeFile, getEmployeeOptions, getUser, listRoles, updateUser, updateUserStatus, uploadEmployeeFile } from '../../api/users'
+import {
+  changeUserRole,
+  getUser,
+  listRoles,
+  updateUser,
+  updateUserStatus,
+} from '../../api/users'
+import { uploadFile, uploadFiles } from '../../api/files'
 import { getSystemRoleFromRoleName, normalizeApiUser, staffRoleOptions } from './userRoleUtils'
 
 const staffRoleSelectOptions = staffRoleOptions.map((role) => ({
   value: role,
   label: roleLabels[role],
 }))
-
-const formatOptionLabel = (value = '') =>
-  String(value)
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase())
-
-const toSelectOptions = (values = [], fallbackOptions = []) => {
-  if (!values.length) {
-    return fallbackOptions
-  }
-
-  return values.map((value) => ({
-    value,
-    label: formatOptionLabel(value),
-  }))
-}
 
 const employmentTypeOptions = [
   { value: 'full_time', label: 'Full Time' },
@@ -75,21 +79,51 @@ const maritalStatusOptions = [
 
 const bloodGroupOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((value) => ({ value, label: value }))
 
-const emptyEmployeeOptions = {
-  employment_types: [],
-  employee_statuses: [],
-  account_statuses: [],
-  genders: [],
-  marital_statuses: [],
-  blood_groups: [],
-  emergency_contact_relationships: [],
-  countries: [],
-  nationalities: [],
-  states: [],
-  designations: [],
-  work_locations: [],
-  shifts: [],
-}
+const identityProofOptions = [
+  { value: 'aadhaar', label: 'Aadhaar' },
+  { value: 'pan', label: 'PAN' },
+  { value: 'voter-id', label: 'Voter ID' },
+  { value: 'passport', label: 'Passport' },
+  { value: 'driving-license', label: 'Driving License' },
+]
+
+const languageOptions = [
+  { value: 'en', label: 'English' },
+  { value: 'hi', label: 'Hindi' },
+  { value: 'mr', label: 'Marathi' },
+]
+
+const timeZoneOptions = [
+  { value: 'Asia/Kolkata', label: 'Asia/Kolkata' },
+  { value: 'UTC', label: 'UTC' },
+  { value: 'Asia/Dubai', label: 'Asia/Dubai' },
+]
+
+// Mirrors the "Add New Staff" modal's tab structure exactly, so the two staff forms feel like one product.
+const staffFormSections = [
+  { number: '1', title: 'Basic Information', description: 'Employee identity and personal profile details.', icon: UserRound },
+  { number: '2', title: 'Contact Information', description: 'Primary, secondary, and emergency contact details.', icon: Phone },
+  { number: '3', title: 'Address Information', description: 'Residential and regional address details.', icon: MapPin },
+  { number: '4', title: 'Employment Information', description: 'Role, reporting, joining, location, and employee status.', icon: BriefcaseBusiness },
+  { number: '5', title: 'Login & Security', description: 'Authentication credentials and invitation settings.', icon: ShieldCheck },
+  { number: '6', title: 'Payroll Information', description: 'Salary bank and payment details.', icon: Banknote },
+  { number: '7', title: 'Uploads', description: 'Compliance, onboarding, and qualification documents.', icon: FileText },
+  { number: '8', title: 'System Preferences', description: 'Application language, timezone, and account status.', icon: Settings },
+]
+
+// Maps a staged Uploads-tab field to the payload key buildSectionedUserBody expects, and (for
+// single files) the section/field the "remove" action must null out.
+const singleDocUploadTargets = [
+  { key: 'identityDocuments', payloadKey: 'identityProofFileUrl' },
+  { key: 'resumeCv', payloadKey: 'resumeCvUrl' },
+  { key: 'offerLetter', payloadKey: 'offerLetterUrl' },
+  { key: 'appointmentLetter', payloadKey: 'appointmentLetterUrl' },
+]
+
+const multiDocUploadTargets = [
+  { key: 'experienceCertificates', payloadKey: 'experienceCertificateUrls', userKey: 'experienceCertificates' },
+  { key: 'educationalCertificates', payloadKey: 'educationalCertificateUrls', userKey: 'educationalCertificates' },
+]
 
 function toDateInputValue(value) {
   if (!value) return ''
@@ -106,11 +140,74 @@ function toSkillsInputValue(value) {
   return Array.isArray(value) ? value.join(', ') : value || ''
 }
 
+function StaffField({ children, className = '' }) {
+  return (
+    <div className={className}>
+      {children}
+    </div>
+  )
+}
+
+function DocumentUploadRow({ label, description, accept, multiple = false, existingItems = [], stagedFiles = [], removed, onFilesSelected, onRemove }) {
+  const stagedNames = stagedFiles.map((file) => file.name).join(', ')
+  const hasExisting = existingItems.length > 0 && !removed
+  const hasAny = stagedFiles.length > 0 || hasExisting
+
+  return (
+    <div className="flex min-h-24 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+      <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-[minmax(10rem,1fr)_auto] sm:items-center">
+        <div className="min-w-0 pr-2">
+          <p className="text-sm font-semibold leading-5 text-neutral-900">{label}</p>
+          <p className="mt-0.5 text-xs text-neutral-500">{description}</p>
+          {stagedNames && <p className="mt-1 truncate text-xs font-medium text-primary-700">{stagedNames}</p>}
+          {hasExisting && (
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+              {existingItems.map((item, index) => (
+                <a
+                  key={item.url || item.id || index}
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="truncate text-xs font-medium text-primary-700 hover:underline"
+                >
+                  {item.name || `File ${index + 1}`}
+                </a>
+              ))}
+            </div>
+          )}
+          {!stagedNames && !hasExisting && <p className="mt-1 text-xs text-neutral-400">No file uploaded</p>}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+            <Upload className="size-3.5" aria-hidden="true" />
+            Upload
+            <input
+              type="file"
+              accept={accept}
+              multiple={multiple}
+              className="sr-only"
+              onChange={(event) => {
+                onFilesSelected(Array.from(event.target.files || []))
+                event.target.value = ''
+              }}
+            />
+          </label>
+          <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" disabled={!hasAny} onClick={onRemove}>
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            Remove
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function UserEdit() {
   const { user_id: userId } = useParams()
   const navigate = useNavigate()
   const [roles, setRoles] = useState([])
   const [user, setUser] = useState(null)
+  const [activeSection, setActiveSection] = useState('1')
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -158,8 +255,6 @@ export default function UserEdit() {
     systemStatus: '',
     profilePictureName: '',
   })
-  const [employeeOptions, setEmployeeOptions] = useState(emptyEmployeeOptions)
-  const [employeeOptionsError, setEmployeeOptionsError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingAccountStatus, setIsSavingAccountStatus] = useState(false)
@@ -167,7 +262,14 @@ export default function UserEdit() {
   const [profilePictureFile, setProfilePictureFile] = useState(null)
   const [profilePictureRemoved, setProfilePictureRemoved] = useState(false)
   const [profilePicturePreviewUrl, setProfilePicturePreviewUrl] = useState('')
+  const [photoLoadFailed, setPhotoLoadFailed] = useState(false)
   const effectivePhotoUrl = profilePicturePreviewUrl || (!profilePictureRemoved ? user?.profilePhoto : '')
+  const showPhotoPreview = Boolean(effectivePhotoUrl) && !photoLoadFailed
+
+  const [singleDocFiles, setSingleDocFiles] = useState({ identityDocuments: null, resumeCv: null, offerLetter: null, appointmentLetter: null })
+  const [singleDocRemoved, setSingleDocRemoved] = useState({ identityDocuments: false, resumeCv: false, offerLetter: false, appointmentLetter: false })
+  const [multiDocFiles, setMultiDocFiles] = useState({ experienceCertificates: [], educationalCertificates: [] })
+
   const roleChanged = Boolean(user) && (
     formData.role_id
       ? formData.role_id !== (user.role_id || user.roleId || '')
@@ -218,7 +320,11 @@ export default function UserEdit() {
     formData.timeZone !== (user.timeZone || '')
   )
   const profilePictureChanged = Boolean(profilePictureFile) || profilePictureRemoved
-  const userProfileChanged = basicInformationChanged || profilePictureChanged || roleChanged
+  const documentsChanged =
+    Object.values(singleDocFiles).some(Boolean) ||
+    Object.values(singleDocRemoved).some(Boolean) ||
+    Object.values(multiDocFiles).some((files) => files.length > 0)
+  const userProfileChanged = basicInformationChanged || profilePictureChanged || roleChanged || documentsChanged
 
   const apiRoleOptions = roles
     .map((role) => {
@@ -231,19 +337,24 @@ export default function UserEdit() {
     })
     .filter((role) => staffRoleOptions.includes(role.value))
 
+  // No dropdown data comes from the backend (GET /users/meta/employee-options was removed) -
+  // these option lists are entirely local now.
   const effectiveRoleSelectOptions = apiRoleOptions.length > 0 ? apiRoleOptions : staffRoleSelectOptions
-  const effectiveGenderOptions = toSelectOptions(employeeOptions.genders, genderOptions)
-  const effectiveMaritalStatusOptions = toSelectOptions(employeeOptions.marital_statuses, maritalStatusOptions)
-  const effectiveBloodGroupOptions = toSelectOptions(employeeOptions.blood_groups, bloodGroupOptions)
-  const effectiveNationalityOptions = toSelectOptions(employeeOptions.nationalities)
-  const effectiveEmergencyRelationshipOptions = toSelectOptions(employeeOptions.emergency_contact_relationships)
-  const effectiveCountryOptions = toSelectOptions(employeeOptions.countries)
-  const effectiveStateOptions = toSelectOptions(employeeOptions.states)
-  const effectiveEmploymentTypeOptions = toSelectOptions(employeeOptions.employment_types, employmentTypeOptions)
-  const effectiveEmployeeStatusOptions = toSelectOptions(employeeOptions.employee_statuses, employeeStatusOptions)
-  const effectiveWorkLocationOptions = toSelectOptions(employeeOptions.work_locations)
-  const effectiveShiftOptions = toSelectOptions(employeeOptions.shifts, shiftOptions)
+  const effectiveGenderOptions = genderOptions
+  const effectiveMaritalStatusOptions = maritalStatusOptions
+  const effectiveBloodGroupOptions = bloodGroupOptions
+  const effectiveNationalityOptions = []
+  const effectiveEmergencyRelationshipOptions = []
+  const effectiveCountryOptions = []
+  const effectiveStateOptions = []
+  const effectiveEmploymentTypeOptions = employmentTypeOptions
+  const effectiveEmployeeStatusOptions = employeeStatusOptions
+  const effectiveWorkLocationOptions = []
+  const effectiveShiftOptions = shiftOptions
+  const effectiveIdentityProofOptions = identityProofOptions
   const effectiveSystemStatusOptions = systemStatusOptions
+
+  const activeStaffFormSection = staffFormSections.find((section) => section.number === activeSection) || staffFormSections[0]
 
   useEffect(() => {
     return () => {
@@ -252,16 +363,19 @@ export default function UserEdit() {
   }, [profilePicturePreviewUrl])
 
   useEffect(() => {
+    setPhotoLoadFailed(false)
+  }, [effectivePhotoUrl])
+
+  useEffect(() => {
     let isMounted = true
 
     async function loadEditData() {
       setIsLoading(true)
       setError('')
 
-      const [userResult, rolesResult, employeeOptionsResult] = await Promise.all([
+      const [userResult, rolesResult] = await Promise.all([
         getUser(userId),
         listRoles(),
-        getEmployeeOptions(),
       ])
 
       if (!isMounted) return
@@ -272,12 +386,6 @@ export default function UserEdit() {
         setRoles(rolesResult.roles || [])
       }
 
-      if (employeeOptionsResult.success) {
-        setEmployeeOptions({ ...emptyEmployeeOptions, ...(employeeOptionsResult.options || {}) })
-      } else {
-        setEmployeeOptionsError(employeeOptionsResult.error)
-      }
-
       if (!userResult.success) {
         setError(userResult.error)
         return
@@ -285,9 +393,13 @@ export default function UserEdit() {
 
       const nextUser = normalizeApiUser(userResult.user)
       setUser(nextUser)
+      setActiveSection('1')
       setProfilePictureFile(null)
       setProfilePictureRemoved(false)
       setProfilePicturePreviewUrl('')
+      setSingleDocFiles({ identityDocuments: null, resumeCv: null, offerLetter: null, appointmentLetter: null })
+      setSingleDocRemoved({ identityDocuments: false, resumeCv: false, offerLetter: false, appointmentLetter: false })
+      setMultiDocFiles({ experienceCertificates: [], educationalCertificates: [] })
       setFormData({
         name: nextUser.name || '',
         email: nextUser.email || '',
@@ -344,6 +456,24 @@ export default function UserEdit() {
     }
   }, [userId])
 
+  const updateSingleDoc = (key, files) => {
+    setSingleDocFiles((current) => ({ ...current, [key]: files[0] || null }))
+    setSingleDocRemoved((current) => ({ ...current, [key]: false }))
+  }
+
+  const removeSingleDoc = (key) => {
+    setSingleDocFiles((current) => ({ ...current, [key]: null }))
+    setSingleDocRemoved((current) => ({ ...current, [key]: true }))
+  }
+
+  const updateMultiDoc = (key, files) => {
+    setMultiDocFiles((current) => ({ ...current, [key]: [...current[key], ...files] }))
+  }
+
+  const removeMultiDoc = (key) => {
+    setMultiDocFiles((current) => ({ ...current, [key]: [] }))
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
@@ -354,14 +484,56 @@ export default function UserEdit() {
 
     setIsSaving(true)
 
-    if (basicInformationChanged) {
-      const updateResult = await updateUser(userId, formData)
+    // Files are uploaded individually (POST /files/upload has no user_id), then every touched
+    // field - basic info, role, files, docs - rides together in one PATCH /users/{id}.
+    const filePayload = {}
 
-      if (!updateResult.success) {
+    if (profilePictureRemoved) {
+      filePayload.profilePhotoUrl = null
+    } else if (profilePictureFile) {
+      const uploadResult = await uploadFile(profilePictureFile)
+      if (!uploadResult.success) {
         setIsSaving(false)
-        setError(updateResult.error)
+        setError(uploadResult.error)
         return
       }
+      filePayload.profilePhotoUrl = uploadResult.file.url
+    }
+
+    for (const { key, payloadKey } of singleDocUploadTargets) {
+      if (singleDocRemoved[key]) {
+        filePayload[payloadKey] = null
+      } else if (singleDocFiles[key]) {
+        const uploadResult = await uploadFile(singleDocFiles[key])
+        if (!uploadResult.success) {
+          setIsSaving(false)
+          setError(uploadResult.error)
+          return
+        }
+        filePayload[payloadKey] = uploadResult.file.url
+      }
+    }
+
+    for (const { key, payloadKey, userKey } of multiDocUploadTargets) {
+      if (multiDocFiles[key].length > 0) {
+        const uploadResult = await uploadFiles(multiDocFiles[key])
+        if (!uploadResult.success) {
+          setIsSaving(false)
+          setError(uploadResult.error)
+          return
+        }
+        const existingUrls = (user?.[userKey] || []).map((document) => document.url).filter(Boolean)
+        const newUrls = uploadResult.files.map((file) => file.url).filter(Boolean)
+        filePayload[payloadKey] = [...existingUrls, ...newUrls]
+      }
+    }
+
+    const updateResult = await updateUser(userId, { ...formData, ...filePayload })
+
+    if (!updateResult.success) {
+      setIsSaving(false)
+      setError(updateResult.error)
+      return
     }
 
     if (roleChanged) {
@@ -382,24 +554,6 @@ export default function UserEdit() {
       if (!roleResult.success) {
         setIsSaving(false)
         setError(roleResult.error)
-        return
-      }
-    }
-
-    if (profilePictureRemoved) {
-      const clearResult = await clearEmployeeFile(userId, 'profile_photo')
-
-      if (!clearResult.success) {
-        setIsSaving(false)
-        setError(clearResult.error)
-        return
-      }
-    } else if (profilePictureFile) {
-      const uploadResult = await uploadEmployeeFile(userId, 'profile_photo', profilePictureFile)
-
-      if (!uploadResult.success) {
-        setIsSaving(false)
-        setError(uploadResult.error)
         return
       }
     }
@@ -456,308 +610,288 @@ export default function UserEdit() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-[1.75rem] border border-neutral-100 bg-white p-6 shadow-(--shadow-card)"
+      className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-[1.75rem] border border-neutral-100 bg-white shadow-(--shadow-card)"
     >
-      <div className="flex flex-col gap-4 border-b border-neutral-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-lg font-semibold text-neutral-900">Edit user profile</p>
-          <p className="mt-1 text-sm text-neutral-500">Update contact details, profile image, and workspace role.</p>
-          {employeeOptionsError && (
-            <p className="mt-2 text-xs font-medium text-amber-600">{employeeOptionsError}</p>
-          )}
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="border-[#063B00] text-[#063B00] hover:border-[#063B00] hover:bg-primary-50 hover:text-[#063B00]"
-          onClick={() => navigate('/admin/users')}
-        >
-          Back to Staff
-        </Button>
-      </div>
+      <div className="grid flex-1 lg:grid-cols-[17rem_minmax(0,1fr)]">
+        <aside className="border-b border-neutral-100 p-6 lg:border-b-0 lg:border-r">
+          <nav className="space-y-2">
+            {staffFormSections.map((section) => {
+              const Icon = section.icon
+              const isActive = section.number === activeSection
+              return (
+                <button
+                  key={section.number}
+                  type="button"
+                  onClick={() => setActiveSection(section.number)}
+                  className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium transition-all ${
+                    isActive
+                      ? 'border border-neutral-100 bg-neutral-50 text-primary-700 shadow-(--shadow-xs)'
+                      : 'text-neutral-500 hover:bg-neutral-50 hover:text-primary-700'
+                  }`}
+                >
+                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{section.title}</span>
+                </button>
+              )
+            })}
+          </nav>
+        </aside>
 
-      <div className="mt-6 grid flex-1 content-start gap-6 xl:grid-cols-[18rem_minmax(0,1fr)]">
-        <div className="rounded-2xl border border-primary-100 bg-linear-to-br from-white to-[#eef6eb] p-4">
-          <p className="text-sm font-semibold text-neutral-900">Profile Picture</p>
-          <p className="mt-1 text-xs leading-5 text-neutral-500">Add an optional image to make staff records easier to scan.</p>
-          <label
-            className={`group relative mt-4 flex aspect-square cursor-pointer flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border text-center transition-all hover:-translate-y-0.5 hover:shadow-(--shadow-card) ${
-              effectivePhotoUrl
-                ? 'border-primary-100 bg-neutral-900'
-                : 'border-dashed border-primary-200 bg-white text-primary-700 hover:border-primary-300 hover:bg-primary-50/70'
-            }`}
-          >
-            {effectivePhotoUrl ? (
-              <>
-                <img src={effectivePhotoUrl} alt="Profile" className="absolute inset-0 size-full object-cover" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-neutral-900/0 opacity-0 transition-all group-hover:bg-neutral-900/60 group-hover:opacity-100">
-                  <span className="flex size-12 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/30">
-                    <Camera className="size-6 text-white" aria-hidden="true" />
-                  </span>
-                  <span className="text-sm font-semibold text-white">Change Photo</span>
-                </div>
-              </>
-            ) : (
-              <>
-                <span className="flex size-12 items-center justify-center rounded-full bg-primary-50 ring-1 ring-primary-100">
-                  <Camera className="size-6" aria-hidden="true" />
-                </span>
-                <span className="text-sm font-semibold">Upload Photo</span>
-                <span className="max-w-36 truncate text-xs text-neutral-500">PNG or JPG</span>
-              </>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                setProfilePictureFile(file || null)
-                setProfilePictureRemoved(false)
-                setProfilePicturePreviewUrl(file ? URL.createObjectURL(file) : '')
-                setFormData({ ...formData, profilePictureName: file?.name || '' })
-              }}
-            />
-          </label>
-          {formData.profilePictureName && (
-            <p className="mt-2 truncate text-center text-xs font-medium text-neutral-500">{formData.profilePictureName}</p>
-          )}
-          {effectivePhotoUrl && (
+        <div className="min-w-0 p-6">
+          <div className="flex flex-col gap-4 border-b border-neutral-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-lg font-semibold text-neutral-900">{activeStaffFormSection.title}</p>
+              <p className="mt-1 text-sm text-neutral-500">{activeStaffFormSection.description}</p>
+            </div>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="mt-3 w-full"
-              onClick={handleRemoveProfilePhoto}
+              className="border-[#063B00] text-[#063B00] hover:border-[#063B00] hover:bg-primary-50 hover:text-[#063B00]"
+              onClick={() => navigate('/admin/users')}
             >
-              <X className="size-4" aria-hidden="true" />
-              Remove
+              Back to Staff
             </Button>
-          )}
-        </div>
-
-        <div className="space-y-5">
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">1</span>
-              <p className="text-sm font-semibold text-neutral-900">Basic information</p>
-            </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Input
-                label="Employee ID"
-                value={formData.employeeId}
-                onChange={(event) => setFormData({ ...formData, employeeId: event.target.value })}
-              />
-              <Input
-                label="First Name"
-                value={formData.firstName}
-                onChange={(event) => setFormData({ ...formData, firstName: event.target.value })}
-              />
-              <Input
-                label="Last Name"
-                value={formData.lastName}
-                onChange={(event) => setFormData({ ...formData, lastName: event.target.value })}
-              />
-              <Input
-                label="Display Name"
-                value={formData.name}
-                onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-                required
-              />
-              <Input
-                label="Email"
-                type="email"
-                value={formData.email}
-                onChange={(event) => setFormData({ ...formData, email: event.target.value })}
-                required
-              />
-              <Input
-                label="Username"
-                value={formData.username}
-                onChange={(event) => setFormData({ ...formData, username: event.target.value })}
-                required
-              />
-              <Input
-                label="Phone Number"
-                type="tel"
-                value={formData.phone}
-                onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
-                required
-              />
-            </div>
           </div>
 
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">2</span>
-              <p className="text-sm font-semibold text-neutral-900">Personal details</p>
-            </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Select
-                label="Gender"
-                options={effectiveGenderOptions}
-                value={formData.gender}
-                onChange={(event) => setFormData({ ...formData, gender: event.target.value })}
-              />
-              <Input
-                label="Date of Birth"
-                type="date"
-                value={formData.dateOfBirth}
-                onChange={(event) => setFormData({ ...formData, dateOfBirth: event.target.value })}
-              />
-              <Select
-                label="Marital Status"
-                options={effectiveMaritalStatusOptions}
-                value={formData.maritalStatus}
-                onChange={(event) => setFormData({ ...formData, maritalStatus: event.target.value })}
-              />
-              <Select
-                label="Blood Group"
-                options={effectiveBloodGroupOptions}
-                value={formData.bloodGroup}
-                onChange={(event) => setFormData({ ...formData, bloodGroup: event.target.value })}
-              />
-              {effectiveNationalityOptions.length > 0 ? (
-                <Select
-                  label="Nationality"
-                  options={effectiveNationalityOptions}
-                  value={formData.nationality}
-                  onChange={(event) => setFormData({ ...formData, nationality: event.target.value })}
-                />
-              ) : (
+          <div className="mt-6 space-y-5">
+            {activeSection === '1' && (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="lg:col-span-2">
+                  <label className="text-sm font-medium text-neutral-700">Profile Photo</label>
+                  <div className="mt-1.5 flex items-center gap-4">
+                    <label
+                      className={`group relative flex size-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border text-center transition-all ${
+                        showPhotoPreview
+                          ? 'border-primary-100 bg-neutral-900'
+                          : 'border-dashed border-primary-200 bg-neutral-50 text-primary-700 hover:border-primary-300 hover:bg-primary-50/70'
+                      }`}
+                    >
+                      {showPhotoPreview ? (
+                        <>
+                          <img
+                            src={effectivePhotoUrl}
+                            alt="Profile"
+                            className="absolute inset-0 size-full object-cover"
+                            onError={() => setPhotoLoadFailed(true)}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-neutral-900/0 opacity-0 transition-all group-hover:bg-neutral-900/60 group-hover:opacity-100">
+                            <Camera className="size-6 text-white" aria-hidden="true" />
+                          </div>
+                        </>
+                      ) : (
+                        <Camera className="size-6" aria-hidden="true" />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0]
+                          setProfilePictureFile(file || null)
+                          setProfilePictureRemoved(false)
+                          setProfilePicturePreviewUrl(file ? URL.createObjectURL(file) : '')
+                          setFormData({ ...formData, profilePictureName: file?.name || '' })
+                        }}
+                      />
+                    </label>
+                    <div>
+                      <p className="text-xs text-neutral-500">PNG or JPG. Employee profile picture.</p>
+                      {formData.profilePictureName && (
+                        <p className="mt-1 truncate text-xs font-medium text-primary-700">{formData.profilePictureName}</p>
+                      )}
+                      {effectivePhotoUrl && (
+                        <Button type="button" variant="ghost" size="sm" className="mt-1.5 -ml-3" onClick={handleRemoveProfilePhoto}>
+                          <X className="size-4" aria-hidden="true" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <Input
-                  label="Nationality"
-                  value={formData.nationality}
-                  onChange={(event) => setFormData({ ...formData, nationality: event.target.value })}
+                  label="Employee ID"
+                  value={formData.employeeId || 'System calculated'}
+                  readOnly
+                  disabled
                 />
-              )}
-              <Input
-                label="Skills"
-                placeholder="Separate skills with commas"
-                value={formData.skills}
-                onChange={(event) => setFormData({ ...formData, skills: event.target.value })}
-              />
-            </div>
-          </div>
+                <div />
+                <Input
+                  label="First Name"
+                  required
+                  value={formData.firstName}
+                  onChange={(event) => setFormData({ ...formData, firstName: event.target.value })}
+                />
+                <Input
+                  label="Last Name"
+                  required
+                  value={formData.lastName}
+                  onChange={(event) => setFormData({ ...formData, lastName: event.target.value })}
+                />
+                <Input
+                  label="Display Name"
+                  value={formData.name}
+                  onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                />
+                <Select
+                  label="Gender"
+                  options={effectiveGenderOptions}
+                  value={formData.gender}
+                  onChange={(event) => setFormData({ ...formData, gender: event.target.value })}
+                />
+                <Input
+                  label="Date of Birth"
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={(event) => setFormData({ ...formData, dateOfBirth: event.target.value })}
+                />
+                <Select
+                  label="Marital Status"
+                  options={effectiveMaritalStatusOptions}
+                  value={formData.maritalStatus}
+                  onChange={(event) => setFormData({ ...formData, maritalStatus: event.target.value })}
+                />
+                <Select
+                  label="Blood Group"
+                  options={effectiveBloodGroupOptions}
+                  value={formData.bloodGroup}
+                  onChange={(event) => setFormData({ ...formData, bloodGroup: event.target.value })}
+                />
+                {effectiveNationalityOptions.length > 0 ? (
+                  <Select
+                    label="Nationality"
+                    options={effectiveNationalityOptions}
+                    value={formData.nationality}
+                    onChange={(event) => setFormData({ ...formData, nationality: event.target.value })}
+                  />
+                ) : (
+                  <Input
+                    label="Nationality"
+                    value={formData.nationality}
+                    onChange={(event) => setFormData({ ...formData, nationality: event.target.value })}
+                  />
+                )}
+              </div>
+            )}
 
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">3</span>
-              <p className="text-sm font-semibold text-neutral-900">Contact details</p>
-            </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Input
-                label="Alternate Mobile Number"
-                type="tel"
-                value={formData.alternateMobileNumber}
-                onChange={(event) => setFormData({ ...formData, alternateMobileNumber: event.target.value })}
-              />
-              <Input
-                label="Personal Email"
-                type="email"
-                value={formData.personalEmail}
-                onChange={(event) => setFormData({ ...formData, personalEmail: event.target.value })}
-              />
-              <Input
-                label="Emergency Contact Name"
-                value={formData.emergencyContactName}
-                onChange={(event) => setFormData({ ...formData, emergencyContactName: event.target.value })}
-              />
-              <Input
-                label="Emergency Contact Number"
-                type="tel"
-                value={formData.emergencyContactNumber}
-                onChange={(event) => setFormData({ ...formData, emergencyContactNumber: event.target.value })}
-              />
-              {effectiveEmergencyRelationshipOptions.length > 0 ? (
-                <Select
-                  label="Emergency Contact Relationship"
-                  options={effectiveEmergencyRelationshipOptions}
-                  value={formData.emergencyContactRelationship}
-                  onChange={(event) => setFormData({ ...formData, emergencyContactRelationship: event.target.value })}
-                />
-              ) : (
+            {activeSection === '2' && (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Input
-                  label="Emergency Contact Relationship"
-                  value={formData.emergencyContactRelationship}
-                  onChange={(event) => setFormData({ ...formData, emergencyContactRelationship: event.target.value })}
+                  label="Mobile Number"
+                  type="tel"
+                  required
+                  value={formData.phone}
+                  onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
                 />
-              )}
-            </div>
-          </div>
+                <Input
+                  label="Alternate Mobile Number"
+                  type="tel"
+                  value={formData.alternateMobileNumber}
+                  onChange={(event) => setFormData({ ...formData, alternateMobileNumber: event.target.value })}
+                />
+                <Input
+                  label="Personal Email"
+                  type="email"
+                  value={formData.personalEmail}
+                  onChange={(event) => setFormData({ ...formData, personalEmail: event.target.value })}
+                />
+                <Input
+                  label="Official Email"
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(event) => setFormData({ ...formData, email: event.target.value })}
+                />
+                <Input
+                  label="Emergency Contact Name"
+                  value={formData.emergencyContactName}
+                  onChange={(event) => setFormData({ ...formData, emergencyContactName: event.target.value })}
+                />
+                <Input
+                  label="Emergency Contact Number"
+                  type="tel"
+                  value={formData.emergencyContactNumber}
+                  onChange={(event) => setFormData({ ...formData, emergencyContactNumber: event.target.value })}
+                />
+                {effectiveEmergencyRelationshipOptions.length > 0 ? (
+                  <Select
+                    label="Emergency Contact Relationship"
+                    options={effectiveEmergencyRelationshipOptions}
+                    value={formData.emergencyContactRelationship}
+                    onChange={(event) => setFormData({ ...formData, emergencyContactRelationship: event.target.value })}
+                  />
+                ) : (
+                  <Input
+                    label="Emergency Contact Relationship"
+                    value={formData.emergencyContactRelationship}
+                    onChange={(event) => setFormData({ ...formData, emergencyContactRelationship: event.target.value })}
+                  />
+                )}
+              </div>
+            )}
 
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">4</span>
-              <p className="text-sm font-semibold text-neutral-900">Address details</p>
-            </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Input
-                label="Current Address"
-                as="textarea"
-                value={formData.currentAddress}
-                onChange={(event) => setFormData({ ...formData, currentAddress: event.target.value })}
-              />
-              <Input
-                label="Permanent Address"
-                as="textarea"
-                value={formData.permanentAddress}
-                onChange={(event) => setFormData({ ...formData, permanentAddress: event.target.value })}
-              />
-              <Input
-                label="City"
-                value={formData.city}
-                onChange={(event) => setFormData({ ...formData, city: event.target.value })}
-              />
-              {effectiveStateOptions.length > 0 ? (
-                <Select
-                  label="State"
-                  options={effectiveStateOptions}
-                  value={formData.state}
-                  onChange={(event) => setFormData({ ...formData, state: event.target.value })}
-                />
-              ) : (
+            {activeSection === '3' && (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Input
-                  label="State"
-                  value={formData.state}
-                  onChange={(event) => setFormData({ ...formData, state: event.target.value })}
+                  label="Current Address"
+                  as="textarea"
+                  value={formData.currentAddress}
+                  onChange={(event) => setFormData({ ...formData, currentAddress: event.target.value })}
                 />
-              )}
-              {effectiveCountryOptions.length > 0 ? (
-                <Select
-                  label="Country"
-                  options={effectiveCountryOptions}
-                  value={formData.country}
-                  onChange={(event) => setFormData({ ...formData, country: event.target.value })}
-                />
-              ) : (
                 <Input
-                  label="Country"
-                  value={formData.country}
-                  onChange={(event) => setFormData({ ...formData, country: event.target.value })}
+                  label="Permanent Address"
+                  as="textarea"
+                  value={formData.permanentAddress}
+                  onChange={(event) => setFormData({ ...formData, permanentAddress: event.target.value })}
                 />
-              )}
-              <Input
-                label="PIN/ZIP Code"
-                value={formData.pinCode}
-                onChange={(event) => setFormData({ ...formData, pinCode: event.target.value })}
-              />
-            </div>
-          </div>
+                <Input
+                  label="City"
+                  value={formData.city}
+                  onChange={(event) => setFormData({ ...formData, city: event.target.value })}
+                />
+                {effectiveStateOptions.length > 0 ? (
+                  <Select
+                    label="State"
+                    options={effectiveStateOptions}
+                    value={formData.state}
+                    onChange={(event) => setFormData({ ...formData, state: event.target.value })}
+                  />
+                ) : (
+                  <Input
+                    label="State"
+                    value={formData.state}
+                    onChange={(event) => setFormData({ ...formData, state: event.target.value })}
+                  />
+                )}
+                {effectiveCountryOptions.length > 0 ? (
+                  <Select
+                    label="Country"
+                    options={effectiveCountryOptions}
+                    value={formData.country}
+                    onChange={(event) => setFormData({ ...formData, country: event.target.value })}
+                  />
+                ) : (
+                  <Input
+                    label="Country"
+                    value={formData.country}
+                    onChange={(event) => setFormData({ ...formData, country: event.target.value })}
+                  />
+                )}
+                <Input
+                  label="PIN/ZIP Code"
+                  value={formData.pinCode}
+                  onChange={(event) => setFormData({ ...formData, pinCode: event.target.value })}
+                />
+              </div>
+            )}
 
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">5</span>
-              <p className="text-sm font-semibold text-neutral-900">Role and invitation</p>
-            </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-1">
-              <div className="flex w-[50%] items-end gap-2">
+            {activeSection === '4' && (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Select
                   label="Role"
+                  required
                   options={effectiveRoleSelectOptions}
                   placeholder="Select role"
-                  className="min-w-0 flex-1"
                   value={formData.role}
                   onChange={(event) => {
                     const selectedRole = effectiveRoleSelectOptions.find((role) => role.value === event.target.value)
@@ -768,151 +902,247 @@ export default function UserEdit() {
                     })
                   }}
                 />
-              </div>
-              <label className="flex w-[50%] items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-3.5 text-sm text-neutral-600">
-                <input
-                  type="checkbox"
-                  defaultChecked
-                  className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500/20"
-                />
-                Send a notification to the user for this new role.
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">6</span>
-              <p className="text-sm font-semibold text-neutral-900">Employment details</p>
-            </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Input
-                label="Designation"
-                value={formData.designation}
-                onChange={(event) => setFormData({ ...formData, designation: event.target.value })}
-              />
-              <Select
-                label="Employment Type"
-                options={effectiveEmploymentTypeOptions}
-                value={formData.employmentType}
-                onChange={(event) => setFormData({ ...formData, employmentType: event.target.value })}
-              />
-              <Select
-                label="Employee Status"
-                options={effectiveEmployeeStatusOptions}
-                value={formData.employeeStatus}
-                onChange={(event) => setFormData({ ...formData, employeeStatus: event.target.value })}
-              />
-              <Input
-                label="Reporting Manager ID"
-                value={formData.reportingManager}
-                onChange={(event) => setFormData({ ...formData, reportingManager: event.target.value })}
-              />
-              <Input
-                label="Date of Joining"
-                type="date"
-                value={formData.dateOfJoining}
-                onChange={(event) => setFormData({ ...formData, dateOfJoining: event.target.value })}
-              />
-              <Input
-                label="Date of Exit"
-                type="date"
-                value={formData.dateOfExit}
-                onChange={(event) => setFormData({ ...formData, dateOfExit: event.target.value })}
-              />
-              {effectiveWorkLocationOptions.length > 0 ? (
-                <Select
-                  label="Work Location"
-                  options={effectiveWorkLocationOptions}
-                  value={formData.workLocation}
-                  onChange={(event) => setFormData({ ...formData, workLocation: event.target.value })}
-                />
-              ) : (
                 <Input
-                  label="Work Location"
-                  value={formData.workLocation}
-                  onChange={(event) => setFormData({ ...formData, workLocation: event.target.value })}
+                  label="Designation"
+                  required
+                  value={formData.designation}
+                  onChange={(event) => setFormData({ ...formData, designation: event.target.value })}
                 />
-              )}
-              <Select
-                label="Shift"
-                options={effectiveShiftOptions}
-                value={formData.shift}
-                onChange={(event) => setFormData({ ...formData, shift: event.target.value })}
-              />
-              <div className="flex items-end gap-2">
+                <Input
+                  label="Reporting Manager ID"
+                  value={formData.reportingManager}
+                  onChange={(event) => setFormData({ ...formData, reportingManager: event.target.value })}
+                />
                 <Select
-                  label="Account Status"
-                  options={effectiveSystemStatusOptions}
-                  className="min-w-0 flex-1"
-                  value={formData.systemStatus}
-                  onChange={(event) => setFormData({ ...formData, systemStatus: event.target.value })}
+                  label="Employment Type"
+                  required
+                  options={effectiveEmploymentTypeOptions}
+                  value={formData.employmentType}
+                  onChange={(event) => setFormData({ ...formData, employmentType: event.target.value })}
                 />
-                {accountStatusChanged && (
-                  <Button type="button" size="md" onClick={handleSaveAccountStatus} loading={isSavingAccountStatus}>
-                    Save
-                  </Button>
+                <Input
+                  label="Date of Joining"
+                  type="date"
+                  required
+                  value={formData.dateOfJoining}
+                  onChange={(event) => setFormData({ ...formData, dateOfJoining: event.target.value })}
+                />
+                <Input
+                  label="Date of Exit"
+                  type="date"
+                  value={formData.dateOfExit}
+                  onChange={(event) => setFormData({ ...formData, dateOfExit: event.target.value })}
+                />
+                {effectiveWorkLocationOptions.length > 0 ? (
+                  <Select
+                    label="Work Location"
+                    options={effectiveWorkLocationOptions}
+                    value={formData.workLocation}
+                    onChange={(event) => setFormData({ ...formData, workLocation: event.target.value })}
+                  />
+                ) : (
+                  <Input
+                    label="Work Location"
+                    value={formData.workLocation}
+                    onChange={(event) => setFormData({ ...formData, workLocation: event.target.value })}
+                  />
                 )}
+                <Select
+                  label="Shift"
+                  options={effectiveShiftOptions}
+                  value={formData.shift}
+                  onChange={(event) => setFormData({ ...formData, shift: event.target.value })}
+                />
+                <Select
+                  label="Employee Status"
+                  required
+                  options={effectiveEmployeeStatusOptions}
+                  value={formData.employeeStatus}
+                  onChange={(event) => setFormData({ ...formData, employeeStatus: event.target.value })}
+                />
               </div>
-            </div>
+            )}
+
+            {activeSection === '5' && (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <Input
+                  label="Username"
+                  required
+                  value={formData.username}
+                  onChange={(event) => setFormData({ ...formData, username: event.target.value })}
+                />
+                <div className="flex items-end">
+                  <p className="text-xs text-neutral-400">
+                    To change this employee's password, use "Reset Password" from the Staff list instead.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {activeSection === '6' && (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <Input
+                  label="Basic Salary"
+                  type="number"
+                  step="0.01"
+                  value={formData.basicSalary}
+                  onChange={(event) => setFormData({ ...formData, basicSalary: event.target.value })}
+                />
+                <Input
+                  label="Bank Name"
+                  value={formData.bankName}
+                  onChange={(event) => setFormData({ ...formData, bankName: event.target.value })}
+                />
+                <Input
+                  label="Account Number"
+                  value={formData.accountNumber}
+                  onChange={(event) => setFormData({ ...formData, accountNumber: event.target.value })}
+                />
+                <Input
+                  label="IFSC/SWIFT Code"
+                  value={formData.ifscSwiftCode}
+                  onChange={(event) => setFormData({ ...formData, ifscSwiftCode: event.target.value })}
+                />
+                <Input
+                  label="Account Holder Name"
+                  value={formData.accountHolderName}
+                  onChange={(event) => setFormData({ ...formData, accountHolderName: event.target.value })}
+                />
+                <Input
+                  label="UPI ID"
+                  value={formData.upiId}
+                  onChange={(event) => setFormData({ ...formData, upiId: event.target.value })}
+                />
+              </div>
+            )}
+
+            {activeSection === '7' && (
+              <div className="space-y-4">
+                <Select
+                  label="Identity Proof Type"
+                  options={effectiveIdentityProofOptions}
+                  value={formData.identityProofType}
+                  onChange={(event) => setFormData({ ...formData, identityProofType: event.target.value })}
+                />
+                <DocumentUploadRow
+                  label="Identity Proof Document"
+                  description="Aadhaar, PAN, Passport, or similar."
+                  accept="application/pdf,image/*"
+                  existingItems={user?.identityProofFile ? [{ name: 'Identity proof', url: user.identityProofFile }] : []}
+                  stagedFiles={singleDocFiles.identityDocuments ? [singleDocFiles.identityDocuments] : []}
+                  removed={singleDocRemoved.identityDocuments}
+                  onFilesSelected={(files) => updateSingleDoc('identityDocuments', files)}
+                  onRemove={() => removeSingleDoc('identityDocuments')}
+                />
+                <DocumentUploadRow
+                  label="Resume/CV"
+                  description="Employee resume."
+                  accept="application/pdf,.doc,.docx"
+                  existingItems={user?.resumeCv ? [{ name: 'Resume/CV', url: user.resumeCv }] : []}
+                  stagedFiles={singleDocFiles.resumeCv ? [singleDocFiles.resumeCv] : []}
+                  removed={singleDocRemoved.resumeCv}
+                  onFilesSelected={(files) => updateSingleDoc('resumeCv', files)}
+                  onRemove={() => removeSingleDoc('resumeCv')}
+                />
+                <DocumentUploadRow
+                  label="Offer Letter"
+                  description="Employment offer letter."
+                  accept="application/pdf"
+                  existingItems={user?.offerLetter ? [{ name: 'Offer letter', url: user.offerLetter }] : []}
+                  stagedFiles={singleDocFiles.offerLetter ? [singleDocFiles.offerLetter] : []}
+                  removed={singleDocRemoved.offerLetter}
+                  onFilesSelected={(files) => updateSingleDoc('offerLetter', files)}
+                  onRemove={() => removeSingleDoc('offerLetter')}
+                />
+                <DocumentUploadRow
+                  label="Appointment Letter"
+                  description="Appointment letter."
+                  accept="application/pdf"
+                  existingItems={user?.appointmentLetter ? [{ name: 'Appointment letter', url: user.appointmentLetter }] : []}
+                  stagedFiles={singleDocFiles.appointmentLetter ? [singleDocFiles.appointmentLetter] : []}
+                  removed={singleDocRemoved.appointmentLetter}
+                  onFilesSelected={(files) => updateSingleDoc('appointmentLetter', files)}
+                  onRemove={() => removeSingleDoc('appointmentLetter')}
+                />
+                <DocumentUploadRow
+                  label="Experience Certificates"
+                  description="Previous employment certificates."
+                  accept="application/pdf,.doc,.docx,image/*"
+                  multiple
+                  existingItems={user?.experienceCertificates || []}
+                  stagedFiles={multiDocFiles.experienceCertificates}
+                  onFilesSelected={(files) => updateMultiDoc('experienceCertificates', files)}
+                  onRemove={() => removeMultiDoc('experienceCertificates')}
+                />
+                <DocumentUploadRow
+                  label="Educational Certificates"
+                  description="Academic certificates."
+                  accept="application/pdf,.doc,.docx,image/*"
+                  multiple
+                  existingItems={user?.educationalCertificates || []}
+                  stagedFiles={multiDocFiles.educationalCertificates}
+                  onFilesSelected={(files) => updateMultiDoc('educationalCertificates', files)}
+                  onRemove={() => removeMultiDoc('educationalCertificates')}
+                />
+                <StaffField className="lg:col-span-2">
+                  <Input
+                    label="Skills"
+                    placeholder="Separate skills with commas"
+                    value={formData.skills}
+                    onChange={(event) => setFormData({ ...formData, skills: event.target.value })}
+                  />
+                </StaffField>
+              </div>
+            )}
+
+            {activeSection === '8' && (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <Select
+                  label="Language"
+                  options={languageOptions}
+                  value={formData.language}
+                  onChange={(event) => setFormData({ ...formData, language: event.target.value })}
+                />
+                <Select
+                  label="Time Zone"
+                  options={timeZoneOptions}
+                  value={formData.timeZone}
+                  onChange={(event) => setFormData({ ...formData, timeZone: event.target.value })}
+                />
+                <div className="flex items-end gap-2">
+                  <Select
+                    label="Account Status"
+                    required
+                    options={effectiveSystemStatusOptions}
+                    className="min-w-0 flex-1"
+                    value={formData.systemStatus}
+                    onChange={(event) => setFormData({ ...formData, systemStatus: event.target.value })}
+                  />
+                  {accountStatusChanged && (
+                    <Button type="button" size="md" onClick={handleSaveAccountStatus} loading={isSavingAccountStatus}>
+                      Save
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">7</span>
-              <p className="text-sm font-semibold text-neutral-900">Payroll details</p>
+          {error && (
+            <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
             </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Input
-                label="Basic Salary"
-                type="number"
-                step="0.01"
-                value={formData.basicSalary}
-                onChange={(event) => setFormData({ ...formData, basicSalary: event.target.value })}
-              />
-              <Input
-                label="Bank Name"
-                value={formData.bankName}
-                onChange={(event) => setFormData({ ...formData, bankName: event.target.value })}
-              />
-              <Input
-                label="Account Number"
-                value={formData.accountNumber}
-                onChange={(event) => setFormData({ ...formData, accountNumber: event.target.value })}
-              />
-              <Input
-                label="IFSC/SWIFT Code"
-                value={formData.ifscSwiftCode}
-                onChange={(event) => setFormData({ ...formData, ifscSwiftCode: event.target.value })}
-              />
-              <Input
-                label="Account Holder Name"
-                value={formData.accountHolderName}
-                onChange={(event) => setFormData({ ...formData, accountHolderName: event.target.value })}
-              />
-              <Input
-                label="UPI ID"
-                value={formData.upiId}
-                onChange={(event) => setFormData({ ...formData, upiId: event.target.value })}
-              />
-            </div>
+          )}
+
+          <div className="mt-6 flex flex-col-reverse gap-3 border-t border-neutral-100 pt-5 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => navigate(`/admin/users/${userId}`)}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={isSaving} disabled={!userProfileChanged}>
+              Update User
+            </Button>
           </div>
         </div>
-      </div>
-
-      {error && (
-        <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      <div className="mt-6 flex flex-col-reverse gap-3 border-t border-neutral-100 pt-5 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={() => navigate(`/admin/users/${userId}`)}>
-          Cancel
-        </Button>
-        <Button type="submit" loading={isSaving} disabled={!userProfileChanged}>
-          Update User
-        </Button>
       </div>
     </form>
   )

@@ -72,6 +72,7 @@ export function normalizeApiUser(user) {
     employeeStatus: user.employee_status,
     workLocation: user.work_location,
     reportingManagerId: user.reporting_manager_id,
+    reportingManagerName: user.reporting_manager_name,
     shift: user.shift,
     basicSalary: user.basic_salary,
     bankName: user.bank_name,
@@ -97,8 +98,16 @@ export function normalizeApiUser(user) {
 function normalizeDocuments(documents = []) {
   if (!Array.isArray(documents)) return []
 
-  return documents.map((document) => ({
-    ...document,
-    url: getFileUrl(document),
-  }))
+  return documents.map((document) => {
+    if (typeof document === 'string') {
+      // No file_id metadata on a bare URL - can't target it for a single delete, only bulk-clear.
+      return { url: getFileUrl(document), name: document.split('/').pop() }
+    }
+
+    return {
+      ...document,
+      id: document.file_id || document.id,
+      url: getFileUrl(document),
+    }
+  })
 }
