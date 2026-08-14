@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  Banknote,
   CreditCard,
   FileCheck2,
   Info,
@@ -24,10 +25,9 @@ import { customers as seedCustomers } from '../../mockData/customers'
 import { buildOrder, orders as seedOrders } from '../../mockData/orders'
 import { vehicleStock } from '../../mockData/vehicleStock'
 import { users } from '../../mockData/users'
-import { createCustomer } from '../../api/customers'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
-import CustomerForm from '../customers/CustomerForm'
+import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
 import { useToast } from '../../components/ui/toastContext'
 
 const paymentOptions = [
@@ -35,11 +35,21 @@ const paymentOptions = [
   { value: 'card', label: 'Card', icon: CreditCard },
   { value: 'cash', label: 'Cash', icon: Wallet },
   { value: 'cod', label: 'COD', icon: Wallet },
+  { value: 'credit', label: 'Credit', icon: Banknote },
 ]
 
+const paymentTermsOptions = [
+  { value: '7', label: 'Credit (7 Days)' },
+  { value: '15', label: 'Credit (15 Days)' },
+  { value: '30', label: 'Credit (30 Days)' },
+  { value: '45', label: 'Credit (45 Days)' },
+]
+
+const warehouseOptions = [{ value: 'main', label: 'Main Warehouse' }]
+
 const deliveryOptions = [
-  { value: 'takeaway', label: 'Takeaway Order', description: 'Customer will collect the order.', icon: Store },
-  { value: 'delivery_boy', label: 'Choose Delivery Boy', description: 'Assign a delivery partner for doorstep delivery.', icon: Truck },
+  { value: 'takeaway', label: 'Takeaway / Self Pickup', description: 'Customer will collect the order from our store.', icon: Store },
+  { value: 'delivery_boy', label: 'Home Delivery', description: 'We will deliver the order to customer address.', icon: Truck },
 ]
 
 const discountTypeOptions = [
@@ -59,6 +69,14 @@ const phoneMatches = (registeredPhone = '', typedPhone = '') => {
 function formatGstPercent(value) {
   if (!value) return '0'
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+function SectionBadge({ number }) {
+  return (
+    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">
+      {number}
+    </span>
+  )
 }
 
 export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
@@ -82,18 +100,19 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const [customerMode, setCustomerMode] = useState('existing')
   const [customerSearch, setCustomerSearch] = useState('')
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
-  const [showCustomerForm, setShowCustomerForm] = useState(false)
-  const [isSavingCustomer, setIsSavingCustomer] = useState(false)
-  const [customerFormError, setCustomerFormError] = useState('')
+  const [showQuickAddCustomer, setShowQuickAddCustomer] = useState(false)
 
-  // Delivery date
+  // Order details
+  const [orderDate] = useState(new Date().toISOString().slice(0, 10))
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().slice(0, 10))
+  const [warehouse, setWarehouse] = useState('main')
 
   // Products
   const [orderItems, setOrderItems] = useState([])
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false)
   const [productSearch, setProductSearch] = useState('')
   const [orderNotes, setOrderNotes] = useState('')
+  const [internalNotes, setInternalNotes] = useState('')
   const productPickerRef = useRef(null)
 
   // Discount
@@ -102,8 +121,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
   // Payment / delivery
   const [paymentMethod, setPaymentMethod] = useState('')
+  const [paymentTerms, setPaymentTerms] = useState('15')
   const [deliveryType, setDeliveryType] = useState('')
   const [deliveryBoyId, setDeliveryBoyId] = useState('')
+  const [deliveryAddress, setDeliveryAddress] = useState('')
 
   const [errors, setErrors] = useState({})
 
@@ -128,11 +149,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
   const deliveryBoys = useMemo(
     () => users.filter((user) => user.role === ROLES.DELIVERY_PARTNER && user.status !== 'inactive'),
-    [],
-  )
-
-  const salesOfficers = useMemo(
-    () => users.filter((user) => user.role === ROLES.SALES_OFFICER && user.status !== 'inactive'),
     [],
   )
 
@@ -161,45 +177,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     return availableProducts.filter((product) => product.fullName.toLowerCase().includes(search))
   }, [availableProducts, productSearch])
 
-  const handleOpenCustomerForm = () => {
-    setCustomerFormError('')
-    setShowCustomerForm(true)
-  }
-
-  const handleCloseCustomerForm = () => {
-    setCustomerFormError('')
-    setShowCustomerForm(false)
-    setCustomerMode('existing')
-  }
-
-  const handleSaveNewCustomer = async (customerData) => {
-    setIsSavingCustomer(true)
-    setCustomerFormError('')
-
-    const result = await createCustomer(customerData)
-
-    if (!result.success) {
-      setCustomerFormError(result.error)
-      setIsSavingCustomer(false)
-      return
-    }
-
-    const createdCustomer = {
-      ...customerData,
-      ...result.customer,
-      id: result.customer.id,
-      name: result.customer.name || customerData.name,
-      phone: result.customer.phone || customerData.phone,
-      email: result.customer.email || customerData.email,
-      type: result.customer.category || customerData.type,
-      assignedSalesOfficerId: result.customer.assigned_sales_officer_id || customerData.assignedSalesOfficerId,
-    }
-
+  const handleCustomerCreated = (createdCustomer) => {
     setCustomerRecords((current) => [createdCustomer, ...current])
     setSelectedCustomerId(createdCustomer.id)
     setCustomerMode('existing')
-    setIsSavingCustomer(false)
-    setShowCustomerForm(false)
+    setShowQuickAddCustomer(false)
     setErrors((current) => ({ ...current, customer: '' }))
   }
 
@@ -262,15 +244,15 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const validateForm = () => {
     const nextErrors = {}
 
-    if (!selectedCustomer) nextErrors.customer = 'Select an existing company or create a new one.'
+    if (!selectedCustomer) nextErrors.customer = 'Select an existing customer or quick add a new one.'
     if (!deliveryDate) nextErrors.deliveryDate = 'Delivery date is required.'
     if (orderItems.length === 0) nextErrors.items = 'Add at least one product to the order.'
     if (orderItems.some((item) => !Number(item.quantity) || Number(item.quantity) < 1)) {
       nextErrors.items = 'Keep every product quantity at least 1.'
     }
-    if (!paymentMethod) nextErrors.paymentMethod = 'Select a payment method.'
-    if (!restrictToVehicleStock && !deliveryType) nextErrors.deliveryType = 'Select a delivery option.'
-    if (deliveryType === 'delivery_boy' && !deliveryBoyId) nextErrors.deliveryBoyId = 'Choose a delivery boy.'
+    if (!paymentMethod) nextErrors.paymentMethod = 'Select a payment type.'
+    if (!restrictToVehicleStock && !deliveryType) nextErrors.deliveryType = 'Select a delivery method.'
+    if (deliveryType === 'delivery_boy' && !restrictToVehicleStock && !deliveryBoyId) nextErrors.deliveryBoyId = 'Choose a delivery partner.'
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -280,7 +262,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     event.preventDefault()
     if (!validateForm()) return
 
-    const isCod = paymentMethod === 'cod'
+    const isCod = paymentMethod === 'cod' || paymentMethod === 'credit'
     const deliveryPartnerId = deliveryType === 'delivery_boy' ? deliveryBoyId : null
     const newOrder = buildOrder({
       id: `ORD-${Date.now()}`,
@@ -288,7 +270,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       customerId: selectedCustomer.id,
       customerName: selectedCustomer.name,
       status: deliveryPartnerId ? 'Confirmed' : 'Draft',
-      orderDate: new Date().toISOString().slice(0, 10),
+      orderDate,
       expectedDeliveryDate: deliveryDate,
       deliveryPartnerId,
       amountPaid: isCod ? 0 : totals.total,
@@ -305,8 +287,12 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       customerPhone: selectedCustomer.phone,
       customerEmail: selectedCustomer.email || null,
       paymentMethod,
+      paymentTerms: paymentMethod === 'credit' ? paymentTerms : null,
+      warehouse,
       fulfillmentType: deliveryType,
+      deliveryAddress: deliveryAddress || null,
       notes: orderNotes.trim() || null,
+      internalNotes: internalNotes.trim() || null,
       source: restrictToVehicleStock ? 'delivery_vehicle' : 'standard',
     })
 
@@ -330,12 +316,12 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="space-y-5">
-          {/* Company + Delivery Date */}
-          <div className="grid grid-cols-1 divide-y divide-neutral-100 rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card) lg:grid-cols-[minmax(0,1fr)_18rem] lg:divide-x lg:divide-y-0">
+          {/* Customer + Order Details */}
+          <div className="grid grid-cols-1 divide-y divide-neutral-100 rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card) lg:grid-cols-2 lg:divide-x lg:divide-y-0">
             <div className="space-y-4 p-5">
-              <div>
-                <h3 className="text-base font-semibold text-neutral-900">Company</h3>
-                <p className="mt-0.5 text-sm text-neutral-500">Select an existing company or create a new one.</p>
+              <div className="flex items-center gap-2.5">
+                <SectionBadge number={1} />
+                <h3 className="text-base font-semibold text-neutral-900">Customer</h3>
               </div>
 
               <div className="flex flex-wrap items-center gap-5">
@@ -347,7 +333,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     onChange={() => setCustomerMode('existing')}
                     className="size-4 text-primary-600 focus:ring-primary-500"
                   />
-                  Select Existing Company
+                  Select Existing Customer
                 </label>
                 <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-neutral-800">
                   <input
@@ -356,57 +342,106 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     checked={customerMode === 'new'}
                     onChange={() => {
                       setCustomerMode('new')
-                      handleOpenCustomerForm()
+                      setShowQuickAddCustomer(true)
                     }}
                     className="size-4 text-primary-600 focus:ring-primary-500"
                   />
-                  Create New Company
+                  Quick Add Customer
                 </label>
               </div>
 
-              {customerMode === 'existing' ? (
-                <div className="space-y-2">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                    <input
-                      type="search"
-                      value={customerSearch}
-                      onChange={(event) => setCustomerSearch(event.target.value)}
-                      placeholder="Search by name, phone or email..."
-                      className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 pl-10 pr-4 text-sm text-neutral-900 transition-all focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                    />
-                  </div>
-                  <Select
-                    options={customerOptions}
-                    value={selectedCustomerId}
-                    onChange={(event) => {
-                      setSelectedCustomerId(event.target.value)
-                      setErrors((current) => ({ ...current, customer: '' }))
-                    }}
-                    placeholder={customerOptions.length ? 'Select a company' : 'No matching company found'}
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="search"
+                    value={customerSearch}
+                    onChange={(event) => setCustomerSearch(event.target.value)}
+                    placeholder="Search by name, phone, email or GSTIN..."
+                    className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 pl-10 pr-4 text-sm text-neutral-900 transition-all focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                   />
-                  {errors.customer && <p className="text-sm text-red-600">{errors.customer}</p>}
                 </div>
-              ) : (
-                <p className="text-sm text-neutral-500">A form to create the new company will open in a moment.</p>
-              )}
+                <Select
+                  options={customerOptions}
+                  value={selectedCustomerId}
+                  onChange={(event) => {
+                    setSelectedCustomerId(event.target.value)
+                    setErrors((current) => ({ ...current, customer: '' }))
+                  }}
+                  placeholder={customerOptions.length ? 'Select a customer' : 'No matching customer found'}
+                />
+                {errors.customer && <p className="text-sm text-red-600">{errors.customer}</p>}
+
+                {selectedCustomer && (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-neutral-900">{selectedCustomer.name}</p>
+                      <p className="truncate text-xs text-neutral-500">
+                        {selectedCustomer.phone} {selectedCustomer.city ? `• ${selectedCustomer.city}` : ''}
+                      </p>
+                    </div>
+                    <a href={`/admin/customers/${selectedCustomer.id}`} className="shrink-0 text-sm font-medium text-primary-700 hover:underline">
+                      View Details
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-4 p-5">
-              <div>
-                <h3 className="text-base font-semibold text-neutral-900">Delivery Date</h3>
-                <p className="mt-0.5 text-sm text-neutral-500">Select the date for delivery.</p>
+              <div className="flex items-center gap-2.5">
+                <SectionBadge number={2} />
+                <h3 className="text-base font-semibold text-neutral-900">Order Details</h3>
               </div>
-              <DatePicker value={deliveryDate} onChange={setDeliveryDate} error={errors.deliveryDate} />
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-neutral-700">Order Date</label>
+                  <div className="flex h-11 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 text-sm text-neutral-600">
+                    {new Date(orderDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Delivery Date<span className="text-red-500"> *</span>
+                  </label>
+                  <DatePicker value={deliveryDate} onChange={setDeliveryDate} error={errors.deliveryDate} />
+                </div>
+              </div>
+
+              <Select label="Warehouse" required options={warehouseOptions} value={warehouse} onChange={(event) => setWarehouse(event.target.value)} />
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-neutral-700">
+                  Payment Type<span className="text-red-500"> *</span>
+                </label>
+                <Select
+                  options={paymentOptions.map(({ value, label }) => ({ value, label }))}
+                  value={paymentMethod}
+                  onChange={(event) => {
+                    setPaymentMethod(event.target.value)
+                    setErrors((current) => ({ ...current, paymentMethod: '' }))
+                  }}
+                  placeholder="Select payment type"
+                  error={errors.paymentMethod}
+                />
+              </div>
+
+              {paymentMethod === 'credit' && (
+                <Select label="Payment Terms" required options={paymentTermsOptions} value={paymentTerms} onChange={(event) => setPaymentTerms(event.target.value)} />
+              )}
             </div>
           </div>
 
           {/* Products */}
           <div className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
             <div className="flex items-center justify-between gap-4 border-b border-neutral-100 p-5">
-              <div>
-                <h3 className="text-base font-semibold text-neutral-900">Products</h3>
-                <p className="mt-0.5 text-sm text-neutral-500">Add products, set selling price and quantity.</p>
+              <div className="flex items-center gap-2.5">
+                <SectionBadge number={3} />
+                <div>
+                  <h3 className="text-base font-semibold text-neutral-900">Products / Order Items</h3>
+                  <p className="mt-0.5 text-sm text-neutral-500">Add products, set selling price and quantity.</p>
+                </div>
               </div>
               <div className="relative" ref={productPickerRef}>
                 <Button type="button" variant="outline" size="sm" onClick={() => setIsProductPickerOpen((current) => !current)}>
@@ -462,20 +497,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <thead>
                     <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
                       <th className="px-5 py-3">Product</th>
-                      <th className="px-3 py-3">
-                        Unit Price (₹)
-                        <span className="block text-[0.6rem] font-medium normal-case tracking-normal text-neutral-300">Fixed by Company</span>
-                      </th>
-                      <th className="px-3 py-3">
-                        Unit of Measure
-                        <span className="block text-[0.6rem] font-medium normal-case tracking-normal text-neutral-300">(UoM)</span>
-                      </th>
-                      <th className="px-3 py-3">
-                        Selling Price (₹)
-                        <span className="block text-[0.6rem] font-medium normal-case tracking-normal text-neutral-300">Editable</span>
-                      </th>
-                      <th className="px-3 py-3 text-center">Quantity</th>
-                      <th className="px-3 py-3 text-right">Total Amount (₹)</th>
+                      <th className="px-3 py-3">UoM</th>
+                      <th className="px-3 py-3">Unit Price (₹)</th>
+                      <th className="px-3 py-3 text-center">Qty</th>
+                      <th className="px-3 py-3">Tax (%)</th>
+                      <th className="px-3 py-3 text-right">Line Total (₹)</th>
                       <th className="w-10 px-3 py-3" />
                     </tr>
                   </thead>
@@ -507,7 +533,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               </div>
                             </div>
                           </td>
-                          <td className="px-3 py-3.5 text-neutral-600">{formatCurrency(product.sellingPrice)}</td>
                           <td className="px-3 py-3.5">
                             <span className="inline-flex items-center rounded-lg bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-600">
                               {product.unit}
@@ -550,6 +575,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               </button>
                             </div>
                           </td>
+                          <td className="px-3 py-3.5 text-neutral-500">{formatGstPercent((product.gstRate || 0) * 100)}%</td>
                           <td className="px-3 py-3.5 text-right font-semibold text-neutral-900">
                             {formatCurrency(sellingPrice * quantity)}
                           </td>
@@ -594,101 +620,111 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
             </div>
           </div>
 
-          {/* Payment + Delivery */}
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-              <h3 className="text-base font-semibold text-neutral-900">Payment Type</h3>
-              <p className="mt-0.5 text-sm text-neutral-500">Select how the customer will pay.</p>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {paymentOptions.map((option) => {
-                  const Icon = option.icon
-                  const isSelected = paymentMethod === option.value
-
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod(option.value)
-                        setErrors((current) => ({ ...current, paymentMethod: '' }))
-                      }}
-                      className={`flex items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm font-medium transition-all focus:outline-none focus:ring-4 focus:ring-primary-500/12 ${
-                        isSelected
-                          ? 'border-primary-500 bg-primary-50 text-primary-800'
-                          : 'border-neutral-200 bg-white text-neutral-700 hover:border-primary-200 hover:bg-primary-50/50'
-                      }`}
-                      aria-pressed={isSelected}
-                    >
-                      <Icon className="size-4" aria-hidden="true" />
-                      {option.label}
-                    </button>
-                  )
-                })}
-              </div>
-              {errors.paymentMethod && <p className="mt-3 text-sm text-red-600">{errors.paymentMethod}</p>}
+          {/* Delivery Method */}
+          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="flex items-center gap-2.5">
+              <SectionBadge number={4} />
+              <h3 className="text-base font-semibold text-neutral-900">Delivery Method</h3>
             </div>
 
-            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-              <h3 className="text-base font-semibold text-neutral-900">Delivery Method</h3>
-              <p className="mt-0.5 text-sm text-neutral-500">
-                {restrictToVehicleStock ? 'This order is being handed over directly from your vehicle.' : 'Select takeaway or assign a delivery boy.'}
-              </p>
+            {restrictToVehicleStock ? (
+              <div className="mt-4 flex items-center gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
+                <Truck className="size-5 text-primary-700" aria-hidden="true" />
+                <span className="text-sm font-medium text-neutral-800">
+                  Delivered by you ({currentUser?.name || 'this vehicle'}) — no separate assignment needed.
+                </span>
+              </div>
+            ) : (
+              <>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {deliveryOptions.map((option) => {
+                    const Icon = option.icon
+                    const isSelected = deliveryType === option.value
 
-              {restrictToVehicleStock ? (
-                <div className="mt-4 flex items-center gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
-                  <Truck className="size-5 text-primary-700" aria-hidden="true" />
-                  <span className="text-sm font-medium text-neutral-800">
-                    Delivered by you ({currentUser?.name || 'this vehicle'}) — no separate assignment needed.
-                  </span>
-                </div>
-              ) : (
-                <>
-                  <div className="mt-4 space-y-3">
-                    {deliveryOptions.map((option) => {
-                      const Icon = option.icon
-                      const isSelected = deliveryType === option.value
-
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => {
-                            setDeliveryType(option.value)
-                            if (option.value === 'takeaway') setDeliveryBoyId('')
-                            setErrors((current) => ({ ...current, deliveryType: '', deliveryBoyId: '' }))
-                          }}
-                          className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition-all focus:outline-none focus:ring-4 focus:ring-primary-500/12 ${
-                            isSelected ? 'border-primary-500 bg-primary-50' : 'border-neutral-200 bg-white hover:border-primary-200 hover:bg-primary-50/50'
-                          }`}
-                          aria-pressed={isSelected}
-                        >
-                          <Icon className="mt-0.5 size-5 text-primary-700" aria-hidden="true" />
-                          <span>
-                            <span className="block text-sm font-semibold text-neutral-900">{option.label}</span>
-                            <span className="mt-0.5 block text-xs text-neutral-500">{option.description}</span>
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {deliveryType === 'delivery_boy' && (
-                    <div className="mt-4 space-y-1.5">
-                      <label className="text-sm font-medium text-neutral-700">Delivery Boy</label>
-                      <Select
-                        options={deliveryBoys.map((user) => ({ value: user.id, label: user.name }))}
-                        value={deliveryBoyId}
-                        onChange={(event) => {
-                          setDeliveryBoyId(event.target.value)
-                          setErrors((current) => ({ ...current, deliveryBoyId: '' }))
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setDeliveryType(option.value)
+                          if (option.value === 'takeaway') setDeliveryBoyId('')
+                          setErrors((current) => ({ ...current, deliveryType: '', deliveryBoyId: '' }))
                         }}
-                        placeholder="Choose delivery boy"
-                        error={errors.deliveryBoyId}
-                      />
-                    </div>
-                  )}
-                  {errors.deliveryType && <p className="mt-3 text-sm text-red-600">{errors.deliveryType}</p>}
-                </>
-              )}
+                        className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition-all focus:outline-none focus:ring-4 focus:ring-primary-500/12 ${
+                          isSelected ? 'border-primary-500 bg-primary-50' : 'border-neutral-200 bg-white hover:border-primary-200 hover:bg-primary-50/50'
+                        }`}
+                        aria-pressed={isSelected}
+                      >
+                        <Icon className="mt-0.5 size-5 text-primary-700" aria-hidden="true" />
+                        <span>
+                          <span className="block text-sm font-semibold text-neutral-900">{option.label}</span>
+                          <span className="mt-0.5 block text-xs text-neutral-500">{option.description}</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {errors.deliveryType && <p className="mt-3 text-sm text-red-600">{errors.deliveryType}</p>}
+
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-neutral-700">
+                      Assign Delivery Partner{deliveryType === 'delivery_boy' && <span className="text-red-500"> *</span>}
+                    </label>
+                    <Select
+                      options={deliveryBoys.map((user) => ({ value: user.id, label: user.name }))}
+                      value={deliveryBoyId}
+                      onChange={(event) => {
+                        setDeliveryBoyId(event.target.value)
+                        setErrors((current) => ({ ...current, deliveryBoyId: '' }))
+                      }}
+                      placeholder="Choose delivery partner"
+                      error={errors.deliveryBoyId}
+                      disabled={deliveryType !== 'delivery_boy'}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-neutral-700">Delivery Address (Optional)</label>
+                    <Select
+                      options={selectedCustomer ? [{ value: selectedCustomer.address || selectedCustomer.city || '', label: selectedCustomer.address || selectedCustomer.city || 'Customer address' }] : []}
+                      value={deliveryAddress}
+                      onChange={(event) => setDeliveryAddress(event.target.value)}
+                      placeholder="Search and select address"
+                      disabled={!selectedCustomer}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="flex items-center gap-2.5">
+              <SectionBadge number={5} />
+              <h3 className="text-base font-semibold text-neutral-900">Notes</h3>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-neutral-700">Order Notes (Visible to Customer)</label>
+                <textarea
+                  value={orderNotes}
+                  maxLength={250}
+                  onChange={(event) => setOrderNotes(event.target.value)}
+                  className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+                <p className="text-right text-xs text-neutral-400">{orderNotes.length} / 250</p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-neutral-700">Internal Notes (Not Visible to Customer)</label>
+                <textarea
+                  value={internalNotes}
+                  maxLength={250}
+                  onChange={(event) => setInternalNotes(event.target.value)}
+                  className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+                <p className="text-right text-xs text-neutral-400">{internalNotes.length} / 250</p>
+              </div>
             </div>
           </div>
 
@@ -734,19 +770,41 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               </div>
 
               <div className="flex items-center justify-between">
+                <span className="text-sm text-neutral-600">Subtotal</span>
+                <span className="text-sm font-medium text-neutral-900">{formatCurrency(totals.subtotal - totals.discountAmount)}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
                 <span className="text-sm text-neutral-600">GST ({formatGstPercent(totals.effectiveGstPercent)}%)</span>
                 <span className="text-sm font-medium text-neutral-900">{formatCurrency(totals.gstAmount)}</span>
               </div>
 
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-neutral-600">Shipping / Delivery</span>
+                <span className="text-sm font-medium text-neutral-900">₹0.00</span>
+              </div>
+
               <div className="space-y-2 border-t border-neutral-100 pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-600">Total Quantity</span>
+                  <span className="text-sm font-medium text-neutral-900">{totals.totalQuantity} Items</span>
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-600">Payment Type</span>
                   <span className="text-sm font-medium text-neutral-900">
                     {paymentOptions.find((option) => option.value === paymentMethod)?.label || 'Not selected'}
                   </span>
                 </div>
+                {paymentMethod === 'credit' && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-600">Payment Terms</span>
+                    <span className="text-sm font-medium text-neutral-900">
+                      {paymentTermsOptions.find((option) => option.value === paymentTerms)?.label}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-neutral-600">Delivery Boy</span>
+                  <span className="text-sm text-neutral-600">Delivery Partner</span>
                   <span className="text-sm font-medium text-neutral-900">{assignedDeliveryBoyName || 'Takeaway / Not assigned'}</span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -754,10 +812,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <span className="text-sm font-medium text-neutral-900">
                     {deliveryDate ? new Date(deliveryDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                   </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-neutral-600">Shipping / Delivery</span>
-                  <span className="text-sm font-medium text-neutral-900">Free</span>
                 </div>
               </div>
 
@@ -774,29 +828,19 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               <FileCheck2 className="size-4" aria-hidden="true" />
               Create Order
             </Button>
+            <p className="mt-3 text-center text-xs text-neutral-400">You can review and edit the order before confirmation.</p>
           </div>
         </div>
       </form>
 
-      {showCustomerForm && (
-        <div
-          className="fixed inset-0 z-50 overflow-y-auto bg-neutral-900/60 p-4 backdrop-blur-sm"
-          onClick={handleCloseCustomerForm}
-        >
-          <div className="mx-auto my-6 max-w-5xl" onClick={(event) => event.stopPropagation()}>
-            <CustomerForm
-              isOpen={showCustomerForm}
-              onClose={handleCloseCustomerForm}
-              customer={null}
-              onSave={handleSaveNewCustomer}
-              salesOfficers={salesOfficers}
-              currentUser={currentUser}
-              saving={isSavingCustomer}
-              formError={customerFormError}
-            />
-          </div>
-        </div>
-      )}
+      <QuickAddCustomerModal
+        isOpen={showQuickAddCustomer}
+        onClose={() => {
+          setShowQuickAddCustomer(false)
+          setCustomerMode('existing')
+        }}
+        onCreated={handleCustomerCreated}
+      />
     </div>
   )
 }

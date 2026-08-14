@@ -67,6 +67,9 @@ import AdminPlans from '../features/plans/AdminPlans'
 import AdminDeliveries from '../features/deliveries/AdminDeliveries'
 import AdminExpenses from '../features/expenses/AdminExpenses'
 import AdminInvoices from '../features/invoices/AdminInvoices'
+import CreateSalesInvoice from '../features/invoices/CreateSalesInvoice'
+import InvoiceDetail from '../features/invoices/InvoiceDetail'
+import InvoiceSettings from '../features/invoices/InvoiceSettings'
 import AdminSettings from '../features/settings/AdminSettings'
 import ObjectFieldsSettings from '../features/settings/ObjectFieldsSettings'
 import AdminAttendance from '../features/attendance/AdminAttendance'
@@ -198,6 +201,9 @@ export default function AppRoutes() {
           <Route path="/admin/deliveries" element={<AdminDeliveries />} />
           <Route path="/admin/expenses" element={<AdminExpenses />} />
           <Route path="/admin/invoices" element={<AdminInvoices />} />
+          <Route path="/admin/invoices/new" element={<CreateSalesInvoice />} />
+          <Route path="/admin/invoices/settings" element={<InvoiceSettings />} />
+          <Route path="/admin/invoices/:invoiceNumber" element={<InvoiceDetail />} />
           <Route path="/admin/reports" element={<ReportsHub />} />
           <Route path="/admin/notifications" element={<NotificationsList />} />
           <Route path="/admin/audit-logs" element={<AuditLogList />} />

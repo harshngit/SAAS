@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { CheckCircle2, Clock3, IndianRupee, Plus, Search, ShoppingCart, Wallet } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Clock3, Plus, Search, ShoppingCart, Truck, Wallet } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -13,6 +13,7 @@ import StatCard from '../../components/ui/StatCard'
 import { RequirePermission } from '../../auth/RequirePermission'
 import { ORDER_STATUSES, orderStatusBadgeVariant, orders as seedOrders } from '../../mockData/orders'
 import { users } from '../../mockData/users'
+import { getInvoiceByOrderNumber } from '../../mockData/invoices'
 import { formatCurrency } from '../../utils/format'
 
 const statusTabs = [{ value: 'all', label: 'All' }, ...ORDER_STATUSES.map((status) => ({ value: status.value, label: status.label }))]
@@ -41,15 +42,25 @@ const salesOfficerOptions = [
   ...salesOfficers.map((officer) => ({ value: officer.id, label: officer.name })),
 ]
 
+const deliveryPartnerUsers = users.filter((user) => user.role === 'delivery_partner')
+const deliveryPartnerOptions = [
+  { value: 'all', label: 'All delivery partners' },
+  ...deliveryPartnerUsers.map((partner) => ({ value: partner.id, label: partner.name })),
+]
+
+const pageSize = 10
+
 export default function OrderList() {
   const navigate = useNavigate()
   const [orders] = useState(seedOrders)
   const [statusFilter, setStatusFilter] = useState('all')
   const [paymentFilter, setPaymentFilter] = useState('all')
   const [officerFilter, setOfficerFilter] = useState('all')
+  const [deliveryPartnerFilter, setDeliveryPartnerFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [page, setPage] = useState(1)
 
   const filteredOrders = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -61,22 +72,40 @@ export default function OrderList() {
       const matchesStatus = statusFilter === 'all' || order.status === statusFilter
       const matchesPayment = paymentFilter === 'all' || order.paymentStatus === paymentFilter
       const matchesOfficer = officerFilter === 'all' || order.salesOfficerId === officerFilter
+      const matchesDeliveryPartner = deliveryPartnerFilter === 'all' || order.deliveryPartnerId === deliveryPartnerFilter
       const matchesFrom = !dateFrom || order.orderDate >= dateFrom
       const matchesTo = !dateTo || order.orderDate <= dateTo
 
-      return matchesSearch && matchesStatus && matchesPayment && matchesOfficer && matchesFrom && matchesTo
+      return matchesSearch && matchesStatus && matchesPayment && matchesOfficer && matchesDeliveryPartner && matchesFrom && matchesTo
     })
-  }, [orders, searchTerm, statusFilter, paymentFilter, officerFilter, dateFrom, dateTo])
+  }, [orders, searchTerm, statusFilter, paymentFilter, officerFilter, deliveryPartnerFilter, dateFrom, dateTo])
 
-  const stats = useMemo(() => {
-    const pendingStatuses = ['Draft', 'Confirmed', 'Processing']
-    return {
-      totalOrders: filteredOrders.length,
-      pendingOrders: filteredOrders.filter((order) => pendingStatuses.includes(order.status)).length,
-      totalValue: filteredOrders.reduce((sum, order) => sum + order.total, 0),
-      outstanding: filteredOrders.reduce((sum, order) => sum + order.balanceDue, 0),
-    }
-  }, [filteredOrders])
+  const stats = useMemo(
+    () => ({
+      totalOrders: orders.length,
+      processing: orders.filter((order) => order.status === 'Processing').length,
+      outForDelivery: orders.filter((order) => order.status === 'Out for Delivery').length,
+      outstanding: orders.reduce((sum, order) => sum + order.balanceDue, 0),
+    }),
+    [orders],
+  )
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const rangeStart = filteredOrders.length === 0 ? 0 : (currentPage - 1) * pageSize + 1
+  const rangeEnd = Math.min(filteredOrders.length, currentPage * pageSize)
+
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1)
+    const pages = new Set([1, 2, currentPage - 1, currentPage, currentPage + 1, totalPages - 1, totalPages])
+    return Array.from(pages).filter((value) => value >= 1 && value <= totalPages).sort((a, b) => a - b)
+  }, [totalPages, currentPage])
+
+  const updateFilter = (setter) => (event) => {
+    setter(event.target.value)
+    setPage(1)
+  }
 
   const getDeliveryPartnerName = (order) =>
     order.deliveryPartnerId ? users.find((user) => user.id === order.deliveryPartnerId)?.name : null
@@ -85,8 +114,8 @@ export default function OrderList() {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Sales Orders</h1>
-          <p className="mt-1 text-sm text-neutral-500">Monitor, filter, and approve orders across the organization</p>
+          <h1 className="text-2xl font-semibold text-neutral-900">Orders</h1>
+          <p className="mt-1 text-sm text-neutral-500">Track, manage, and fulfill customer orders</p>
         </div>
         <RequirePermission module="sales_orders" action="create">
           <Button size="sm" onClick={() => navigate('/admin/orders/create')} className="w-full sm:w-auto">
@@ -98,9 +127,9 @@ export default function OrderList() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={ShoppingCart} iconVariant="primary" label="Total Orders" value={stats.totalOrders} />
-        <StatCard icon={Clock3} iconVariant="warning" label="Pending Orders" value={stats.pendingOrders} />
-        <StatCard icon={IndianRupee} iconVariant="success" label="Total Value" value={formatCurrency(stats.totalValue)} />
-        <StatCard icon={Wallet} iconVariant="danger" label="Outstanding" value={formatCurrency(stats.outstanding)} />
+        <StatCard icon={Clock3} iconVariant="warning" label="Processing" value={stats.processing} />
+        <StatCard icon={Truck} iconVariant="info" label="Out for Delivery" value={stats.outForDelivery} />
+        <StatCard icon={Wallet} iconVariant="danger" label="Outstanding Value" value={formatCurrency(stats.outstanding)} />
       </div>
 
       <Card className="p-0">
@@ -112,7 +141,10 @@ export default function OrderList() {
                 <button
                   key={tab.value}
                   type="button"
-                  onClick={() => setStatusFilter(tab.value)}
+                  onClick={() => {
+                    setStatusFilter(tab.value)
+                    setPage(1)
+                  }}
                   className={`relative py-2 text-sm font-medium transition-colors ${
                     isActive ? 'text-primary-700' : 'text-neutral-500 hover:text-neutral-900'
                   }`}
@@ -134,30 +166,21 @@ export default function OrderList() {
               <input
                 type="search"
                 value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
+                onChange={updateFilter(setSearchTerm)}
                 placeholder="Search order # or customer"
                 className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
-            <Select
-              options={paymentStatusOptions}
-              value={paymentFilter}
-              onChange={(event) => setPaymentFilter(event.target.value)}
-              className="sm:w-44"
-            />
-            <Select
-              options={salesOfficerOptions}
-              value={officerFilter}
-              onChange={(event) => setOfficerFilter(event.target.value)}
-              className="sm:w-52"
-            />
-            <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="sm:w-44" />
-            <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="sm:w-44" />
+            <Select options={paymentStatusOptions} value={paymentFilter} onChange={updateFilter(setPaymentFilter)} className="sm:w-44" />
+            <Select options={salesOfficerOptions} value={officerFilter} onChange={updateFilter(setOfficerFilter)} className="sm:w-52" />
+            <Select options={deliveryPartnerOptions} value={deliveryPartnerFilter} onChange={updateFilter(setDeliveryPartnerFilter)} className="sm:w-52" />
+            <DatePicker value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} placeholder="From date" className="sm:w-44" />
+            <DatePicker value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} placeholder="To date" className="sm:w-44" />
           </div>
         </div>
 
         <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">
-          {filteredOrders.length === 0 ? (
+          {paginatedOrders.length === 0 ? (
             <EmptyState
               icon={ShoppingCart}
               title="No orders match these filters"
@@ -175,12 +198,14 @@ export default function OrderList() {
                   <th className="whitespace-nowrap px-4 py-3">Payment</th>
                   <th className="whitespace-nowrap px-4 py-3">Status</th>
                   <th className="whitespace-nowrap px-4 py-3">Delivery Partner</th>
+                  <th className="whitespace-nowrap px-4 py-3">Invoice</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map((order) => {
+                {paginatedOrders.map((order) => {
                   const deliveryPartnerName = getDeliveryPartnerName(order)
+                  const invoice = getInvoiceByOrderNumber(order.orderNumber)
                   return (
                     <tr
                       key={order.id}
@@ -205,19 +230,23 @@ export default function OrderList() {
                           <span className="text-neutral-400">Unassigned</span>
                         )}
                       </td>
+                      <td className="px-4 py-3.5" onClick={(event) => event.stopPropagation()}>
+                        {invoice ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/admin/invoices/${invoice.invoiceNumber}`)}
+                            className="font-medium text-primary-700 hover:underline"
+                          >
+                            {invoice.invoiceNumber}
+                          </button>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
                         <ActionMenu
                           items={[
-                            { label: 'View', icon: CheckCircle2, onClick: () => navigate(`/admin/orders/${order.id}`) },
-                            ...(order.requiresApproval && order.status === 'Confirmed'
-                              ? [
-                                  {
-                                    label: 'Approve',
-                                    icon: CheckCircle2,
-                                    onClick: () => navigate(`/admin/orders/${order.id}`),
-                                  },
-                                ]
-                              : []),
+                            { label: 'View', icon: ShoppingCart, onClick: () => navigate(`/admin/orders/${order.id}`) },
                           ]}
                         />
                       </td>
@@ -229,11 +258,54 @@ export default function OrderList() {
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-3 text-xs text-neutral-400">
-          <span>
-            {filteredOrders.length === 0 ? '0' : `1 to ${filteredOrders.length}`} of {orders.length}
-          </span>
-          <span>Orders</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-3.5">
+          <p className="text-xs text-neutral-400">
+            Showing {rangeStart} to {rangeEnd} of {filteredOrders.length} orders
+          </p>
+          <div className="flex items-center gap-3">
+            <button type="button" className="flex items-center gap-1 rounded-full border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700">
+              10 / page <ChevronDown className="size-3.5" />
+            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="flex size-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-40"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              {pageNumbers.map((pageNumber, index) => {
+                const previous = pageNumbers[index - 1]
+                const showEllipsis = previous != null && pageNumber - previous > 1
+
+                return (
+                  <span key={pageNumber} className="flex items-center gap-1.5">
+                    {showEllipsis && <span className="px-1 text-neutral-300">…</span>}
+                    <button
+                      type="button"
+                      onClick={() => setPage(pageNumber)}
+                      className={`flex size-8 items-center justify-center rounded-full text-sm ${
+                        pageNumber === currentPage ? 'bg-primary-700 text-white' : 'border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                      }`}
+                    >
+                      {pageNumber}
+                    </button>
+                  </span>
+                )
+              })}
+              <button
+                type="button"
+                disabled={currentPage === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="flex size-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-40"
+                aria-label="Next page"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </Card>
     </div>
