@@ -19,7 +19,6 @@ import { ROLES } from '../../auth/roles'
 import { RequirePermission } from '../../auth/RequirePermission'
 import { createCustomer, deleteCustomer as deleteCustomerApi, getCustomer, listCustomers, updateCustomer } from '../../api/customers'
 import { listUsers } from '../../api/users'
-import { users as seedUsers } from '../../mockData/users'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import CustomerForm from './CustomerForm'
@@ -76,7 +75,7 @@ export default function CustomerList() {
   const basePath = isAdmin ? '/admin/customers' : '/sales/customers'
 
   const [customers, setCustomers] = useState([])
-  const [staffUsers, setStaffUsers] = useState(seedUsers.map(normalizeUser))
+  const [staffUsers, setStaffUsers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')

@@ -143,9 +143,8 @@ export async function deleteCategory(categoryId) {
 
 export async function deleteCategoriesBulk(categoryIds) {
   try {
-    await apiClient.delete('/categories/bulk', {
+    await apiClient.post('/categories/bulk-delete', { ids: categoryIds }, {
       headers: authHeader(),
-      data: { category_ids: categoryIds },
     })
 
     return { success: true }

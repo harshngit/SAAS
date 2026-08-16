@@ -44,6 +44,8 @@ import {
   Boxes,
   ClipboardCheck,
   SlidersHorizontal,
+  Undo2,
+  Bus,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -136,8 +138,11 @@ export const roleMenus = {
       section: 'Operations',
       items: [
         { label: 'Inventory', path: '/admin/inventory', icon: Warehouse, module: 'inventory' },
+        { label: 'Warehouses', path: '/admin/warehouses', icon: Building2, module: 'inventory' },
         { label: 'Orders', path: '/admin/orders', icon: ShoppingCart, module: 'sales_orders' },
+        { label: 'Sales Returns', path: '/admin/sales-returns', icon: Undo2, module: 'sales_orders' },
         { label: 'Vehicle Stock', path: '/admin/vehicle-stock', icon: Car, module: 'vehicle_stock' },
+        { label: 'Vehicles', path: '/admin/vehicles', icon: Bus, module: 'vehicle_stock' },
         { label: 'Purchases', path: '/admin/purchases', icon: PackagePlus, module: 'purchases' },
         { label: 'Deliveries', path: '/admin/deliveries', icon: Truck, module: 'deliveries' },
       ],
@@ -166,7 +171,7 @@ export const roleMenus = {
       section: 'System',
       items: [
         { label: 'Notifications', path: '/admin/notifications', icon: Bell },
-        { label: 'Settings', path: '/admin/settings', icon: Settings, module: 'settings' },
+        { label: 'Sales Workflow', path: '/admin/settings', icon: Settings, module: 'settings' },
       ],
     },
   ],

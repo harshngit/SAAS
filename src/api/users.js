@@ -482,6 +482,57 @@ export async function getUser(userId) {
   }
 }
 
+export async function postLocationPing(payload) {
+  try {
+    const requestBody = {
+      latitude: Number(payload.latitude),
+      longitude: Number(payload.longitude),
+    }
+
+    if (payload.accuracyMeters !== undefined) requestBody.accuracy_meters = Number(payload.accuracyMeters)
+    if (payload.label) requestBody.label = payload.label
+    if (payload.capturedAt) requestBody.captured_at = payload.capturedAt
+
+    const { data } = await apiClient.post('/users/me/location', requestBody, {
+      headers: authHeader(),
+    })
+
+    return { success: true, ping: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to share your location. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function getUserOverview(userId, params = {}) {
+  try {
+    const queryParams = {}
+    if (params.period) queryParams.period = params.period
+    if (params.date_from) queryParams.date_from = params.date_from
+    if (params.date_to) queryParams.date_to = params.date_to
+
+    const { data } = await apiClient.get(`/users/${userId}/overview`, {
+      headers: authHeader(),
+      params: queryParams,
+    })
+
+    return { success: true, overview: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load staff overview. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function updateUser(userId, payload) {
   try {
     const requestBody = buildSectionedUserBody(payload)

@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import {
   BarChart3,
@@ -22,6 +22,8 @@ import { useAuthStore } from '../../store/authStore'
 import { roleMenus, roleLabels, ROLES } from '../../auth/roles'
 import { usePermission } from '../../auth/usePermission'
 import { listSuperAdminOrganizations } from '../../api/superadmin'
+import { getMyAttendance } from '../../api/attendance'
+import { formatTimeLabel, normalizeAttendanceRecord } from '../../features/attendance/attendanceUtils'
 
 const NAV_BADGE_COUNTS = {
   '/superadmin/upgrade-requests': 'pendingUpgrades',
@@ -56,6 +58,7 @@ export default function Sidebar({
   onCloseMobile,
 }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const currentRole = currentUser?.role
@@ -70,6 +73,39 @@ export default function Sidebar({
     .filter((group) => group.items.length > 0)
   const [openSections, setOpenSections] = useState({})
   const [navBadgeCounts, setNavBadgeCounts] = useState({})
+  const [todaysAttendance, setTodaysAttendance] = useState(null)
+  const [isLoadingAttendance, setIsLoadingAttendance] = useState(false)
+
+  useEffect(() => {
+    if (currentRole !== ROLES.DELIVERY_PARTNER) {
+      setTodaysAttendance(null)
+      return
+    }
+
+    let isMounted = true
+    const todayIso = new Date().toISOString().slice(0, 10)
+
+    async function loadTodaysAttendance() {
+      setIsLoadingAttendance(true)
+      const result = await getMyAttendance({ date_from: todayIso, date_to: todayIso })
+      if (!isMounted) return
+      setIsLoadingAttendance(false)
+
+      if (!result.success || result.records.length === 0) {
+        setTodaysAttendance(null)
+        return
+      }
+
+      setTodaysAttendance(normalizeAttendanceRecord(result.records[0]))
+    }
+
+    loadTodaysAttendance()
+
+    return () => {
+      isMounted = false
+    }
+    // Re-check on route change so checking in from the Attendance page updates this immediately.
+  }, [currentRole, location.pathname])
 
   useEffect(() => {
     if (currentRole !== ROLES.SUPER_ADMIN) {
@@ -98,9 +134,13 @@ export default function Sidebar({
     const nextMenuGroups = currentRole ? roleMenus[currentRole] || [] : []
     setOpenSections(
       Object.fromEntries(
-        nextMenuGroups.map((group) => [
+        // Open the first section by default for every role (covers single-section roles like
+        // Sales Officer/Delivery Partner/Accountant/Super Admin, whose only group isn't named
+        // 'Overview') plus 'Sales Operation' specifically, to keep Admin's existing two-open
+        // default unchanged.
+        nextMenuGroups.map((group, index) => [
           group.section,
-          group.section === 'Overview' || group.section === 'Sales Operation',
+          index === 0 || group.section === 'Sales Operation',
         ]),
       ),
     )
@@ -360,22 +400,53 @@ export default function Sidebar({
           })}
         </nav>
 
-        {showDeliveryCheckInCard && (
+        {showDeliveryCheckInCard && !isLoadingAttendance && (
           <div className="px-3 pb-3">
-            <div className="max-w-[11rem] rounded-[1rem] bg-white px-4 py-4 shadow-[0_12px_26px_-20px_rgb(15_23_42/0.22)]">
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-700 text-white">
-                  <CheckCircle2 className="size-4" aria-hidden="true" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold leading-tight text-neutral-900">You're checked in</p>
-                  <p className="mt-0.5 text-xs text-neutral-500">Since 8:45 AM</p>
+            {isExpanded ? (
+              <div className="max-w-[11rem] rounded-[1rem] bg-white px-4 py-4 shadow-[0_12px_26px_-20px_rgb(15_23_42/0.22)]">
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-white ${
+                      todaysAttendance?.checkIn ? 'bg-primary-700' : 'bg-neutral-300'
+                    }`}
+                  >
+                    <CheckCircle2 className="size-4" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold leading-tight text-neutral-900">
+                      {todaysAttendance?.checkIn ? "You're checked in" : 'Not checked in yet'}
+                    </p>
+                    <p className="mt-0.5 text-xs text-neutral-500">
+                      {todaysAttendance?.checkIn ? `Since ${formatTimeLabel(todaysAttendance.checkIn)}` : 'No check-in recorded today'}
+                    </p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate('/delivery/attendance')
+                    onCloseMobile()
+                  }}
+                  className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary-700 hover:underline"
+                >
+                  View Attendance <ArrowRight className="size-4" />
+                </button>
               </div>
-              <button type="button" className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary-700 hover:underline">
-                View Attendance <ArrowRight className="size-4" />
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate('/delivery/attendance')}
+                aria-label={todaysAttendance?.checkIn ? `Checked in since ${formatTimeLabel(todaysAttendance.checkIn)}` : 'Not checked in yet'}
+                title={todaysAttendance?.checkIn ? `Checked in since ${formatTimeLabel(todaysAttendance.checkIn)}` : 'Not checked in yet'}
+                className={`hidden size-9 w-full items-center justify-center rounded-[0.85rem] ring-1 transition-colors md:flex ${
+                  todaysAttendance?.checkIn
+                    ? 'bg-primary-50 text-primary-700 ring-primary-100 hover:bg-primary-100'
+                    : 'bg-neutral-100 text-neutral-500 ring-neutral-200 hover:bg-neutral-200'
+                }`}
+              >
+                <CheckCircle2 className="size-4.5" aria-hidden="true" />
               </button>
-            </div>
+            )}
           </div>
         )}
 

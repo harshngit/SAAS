@@ -22,6 +22,8 @@ import ProductDetail from '../features/products/ProductDetail'
 import StockBoard from '../features/inventory/StockBoard'
 import StockDetail from '../features/inventory/StockDetail'
 import VehicleStockOverview from '../features/vehicleStock/VehicleStockOverview'
+import WarehouseList from '../features/warehouses/WarehouseList'
+import VehicleList from '../features/vehicles/VehicleList'
 import PurchaseInvoiceList from '../features/purchases/PurchaseInvoiceList'
 import ReportsHub from '../features/reports/ReportsHub'
 import NotificationsList from '../features/notifications/NotificationsList'
@@ -75,6 +77,9 @@ import ObjectFieldsSettings from '../features/settings/ObjectFieldsSettings'
 import AdminAttendance from '../features/attendance/AdminAttendance'
 import AttendanceDetail from '../features/attendance/AttendanceDetail'
 import Profile from '../features/profile/Profile'
+import SalesReturnList from '../features/salesReturns/SalesReturnList'
+import SalesReturnFormPage from '../features/salesReturns/SalesReturnFormPage'
+import SalesReturnDetail from '../features/salesReturns/SalesReturnDetail'
 
 function RootRedirect() {
   const currentUser = useAuthStore((state) => state.currentUser)
@@ -196,7 +201,9 @@ export default function AppRoutes() {
           <Route path="/admin/products/:id" element={<ProductDetail />} />
           <Route path="/admin/inventory" element={<StockBoard />} />
           <Route path="/admin/inventory/:product_id" element={<StockDetail />} />
+          <Route path="/admin/warehouses" element={<WarehouseList />} />
           <Route path="/admin/vehicle-stock" element={<VehicleStockOverview />} />
+          <Route path="/admin/vehicles" element={<VehicleList />} />
           <Route path="/admin/purchases" element={<PurchaseInvoiceList />} />
           <Route path="/admin/deliveries" element={<AdminDeliveries />} />
           <Route path="/admin/expenses" element={<AdminExpenses />} />
@@ -204,6 +211,9 @@ export default function AppRoutes() {
           <Route path="/admin/invoices/new" element={<CreateSalesInvoice />} />
           <Route path="/admin/invoices/settings" element={<InvoiceSettings />} />
           <Route path="/admin/invoices/:invoiceNumber" element={<InvoiceDetail />} />
+          <Route path="/admin/sales-returns" element={<SalesReturnList />} />
+          <Route path="/admin/sales-returns/new" element={<SalesReturnFormPage />} />
+          <Route path="/admin/sales-returns/:id" element={<SalesReturnDetail />} />
           <Route path="/admin/reports" element={<ReportsHub />} />
           <Route path="/admin/notifications" element={<NotificationsList />} />
           <Route path="/admin/audit-logs" element={<AuditLogList />} />

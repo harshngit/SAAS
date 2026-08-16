@@ -39,11 +39,7 @@ function authHeader() {
 
 // /auth/login only verifies credentials and returns tokens - the full session (user, role,
 // permissions, organization) comes from /auth/me, so login chains straight into it.
-export async function login({ email, phone, password, otp }) {
-  if (phone || otp) {
-    return { success: false, error: 'Phone login is not available yet. Please sign in with email and password.' }
-  }
-
+export async function login({ email, password }) {
   try {
     const requestBody = {
       email: email.trim().toLowerCase(),
@@ -102,20 +98,39 @@ export async function registerOrganization(payload) {
   }
 }
 
-export async function resetPasswordDirect({ email, newPassword }) {
+export async function forgotPassword({ email }) {
   try {
-    const requestBody = {
+    const { data } = await apiClient.post('/auth/forgot-password', {
       email: email.trim().toLowerCase(),
-      new_password: newPassword,
-    }
+    })
 
-    const { data } = await apiClient.post('/auth/reset-password-direct', requestBody)
+    // reset_token is only populated when the backend runs with expose_reset_token enabled
+    // (dev/demo) - production responses omit it and rely on the emailed link instead.
+    return { success: true, detail: data?.detail || 'If an account exists for that email, a reset link has been sent.', resetToken: data?.reset_token || '' }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to start password reset. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function resetPassword({ token, newPassword }) {
+  try {
+    const { data } = await apiClient.post('/auth/reset-password', {
+      token,
+      new_password: newPassword,
+    })
+
     return { success: true, detail: data?.detail || 'Password reset successfully.' }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to reset password. Please try again.',
+      'Unable to reset password. The reset link may have expired.',
     )
 
     return { success: false, error: message }

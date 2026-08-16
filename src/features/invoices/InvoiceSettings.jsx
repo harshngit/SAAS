@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Droplet, QrCode, RotateCcw, Save, Upload } from 'lucide-react'
+import { ArrowLeft, Check, Droplet, QrCode, Save, Upload } from 'lucide-react'
 import Button from '../../components/ui/Button'
-import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useToast } from '../../components/ui/toastContext'
+import { getInvoiceSettings, updateInvoiceSettings } from '../../api/invoices'
+import { uploadFile } from '../../api/files'
 
 const templates = [
   { value: 'classic', label: 'Classic' },
@@ -14,7 +15,11 @@ const templates = [
   { value: 'thermal', label: 'Thermal' },
 ]
 
-const paperSizes = ['A4', 'A5', 'Thermal']
+const paperSizes = [
+  { value: 'A4', label: 'A4' },
+  { value: 'A5', label: 'A5' },
+  { value: 'thermal', label: 'Thermal' },
+]
 
 const colorOptions = [
   { value: '#16A34A', label: '#16A34A' },
@@ -24,33 +29,17 @@ const colorOptions = [
   { value: '#0F172A', label: '#0F172A' },
 ]
 
-const defaultFields = {
-  gstin: true,
-  hsnSac: true,
-  discount: true,
-  tax: true,
-  batch: false,
-  expiry: false,
-  bankDetails: true,
-  upiQrCode: true,
-  termsAndConditions: true,
-  signature: true,
-}
-
+// Exactly the 14 booleans the backend's `fields` object supports - no invented toggles.
 const fieldRows = [
-  [{ key: 'gstin', label: 'GSTIN' }, { key: 'hsnSac', label: 'HSN / SAC' }],
-  [{ key: 'discount', label: 'Discount' }, { key: 'tax', label: 'Tax' }],
-  [{ key: 'batch', label: 'Batch' }, { key: 'expiry', label: 'Expiry' }],
-  [{ key: 'bankDetails', label: 'Bank Details' }, { key: 'upiQrCode', label: 'UPI / QR Code' }],
-  [{ key: 'termsAndConditions', label: 'Terms & Conditions' }, { key: 'signature', label: 'Signature' }],
+  [{ key: 'show_company_gstin', label: 'Company GSTIN' }, { key: 'show_customer_gstin', label: 'Customer GSTIN' }],
+  [{ key: 'show_billing_address', label: 'Billing Address' }, { key: 'show_shipping_address', label: 'Shipping Address' }],
+  [{ key: 'show_hsn_sac', label: 'HSN / SAC' }, { key: 'show_mrp', label: 'MRP' }],
+  [{ key: 'show_discount', label: 'Discount' }, { key: 'show_tax_rate', label: 'Tax Rate' }],
+  [{ key: 'show_tax_amount', label: 'Tax Amount' }, { key: 'show_batch_number', label: 'Batch Number' }],
+  [{ key: 'show_expiry_date', label: 'Expiry Date' }, { key: 'show_bank_details', label: 'Bank Details' }],
+  [{ key: 'show_upi_qr', label: 'UPI / QR Code' }, { key: 'show_terms', label: 'Terms & Conditions' }],
+  [{ key: 'show_signature', label: 'Signature' }],
 ]
-
-const defaultFooterText = 'Thank you for your business!'
-const defaultTerms = [
-  '1. Goods once sold will not be taken back.',
-  '2. Interest @ 18% p.a. will be charged on overdue payments.',
-  '3. Subject to jurisdiction of Bangalore courts only.',
-].join('\n')
 
 function Toggle({ checked, onChange }) {
   return (
@@ -68,7 +57,7 @@ function Toggle({ checked, onChange }) {
 
 const sampleInvoice = {
   company: { name: 'SAAS CRM', address: '123, Business Park, Koramangala', cityLine: 'Bangalore, Karnataka - 560095', gstin: '29ABCDE1234F1Z5' },
-  invoiceNo: 'SO-2026-1001',
+  invoiceNo: 'INV-2026-1001',
   invoiceDate: '01 Jul 2026',
   dueDate: '16 Jul 2026',
   billTo: { name: 'Hotel Grand Meridian', address: '45, Residency Road', cityLine: 'Bangalore, Karnataka - 560025' },
@@ -95,7 +84,7 @@ function ClassicPreview({ primaryColor, fields, footerText, terms }) {
         <div>
           <p className="text-sm font-bold" style={{ color: primaryColor }}>{company.name}</p>
           <p className="mt-1 leading-4 text-neutral-500">{company.address}<br />{company.cityLine}</p>
-          {fields.gstin && <p className="mt-1 text-neutral-500">GSTIN: {company.gstin}</p>}
+          {fields.show_company_gstin && <p className="mt-1 text-neutral-500">GSTIN: {company.gstin}</p>}
         </div>
         <div className="text-right">
           <p className="text-sm font-semibold tracking-wide text-neutral-900">TAX INVOICE</p>
@@ -106,14 +95,18 @@ function ClassicPreview({ primaryColor, fields, footerText, terms }) {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <p className="font-semibold text-neutral-700">Bill To</p>
-          <p className="mt-1 text-neutral-500">{billTo.name}<br />{billTo.address}<br />{billTo.cityLine}</p>
-        </div>
-        <div>
-          <p className="font-semibold text-neutral-700">Ship To</p>
-          <p className="mt-1 text-neutral-500">{billTo.name}<br />{billTo.address}<br />{billTo.cityLine}</p>
-        </div>
+        {fields.show_billing_address && (
+          <div>
+            <p className="font-semibold text-neutral-700">Bill To</p>
+            <p className="mt-1 text-neutral-500">{billTo.name}<br />{billTo.address}<br />{billTo.cityLine}</p>
+          </div>
+        )}
+        {fields.show_shipping_address && (
+          <div>
+            <p className="font-semibold text-neutral-700">Ship To</p>
+            <p className="mt-1 text-neutral-500">{billTo.name}<br />{billTo.address}<br />{billTo.cityLine}</p>
+          </div>
+        )}
       </div>
 
       <table className="w-full border-t border-neutral-200 text-left">
@@ -121,10 +114,10 @@ function ClassicPreview({ primaryColor, fields, footerText, terms }) {
           <tr className="border-b border-neutral-200 text-[0.6rem] uppercase text-neutral-400">
             <th className="py-1.5">#</th>
             <th className="py-1.5">Item</th>
-            {fields.hsnSac && <th className="py-1.5">HSN</th>}
+            {fields.show_hsn_sac && <th className="py-1.5">HSN</th>}
             <th className="py-1.5">Qty</th>
             <th className="py-1.5">Rate</th>
-            {fields.tax && <th className="py-1.5">Tax</th>}
+            {fields.show_tax_rate && <th className="py-1.5">Tax</th>}
             <th className="py-1.5 text-right">Amount</th>
           </tr>
         </thead>
@@ -133,10 +126,10 @@ function ClassicPreview({ primaryColor, fields, footerText, terms }) {
             <tr key={item.name} className="border-b border-neutral-50">
               <td className="py-1.5">{index + 1}</td>
               <td className="py-1.5">{item.name}</td>
-              {fields.hsnSac && <td className="py-1.5">{item.hsn}</td>}
+              {fields.show_hsn_sac && <td className="py-1.5">{item.hsn}</td>}
               <td className="py-1.5">{item.qty}</td>
               <td className="py-1.5">{money(item.rate)}</td>
-              {fields.tax && <td className="py-1.5">{item.taxRate}%</td>}
+              {fields.show_tax_rate && <td className="py-1.5">{item.taxRate}%</td>}
               <td className="py-1.5 text-right">{money(item.amount)}</td>
             </tr>
           ))}
@@ -145,13 +138,13 @@ function ClassicPreview({ primaryColor, fields, footerText, terms }) {
 
       <div className="flex flex-wrap justify-between gap-4 border-t border-neutral-200 pt-3">
         <div className="space-y-2">
-          {fields.bankDetails && (
+          {fields.show_bank_details && (
             <div>
               <p className="font-semibold text-neutral-700">Bank Details</p>
               <p className="mt-1 text-neutral-500">{bank.name}<br />A/C: {bank.account} · IFSC: {bank.ifsc}</p>
             </div>
           )}
-          {fields.upiQrCode && (
+          {fields.show_upi_qr && (
             <div className="flex items-center gap-2">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50">
                 <QrCode className="size-5 text-neutral-400" />
@@ -162,14 +155,14 @@ function ClassicPreview({ primaryColor, fields, footerText, terms }) {
         </div>
         <div className="min-w-36 space-y-1">
           <div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-          <div className="flex justify-between"><span>Tax</span><span>{money(taxTotal)}</span></div>
+          {fields.show_tax_amount && <div className="flex justify-between"><span>Tax</span><span>{money(taxTotal)}</span></div>}
           <div className="flex justify-between border-t border-neutral-200 pt-1 font-semibold text-neutral-900" style={{ color: primaryColor }}>
             <span>Total</span><span>{money(total)}</span>
           </div>
         </div>
       </div>
 
-      {fields.termsAndConditions && (
+      {fields.show_terms && (
         <div className="border-t border-neutral-200 pt-3">
           <p className="font-semibold text-neutral-700">Terms & Conditions</p>
           <p className="mt-1 whitespace-pre-line text-neutral-500">{terms}</p>
@@ -178,7 +171,7 @@ function ClassicPreview({ primaryColor, fields, footerText, terms }) {
 
       <div className="flex items-end justify-between border-t border-neutral-200 pt-3">
         <p className="text-neutral-500">{footerText}</p>
-        {fields.signature && (
+        {fields.show_signature && (
           <div className="text-right">
             <p className="italic text-neutral-400">Signature</p>
             <p className="mt-1 text-neutral-500">Authorised Signatory</p>
@@ -193,195 +186,157 @@ function ModernPreview({ primaryColor, fields, footerText, terms }) {
   const { company, billTo, items, subtotal, taxTotal, total, bank } = sampleInvoice
 
   return (
-    <div className="-m-4 overflow-hidden font-sans">
-      <div className="flex items-start justify-between px-4 py-4 text-white" style={{ backgroundColor: primaryColor }}>
-        <div>
-          <p className="flex items-center gap-1.5 text-sm font-bold"><Droplet className="size-3.5" />{company.name}</p>
-          <p className="mt-1 text-[0.65rem] leading-4 text-white/80">{company.address}, {company.cityLine}</p>
-          {fields.gstin && <p className="text-[0.65rem] text-white/80">GSTIN: {company.gstin}</p>}
-        </div>
-        <div className="text-right">
-          <p className="text-base font-bold tracking-wide">INVOICE</p>
-          <p className="mt-1 text-[0.65rem] text-white/80">{sampleInvoice.invoiceNo}</p>
+    <div className="space-y-4 font-sans">
+      <div className="rounded-xl p-4 text-white" style={{ backgroundColor: primaryColor }}>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm font-bold tracking-wide">{company.name}</p>
+            <p className="mt-1 leading-4 text-white/80">{company.address}<br />{company.cityLine}</p>
+            {fields.show_company_gstin && <p className="mt-1 text-white/80">GSTIN: {company.gstin}</p>}
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-semibold uppercase tracking-widest">Invoice</p>
+            <p className="mt-1 text-white/80">{sampleInvoice.invoiceNo}</p>
+            <p className="text-white/80">{sampleInvoice.invoiceDate}</p>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-4 p-4 text-neutral-600">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-lg bg-neutral-50 p-2.5">
-            <p className="text-[0.6rem] font-semibold uppercase tracking-wide text-neutral-400">Billed To</p>
-            <p className="mt-1 font-medium text-neutral-800">{billTo.name}</p>
-            <p className="text-neutral-500">{billTo.address}, {billTo.cityLine}</p>
-          </div>
-          <div className="rounded-lg bg-neutral-50 p-2.5">
-            <p className="text-[0.6rem] font-semibold uppercase tracking-wide text-neutral-400">Details</p>
-            <p className="mt-1 text-neutral-600">Date: {sampleInvoice.invoiceDate}</p>
-            <p className="text-neutral-600">Due: {sampleInvoice.dueDate}</p>
-          </div>
+      {fields.show_billing_address && (
+        <div className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
+          <p className="text-[0.6rem] font-semibold uppercase tracking-wide text-neutral-400">Billed To</p>
+          <p className="mt-1 font-medium text-neutral-800">{billTo.name}</p>
+          <p className="text-neutral-500">{billTo.address}, {billTo.cityLine}</p>
         </div>
+      )}
 
-        <div className="space-y-1.5">
-          {items.map((item) => (
-            <div key={item.name} className="flex items-center justify-between rounded-lg bg-neutral-50 px-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate font-medium text-neutral-800">{item.name}</p>
-                <p className="text-[0.65rem] text-neutral-400">
-                  {item.qty} {item.unit} × {money(item.rate)}{fields.tax ? ` · ${item.taxRate}% tax` : ''}{fields.hsnSac ? ` · HSN ${item.hsn}` : ''}
-                </p>
-              </div>
-              <p className="shrink-0 font-semibold text-neutral-900">{money(item.amount)}</p>
+      <div className="space-y-2">
+        {items.map((item) => (
+          <div key={item.name} className="flex items-center justify-between rounded-lg border border-neutral-100 p-2.5">
+            <div>
+              <p className="font-medium text-neutral-800">{item.name}</p>
+              <p className="text-neutral-400">
+                {item.qty} × {money(item.rate)}
+                {fields.show_hsn_sac ? ` · HSN ${item.hsn}` : ''}
+                {fields.show_tax_rate ? ` · ${item.taxRate}% tax` : ''}
+              </p>
             </div>
-          ))}
+            <p className="font-semibold" style={{ color: primaryColor }}>{money(item.amount)}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-lg border border-neutral-100 p-3">
+        <div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+        {fields.show_tax_amount && <div className="flex justify-between"><span>Tax</span><span>{money(taxTotal)}</span></div>}
+        <div className="mt-1 flex justify-between border-t border-neutral-200 pt-1 font-bold" style={{ color: primaryColor }}>
+          <span>Total</span><span>{money(total)}</span>
         </div>
+      </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: `${primaryColor}14` }}>
-          <div className="space-y-0.5 text-[0.65rem] text-neutral-500">
-            <p>Subtotal {money(subtotal)}</p>
-            <p>Tax {money(taxTotal)}</p>
-          </div>
-          <div className="rounded-full px-3.5 py-1.5 text-sm font-bold text-white" style={{ backgroundColor: primaryColor }}>
-            Total {money(total)}
-          </div>
-        </div>
-
-        {(fields.bankDetails || fields.upiQrCode) && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-3">
-            {fields.bankDetails && <p className="text-neutral-500">{bank.name} · A/C {bank.account} · IFSC {bank.ifsc}</p>}
-            {fields.upiQrCode && (
-              <div className="flex items-center gap-2">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white">
-                  <QrCode className="size-4.5 text-neutral-400" />
-                </div>
-                <p className="text-neutral-500">Scan to pay</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {fields.termsAndConditions && (
-          <div className="border-t border-neutral-100 pt-3">
-            <p className="font-semibold text-neutral-700">Terms & Conditions</p>
-            <p className="mt-1 whitespace-pre-line text-neutral-500">{terms}</p>
-          </div>
-        )}
-
-        <div className="flex items-end justify-between border-t border-neutral-100 pt-3">
-          <p className="font-medium" style={{ color: primaryColor }}>{footerText}</p>
-          {fields.signature && (
-            <div className="text-right">
-              <p className="italic text-neutral-400">Signature</p>
-              <p className="mt-1 text-neutral-500">Authorised Signatory</p>
+      {(fields.show_bank_details || fields.show_upi_qr) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-neutral-500">
+          {fields.show_bank_details && <p>{bank.name} · {bank.account}</p>}
+          {fields.show_upi_qr && (
+            <div className="flex items-center gap-1.5">
+              <QrCode className="size-4" /> Scan to pay
             </div>
           )}
         </div>
+      )}
+
+      {fields.show_terms && (
+        <p className="whitespace-pre-line border-t border-neutral-100 pt-3 text-neutral-500">{terms}</p>
+      )}
+
+      <div className="flex items-end justify-between border-t border-neutral-100 pt-3">
+        <p className="text-neutral-500">{footerText}</p>
+        {fields.show_signature && <p className="text-right italic text-neutral-400">Authorised Signatory</p>}
       </div>
     </div>
   )
 }
 
-function CompactPreview({ primaryColor, fields, footerText, terms }) {
-  const { company, billTo, items, subtotal, taxTotal, total, bank } = sampleInvoice
+function CompactPreview({ fields, footerText, terms, primaryColor }) {
+  const { company, items, subtotal, taxTotal, total } = sampleInvoice
 
   return (
-    <div className="space-y-1.5 font-sans text-[0.65rem] leading-tight">
-      <div className="flex items-center justify-between border-b pb-1" style={{ borderColor: primaryColor }}>
-        <p className="font-bold" style={{ color: primaryColor }}>{company.name}{fields.gstin ? ` · GSTIN ${company.gstin}` : ''}</p>
-        <p className="font-semibold text-neutral-900">{sampleInvoice.invoiceNo} · {sampleInvoice.invoiceDate}</p>
+    <div className="space-y-2 font-sans text-[0.65rem] leading-tight">
+      <div className="flex items-center justify-between">
+        <p className="font-bold" style={{ color: primaryColor }}>{company.name}</p>
+        <p className="text-neutral-500">{sampleInvoice.invoiceNo} · {sampleInvoice.invoiceDate}</p>
       </div>
-
-      <p className="text-neutral-500">Bill To: <span className="font-medium text-neutral-800">{billTo.name}</span>, {billTo.address}, {billTo.cityLine}</p>
+      {fields.show_company_gstin && <p className="text-neutral-400">GSTIN: {company.gstin}</p>}
 
       <table className="w-full border-t border-neutral-200 text-left">
         <thead>
-          <tr className="border-b border-neutral-200 text-[0.55rem] uppercase text-neutral-400">
+          <tr className="text-[0.55rem] uppercase text-neutral-400">
             <th className="py-1">Item</th>
-            {fields.hsnSac && <th className="py-1">HSN</th>}
-            <th className="py-1">Qty</th>
-            <th className="py-1">Rate</th>
-            {fields.tax && <th className="py-1">Tax</th>}
+            <th className="py-1 text-right">Qty</th>
+            <th className="py-1 text-right">Rate</th>
             <th className="py-1 text-right">Amt</th>
           </tr>
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.name} className="border-b border-neutral-50">
+            <tr key={item.name} className="border-t border-neutral-100">
               <td className="py-0.5">{item.name}</td>
-              {fields.hsnSac && <td className="py-0.5">{item.hsn}</td>}
-              <td className="py-0.5">{item.qty}</td>
-              <td className="py-0.5">{money(item.rate)}</td>
-              {fields.tax && <td className="py-0.5">{item.taxRate}%</td>}
+              <td className="py-0.5 text-right">{item.qty}</td>
+              <td className="py-0.5 text-right">{money(item.rate)}</td>
               <td className="py-0.5 text-right">{money(item.amount)}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <div className="flex items-center justify-between border-t border-neutral-200 pt-1">
-        <p className="text-neutral-400">
-          {fields.bankDetails ? `${bank.name} · A/C ${bank.account} · IFSC ${bank.ifsc}` : ''}
-        </p>
-        <p className="font-semibold text-neutral-900">
-          Sub {money(subtotal)} + Tax {money(taxTotal)} = <span style={{ color: primaryColor }}>{money(total)}</span>
-        </p>
+      <div className="flex justify-between border-t border-neutral-200 pt-1">
+        <span>Subtotal</span><span>{money(subtotal)}</span>
+      </div>
+      {fields.show_tax_amount && (
+        <div className="flex justify-between"><span>Tax</span><span>{money(taxTotal)}</span></div>
+      )}
+      <div className="flex justify-between border-t border-neutral-200 pt-1 font-bold" style={{ color: primaryColor }}>
+        <span>Total</span><span>{money(total)}</span>
       </div>
 
-      {fields.termsAndConditions && <p className="border-t border-neutral-200 pt-1 whitespace-pre-line text-neutral-400">{terms}</p>}
-
-      <div className="flex items-center justify-between border-t border-neutral-200 pt-1 text-neutral-400">
-        <span>{footerText}</span>
-        {fields.signature && <span className="italic">Authorised Signatory</span>}
-      </div>
+      {fields.show_terms && <p className="border-t border-neutral-100 pt-1 text-neutral-400">{terms}</p>}
+      <p className="text-neutral-400">{footerText}</p>
     </div>
   )
 }
 
-function ThermalPreview({ primaryColor, fields, footerText, terms }) {
-  const { company, billTo, items, subtotal, taxTotal, total } = sampleInvoice
-  const dashedLine = '- - - - - - - - - - - - - -'
+function ThermalPreview({ fields, footerText, primaryColor }) {
+  const { company, items, subtotal, taxTotal, total } = sampleInvoice
 
   return (
-    <div className="space-y-2 text-center font-mono text-[0.65rem] leading-tight text-neutral-700">
-      <p className="text-sm font-bold" style={{ color: primaryColor }}>{company.name}</p>
-      <p className="text-neutral-500">{company.address}</p>
-      <p className="text-neutral-500">{company.cityLine}</p>
-      {fields.gstin && <p className="text-neutral-500">GSTIN {company.gstin}</p>}
-      <p className="text-neutral-300">{dashedLine}</p>
-      <p>{sampleInvoice.invoiceNo}</p>
-      <p className="text-neutral-500">{sampleInvoice.invoiceDate}</p>
-      <p className="text-neutral-500">Bill To: {billTo.name}</p>
-      <p className="text-neutral-300">{dashedLine}</p>
-
-      <div className="space-y-1 text-left">
+    <div className="space-y-2 font-mono text-[0.65rem] leading-tight text-neutral-700">
+      <div className="text-center">
+        <p className="font-bold" style={{ color: primaryColor }}>{company.name}</p>
+        <p className="text-neutral-500">{company.address}</p>
+        <p className="text-neutral-500">{company.cityLine}</p>
+        {fields.show_company_gstin && <p className="text-neutral-500">GSTIN {company.gstin}</p>}
+      </div>
+      <div className="border-t border-dashed border-neutral-300 pt-1.5 text-center text-neutral-500">
+        <p>{sampleInvoice.invoiceNo}</p>
+        <p>{sampleInvoice.invoiceDate}</p>
+      </div>
+      <div className="space-y-1 border-t border-dashed border-neutral-300 pt-1.5">
         {items.map((item) => (
           <div key={item.name}>
             <p className="truncate">{item.name}</p>
             <div className="flex justify-between text-neutral-500">
-              <span>{item.qty} x {money(item.rate)}{fields.tax ? ` (${item.taxRate}%)` : ''}</span>
+              <span>{item.qty} x {money(item.rate)}</span>
               <span>{money(item.amount)}</span>
             </div>
           </div>
         ))}
       </div>
-
-      <p className="text-neutral-300">{dashedLine}</p>
-      <div className="space-y-0.5 text-left">
-        <div className="flex justify-between text-neutral-500"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-        <div className="flex justify-between text-neutral-500"><span>Tax</span><span>{money(taxTotal)}</span></div>
-        <div className="flex justify-between text-sm font-bold" style={{ color: primaryColor }}><span>TOTAL</span><span>{money(total)}</span></div>
+      <div className="space-y-0.5 border-t border-dashed border-neutral-300 pt-1.5">
+        <div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+        {fields.show_tax_amount && <div className="flex justify-between"><span>Tax</span><span>{money(taxTotal)}</span></div>}
+        <div className="flex justify-between font-bold"><span>TOTAL</span><span>{money(total)}</span></div>
       </div>
-      <p className="text-neutral-300">{dashedLine}</p>
-
-      {fields.upiQrCode && (
-        <div className="flex justify-center py-1">
-          <div className="flex size-12 items-center justify-center rounded border border-neutral-300">
-            <QrCode className="size-6 text-neutral-400" />
-          </div>
-        </div>
-      )}
-
-      {fields.termsAndConditions && <p className="whitespace-pre-line text-neutral-400">{terms}</p>}
-      <p className="font-semibold text-neutral-700">{footerText}</p>
-      {fields.signature && <p className="text-neutral-400">* Authorised Signatory *</p>}
+      <p className="border-t border-dashed border-neutral-300 pt-1.5 text-center text-neutral-500">{footerText || 'Thank you!'}</p>
     </div>
   )
 }
@@ -394,13 +349,13 @@ const templateComponents = {
 }
 
 function InvoicePreviewPanel({ template, primaryColor, paperSize, fields, footerText, terms }) {
-  const paperClass = paperSize === 'A5' ? 'max-w-sm' : paperSize === 'Thermal' ? 'max-w-52' : 'max-w-lg'
+  const paperClass = paperSize === 'A5' ? 'max-w-sm' : paperSize === 'thermal' ? 'max-w-52' : 'max-w-lg'
   const TemplateComponent = templateComponents[template] || ClassicPreview
 
   return (
     <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
       <p className="text-sm font-semibold text-neutral-900">Invoice Preview</p>
-      <p className="text-xs text-neutral-400">This is how your invoice will look like ({templates.find((t) => t.value === template)?.label} template)</p>
+      <p className="text-xs text-neutral-400">This is how your invoice will look ({templates.find((t) => t.value === template)?.label} template)</p>
 
       <div className={`mx-auto mt-4 overflow-hidden rounded-xl border border-neutral-100 bg-white p-4 text-xs text-neutral-600 shadow-(--shadow-xs) ${paperClass}`}>
         <TemplateComponent primaryColor={primaryColor} fields={fields} footerText={footerText} terms={terms} />
@@ -409,238 +364,77 @@ function InvoicePreviewPanel({ template, primaryColor, paperSize, fields, footer
   )
 }
 
-function TemplateThumbnail({ value, primaryColor }) {
-  if (value === 'modern') {
-    return (
-      <div className="flex aspect-3/4 w-full flex-col overflow-hidden rounded-lg border border-neutral-100 bg-white">
-        <div className="h-6 w-full shrink-0" style={{ backgroundColor: primaryColor }} />
-        <div className="flex flex-1 flex-col gap-1 p-2">
-          <div className="h-2.5 w-full rounded bg-neutral-100" />
-          <div className="h-2.5 w-full rounded bg-neutral-100" />
-          <div className="mt-auto h-2 w-2/3 self-end rounded-full" style={{ backgroundColor: primaryColor, opacity: 0.85 }} />
-        </div>
-      </div>
-    )
-  }
-
-  if (value === 'compact') {
-    return (
-      <div className="flex aspect-3/4 w-full flex-col gap-0.75 rounded-lg border border-neutral-100 bg-neutral-50 p-2">
-        <div className="h-1 w-2/3 rounded-full" style={{ backgroundColor: primaryColor }} />
-        {Array.from({ length: 8 }).map((_, index) => (
-          <div key={index} className="h-0.75 w-full rounded-full bg-neutral-200" />
-        ))}
-      </div>
-    )
-  }
-
-  if (value === 'thermal') {
-    return (
-      <div className="flex aspect-3/4 w-full items-center justify-center rounded-lg border border-neutral-100 bg-neutral-50 p-2">
-        <div className="flex w-2/3 flex-col items-center gap-1">
-          <div className="h-1.5 w-3/4 rounded-full" style={{ backgroundColor: primaryColor }} />
-          <div className="h-1 w-full rounded-full border border-dashed border-neutral-300" />
-          <div className="h-1 w-full rounded-full bg-neutral-200" />
-          <div className="h-1 w-full rounded-full bg-neutral-200" />
-          <div className="h-1 w-full rounded-full border border-dashed border-neutral-300" />
-          <div className="h-1.5 w-1/2 rounded-full bg-neutral-300" />
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex aspect-3/4 w-full flex-col gap-1 rounded-lg border border-neutral-100 bg-neutral-50 p-2">
-      <div className="h-1.5 w-1/2 rounded-full" style={{ backgroundColor: primaryColor }} />
-      <div className="mt-1 h-px w-full bg-neutral-200" />
-      <div className="h-1 w-full rounded-full bg-neutral-200" />
-      <div className="h-1 w-full rounded-full bg-neutral-200" />
-      <div className="h-1 w-2/3 rounded-full bg-neutral-200" />
-    </div>
-  )
-}
-
-function TemplatesTab({ template, setTemplate, primaryColor, setPrimaryColor, paperSize, setPaperSize, fields, setFields, footerText, setFooterText, terms, setTerms }) {
-  const toggleField = (key) => setFields((current) => ({ ...current, [key]: !current[key] }))
-
-  return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-      <div className="space-y-5">
-        <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-          <p className="text-sm font-semibold text-neutral-900">1. Choose Template</p>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {templates.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setTemplate(option.value)}
-                className={`relative flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-colors ${
-                  template === option.value ? 'border-primary-500 bg-primary-50/40' : 'border-neutral-100 hover:border-neutral-200'
-                }`}
-              >
-                {template === option.value && (
-                  <span className="absolute right-2 top-2 flex size-4 items-center justify-center rounded-full bg-primary-600 text-white">
-                    <Check className="size-2.5" />
-                  </span>
-                )}
-                <TemplateThumbnail value={option.value} primaryColor={primaryColor} />
-                <p className="text-xs font-medium text-neutral-700">{option.label}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-          <p className="text-sm font-semibold text-neutral-900">2. Branding & Appearance</p>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <p className="text-sm font-medium text-neutral-700">Business Logo</p>
-              <label className="mt-1.5 flex h-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 text-xs text-neutral-400 hover:border-primary-300">
-                <Upload className="size-4" />
-                Upload Logo
-                <span>PNG, JPG up to 2MB</span>
-                <input type="file" accept="image/*" className="hidden" />
-              </label>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-neutral-700">Primary Color</p>
-              <Select className="mt-1.5" options={colorOptions} value={primaryColor} onChange={(event) => setPrimaryColor(event.target.value)} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-neutral-700">Paper Size</p>
-              <div className="mt-1.5 flex gap-2">
-                {paperSizes.map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    onClick={() => setPaperSize(size)}
-                    className={`flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium ${
-                      paperSize === size ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-600'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-          <p className="text-sm font-semibold text-neutral-900">3. Show / Hide Fields</p>
-          <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-            {fieldRows.flat().map((field) => (
-              <div key={field.key} className="flex items-center justify-between gap-3">
-                <p className="text-sm text-neutral-700">{field.label}</p>
-                <Toggle checked={fields[field.key]} onChange={() => toggleField(field.key)} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-          <p className="text-sm font-semibold text-neutral-900">4. Footer Text</p>
-          <textarea
-            value={footerText}
-            maxLength={200}
-            onChange={(event) => setFooterText(event.target.value)}
-            className="mt-3 h-16 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-          />
-          <p className="mt-1 text-right text-xs text-neutral-400">{footerText.length}/200</p>
-        </div>
-
-        <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-          <p className="text-sm font-semibold text-neutral-900">5. Terms & Conditions</p>
-          <textarea
-            value={terms}
-            maxLength={500}
-            onChange={(event) => setTerms(event.target.value)}
-            className="mt-3 h-28 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-          />
-          <p className="mt-1 text-right text-xs text-neutral-400">{terms.length}/500</p>
-        </div>
-      </div>
-
-      <InvoicePreviewPanel template={template} primaryColor={primaryColor} paperSize={paperSize} fields={fields} footerText={footerText} terms={terms} />
-    </div>
-  )
-}
-
-function GeneralTab({ dueDays, setDueDays, currency, setCurrency, dateFormat, setDateFormat }) {
-  return (
-    <div className="max-w-2xl space-y-4 rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-      <p className="text-sm font-semibold text-neutral-900">General</p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input label="Default Due Period (days)" type="number" min="0" value={dueDays} onChange={(event) => setDueDays(event.target.value)} />
-        <Select
-          label="Currency"
-          value={currency}
-          onChange={(event) => setCurrency(event.target.value)}
-          options={[{ value: 'INR', label: 'Indian Rupee (₹)' }, { value: 'USD', label: 'US Dollar ($)' }]}
-        />
-        <Select
-          label="Date Format"
-          value={dateFormat}
-          onChange={(event) => setDateFormat(event.target.value)}
-          options={[{ value: 'dd-mmm-yyyy', label: '01 Jul 2026' }, { value: 'dd/mm/yyyy', label: '01/07/2026' }]}
-          className="sm:col-span-2"
-        />
-      </div>
-    </div>
-  )
-}
-
-function NumberingTab({ prefix, setPrefix, startingNumber, setStartingNumber, resetCycle, setResetCycle }) {
-  return (
-    <div className="max-w-2xl space-y-4 rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-      <p className="text-sm font-semibold text-neutral-900">Numbering</p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input label="Invoice Prefix" value={prefix} onChange={(event) => setPrefix(event.target.value)} placeholder="INV-2026-" />
-        <Input label="Starting Number" type="number" min="1" value={startingNumber} onChange={(event) => setStartingNumber(event.target.value)} />
-        <Select
-          label="Reset Cycle"
-          value={resetCycle}
-          onChange={(event) => setResetCycle(event.target.value)}
-          options={[{ value: 'never', label: 'Never' }, { value: 'yearly', label: 'Every Financial Year' }, { value: 'monthly', label: 'Every Month' }]}
-          className="sm:col-span-2"
-        />
-      </div>
-      <p className="text-xs text-neutral-400">Next invoice number preview: {prefix}{startingNumber}</p>
-    </div>
-  )
-}
-
 export default function InvoiceSettings() {
   const navigate = useNavigate()
   const { showToast } = useToast()
 
-  const [template, setTemplate] = useState('classic')
-  const [primaryColor, setPrimaryColor] = useState('#16A34A')
-  const [paperSize, setPaperSize] = useState('A4')
-  const [fields, setFields] = useState(defaultFields)
-  const [footerText, setFooterText] = useState(defaultFooterText)
-  const [terms, setTerms] = useState(defaultTerms)
+  const [settings, setSettings] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
 
-  const [dueDays, setDueDays] = useState('15')
-  const [currency, setCurrency] = useState('INR')
-  const [dateFormat, setDateFormat] = useState('dd-mmm-yyyy')
+  useEffect(() => {
+    getInvoiceSettings().then((result) => {
+      if (!result.success) {
+        setLoadError(result.error)
+        setIsLoading(false)
+        return
+      }
+      setSettings(result.settings)
+      setIsLoading(false)
+    })
+  }, [])
 
-  const [prefix, setPrefix] = useState('INV-2026-')
-  const [startingNumber, setStartingNumber] = useState('1043')
-  const [resetCycle, setResetCycle] = useState('yearly')
-
-  const handleReset = () => {
-    setTemplate('classic')
-    setPrimaryColor('#16A34A')
-    setPaperSize('A4')
-    setFields(defaultFields)
-    setFooterText(defaultFooterText)
-    setTerms(defaultTerms)
-    showToast({ title: 'Settings reset', message: 'Invoice settings restored to defaults.' })
+  if (isLoading) {
+    return (
+      <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-10 shadow-(--shadow-card)">
+        <LoadingSpinner label="Loading invoice settings..." />
+      </div>
+    )
   }
 
-  const handleSave = () => {
-    showToast({ title: 'Settings saved', message: 'Invoice template and numbering preferences updated.' })
+  if (loadError || !settings) {
+    return (
+      <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-10 text-center shadow-(--shadow-card)">
+        <p className="text-sm text-red-600">{loadError || 'Unable to load invoice settings.'}</p>
+      </div>
+    )
+  }
+
+  const toggleField = (key) => setSettings((current) => ({ ...current, fields: { ...current.fields, [key]: !current.fields[key] } }))
+
+  const handleLogoUpload = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setIsUploadingLogo(true)
+    const result = await uploadFile(file)
+    setIsUploadingLogo(false)
+
+    if (!result.success) {
+      showToast({ title: 'Upload failed', message: result.error, variant: 'error' })
+      return
+    }
+
+    setSettings((current) => ({ ...current, branding: { ...current.branding, logoFileId: result.file.file_id } }))
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true)
+
+    const result = await updateInvoiceSettings(settings)
+
+    if (!result.success) {
+      showToast({ title: 'Save failed', message: result.error, variant: 'error' })
+      setIsSaving(false)
+      return
+    }
+
+    setSettings(result.settings)
+    setIsSaving(false)
+    showToast({ title: 'Settings saved', message: 'Invoice template preferences updated.' })
   }
 
   return (
@@ -657,60 +451,127 @@ export default function InvoiceSettings() {
           </button>
           <div>
             <h1 className="text-2xl font-semibold text-neutral-900">Invoice Settings</h1>
-            <p className="mt-1 text-sm text-neutral-500">Manage invoice templates, appearance and numbering preferences</p>
+            <p className="mt-1 text-sm text-neutral-500">Manage the invoice template, branding, and which fields print on generated PDFs</p>
           </div>
         </div>
-        <div className="flex items-center gap-2.5">
-          <Button type="button" variant="outline" onClick={handleReset}>
-            <RotateCcw className="size-4" />
-            Reset
-          </Button>
-          <Button type="button" onClick={handleSave}>
-            <Save className="size-4" />
-            Save Settings
-          </Button>
-        </div>
+        <Button type="button" loading={isSaving} onClick={handleSave}>
+          <Save className="size-4" />
+          Save Settings
+        </Button>
       </div>
 
-      <Tabs defaultValue="templates">
-        <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="numbering">Numbering</TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div className="space-y-5">
+          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <p className="text-sm font-semibold text-neutral-900">1. Choose Template</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {templates.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSettings((current) => ({ ...current, template: option.value }))}
+                  className={`relative flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-colors ${
+                    settings.template === option.value ? 'border-primary-500 bg-primary-50/40' : 'border-neutral-100 hover:border-neutral-200'
+                  }`}
+                >
+                  {settings.template === option.value && (
+                    <span className="absolute right-2 top-2 flex size-4 items-center justify-center rounded-full bg-primary-600 text-white">
+                      <Check className="size-2.5" />
+                    </span>
+                  )}
+                  <div className="flex aspect-3/4 w-full flex-col gap-1 rounded-lg border border-neutral-100 bg-neutral-50 p-2">
+                    <div className="h-1.5 w-1/2 rounded-full" style={{ backgroundColor: settings.branding.primaryColor }} />
+                    <div className="mt-1 h-px w-full bg-neutral-200" />
+                    <div className="h-1 w-full rounded-full bg-neutral-200" />
+                    <div className="h-1 w-full rounded-full bg-neutral-200" />
+                  </div>
+                  <p className="text-xs font-medium text-neutral-700">{option.label}</p>
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <TabsContent value="general" className="mt-5">
-          <GeneralTab dueDays={dueDays} setDueDays={setDueDays} currency={currency} setCurrency={setCurrency} dateFormat={dateFormat} setDateFormat={setDateFormat} />
-        </TabsContent>
+          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <p className="text-sm font-semibold text-neutral-900">2. Branding & Paper</p>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-sm font-medium text-neutral-700">Business Logo</p>
+                <label className="mt-1.5 flex h-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 text-xs text-neutral-400 hover:border-primary-300">
+                  {isUploadingLogo ? <LoadingSpinner /> : (
+                    <>
+                      <Upload className="size-4" />
+                      {settings.branding.logoFileId ? 'Replace Logo' : 'Upload Logo'}
+                    </>
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={isUploadingLogo} />
+                </label>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-neutral-700">Primary Color</p>
+                <Select
+                  className="mt-1.5"
+                  options={colorOptions}
+                  value={settings.branding.primaryColor}
+                  onChange={(event) => setSettings((current) => ({ ...current, branding: { ...current.branding, primaryColor: event.target.value } }))}
+                />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-neutral-700">Paper Size</p>
+                <Select
+                  className="mt-1.5"
+                  options={paperSizes}
+                  value={settings.paperSize}
+                  onChange={(event) => setSettings((current) => ({ ...current, paperSize: event.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
 
-        <TabsContent value="templates" className="mt-5">
-          <TemplatesTab
-            template={template}
-            setTemplate={setTemplate}
-            primaryColor={primaryColor}
-            setPrimaryColor={setPrimaryColor}
-            paperSize={paperSize}
-            setPaperSize={setPaperSize}
-            fields={fields}
-            setFields={setFields}
-            footerText={footerText}
-            setFooterText={setFooterText}
-            terms={terms}
-            setTerms={setTerms}
-          />
-        </TabsContent>
+          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <p className="text-sm font-semibold text-neutral-900">3. Show / Hide Fields</p>
+            <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+              {fieldRows.flat().map((field) => (
+                <div key={field.key} className="flex items-center justify-between gap-3">
+                  <p className="text-sm text-neutral-700">{field.label}</p>
+                  <Toggle checked={Boolean(settings.fields[field.key])} onChange={() => toggleField(field.key)} />
+                </div>
+              ))}
+            </div>
+          </div>
 
-        <TabsContent value="numbering" className="mt-5">
-          <NumberingTab
-            prefix={prefix}
-            setPrefix={setPrefix}
-            startingNumber={startingNumber}
-            setStartingNumber={setStartingNumber}
-            resetCycle={resetCycle}
-            setResetCycle={setResetCycle}
-          />
-        </TabsContent>
-      </Tabs>
+          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <p className="text-sm font-semibold text-neutral-900">4. Footer Text</p>
+            <textarea
+              value={settings.footerText}
+              maxLength={200}
+              onChange={(event) => setSettings((current) => ({ ...current, footerText: event.target.value }))}
+              className="mt-3 h-16 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            />
+            <p className="mt-1 text-right text-xs text-neutral-400">{settings.footerText.length}/200</p>
+          </div>
+
+          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <p className="text-sm font-semibold text-neutral-900">5. Terms & Conditions</p>
+            <textarea
+              value={settings.terms}
+              maxLength={500}
+              onChange={(event) => setSettings((current) => ({ ...current, terms: event.target.value }))}
+              className="mt-3 h-28 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            />
+            <p className="mt-1 text-right text-xs text-neutral-400">{settings.terms.length}/500</p>
+          </div>
+        </div>
+
+        <InvoicePreviewPanel
+          template={settings.template}
+          primaryColor={settings.branding.primaryColor}
+          paperSize={settings.paperSize}
+          fields={settings.fields}
+          footerText={settings.footerText}
+          terms={settings.terms}
+        />
+      </div>
+      <p className="text-xs text-neutral-400 flex items-center gap-1.5"><Droplet className="size-3" aria-hidden="true" /> Preview uses sample data — actual invoices pull your real company details.</p>
     </div>
   )
 }

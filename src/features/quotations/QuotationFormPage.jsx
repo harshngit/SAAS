@@ -1,45 +1,44 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { FileText, PackageSearch, ReceiptText, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import { customers as seedCustomers } from '../../mockData/customers'
-import { products as seedProducts } from '../../mockData/products'
-import { quotations as seedQuotations } from '../../mockData/quotations'
-import { users as seedUsers } from '../../mockData/users'
+import { createQuotation } from '../../api/quotations'
+import { listCustomers } from '../../api/customers'
+import { listProducts } from '../../api/products'
+import { listUsers } from '../../api/users'
+import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
-import { readStoredQuotations, saveStoredQuotation } from './quotationStorage'
 
 const today = new Date().toISOString().slice(0, 10)
 
 const emptyItem = {
-  product: '',
+  productId: '',
+  variantId: '',
+  productName: '',
   sku: '',
-  description: '',
-  quantity: '',
   uom: '',
+  quantity: '',
   unitPrice: '',
   discount: '',
-  tax: '',
+  taxRate: '',
 }
 
 const emptyQuotation = {
-  id: '',
   quotationDate: today,
   validUntil: '',
-  customer: '',
+  customerId: '',
   billingAddress: '',
   shippingAddress: '',
-  salesperson: '',
+  salespersonId: '',
   currency: 'INR',
   paymentTerms: '',
   deliveryTerms: '',
   notes: '',
-  terms: '',
-  status: 'Draft',
+  termsConditions: '',
   items: [{ ...emptyItem }],
 }
 
@@ -55,45 +54,11 @@ const taxOptions = [
   { value: '28', label: '28%' },
 ]
 
-const formSections = [
-  {
-    id: 'quotation-details',
-    title: 'Quotation Details',
-    description: 'Quotation number, dates, customer, and sales ownership.',
-    icon: ReceiptText,
-    fields: ['id', 'quotationDate', 'validUntil', 'customer', 'billingAddress', 'shippingAddress', 'salesperson', 'currency'],
-  },
-  {
-    id: 'terms-details',
-    title: 'Terms Details',
-    description: 'Payment, delivery, notes, and printed terms.',
-    icon: FileText,
-    fields: ['paymentTerms', 'deliveryTerms', 'notes', 'terms'],
-  },
-  {
-    id: 'quotation-items',
-    title: 'Quotation Items',
-    description: 'Products, quantities, pricing, tax, and line totals.',
-    icon: PackageSearch,
-    fields: ['items'],
-  },
-]
-
-function makeQuotationNumber() {
-  const allQuotations = [...readStoredQuotations(), ...seedQuotations]
-  const nextNumber = allQuotations.reduce((highest, quotation) => {
-    const number = Number(String(quotation.id || '').replace(/\D/g, ''))
-    return Number.isFinite(number) ? Math.max(highest, number) : highest
-  }, 20261000) + 1
-
-  return `QT-${new Date().getFullYear()}-${String(nextNumber).slice(-4)}`
-}
-
 function calculateLineTotal(item) {
   const quantity = Number(item.quantity) || 0
   const unitPrice = Number(item.unitPrice) || 0
   const discount = Number(item.discount) || 0
-  const tax = Number(item.tax) || 0
+  const tax = Number(item.taxRate) || 0
   const subtotal = quantity * unitPrice
   const discounted = subtotal - subtotal * (discount / 100)
   return discounted + discounted * (tax / 100)
@@ -107,9 +72,75 @@ export default function QuotationFormPage() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
   const basePath = currentUser?.role === ROLES.SALES_OFFICER ? '/sales/quotations' : '/admin/quotations'
-  const [formData, setFormData] = useState(() => ({ ...emptyQuotation, id: makeQuotationNumber() }))
+
+  const [formData, setFormData] = useState(() => ({
+    ...emptyQuotation,
+    salespersonId: currentUser?.role === ROLES.SALES_OFFICER ? currentUser.id : '',
+  }))
   const [errors, setErrors] = useState({})
-  const [activeSection, setActiveSection] = useState(formSections[0].id)
+  const [submitError, setSubmitError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeSection, setActiveSection] = useState('quotation-details')
+
+  const [customers, setCustomers] = useState([])
+  const [products, setProducts] = useState([])
+  const [salespeople, setSalespeople] = useState([])
+  const [isLoadingOptions, setIsLoadingOptions] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadOptions() {
+      const [customersResult, productsResult, usersResult] = await Promise.all([
+        listCustomers(),
+        listProducts(),
+        listUsers(),
+      ])
+
+      if (!isMounted) return
+
+      if (customersResult.success) setCustomers(customersResult.customers)
+      if (productsResult.success) setProducts(productsResult.products)
+      if (usersResult.success) {
+        setSalespeople(
+          usersResult.users
+            .map(normalizeApiUser)
+            .filter((user) => user.role === ROLES.SALES_OFFICER || user.role === ROLES.ADMIN),
+        )
+      }
+
+      setIsLoadingOptions(false)
+    }
+
+    loadOptions()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const formSections = [
+    {
+      id: 'quotation-details',
+      title: 'Quotation Details',
+      description: 'Dates, customer, and sales ownership.',
+      icon: ReceiptText,
+      fields: ['quotationDate', 'validUntil', 'customerId', 'billingAddress', 'shippingAddress', 'salespersonId', 'currency'],
+    },
+    {
+      id: 'terms-details',
+      title: 'Terms Details',
+      description: 'Payment, delivery, notes, and printed terms.',
+      icon: FileText,
+      fields: ['paymentTerms', 'deliveryTerms', 'notes', 'termsConditions'],
+    },
+    {
+      id: 'quotation-items',
+      title: 'Quotation Items',
+      description: 'Products, quantities, pricing, tax, and line totals.',
+      icon: PackageSearch,
+      fields: ['items'],
+    },
+  ]
 
   const activeFormSection = formSections.find((section) => section.id === activeSection) || formSections[0]
   const activeSectionIndex = formSections.findIndex((section) => section.id === activeSection)
@@ -117,25 +148,13 @@ export default function QuotationFormPage() {
   const isLastSection = activeSectionIndex === formSections.length - 1
 
   const customerOptions = useMemo(
-    () => seedCustomers.map((customer) => ({ value: customer.name, label: customer.name, customer })),
-    [],
+    () => customers.map((customer) => ({ value: customer.id, label: `${customer.name}${customer.phone ? ` • ${customer.phone}` : ''}`, customer })),
+    [customers],
   )
-
-  const salespersonOptions = useMemo(() => {
-    const names = seedUsers
-      .filter((user) => user.role === ROLES.SALES_OFFICER)
-      .map((user) => user.name)
-
-    if (currentUser?.role === ROLES.SALES_OFFICER && currentUser?.name && !names.includes(currentUser.name)) {
-      names.unshift(currentUser.name)
-    }
-
-    return names.map((name) => ({ value: name, label: name }))
-  }, [currentUser])
-
+  const salespersonOptions = useMemo(() => salespeople.map((user) => ({ value: user.id, label: user.name })), [salespeople])
   const productOptions = useMemo(
-    () => seedProducts.map((product) => ({ value: product.fullName || product.name, label: product.fullName || product.name, product })),
-    [],
+    () => products.map((product) => ({ value: product.id, label: product.name, product })),
+    [products],
   )
 
   const quotationTotal = useMemo(
@@ -147,11 +166,11 @@ export default function QuotationFormPage() {
     setFormData((current) => {
       const next = { ...current, [field]: value }
 
-      if (field === 'customer') {
+      if (field === 'customerId') {
         const selectedCustomer = customerOptions.find((option) => option.value === value)?.customer
         if (selectedCustomer) {
-          next.billingAddress = selectedCustomer.city ? `${selectedCustomer.name}, ${selectedCustomer.city}` : selectedCustomer.name
-          next.shippingAddress = next.billingAddress
+          next.billingAddress = selectedCustomer.billingAddress || next.billingAddress
+          next.shippingAddress = selectedCustomer.shippingAddress || selectedCustomer.billingAddress || next.shippingAddress
         }
       }
 
@@ -167,14 +186,14 @@ export default function QuotationFormPage() {
 
         const nextItem = { ...item, [field]: value }
 
-        if (field === 'product') {
+        if (field === 'productId') {
           const selectedProduct = productOptions.find((option) => option.value === value)?.product
           if (selectedProduct) {
-            nextItem.sku = selectedProduct.id
-            nextItem.description = selectedProduct.fullName || selectedProduct.name
-            nextItem.uom = selectedProduct.unit || 'unit'
-            nextItem.unitPrice = selectedProduct.sellingPrice || ''
-            nextItem.tax = selectedProduct.gstRate ? String(Number(selectedProduct.gstRate) * 100) : ''
+            nextItem.productName = selectedProduct.name
+            nextItem.sku = selectedProduct.sku || ''
+            nextItem.unitPrice = selectedProduct.price ?? ''
+            nextItem.taxRate = selectedProduct.tax_rate ?? ''
+            nextItem.variantId = ''
           }
         }
 
@@ -200,42 +219,37 @@ export default function QuotationFormPage() {
   const validate = () => {
     const nextErrors = {}
 
-    if (!formData.id) nextErrors.id = 'Quotation number is required.'
-    if (!formData.quotationDate) nextErrors.quotationDate = 'Quotation date is required.'
-    if (!formData.validUntil) nextErrors.validUntil = 'Valid until date is required.'
-    if (!formData.customer) nextErrors.customer = 'Customer is required.'
-    if (!formData.billingAddress.trim()) nextErrors.billingAddress = 'Billing address is required.'
-    if (!formData.salesperson) nextErrors.salesperson = 'Salesperson is required.'
+    if (!formData.customerId) nextErrors.customerId = 'Customer is required.'
+    if (!formData.salespersonId) nextErrors.salespersonId = 'Salesperson is required.'
     if (!formData.currency) nextErrors.currency = 'Currency is required.'
 
     const hasInvalidItem = formData.items.some((item) => (
-      !item.product ||
+      !item.productId ||
       !item.quantity ||
-      !item.uom ||
-      !item.unitPrice ||
       Number(item.quantity) <= 0 ||
+      item.unitPrice === '' ||
       Number(item.unitPrice) < 0
     ))
-    if (hasInvalidItem) nextErrors.items = 'Each item needs product, quantity, UOM, and unit price.'
+    if (hasInvalidItem) nextErrors.items = 'Each item needs a product, quantity, and unit price.'
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
     if (!validate()) return
 
-    saveStoredQuotation({
-      ...formData,
-      items: formData.items.map((item) => ({
-        ...item,
-        quantity: Number(item.quantity) || 0,
-        unitPrice: Number(item.unitPrice) || 0,
-        discount: Number(item.discount) || 0,
-        tax: Number(item.tax) || 0,
-      })),
-    })
+    setIsSubmitting(true)
+    setSubmitError('')
+
+    const result = await createQuotation(formData)
+
+    if (!result.success) {
+      setSubmitError(result.error)
+      setIsSubmitting(false)
+      return
+    }
 
     navigate(basePath)
   }
@@ -251,25 +265,24 @@ export default function QuotationFormPage() {
   }
 
   const renderField = (field) => {
-    if (field === 'id') return <Input label="Quotation Number" value={formData.id} disabled required error={errors.id} />
     if (field === 'quotationDate') return <Input label="Quotation Date" type="date" value={formData.quotationDate} onChange={(event) => updateField(field, event.target.value)} required error={errors.quotationDate} />
-    if (field === 'validUntil') return <Input label="Valid Until" type="date" value={formData.validUntil} onChange={(event) => updateField(field, event.target.value)} required error={errors.validUntil} />
-    if (field === 'customer') return <Select label="Customer" options={customerOptions} value={formData.customer} onChange={(event) => updateField(field, event.target.value)} required placeholder="Select customer" error={errors.customer} />
-    if (field === 'billingAddress') return <Input label="Billing Address" value={formData.billingAddress} onChange={(event) => updateField(field, event.target.value)} required error={errors.billingAddress} />
+    if (field === 'validUntil') return <Input label="Valid Until" type="date" value={formData.validUntil} onChange={(event) => updateField(field, event.target.value)} />
+    if (field === 'customerId') return <Select label="Customer" options={customerOptions} value={formData.customerId} onChange={(event) => updateField(field, event.target.value)} required placeholder={isLoadingOptions ? 'Loading...' : 'Select customer'} error={errors.customerId} disabled={isLoadingOptions} />
+    if (field === 'billingAddress') return <Input label="Billing Address" value={formData.billingAddress} onChange={(event) => updateField(field, event.target.value)} />
     if (field === 'shippingAddress') return <Input label="Shipping Address" value={formData.shippingAddress} onChange={(event) => updateField(field, event.target.value)} />
-    if (field === 'salesperson') return <Select label="Salesperson" options={salespersonOptions} value={formData.salesperson} onChange={(event) => updateField(field, event.target.value)} required placeholder="Select salesperson" error={errors.salesperson} />
+    if (field === 'salespersonId') return <Select label="Salesperson" options={salespersonOptions} value={formData.salespersonId} onChange={(event) => updateField(field, event.target.value)} required placeholder={isLoadingOptions ? 'Loading...' : 'Select salesperson'} error={errors.salespersonId} disabled={isLoadingOptions} />
     if (field === 'currency') return <Select label="Currency" options={currencyOptions} value={formData.currency} onChange={(event) => updateField(field, event.target.value)} required error={errors.currency} />
     if (field === 'paymentTerms') return <Select label="Payment Terms" options={paymentTermOptions} value={formData.paymentTerms} onChange={(event) => updateField(field, event.target.value)} placeholder="Select payment terms" />
     if (field === 'deliveryTerms') return <Select label="Delivery Terms" options={deliveryTermOptions} value={formData.deliveryTerms} onChange={(event) => updateField(field, event.target.value)} placeholder="Select delivery terms" />
     if (field === 'notes') return <Input as="textarea" label="Notes" value={formData.notes} onChange={(event) => updateField(field, event.target.value)} placeholder="Internal remarks" />
-    if (field === 'terms') return <Input as="textarea" label="Terms & Conditions" value={formData.terms} onChange={(event) => updateField(field, event.target.value)} placeholder="Terms printed on quotation" />
+    if (field === 'termsConditions') return <Input as="textarea" label="Terms & Conditions" value={formData.termsConditions} onChange={(event) => updateField(field, event.target.value)} placeholder="Terms printed on quotation" />
 
     return (
       <div className="lg:col-span-2">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-neutral-900">Quotation Items</p>
-            <p className="mt-1 text-xs text-neutral-400">Add products or services for this estimate.</p>
+            <p className="mt-1 text-xs text-neutral-400">Add products for this estimate.</p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={addItem}>
             Add Item
@@ -287,14 +300,13 @@ export default function QuotationFormPage() {
                 </Button>
               </div>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <Select label="Product" required options={productOptions} value={item.product} onChange={(event) => updateItem(index, 'product', event.target.value)} placeholder="Select product or service" />
-                <Input label="SKU" value={item.sku} onChange={(event) => updateItem(index, 'sku', event.target.value)} placeholder="Auto-filled product code" />
-                <Input as="textarea" label="Description" value={item.description} onChange={(event) => updateItem(index, 'description', event.target.value)} placeholder="Product description" className="lg:col-span-2" />
+                <Select label="Product" required options={productOptions} value={item.productId} onChange={(event) => updateItem(index, 'productId', event.target.value)} placeholder={isLoadingOptions ? 'Loading...' : 'Select product'} disabled={isLoadingOptions} />
+                <Input label="SKU" value={item.sku} disabled placeholder="Auto-filled product code" />
                 <Input label="Quantity" required type="number" min="0" step="0.01" value={item.quantity} onChange={(event) => updateItem(index, 'quantity', event.target.value)} />
-                <Select label="UOM" required options={uomOptions} value={item.uom} onChange={(event) => updateItem(index, 'uom', event.target.value)} placeholder="Select UOM" />
+                <Select label="UOM" options={uomOptions} value={item.uom} onChange={(event) => updateItem(index, 'uom', event.target.value)} placeholder="Select UOM" />
                 <Input label="Unit Price" required type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => updateItem(index, 'unitPrice', event.target.value)} />
                 <Input label="Discount (%)" type="number" min="0" step="0.01" value={item.discount} onChange={(event) => updateItem(index, 'discount', event.target.value)} />
-                <Select label="Tax (%)" options={taxOptions} value={String(item.tax)} onChange={(event) => updateItem(index, 'tax', event.target.value)} placeholder="Select tax" />
+                <Select label="Tax (%)" options={taxOptions} value={String(item.taxRate ?? '')} onChange={(event) => updateItem(index, 'taxRate', event.target.value)} placeholder="Select tax" />
                 <Input label="Line Total" value={formatCurrency(calculateLineTotal(item))} disabled />
               </div>
             </div>
@@ -353,11 +365,15 @@ export default function QuotationFormPage() {
             </Button>
           </div>
 
+          {submitError && (
+            <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{submitError}</div>
+          )}
+
           <section className="flex-1 border-b border-neutral-100 py-5">
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {activeFormSection.fields.map((field) => (
                 <Fragment key={field}>
-                  <QuotationField className={['notes', 'terms', 'items'].includes(field) ? 'lg:col-span-2' : ''}>
+                  <QuotationField className={['notes', 'termsConditions', 'items'].includes(field) ? 'lg:col-span-2' : ''}>
                     {renderField(field)}
                   </QuotationField>
                 </Fragment>
@@ -370,7 +386,7 @@ export default function QuotationFormPage() {
               Back
             </Button>
             {isLastSection ? (
-              <Button type="submit">
+              <Button type="submit" loading={isSubmitting}>
                 Save Quotation
               </Button>
             ) : (

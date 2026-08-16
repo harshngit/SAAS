@@ -21,6 +21,7 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { formatCurrency } from '../../utils/format'
 import { readImageAsDataUrl } from '../../utils/imageFile'
+import { uploadFile } from '../../api/files'
 
 const MAX_TOTAL_IMAGES = 5
 
@@ -73,8 +74,8 @@ const emptyForm = {
   images: [],
   videoUrl: '',
   videoFileName: '',
-  catalogBrochureName: '',
-  productManualName: '',
+  catalogBrochure: '',
+  productManual: '',
   purchasePrice: '',
   sellingPrice: '',
   mrp: '',
@@ -121,7 +122,7 @@ const emptyForm = {
   variantBarcode: '',
   variantPrice: '',
   downloadableProduct: false,
-  downloadFileName: '',
+  downloadFile: '',
   licenseKeyRequired: false,
   downloadLimit: '',
   warrantyPeriod: '',
@@ -131,9 +132,9 @@ const emptyForm = {
   endOfLifeDate: '',
   productTags: '',
   notes: '',
-  productDatasheetName: '',
-  complianceCertificateName: '',
-  warrantyDocumentName: '',
+  productDatasheet: '',
+  complianceCertificate: '',
+  warrantyDocument: '',
   otherAttachmentsName: '',
   variants: [],
 }
@@ -206,8 +207,8 @@ const productSections = [
     { name: 'coverImage', label: 'Primary Product Image', input: 'image', required: true },
     { name: 'images', label: 'Additional Images', input: 'multiImage' },
     { name: 'videoUrl', label: 'Product Video', input: 'video', wide: true },
-    { name: 'catalogBrochureName', label: 'Product Catalog/Brochure', input: 'file', accept: '.pdf' },
-    { name: 'productManualName', label: 'Product Manual', input: 'file', accept: '.pdf' },
+    { name: 'catalogBrochure', label: 'Product Catalog/Brochure', input: 'file', accept: '.pdf' },
+    { name: 'productManual', label: 'Product Manual', input: 'file', accept: '.pdf' },
   ]),
   section('Variants & Attributes', [
     { name: 'variants', label: 'Variants', input: 'variants', wide: true },
@@ -253,7 +254,7 @@ const productSections = [
     { name: 'downloadableProduct', label: 'Downloadable Product', input: 'checkbox' },
     { name: 'licenseKeyRequired', label: 'License Key Required', input: 'checkbox' },
     { name: 'downloadLimit', label: 'Download Limit', input: 'number' },
-    { name: 'downloadFileName', label: 'Download File', input: 'compactFile', accept: '.zip,.pdf,image/*' },
+    { name: 'downloadFile', label: 'Download File', input: 'compactFile', accept: '.zip,.pdf,image/*' },
   ]),
   section('Additional Information', [
     { name: 'warrantyPeriod', label: 'Warranty Period' },
@@ -265,9 +266,9 @@ const productSections = [
     { name: 'notes', label: 'Notes' },
   ]),
   section('Documents', [
-    { name: 'productDatasheetName', label: 'Product Datasheet', input: 'file', accept: '.pdf' },
-    { name: 'complianceCertificateName', label: 'Compliance Certificate', input: 'file', accept: '.pdf' },
-    { name: 'warrantyDocumentName', label: 'Warranty Document', input: 'file', accept: '.pdf' },
+    { name: 'productDatasheet', label: 'Product Datasheet', input: 'file', accept: '.pdf' },
+    { name: 'complianceCertificate', label: 'Compliance Certificate', input: 'file', accept: '.pdf' },
+    { name: 'warrantyDocument', label: 'Warranty Document', input: 'file', accept: '.pdf' },
     { name: 'otherAttachmentsName', label: 'Other Attachments', input: 'file', accept: '.pdf,.docx,.png,.jpg,.jpeg', multiple: true },
   ]),
 ]
@@ -333,7 +334,7 @@ function hydrateProduct(product) {
   }
 }
 
-function ProductUploadField({ field, value, onChange, onRemove }) {
+function ProductUploadField({ field, value, isUploading, onFileSelected, onRemove }) {
   return (
     <div className="flex min-h-28 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
       <div className="grid w-full grid-cols-1 gap-3 xl:grid-cols-[minmax(10rem,1fr)_auto_auto] xl:items-center">
@@ -344,26 +345,33 @@ function ProductUploadField({ field, value, onChange, onRemove }) {
           </p>
           {value && <p className="mt-1 truncate text-xs font-medium text-primary-700">{value}</p>}
         </div>
-        <button
-          type="button"
-          className="flex h-16 min-w-28 cursor-pointer items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-400"
-          style={{ cursor: 'pointer' }}
-        >
-          Preview
-        </button>
+        {value ? (
+          <a
+            href={value}
+            target="_blank"
+            rel="noreferrer"
+            className="flex h-16 min-w-28 items-center justify-center rounded-lg border border-dashed border-primary-200 bg-white px-3 text-xs font-medium text-primary-600"
+          >
+            Preview
+          </a>
+        ) : (
+          <span className="flex h-16 min-w-28 items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-400">
+            {isUploading ? 'Uploading...' : 'No file'}
+          </span>
+        )}
         <div className="flex shrink-0 flex-col items-start gap-2">
           <label className="inline-flex h-8 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
             <Upload className="size-3.5" aria-hidden="true" />
-            Upload
+            {isUploading ? 'Uploading' : 'Upload'}
             <input
               type="file"
-              multiple={field.multiple}
               accept={field.accept || '.pdf,.docx,.png,.jpg,.jpeg,.webp'}
               className="sr-only"
+              disabled={isUploading}
               onChange={(event) => {
-                const fileNames = Array.from(event.target.files || []).map((file) => file.name).join(', ')
-                onChange(fileNames)
+                const file = event.target.files?.[0]
                 event.target.value = ''
+                if (file) onFileSelected(file)
               }}
             />
           </label>
@@ -384,6 +392,8 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
   const [errors, setErrors] = useState({})
   const [imageError, setImageError] = useState('')
   const [openVariantIndex, setOpenVariantIndex] = useState(-1)
+  const [uploadingFields, setUploadingFields] = useState({})
+  const [documentUploadError, setDocumentUploadError] = useState('')
 
   const activeFormSection = useMemo(
     () => productSections.find((sectionItem) => sectionItem.id === activeSection) || productSections[0],
@@ -412,6 +422,27 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
   const updateField = (field, value) => {
     setFormData((current) => ({ ...current, [field]: value }))
     setErrors((current) => ({ ...current, [field]: '' }))
+  }
+
+  // Uploads immediately via the universal file endpoint (no product id required) and stores
+  // the real URL, so it's part of the form payload the same way coverImage/images already are -
+  // no more filename-only fields that quietly never reach the backend.
+  const handleDocumentUpload = async (field, file) => {
+    if (!file) return
+
+    setDocumentUploadError('')
+    setUploadingFields((current) => ({ ...current, [field]: true }))
+
+    const result = await uploadFile(file)
+
+    setUploadingFields((current) => ({ ...current, [field]: false }))
+
+    if (!result.success) {
+      setDocumentUploadError(result.error)
+      return
+    }
+
+    updateField(field, result.file.url)
   }
 
   const validate = () => {
@@ -948,37 +979,42 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
         <ProductUploadField
           field={field}
           value={formData[field.name]}
-          onChange={(value) => updateField(field.name, value)}
+          isUploading={Boolean(uploadingFields[field.name])}
+          onFileSelected={(file) => handleDocumentUpload(field.name, file)}
           onRemove={() => updateField(field.name, '')}
         />
       )
     }
 
     if (field.input === 'compactFile') {
+      const isUploading = Boolean(uploadingFields[field.name])
+
       return (
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-neutral-700">{field.label}</label>
           <div className="flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2">
-            <button
-              type="button"
-              className="min-w-0 flex-1 cursor-pointer truncate text-left text-sm font-medium text-neutral-400"
-              style={{ cursor: 'pointer' }}
-            >
-              {formData[field.name] || 'Preview'}
-            </button>
+            {formData[field.name] ? (
+              <a href={formData[field.name]} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-sm font-medium text-primary-700">
+                {formData[field.name]}
+              </a>
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-400">
+                {isUploading ? 'Uploading...' : 'No file'}
+              </span>
+            )}
             <div className="flex shrink-0 items-center gap-2">
               <label className="inline-flex h-8 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
                 <Upload className="size-3.5" aria-hidden="true" />
-                Upload
+                {isUploading ? 'Uploading' : 'Upload'}
                 <input
                   type="file"
-                  multiple={field.multiple}
                   accept={field.accept || '.zip,.pdf,image/*'}
                   className="sr-only"
+                  disabled={isUploading}
                   onChange={(event) => {
-                    const fileNames = Array.from(event.target.files || []).map((file) => file.name).join(', ')
-                    updateField(field.name, fileNames)
+                    const file = event.target.files?.[0]
                     event.target.value = ''
+                    if (file) handleDocumentUpload(field.name, file)
                   }}
                 />
               </label>
@@ -1000,6 +1036,8 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
     }
 
     if (field.input === 'video') {
+      const isUploading = Boolean(uploadingFields.videoUrl)
+
       return (
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-neutral-700">{field.label}</label>
@@ -1007,22 +1045,23 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
             <Input
               value={formData.videoUrl}
               type="url"
-              placeholder="Paste video URL"
+              placeholder="Paste video URL, or upload a file"
               onChange={(event) => updateField('videoUrl', event.target.value)}
               error={errors.videoUrl}
             />
             <div className="flex flex-wrap items-center gap-2">
               <label className="inline-flex h-10 w-28 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-sm font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
                 <Upload className="size-4" aria-hidden="true" />
-                Upload
+                {isUploading ? 'Uploading' : 'Upload'}
                 <input
                   type="file"
                   accept="video/mp4,video/webm,video/ogg,video/*"
                   className="sr-only"
+                  disabled={isUploading}
                   onChange={(event) => {
-                    const fileName = event.target.files?.[0]?.name || ''
-                    updateField('videoFileName', fileName)
+                    const file = event.target.files?.[0]
                     event.target.value = ''
+                    if (file) handleDocumentUpload('videoUrl', file)
                   }}
                 />
               </label>
@@ -1031,17 +1070,14 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
                 variant="outline"
                 size="sm"
                 className="h-10 w-28 rounded-full px-3 text-sm"
-                disabled={!formData.videoFileName}
-                onClick={() => updateField('videoFileName', '')}
+                disabled={!formData.videoUrl}
+                onClick={() => updateField('videoUrl', '')}
               >
                 <Trash2 className="size-4" aria-hidden="true" />
                 Remove
               </Button>
             </div>
           </div>
-          {formData.videoFileName && (
-            <p className="truncate text-xs font-medium text-primary-700">{formData.videoFileName}</p>
-          )}
         </div>
       )
     }
@@ -1190,9 +1226,9 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
             </Button>
           </div>
 
-          {(formError || imageError) && (
+          {(formError || imageError || documentUploadError) && (
             <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {formError || imageError}
+              {formError || imageError || documentUploadError}
             </div>
           )}
 

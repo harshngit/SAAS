@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Boxes, Eye, Package, PackagePlus, PowerOff, RotateCw, Search, XCircle } from 'lucide-react'
+import { AlertTriangle, Boxes, Eye, Package, PackagePlus, PowerOff, RotateCw, Search, XCircle } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -8,8 +8,66 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
-import { getStockBoard, recordStockAdjustment } from '../../api/inventory'
+import { getExpiringBatches, getStockBoard, recordStockAdjustment } from '../../api/inventory'
 import StockEntryForm from './StockEntryForm'
+
+function ExpiringBatchesPanel() {
+  const [batches, setBatches] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+
+    getExpiringBatches({ within_days: 30 }).then((result) => {
+      if (!isMounted) return
+      if (result.success) setBatches(result.batches)
+      setIsLoading(false)
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  if (isLoading || batches.length === 0) return null
+
+  return (
+    <Card className="p-0">
+      <div className="flex items-center gap-2 border-b border-amber-100 bg-amber-50/60 px-5 py-3.5">
+        <AlertTriangle className="size-4 shrink-0 text-amber-600" aria-hidden="true" />
+        <p className="text-sm font-semibold text-amber-800">{batches.length} batch(es) expired or expiring within 30 days</p>
+      </div>
+      <div className="max-h-56 overflow-y-auto px-5 py-3">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-neutral-400">
+              <th className="py-2 pr-4">Product</th>
+              <th className="py-2 pr-4">Batch</th>
+              <th className="py-2 pr-4">Warehouse</th>
+              <th className="py-2 pr-4">Qty</th>
+              <th className="py-2 text-right">Expiry</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-50">
+            {batches.map((batch, index) => (
+              <tr key={batch.id || index}>
+                <td className="py-2 pr-4 font-medium text-neutral-800">{batch.product_name || batch.product?.name || '—'}</td>
+                <td className="py-2 pr-4 text-neutral-500">{batch.batch_number || '—'}</td>
+                <td className="py-2 pr-4 text-neutral-500">{batch.warehouse_name || batch.warehouse?.name || '—'}</td>
+                <td className="py-2 pr-4 text-neutral-600">{batch.quantity ?? batch.in_stock_quantity ?? '—'}</td>
+                <td className="py-2 text-right">
+                  <Badge variant={batch.is_expired ? 'danger' : 'warning'} dot>
+                    {batch.is_expired ? 'Expired' : `${batch.days_to_expiry ?? '?'}d left`}
+                  </Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
 
 const stockStatusTabs = [
   { value: 'all', label: 'All' },
@@ -142,6 +200,8 @@ export default function StockBoard({ readOnly = false }) {
         <StatCard icon={XCircle} iconVariant="danger" label="Out of Stock" value={stats.outOfStock} />
         <StatCard icon={PowerOff} iconVariant="warning" label="Inactive" value={stats.inactive} />
       </div>
+
+      {!readOnly && <ExpiringBatchesPanel />}
 
       <Card className="p-0">
         <div className="border-b border-neutral-100 px-5 py-4">

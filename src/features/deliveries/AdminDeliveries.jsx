@@ -1,31 +1,55 @@
-import { Truck, CheckCircle2, Clock, XCircle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Truck, CheckCircle2, Clock, XCircle, RotateCw } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import DataTable from '../../components/ui/DataTable'
 import StatCard from '../../components/ui/StatCard'
-import { deliveries } from '../../mockData/deliveries'
-import { users } from '../../mockData/users'
+import Button from '../../components/ui/Button'
+import { DELIVERY_STATUS_OPTIONS, listDeliveries } from '../../api/deliveries'
 import { formatCurrency } from '../../utils/format'
 
 const statusVariant = {
-  Delivered: 'success',
-  'Out for Delivery': 'warning',
-  Scheduled: 'info',
-  Failed: 'danger',
-  Partial: 'info',
-  Rescheduled: 'info',
+  delivered: 'success',
+  in_transit: 'warning',
+  planned: 'info',
+  loaded: 'info',
+  partially_delivered: 'warning',
+  failed: 'danger',
+  cancelled: 'neutral',
 }
 
-const userName = (id) => users.find((user) => user.id === id)?.name || 'Unassigned'
-
 export default function AdminDeliveries() {
-  const rows = [...deliveries]
-    .map((delivery) => ({ ...delivery, partnerName: userName(delivery.deliveryPartnerId) }))
-    .sort((a, b) => (a.scheduledDate < b.scheduledDate ? 1 : -1))
+  const [deliveries, setDeliveries] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const delivered = rows.filter((row) => row.status === 'Delivered').length
-  const inProgress = rows.filter((row) => row.status === 'Out for Delivery' || row.status === 'Scheduled').length
-  const failed = rows.filter((row) => row.status === 'Failed').length
+  const loadDeliveries = useCallback(async () => {
+    setIsLoading(true)
+    setError('')
+
+    const result = await listDeliveries()
+
+    if (!result.success) {
+      setDeliveries([])
+      setError(result.error)
+      setIsLoading(false)
+      return
+    }
+
+    setDeliveries(result.deliveries)
+    setIsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadDeliveries()
+  }, [loadDeliveries])
+
+  const stats = useMemo(() => {
+    const delivered = deliveries.filter((row) => row.status === 'delivered').length
+    const inProgress = deliveries.filter((row) => ['planned', 'loaded', 'in_transit'].includes(row.status)).length
+    const failed = deliveries.filter((row) => row.status === 'failed').length
+    return { total: deliveries.length, delivered, inProgress, failed }
+  }, [deliveries])
 
   return (
     <div className="space-y-6">
@@ -35,31 +59,46 @@ export default function AdminDeliveries() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={Truck} label="Total Deliveries" value={rows.length} iconVariant="primary" />
-        <StatCard icon={CheckCircle2} label="Delivered" value={delivered} iconVariant="success" />
-        <StatCard icon={Clock} label="In Progress" value={inProgress} iconVariant="warning" />
-        <StatCard icon={XCircle} label="Failed" value={failed} iconVariant="danger" />
+        <StatCard icon={Truck} label="Total Deliveries" value={stats.total} iconVariant="primary" />
+        <StatCard icon={CheckCircle2} label="Delivered" value={stats.delivered} iconVariant="success" />
+        <StatCard icon={Clock} label="In Progress" value={stats.inProgress} iconVariant="warning" />
+        <StatCard icon={XCircle} label="Failed" value={stats.failed} iconVariant="danger" />
       </div>
 
-      <Card title="All Deliveries" subtitle="Scheduled, out for delivery, and completed">
-        <DataTable
-          columns={[
-            { key: 'orderNumber', header: 'Order #', sortable: true },
-            { key: 'customerName', header: 'Customer', sortable: true },
-            { key: 'partnerName', header: 'Delivery Partner', sortable: true },
-            {
-              key: 'status',
-              header: 'Status',
-              sortable: true,
-              render: (row) => <Badge variant={statusVariant[row.status] || 'neutral'} dot>{row.status}</Badge>,
-            },
-            { key: 'scheduledDate', header: 'Scheduled Date', sortable: true },
-            { key: 'amountDue', header: 'Amount Due', sortable: true, align: 'right', render: (row) => formatCurrency(row.amountDue) },
-          ]}
-          data={rows}
-          searchKeys={['orderNumber', 'customerName', 'partnerName', 'status']}
-          searchPlaceholder="Search deliveries…"
-        />
+      <Card title="All Deliveries" subtitle="Planned, loaded, in transit, and completed">
+        {error ? (
+          <div className="py-8 text-center">
+            <p className="text-sm text-red-600">{error}</p>
+            <Button type="button" variant="outline" className="mt-4" onClick={loadDeliveries}>
+              <RotateCw className="size-4" aria-hidden="true" />
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <DataTable
+            loading={isLoading}
+            columns={[
+              { key: 'orderNumber', header: 'Order #', sortable: true },
+              { key: 'customerName', header: 'Customer', sortable: true },
+              { key: 'deliveryPartnerName', header: 'Delivery Partner', sortable: true, render: (row) => row.deliveryPartnerName || 'Unassigned' },
+              {
+                key: 'status',
+                header: 'Status',
+                sortable: true,
+                render: (row) => (
+                  <Badge variant={statusVariant[row.status] || 'neutral'} dot>
+                    {DELIVERY_STATUS_OPTIONS.find((option) => option.value === row.status)?.label || row.status}
+                  </Badge>
+                ),
+              },
+              { key: 'scheduledDate', header: 'Scheduled Date', sortable: true },
+              { key: 'amountDue', header: 'Amount Due', sortable: true, align: 'right', render: (row) => formatCurrency(row.amountDue) },
+            ]}
+            data={deliveries}
+            searchKeys={['orderNumber', 'customerName', 'deliveryPartnerName', 'status']}
+            searchPlaceholder="Search deliveries…"
+          />
+        )}
       </Card>
     </div>
   )

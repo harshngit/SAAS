@@ -108,6 +108,30 @@ export async function recordStockAdjustment(payload) {
   }
 }
 
+export async function getExpiringBatches(params = {}) {
+  try {
+    const queryParams = {}
+
+    if (params.within_days !== undefined) queryParams.within_days = params.within_days
+    if (params.include_expired !== undefined) queryParams.include_expired = params.include_expired
+
+    const { data } = await apiClient.get('/inventory/expiring', {
+      headers: authHeader(),
+      params: queryParams,
+    })
+
+    return { success: true, batches: Array.isArray(data) ? data : data?.batches || [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load expiring batches. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function setExactStock(productId, payload) {
   try {
     const requestBody = {

@@ -27,7 +27,16 @@ export function normalizeApiProduct(product, fallback = {}) {
     description: product.description || fallback.description || '',
     coverImage: product.cover_image || fallback.coverImage || '',
     images: product.images || fallback.images || [],
+    videoUrl: product.product_video || fallback.videoUrl || '',
+    catalogBrochure: product.catalog_brochure || fallback.catalogBrochure || '',
+    productManual: product.manual || fallback.productManual || '',
+    productDatasheet: product.product_datasheet || fallback.productDatasheet || '',
+    complianceCertificate: product.compliance_certificate || fallback.complianceCertificate || '',
+    warrantyDocument: product.warranty_document || fallback.warrantyDocument || '',
+    downloadFile: product.download_file || fallback.downloadFile || '',
     totalStock: product.total_stock ?? fallback.totalStock ?? 0,
+    batchTracking: Boolean(product.batch_tracking ?? fallback.batchTracking ?? false),
+    serialNumberTracking: Boolean(product.serial_number_tracking ?? fallback.serialNumberTracking ?? false),
     variants: sourceVariants.map((variant, index) => {
       const fallbackVariant = fallback.variants?.find((item) => item.id && item.id === (variant.id || variant.variantId || variant.variant_id)) || fallback.variants?.[index] || {}
       const fallbackInventory = normalizeVariantInventory(fallbackVariant)

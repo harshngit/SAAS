@@ -1,0 +1,13 @@
+{
+  "name": "crm-saas-seed",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "form-data": "^4.0.1"
+  }
+}

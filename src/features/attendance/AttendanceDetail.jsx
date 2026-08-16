@@ -15,13 +15,13 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { getAttendance } from '../../api/attendance'
 import { listUsers } from '../../api/users'
-import { attendance as sampleAttendance } from '../../mockData/attendance'
 import { roleLabels } from '../../auth/roles'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 import {
   formatDateLabel,
   formatTimeLabel,
   isCheckInOnTime,
+  normalizeAttendanceRecord,
   statusVariant,
   workHoursLabel,
   workMinutes,
@@ -49,29 +49,6 @@ function normalizeUser(user) {
   }
 }
 
-function normalizeAttendanceRecord(record) {
-  return {
-    userId: record.user_id || record.userId || '',
-    date: record.date || record.attendance_date || '',
-    status: record.status || 'Present',
-    checkIn: record.check_in || record.checkIn || null,
-    checkOut: record.check_out || record.checkOut || null,
-    name: record.name || '',
-    role: record.role || '',
-  }
-}
-
-function flattenSampleAttendance() {
-  return sampleAttendance.flatMap((user) =>
-    user.records.map((record) => ({
-      userId: user.userId,
-      name: user.name,
-      role: user.role,
-      ...record,
-    })),
-  )
-}
-
 export default function AttendanceDetail() {
   const { userId } = useParams()
   const navigate = useNavigate()
@@ -95,10 +72,7 @@ export default function AttendanceDetail() {
 
       setUser(nextUsersById.get(userId) || null)
 
-      const records =
-        attendanceResult.success && attendanceResult.records.length > 0
-          ? attendanceResult.records.map(normalizeAttendanceRecord)
-          : flattenSampleAttendance()
+      const records = attendanceResult.success ? attendanceResult.records.map(normalizeAttendanceRecord) : []
 
       setAllRows(records)
       setIsLoading(false)

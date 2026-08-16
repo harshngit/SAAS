@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Save } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useToast } from '../../components/ui/toastContext'
+import { getSalesWorkflowSettings, updateSalesWorkflowSettings } from '../../api/settings'
 
 function Toggle({ checked, onChange, label, description }) {
   return (
@@ -32,157 +33,150 @@ function Toggle({ checked, onChange, label, description }) {
   )
 }
 
-const initialNotificationPrefs = {
-  lowStock: true,
-  paymentOverdue: true,
-  deliveryFailed: true,
-  newOrder: false,
-  dailySummaryEmail: true,
-}
-
-const initialSecurityPrefs = {
-  twoFactor: false,
-  forcePasswordReset: false,
-}
-
 export default function AdminSettings() {
   const { showToast } = useToast()
-  const [notificationPrefs, setNotificationPrefs] = useState(initialNotificationPrefs)
-  const [securityPrefs, setSecurityPrefs] = useState(initialSecurityPrefs)
-  const [sessionTimeout, setSessionTimeout] = useState('60')
-  const [currency, setCurrency] = useState('INR')
-  const [dateFormat, setDateFormat] = useState('DD-MM-YYYY')
+  const [settings, setSettings] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
-  const updateNotification = (key) => (value) =>
-    setNotificationPrefs((prev) => ({ ...prev, [key]: value }))
+  useEffect(() => {
+    getSalesWorkflowSettings().then((result) => {
+      if (!result.success) {
+        setLoadError(result.error)
+        setIsLoading(false)
+        return
+      }
+      setSettings(result.settings)
+      setIsLoading(false)
+    })
+  }, [])
 
-  const updateSecurity = (key) => (value) =>
-    setSecurityPrefs((prev) => ({ ...prev, [key]: value }))
+  const updateField = (field) => (value) => setSettings((current) => ({ ...current, [field]: value }))
 
   const handleSave = async () => {
     setIsSaving(true)
-    await new Promise((resolve) => setTimeout(resolve, 800))
+
+    const result = await updateSalesWorkflowSettings(settings)
+
+    if (!result.success) {
+      showToast({ title: 'Save failed', message: result.error, variant: 'error' })
+      setIsSaving(false)
+      return
+    }
+
+    setSettings(result.settings)
     setIsSaving(false)
-    showToast({ title: 'Settings saved', message: 'Settings saved successfully.' })
+    showToast({ title: 'Settings saved', message: 'Sales workflow settings updated. Applies to the next order placed.' })
+  }
+
+  if (isLoading) {
+    return (
+      <Card>
+        <LoadingSpinner label="Loading settings..." />
+      </Card>
+    )
+  }
+
+  if (loadError || !settings) {
+    return (
+      <Card>
+        <div className="py-8 text-center text-sm text-red-600">{loadError || 'Unable to load settings.'}</div>
+      </Card>
+    )
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Settings</h1>
-          <p className="mt-1 text-sm text-neutral-500">Configure notifications, security, and system preferences</p>
+          <h1 className="text-2xl font-semibold text-neutral-900">Sales Workflow Settings</h1>
+          <p className="mt-1 text-sm text-neutral-500">Order approval, stock reservation, backorders, invoicing, and credit-limit behavior</p>
         </div>
         <Button onClick={handleSave} loading={isSaving}>
-          <Save className="size-4 mr-2" />
+          <Save className="size-4" />
           Save Changes
         </Button>
       </div>
 
-      <Tabs defaultValue="notifications">
-        <TabsList>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
-        </TabsList>
+      <Card title="Order Processing" subtitle="Controls how new sales orders are handled">
+        <div className="divide-y divide-neutral-50">
+          <Toggle
+            label="Require approval before placing orders"
+            description="Orders start as Awaiting Approval until an admin approves them"
+            checked={settings.orderRequiresApproval}
+            onChange={updateField('orderRequiresApproval')}
+          />
+          <Toggle
+            label="Reserve stock on order"
+            description="Stock is reserved as soon as an order is placed, before delivery"
+            checked={settings.reserveStockOnOrder}
+            onChange={updateField('reserveStockOnOrder')}
+          />
+          <Toggle
+            label="Allow partial delivery"
+            description="Orders can be delivered in multiple shipments"
+            checked={settings.allowPartialDelivery}
+            onChange={updateField('allowPartialDelivery')}
+          />
+          <Toggle
+            label="Allow backorders"
+            description="Orders can be placed even when stock is insufficient"
+            checked={settings.allowBackorder}
+            onChange={updateField('allowBackorder')}
+          />
+          <Toggle
+            label="Delivery collection allowed"
+            description="Delivery partners can collect payment at the time of delivery"
+            checked={settings.deliveryCollectionAllowed}
+            onChange={updateField('deliveryCollectionAllowed')}
+          />
+        </div>
+      </Card>
 
-        <TabsContent value="notifications" className="mt-6">
-          <Card title="Notification Preferences" subtitle="Choose which alerts your organization receives">
-            <div className="divide-y divide-neutral-50">
-              <Toggle
-                label="Low stock alerts"
-                description="Notify when product inventory falls below threshold"
-                checked={notificationPrefs.lowStock}
-                onChange={updateNotification('lowStock')}
-              />
-              <Toggle
-                label="Payment overdue alerts"
-                description="Notify when a customer payment is past due"
-                checked={notificationPrefs.paymentOverdue}
-                onChange={updateNotification('paymentOverdue')}
-              />
-              <Toggle
-                label="Delivery failed alerts"
-                description="Notify when a scheduled delivery fails or is rescheduled"
-                checked={notificationPrefs.deliveryFailed}
-                onChange={updateNotification('deliveryFailed')}
-              />
-              <Toggle
-                label="New order alerts"
-                description="Notify admins whenever a new sales order is created"
-                checked={notificationPrefs.newOrder}
-                onChange={updateNotification('newOrder')}
-              />
-              <Toggle
-                label="Daily summary email"
-                description="Receive a daily digest of sales, deliveries, and expenses"
-                checked={notificationPrefs.dailySummaryEmail}
-                onChange={updateNotification('dailySummaryEmail')}
-              />
-            </div>
-          </Card>
-        </TabsContent>
+      <Card title="Invoicing" subtitle="When and how invoices are generated">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <Select
+            label="Invoice timing"
+            value={settings.invoiceTiming}
+            onChange={(event) => updateField('invoiceTiming')(event.target.value)}
+            options={[
+              { value: 'after_delivery', label: 'After delivery' },
+              { value: 'on_order', label: 'On order placement' },
+            ]}
+          />
+          <Select
+            label="Partial delivery invoice mode"
+            value={settings.partialDeliveryInvoiceMode}
+            onChange={(event) => updateField('partialDeliveryInvoiceMode')(event.target.value)}
+            options={[
+              { value: 'per_delivery', label: 'Invoice per delivery' },
+              { value: 'after_full_order', label: 'Invoice after full order delivered' },
+            ]}
+          />
+        </div>
+        <div className="mt-4">
+          <Toggle
+            label="Allow direct invoicing"
+            description="Staff can create invoices without a sales order (counter sales)"
+            checked={settings.allowDirectInvoice}
+            onChange={updateField('allowDirectInvoice')}
+          />
+        </div>
+      </Card>
 
-        <TabsContent value="security" className="mt-6">
-          <Card title="Security" subtitle="Manage authentication and session policies">
-            <div className="divide-y divide-neutral-50">
-              <Toggle
-                label="Require two-factor authentication"
-                description="All users must verify with a one-time code at login"
-                checked={securityPrefs.twoFactor}
-                onChange={updateSecurity('twoFactor')}
-              />
-              <Toggle
-                label="Force password reset every 90 days"
-                description="Users are prompted to set a new password quarterly"
-                checked={securityPrefs.forcePasswordReset}
-                onChange={updateSecurity('forcePasswordReset')}
-              />
-            </div>
-            <div className="mt-4 max-w-xs">
-              <Select
-                label="Session timeout (minutes)"
-                value={sessionTimeout}
-                onChange={(e) => setSessionTimeout(e.target.value)}
-                options={[
-                  { value: '15', label: '15 minutes' },
-                  { value: '30', label: '30 minutes' },
-                  { value: '60', label: '60 minutes' },
-                  { value: '120', label: '120 minutes' },
-                ]}
-              />
-            </div>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="preferences" className="mt-6">
-          <Card title="System Preferences" subtitle="Defaults applied across the organization">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <Select
-                label="Currency"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                options={[
-                  { value: 'INR', label: 'Indian Rupee (₹)' },
-                  { value: 'USD', label: 'US Dollar ($)' },
-                  { value: 'EUR', label: 'Euro (€)' },
-                ]}
-              />
-              <Select
-                label="Date format"
-                value={dateFormat}
-                onChange={(e) => setDateFormat(e.target.value)}
-                options={[
-                  { value: 'DD-MM-YYYY', label: 'DD-MM-YYYY' },
-                  { value: 'MM-DD-YYYY', label: 'MM-DD-YYYY' },
-                  { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
-                ]}
-              />
-            </div>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <Card title="Credit Limit" subtitle="What happens when an order would exceed a customer's credit limit">
+        <Select
+          value={settings.creditLimitAction}
+          onChange={(event) => updateField('creditLimitAction')(event.target.value)}
+          options={[
+            { value: 'warn', label: 'Warn, but allow the order' },
+            { value: 'block', label: 'Block the order' },
+            { value: 'ignore', label: 'Ignore credit limit' },
+          ]}
+          className="max-w-xs"
+        />
+      </Card>
     </div>
   )
 }

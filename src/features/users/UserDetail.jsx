@@ -2,13 +2,10 @@ import { useEffect, useState } from 'react'
 import {
   ArrowLeft,
   Banknote,
-  Box,
   BriefcaseBusiness,
   Calendar,
   CalendarCheck2,
   Camera,
-  Clock,
-  IndianRupee,
   Mail,
   MapPin,
   Pencil,
@@ -16,16 +13,13 @@ import {
   RefreshCw,
   Settings,
   ShieldCheck,
-  Timer,
   Trash2,
   Truck,
   UserCheck,
   UserRound,
   Users,
-  Wallet,
 } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Bar, ComposedChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -40,6 +34,7 @@ import {
   deleteEmployeeDocument,
   deleteUser,
   getUser,
+  getUserOverview,
   updateUserStatus,
 } from '../../api/users'
 import { listCustomers } from '../../api/customers'
@@ -47,6 +42,17 @@ import { getAttendance } from '../../api/attendance'
 import { formatTimeLabel } from '../attendance/attendanceUtils'
 import { normalizeApiUser } from './userRoleUtils'
 import ResetPasswordModal from './ResetPasswordModal'
+import { SalesStaffOverviewPanels, SalesStaffStatCards } from './SalesStaffOverview'
+import { DeliveryStaffOverviewPanels, DeliveryStaffStatCards } from './DeliveryStaffOverview'
+import {
+  EmptyPanelState,
+  Panel,
+  emptyDeliveryPoints,
+  emptyTrendPoints,
+  formatChartDate,
+  formatCurrency,
+  formatDate,
+} from './staffOverviewShared'
 
 const getInitials = (name = '') =>
   name
@@ -55,13 +61,6 @@ const getInitials = (name = '') =>
     .join('')
     .slice(0, 2)
     .toUpperCase()
-
-function formatDate(value) {
-  if (!value) return ''
-
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-}
 
 function formatList(values = []) {
   return values.length ? values.join(', ') : ''
@@ -96,13 +95,6 @@ function calculateTenure(joinDate) {
 
   if (years === 0 && remainingMonths === 0) return 'New'
   return [years ? `${years}y` : '', remainingMonths ? `${remainingMonths}m` : ''].filter(Boolean).join(' ')
-}
-
-function formatCurrency(value) {
-  if (value === undefined || value === null || value === '') return ''
-  const amount = Number(value)
-  if (Number.isNaN(amount)) return ''
-  return `₹${amount.toLocaleString('en-IN')}`
 }
 
 function formatLabel(value = '') {
@@ -145,11 +137,6 @@ function minutesElapsedSince(checkInValue) {
   if (!start) return null
   const diff = Math.round((now.getTime() - start.getTime()) / 60000)
   return diff > 0 ? diff : null
-}
-
-function formatMinutes(minutes) {
-  if (minutes == null) return ''
-  return `${Math.floor(minutes / 60)}h ${String(Math.round(minutes % 60)).padStart(2, '0')}m`
 }
 
 function normalizeAttendanceRecord(record) {
@@ -210,51 +197,6 @@ function TopInfoItem({ icon: Icon, label, value }) {
   )
 }
 
-function StatCard({ icon: Icon, iconClassName, label, value, caption, sublabel, onAction, actionLabel }) {
-  return (
-    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-medium text-neutral-500">{label}</p>
-        <div className={`flex size-9 shrink-0 items-center justify-center rounded-full text-white ${iconClassName}`}>
-          <Icon className="size-4" aria-hidden="true" />
-        </div>
-      </div>
-      {caption && <p className="mt-2 text-xs text-neutral-400">{caption}</p>}
-      <p className="mt-1 font-(--font-display) text-xl font-semibold tracking-tight text-neutral-900">{value}</p>
-      {onAction ? (
-        <button type="button" onClick={onAction} className="mt-1 text-xs font-medium text-primary-700 hover:underline">
-          {actionLabel} →
-        </button>
-      ) : (
-        sublabel && <p className="mt-1 text-xs text-neutral-400">{sublabel}</p>
-      )}
-    </div>
-  )
-}
-
-// A stat card with several small metrics side by side (e.g. Order Summary: Total / Delivered /
-// Pending) instead of one headline number.
-function CompoundStatCard({ icon: Icon, iconClassName, title, metrics }) {
-  return (
-    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
-      <div className="flex items-center gap-2.5">
-        <div className={`flex size-10 shrink-0 items-center justify-center rounded-full ${iconClassName}`}>
-          <Icon className="size-4.5" aria-hidden="true" />
-        </div>
-        <p className="truncate text-sm font-medium text-neutral-600">{title}</p>
-      </div>
-      <div className="mt-3 flex items-end gap-5">
-        {metrics.map((metric) => (
-          <div key={metric.label} className="min-w-0">
-            <p className={`truncate text-lg font-semibold tracking-tight ${metric.toneClassName || 'text-neutral-900'}`}>{metric.value}</p>
-            <p className="mt-0.5 truncate text-xs text-neutral-400">{metric.label}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function MiniWidget({ icon: Icon, label, value, sublabel }) {
   return (
     <div className="flex items-center gap-3">
@@ -294,27 +236,6 @@ function Section({ number, title, icon: Icon, actions, children }) {
         {actions}
       </div>
       <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4">{children}</div>
-    </div>
-  )
-}
-
-function Panel({ title, action, children, className = '' }) {
-  return (
-    <div className={`rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) ${className}`}>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
-        {action}
-      </div>
-      <div className="mt-4">{children}</div>
-    </div>
-  )
-}
-
-function EmptyPanelState({ message, note }) {
-  return (
-    <div className="py-8 text-center">
-      <p className="text-sm text-neutral-500">{message}</p>
-      {note && <p className="mt-1 text-xs text-neutral-400">{note}</p>}
     </div>
   )
 }
@@ -360,10 +281,6 @@ const employeeFileFields = [
   { field: 'appointment_letter', userKey: 'appointmentLetter', label: 'Appointment Letter' },
 ]
 
-// Flat placeholder series for the Sales Performance chart - there's no real per-employee sales
-// history to plot yet, so this just keeps the chart's shape/axes visible instead of a blank box.
-const emptyTrendPoints = ['12 AM', '4 AM', '8 AM', '12 PM', '4 PM', '8 PM'].map((label) => ({ label, value: 0 }))
-
 const profileTabs = [
   { key: 'overview', label: 'Overview' },
   { key: 'tasks', label: 'Tasks & Visits' },
@@ -384,10 +301,6 @@ const deliveryProfileTabs = [
   { key: 'documents', label: 'Documents' },
   { key: 'additional', label: 'Additional Details' },
 ]
-
-// Flat placeholder series for the Delivery Progress chart - mirrors emptyTrendPoints but with
-// a second series so the bar+line combo shape stays visible with no real data.
-const emptyDeliveryPoints = ['9 AM', '11 AM', '1 PM', '3 PM', '5 PM', '7 PM'].map((label) => ({ label, delivered: 0, amount: 0 }))
 
 export default function UserDetail() {
   const { user_id: userId } = useParams()
@@ -415,6 +328,8 @@ export default function UserDetail() {
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true)
   const [attendanceRecords, setAttendanceRecords] = useState([])
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(true)
+  const [overview, setOverview] = useState(null)
+  const [isLoadingOverview, setIsLoadingOverview] = useState(true)
 
   useEffect(() => {
     let isMounted = true
@@ -426,12 +341,18 @@ export default function UserDetail() {
       setFilesError('')
       setIsLoadingCustomers(true)
       setIsLoadingAttendance(true)
+      setIsLoadingOverview(true)
       setActiveTab('overview')
 
-      const [result, customersResult, attendanceResult] = await Promise.all([
+      // getUser/getUserOverview each catch their own HTTP errors and always resolve with
+      // {success, ...} (see src/api/users.js) - neither ever rejects, so a failing overview
+      // call can't reject this Promise.all or block the base profile from loading. The two
+      // results are handled fully independently below.
+      const [result, customersResult, attendanceResult, overviewResult] = await Promise.all([
         getUser(userId),
         listCustomers({ assigned_sales_officer_id: userId }),
         getAttendance({ user_id: userId }),
+        getUserOverview(userId),
       ])
 
       if (!isMounted) return
@@ -439,6 +360,7 @@ export default function UserDetail() {
       setIsLoading(false)
       setIsLoadingCustomers(false)
       setIsLoadingAttendance(false)
+      setIsLoadingOverview(false)
 
       if (customersResult.success) {
         setAssignedCustomers(customersResult.customers.map(normalizeCustomer))
@@ -446,6 +368,12 @@ export default function UserDetail() {
 
       if (attendanceResult.success) {
         setAttendanceRecords(attendanceResult.records.map(normalizeAttendanceRecord))
+      }
+
+      // Best-effort: the overview endpoint 404s for users outside the caller's org, but the
+      // page is still fully usable from the other real data sources above without it.
+      if (overviewResult.success) {
+        setOverview(overviewResult.overview)
       }
 
       if (!result.success) {
@@ -597,8 +525,17 @@ export default function UserDetail() {
   if (!user) return null
 
   const roleLabel = roleLabels[user.role] || user.roleDetail?.name || user.role
-  const isDeliveryPartner = user.role === ROLES.DELIVERY_PARTNER
-  const activeTabsList = isDeliveryPartner ? deliveryProfileTabs : profileTabs
+  // Workspace (not role/system_role) decides which profile design renders - a role name like
+  // "Delivery Partner" doesn't guarantee workspace='delivery' (custom roles, renamed roles,
+  // etc.), but the backend's workspace field is authoritative for this. `overview.workspace`
+  // (GET /users/{id}/overview) is the primary source since it's fetched fresh every load;
+  // `user.roleDetail?.workspace` (embedded role on GET /users/{id}) is the fallback for when
+  // overview fails to load (e.g. a scoped viewer without overview access) but the profile
+  // itself still loaded fine.
+  const workspace = overview?.workspace || user.roleDetail?.workspace || ''
+  const isSalesWorkspace = workspace === 'sales'
+  const isDeliveryWorkspace = workspace === 'delivery'
+  const activeTabsList = isDeliveryWorkspace ? deliveryProfileTabs : profileTabs
   const age = calculateAge(user.dateOfBirth)
   const tenure = calculateTenure(user.dateOfJoining)
 
@@ -620,6 +557,23 @@ export default function UserDetail() {
   const absentCount = attendanceRecords.filter((record) => record.status === 'Absent').length
   const onLeaveCount = attendanceRecords.filter((record) => record.status === 'On Leave').length
   const weekOffCount = attendanceRecords.filter((record) => record.status === 'Week Off').length
+
+  const hasSalesPerformance = Array.isArray(overview?.performance) && overview.performance.length > 0
+  const salesTrendPoints = hasSalesPerformance
+    ? overview.performance.map((point) => ({
+        label: formatChartDate(point.date),
+        value: Number(point.sales_amount) || 0,
+      }))
+    : emptyTrendPoints
+
+  const hasDeliveryPerformance = Array.isArray(overview?.performance) && overview.performance.length > 0
+  const deliveryTrendPoints = hasDeliveryPerformance
+    ? overview.performance.map((point) => ({
+        label: formatChartDate(point.date),
+        delivered: Number(point.deliveries_completed) || 0,
+        amount: Number(point.delivery_amount) || 0,
+      }))
+    : emptyDeliveryPoints
 
   return (
     <div className="space-y-5">
@@ -743,7 +697,13 @@ export default function UserDetail() {
             <TopInfoItem icon={MapPin} label="Territory" value={user.workLocation} />
             <TopInfoItem icon={Mail} label="Email" value={user.email} />
             <TopInfoItem icon={Calendar} label="Joined" value={formatDate(user.dateOfJoining)} />
-            {isDeliveryPartner && <TopInfoItem icon={Truck} label="Vehicle" value="Not assigned" />}
+            {isDeliveryWorkspace && (
+              <TopInfoItem
+                icon={Truck}
+                label="Vehicle"
+                value={overview?.vehicle ? overview.vehicle.vehicle_number || '—' : 'Not assigned'}
+              />
+            )}
           </div>
 
           <div className="flex shrink-0 flex-row gap-2 lg:flex-col">
@@ -769,52 +729,11 @@ export default function UserDetail() {
         </div>
       </div>
 
-      {isDeliveryPartner ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <CompoundStatCard
-            icon={Box}
-            iconClassName="bg-primary-50 text-primary-700"
-            title="Order Summary"
-            metrics={[
-              { label: 'Total Orders', value: '—' },
-              { label: 'Delivered', value: '—' },
-              { label: 'Pending', value: '—', toneClassName: 'text-amber-600' },
-            ]}
-          />
-          <CompoundStatCard
-            icon={Wallet}
-            iconClassName="bg-primary-50 text-primary-700"
-            title="Payment Summary"
-            metrics={[
-              { label: 'Total Sales', value: '—' },
-              { label: 'Amount Collected', value: '—' },
-              { label: 'Receivable', value: '—', toneClassName: 'text-amber-600' },
-            ]}
-          />
-          <StatCard icon={MapPin} iconClassName="bg-primary-700" label="Current Location" value="Not tracked" sublabel="Location tracking not available" />
-          <StatCard
-            icon={Clock}
-            iconClassName="bg-primary-700"
-            label="Check-in / Check-out"
-            value={todaysAttendance?.checkIn ? formatTimeLabel(todaysAttendance.checkIn) : 'Not checked in'}
-            sublabel={dutyMinutes != null ? `${formatMinutes(dutyMinutes)} active` : todaysAttendance?.checkOut ? `Out ${formatTimeLabel(todaysAttendance.checkOut)}` : ''}
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-          <StatCard icon={IndianRupee} iconClassName="bg-primary-700" label="Today's Sales" value="—" sublabel="Not tracked yet" />
-          <StatCard icon={Box} iconClassName="bg-amber-500" label="Orders" value="—" sublabel="Not tracked yet" />
-          <StatCard icon={Users} iconClassName="bg-primary-700" label="Visits" value="—" sublabel="Not tracked yet" />
-          <StatCard icon={MapPin} iconClassName="bg-primary-700" label="Current Location" value="Not tracked" sublabel="Location tracking not available" />
-          <StatCard
-            icon={Clock}
-            iconClassName="bg-primary-700"
-            label="Check-in / Check-out"
-            value={todaysAttendance?.checkIn ? formatTimeLabel(todaysAttendance.checkIn) : 'Not checked in'}
-            sublabel={todaysAttendance?.checkOut ? `Out ${formatTimeLabel(todaysAttendance.checkOut)}` : todaysAttendance?.checkIn ? 'Still on duty' : ''}
-          />
-        </div>
-      )}
+      {isDeliveryWorkspace ? (
+        <DeliveryStaffStatCards overview={overview} todaysAttendance={todaysAttendance} dutyMinutes={dutyMinutes} />
+      ) : isSalesWorkspace ? (
+        <SalesStaffStatCards overview={overview} todaysAttendance={todaysAttendance} />
+      ) : null}
 
       <div className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
         <div className="flex gap-1 overflow-x-auto border-b border-neutral-100 px-3">
@@ -837,173 +756,37 @@ export default function UserDetail() {
         <div className="p-5">
           {activeTab === 'overview' && (
             <div className="space-y-4">
-              {isDeliveryPartner ? (
-                <>
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-                    <Panel title="Delivery Progress">
-                      <div className="relative h-48">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <ComposedChart data={emptyDeliveryPoints} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9aa1ac' }} tickLine={false} axisLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: '#9aa1ac' }} tickLine={false} axisLine={false} width={28} />
-                            <Tooltip />
-                            <Bar dataKey="delivered" fill="#e5e7eb" radius={[4, 4, 0, 0]} barSize={16} />
-                            <Line type="monotone" dataKey="amount" stroke="#d4d8dd" strokeWidth={2} dot={false} />
-                          </ComposedChart>
-                        </ResponsiveContainer>
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                          <p className="rounded-full bg-white/90 px-3 py-1 text-xs text-neutral-400 shadow-(--shadow-xs)">
-                            No delivery data tracked for this employee yet
-                          </p>
-                        </div>
-                      </div>
-                    </Panel>
-                    <Panel title="Today's Activity">
-                      <div className="space-y-3.5">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-neutral-500"><Truck className="size-3.5" aria-hidden="true" />Route Status</span>
-                          <span className="font-semibold text-neutral-900">—</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-neutral-500"><Timer className="size-3.5" aria-hidden="true" />Active Duration</span>
-                          <span className="font-semibold text-neutral-900">{dutyMinutes != null ? formatMinutes(dutyMinutes) : '—'}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-neutral-500"><Box className="size-3.5" aria-hidden="true" />Stops Completed</span>
-                          <span className="font-semibold text-neutral-900">—</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-neutral-500"><RefreshCw className="size-3.5" aria-hidden="true" />Last Sync</span>
-                          <span className="font-semibold text-neutral-900">—</span>
-                        </div>
-                      </div>
-                      <p className="mt-4 border-t border-neutral-100 pt-3 text-xs text-neutral-400">
-                        Route and stop tracking isn't available yet - only attendance check-in/out is real.
-                      </p>
-                    </Panel>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-                    <Panel title="Recent Delivery Activity">
-                      <EmptyPanelState
-                        message="No delivery activity recorded yet."
-                        note="Delivery event tracking isn't linked to staff accounts yet."
-                      />
-                    </Panel>
-                    <Panel title="Current Location">
-                      <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/60 text-center">
-                        <MapPin className="size-5 text-neutral-300" aria-hidden="true" />
-                        <p className="text-sm text-neutral-500">Location tracking not available</p>
-                        <p className="text-xs text-neutral-400">No live GPS data is captured for staff yet.</p>
-                      </div>
-                    </Panel>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                    <Panel title="Assigned Deliveries" action={<button type="button" onClick={() => setActiveTab('deliveries')} className="text-sm font-medium text-primary-700 hover:underline">View All Deliveries →</button>}>
-                      <EmptyPanelState
-                        message="No deliveries linked to this staff member yet."
-                        note="Delivery tracking isn't tied to staff accounts yet."
-                      />
-                    </Panel>
-                    <Panel title="Delivery Summary">
-                      <EmptyPanelState
-                        message="No delivery summary available yet."
-                        note="Successful / pending / failed delivery counts aren't tracked per staff account yet."
-                      />
-                    </Panel>
-                  </div>
-                </>
+              {isDeliveryWorkspace ? (
+                <DeliveryStaffOverviewPanels
+                  overview={overview}
+                  isLoadingOverview={isLoadingOverview}
+                  deliveryTrendPoints={deliveryTrendPoints}
+                  hasDeliveryPerformance={hasDeliveryPerformance}
+                  dutyMinutes={dutyMinutes}
+                  onViewDeliveries={() => setActiveTab('deliveries')}
+                />
+              ) : isSalesWorkspace ? (
+                <SalesStaffOverviewPanels
+                  overview={overview}
+                  isLoadingOverview={isLoadingOverview}
+                  salesTrendPoints={salesTrendPoints}
+                  hasSalesPerformance={hasSalesPerformance}
+                  dutyMinutes={dutyMinutes}
+                  todaysAttendance={todaysAttendance}
+                  assignedCustomers={assignedCustomers}
+                  isLoadingCustomers={isLoadingCustomers}
+                  onViewOrders={() => navigate('/admin/orders')}
+                  onViewCustomers={() => setActiveTab('customers')}
+                />
               ) : (
-                <>
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-                    <Panel title="Sales Performance">
-                      <div className="relative h-48">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={emptyTrendPoints} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9aa1ac' }} tickLine={false} axisLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: '#9aa1ac' }} tickLine={false} axisLine={false} width={32} />
-                            <Tooltip />
-                            <Line type="monotone" dataKey="value" stroke="#d4d8dd" strokeWidth={2} dot={false} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                          <p className="rounded-full bg-white/90 px-3 py-1 text-xs text-neutral-400 shadow-(--shadow-xs)">
-                            No sales data tracked for this employee yet
-                          </p>
-                        </div>
-                      </div>
-                    </Panel>
-                    <Panel title="Today's Activity">
-                      <div className="space-y-3.5">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-neutral-500"><Clock className="size-3.5" aria-hidden="true" />Check-in Time</span>
-                          <span className="font-semibold text-neutral-900">{todaysAttendance?.checkIn ? formatTimeLabel(todaysAttendance.checkIn) : '—'}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-neutral-500"><Timer className="size-3.5" aria-hidden="true" />Active Duration</span>
-                          <span className="font-semibold text-neutral-900">{dutyMinutes != null ? formatMinutes(dutyMinutes) : '—'}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-neutral-500"><Users className="size-3.5" aria-hidden="true" />Total Visits</span>
-                          <span className="font-semibold text-neutral-900">—</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-neutral-500"><RefreshCw className="size-3.5" aria-hidden="true" />Last Sync</span>
-                          <span className="font-semibold text-neutral-900">—</span>
-                        </div>
-                      </div>
-                      <p className="mt-4 border-t border-neutral-100 pt-3 text-xs text-neutral-400">
-                        Visit and sync tracking isn't available yet - only attendance check-in/out is real.
-                      </p>
-                    </Panel>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-                    <Panel title="Recent Tasks & Visits">
-                      <EmptyPanelState
-                        message="No tasks or visits recorded yet."
-                        note="Task and visit tracking isn't linked to staff accounts yet."
-                      />
-                    </Panel>
-                    <Panel title="Current Location">
-                      <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/60 text-center">
-                        <MapPin className="size-5 text-neutral-300" aria-hidden="true" />
-                        <p className="text-sm text-neutral-500">Location tracking not available</p>
-                        <p className="text-xs text-neutral-400">No live GPS data is captured for staff yet.</p>
-                      </div>
-                    </Panel>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                    <Panel title="Order List" action={<button type="button" onClick={() => navigate('/admin/orders')} className="text-sm font-medium text-primary-700 hover:underline">View All Orders →</button>}>
-                      <EmptyPanelState
-                        message="No orders linked to this staff member yet."
-                        note="Order tracking isn't tied to staff accounts yet."
-                      />
-                    </Panel>
-                    <Panel title="Assigned Customers" action={<button type="button" onClick={() => setActiveTab('customers')} className="text-sm font-medium text-primary-700 hover:underline">View All Customers →</button>}>
-                      {isLoadingCustomers ? (
-                        <LoadingSpinner label="Loading customers..." />
-                      ) : assignedCustomers.length === 0 ? (
-                        <EmptyPanelState message="No customers assigned yet." />
-                      ) : (
-                        <div className="space-y-2">
-                          {assignedCustomers.slice(0, 5).map((customer) => (
-                            <Link
-                              key={customer.id}
-                              to={`/admin/customers/${customer.id}`}
-                              className="flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3.5 py-2.5 text-sm transition-colors hover:border-primary-200 hover:bg-primary-50/40"
-                            >
-                              <span className="min-w-0 truncate font-medium text-neutral-800">{customer.businessName || customer.name}</span>
-                              <span className="shrink-0 text-xs text-neutral-400">{customer.city || '—'}</span>
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                    </Panel>
-                  </div>
-                </>
+                // No sales/delivery workspace - no client-approved design for this workspace
+                // yet, so show the shared employee sections below only. No fabricated stats.
+                <Panel title="Overview">
+                  <EmptyPanelState
+                    message="No specialized overview for this workspace yet."
+                    note={workspace ? `Workspace: ${formatLabel(workspace)}` : undefined}
+                  />
+                </Panel>
               )}
 
               <div className="grid gap-4 xl:grid-cols-3">

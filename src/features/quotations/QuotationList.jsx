@@ -1,57 +1,59 @@
-import { useMemo, useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Plus, RotateCw, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import { QUOTATION_STATUS_OPTIONS, listQuotations } from '../../api/quotations'
 import { formatCurrency } from '../../utils/format'
-import { getAllQuotations } from './quotationStorage'
-
-const statusOptions = [
-  { value: 'all', label: 'All status' },
-  { value: 'Draft', label: 'Draft' },
-  { value: 'Sent', label: 'Sent' },
-  { value: 'Accepted', label: 'Accepted' },
-  { value: 'Expired', label: 'Expired' },
-]
 
 const statusVariant = {
-  Draft: 'neutral',
-  Sent: 'info',
-  Accepted: 'success',
-  Expired: 'danger',
-}
-
-function lineTotal(item) {
-  const quantity = Number(item.quantity) || 0
-  const unitPrice = Number(item.unitPrice) || 0
-  const discount = Number(item.discount) || 0
-  const tax = Number(item.tax) || 0
-  const subtotal = quantity * unitPrice
-  const discounted = subtotal - subtotal * (discount / 100)
-  return discounted + discounted * (tax / 100)
-}
-
-function quotationTotal(quotation) {
-  return (quotation.items || []).reduce((total, item) => total + lineTotal(item), 0)
+  draft: 'neutral',
+  sent: 'info',
+  accepted: 'success',
+  rejected: 'danger',
+  expired: 'danger',
+  converted: 'purple',
 }
 
 function formatDate(value) {
   if (!value) return '-'
-  return new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value))
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
 export default function QuotationList() {
   const navigate = useNavigate()
   const basePath = window.location.pathname.startsWith('/sales') ? '/sales/quotations' : '/admin/quotations'
-  const [quotations] = useState(() => getAllQuotations())
+  const [quotations, setQuotations] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [listError, setListError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+
+  const loadQuotations = useCallback(async () => {
+    setIsLoading(true)
+    setListError('')
+
+    const result = await listQuotations()
+
+    if (!result.success) {
+      setQuotations([])
+      setListError(result.error)
+      setIsLoading(false)
+      return
+    }
+
+    setQuotations(result.quotations)
+    setIsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadQuotations()
+  }, [loadQuotations])
 
   const filteredQuotations = useMemo(() => {
     const search = searchTerm.trim().toLowerCase()
@@ -59,7 +61,7 @@ export default function QuotationList() {
     return quotations.filter((quotation) => {
       const matchesSearch =
         !search ||
-        [quotation.id, quotation.customer, quotation.salesperson]
+        [quotation.quotationNumber, quotation.customerName, quotation.salespersonName]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(search))
       const matchesStatus = statusFilter === 'all' || quotation.status === statusFilter
@@ -85,7 +87,7 @@ export default function QuotationList() {
                 />
               </div>
               <Select
-                options={statusOptions}
+                options={[{ value: 'all', label: 'All status' }, ...QUOTATION_STATUS_OPTIONS]}
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
                 className="sm:w-40"
@@ -100,7 +102,17 @@ export default function QuotationList() {
         </div>
 
         <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">
-          {filteredQuotations.length === 0 ? (
+          {listError ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-red-600">{listError}</p>
+              <Button type="button" variant="outline" className="mt-4" onClick={loadQuotations}>
+                <RotateCw className="size-4" aria-hidden="true" />
+                Retry
+              </Button>
+            </div>
+          ) : isLoading ? (
+            <LoadingSpinner label="Loading quotations..." />
+          ) : filteredQuotations.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-sm font-medium text-neutral-900">No quotations found</p>
               <p className="mt-1 text-sm text-neutral-500">Create a quotation estimate for a customer.</p>
@@ -130,14 +142,14 @@ export default function QuotationList() {
                     className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
                   >
                     <td className="px-4 py-3.5">
-                      <p className="font-semibold text-neutral-900">{quotation.id}</p>
-                      <p className="mt-0.5 text-xs text-neutral-400">{quotation.items?.length || 0} item(s)</p>
+                      <p className="font-semibold text-neutral-900">{quotation.quotationNumber}</p>
+                      <p className="mt-0.5 text-xs text-neutral-400">{quotation.itemCount} item(s)</p>
                     </td>
-                    <td className="px-4 py-3.5 text-neutral-600">{quotation.customer}</td>
-                    <td className="px-4 py-3.5 text-neutral-600">{quotation.salesperson}</td>
+                    <td className="px-4 py-3.5 text-neutral-600">{quotation.customerName || '-'}</td>
+                    <td className="px-4 py-3.5 text-neutral-600">{quotation.salespersonName || '-'}</td>
                     <td className="px-4 py-3.5 text-neutral-600">{formatDate(quotation.quotationDate)}</td>
                     <td className="px-4 py-3.5 text-neutral-600">{formatDate(quotation.validUntil)}</td>
-                    <td className="px-4 py-3.5 font-medium text-neutral-900">{formatCurrency(quotationTotal(quotation))}</td>
+                    <td className="px-4 py-3.5 font-medium text-neutral-900">{formatCurrency(quotation.total)}</td>
                     <td className="px-4 py-3.5">
                       <Badge variant={statusVariant[quotation.status] || 'neutral'}>{quotation.status}</Badge>
                     </td>

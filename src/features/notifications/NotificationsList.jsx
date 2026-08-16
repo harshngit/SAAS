@@ -1,91 +1,146 @@
-import { useState } from 'react'
-import { Bell, CheckCircle, AlertCircle, Info, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { AlertCircle, CheckCircle, CheckCheck, Info, RotateCw } from 'lucide-react'
 import Card from '../../components/ui/Card'
+import Button from '../../components/ui/Button'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import EmptyState from '../../components/ui/EmptyState'
+import { Bell } from 'lucide-react'
+import { listNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notifications'
 
-const initialNotifications = [
-  { id: 1, type: 'alert', title: 'Low Stock Alert', message: '500ml Water bottles are running low (200 left)', read: false, time: '5 min ago' },
-  { id: 2, type: 'success', title: 'Order Delivered', message: 'Order #1234 has been delivered to customer', read: true, time: '1 hour ago' },
-  { id: 3, type: 'info', title: 'New User Added', message: 'A new sales officer has been added to the system', read: true, time: '3 hours ago' },
-  { id: 4, type: 'alert', title: 'Payment Due', message: 'Payment to supplier is due tomorrow', read: false, time: 'Yesterday' },
-]
+function getIcon(type) {
+  if (type === 'success') return CheckCircle
+  if (type === 'alert' || type === 'warning') return AlertCircle
+  return Info
+}
+
+function getColorClass(type) {
+  if (type === 'success') return 'text-green-600 bg-green-50'
+  if (type === 'alert' || type === 'warning') return 'text-red-600 bg-red-50'
+  return 'text-blue-600 bg-blue-50'
+}
+
+function formatTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
 
 export default function NotificationsList() {
-  const [notifications, setNotifications] = useState(initialNotifications)
+  const navigate = useNavigate()
+  const [notifications, setNotifications] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [isMarkingAll, setIsMarkingAll] = useState(false)
 
-  const markAsRead = (id) => {
-    setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n))
-  }
+  const loadNotifications = useCallback(async () => {
+    setIsLoading(true)
+    setError('')
 
-  const deleteNotification = (id) => {
-    setNotifications(notifications.filter(n => n.id !== id))
-  }
+    const result = await listNotifications()
 
-  const getIcon = (type) => {
-    switch (type) {
-      case 'success': return CheckCircle
-      case 'alert': return AlertCircle
-      default: return Info
+    if (!result.success) {
+      setNotifications([])
+      setError(result.error)
+      setIsLoading(false)
+      return
+    }
+
+    setNotifications(result.notifications)
+    setIsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadNotifications()
+  }, [loadNotifications])
+
+  const markAsRead = async (notification) => {
+    if (notification.isRead) return
+    const result = await markNotificationRead(notification.id)
+    if (result.success) {
+      setNotifications((current) => current.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)))
     }
   }
 
-  const getColorClass = (type) => {
-    switch (type) {
-      case 'success': return 'text-green-600 bg-green-50'
-      case 'alert': return 'text-red-600 bg-red-50'
-      default: return 'text-blue-600 bg-blue-50'
+  const handleMarkAllRead = async () => {
+    setIsMarkingAll(true)
+    const result = await markAllNotificationsRead()
+    setIsMarkingAll(false)
+
+    if (result.success) {
+      setNotifications((current) => current.map((n) => ({ ...n, isRead: true })))
     }
   }
+
+  const handleClick = (notification) => {
+    markAsRead(notification)
+    if (notification.link) navigate(notification.link)
+  }
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Notifications</h1>
-          <p className="text-sm text-neutral-500">You have {notifications.filter(n => !n.read).length} unread notifications</p>
+          <p className="text-sm text-neutral-500">You have {unreadCount} unread notification(s)</p>
         </div>
+        {unreadCount > 0 && (
+          <Button type="button" variant="outline" size="sm" loading={isMarkingAll} onClick={handleMarkAllRead}>
+            <CheckCheck className="size-4" aria-hidden="true" />
+            Mark all as read
+          </Button>
+        )}
       </div>
 
-      <div className="space-y-4">
-        {notifications.map((notification) => {
-          const Icon = getIcon(notification.type)
-          return (
-            <Card key={notification.id} className={!notification.read ? 'border-l-4 border-l-primary-500' : ''}>
-              <div className="p-4">
-                <div className="flex items-start gap-4">
-                  <div className={`flex size-10 items-center justify-center rounded-xl ${getColorClass(notification.type)}`}>
-                    <Icon className="size-5" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-semibold text-neutral-900">{notification.title}</h3>
-                        <p className="text-sm text-neutral-600 mt-1">{notification.message}</p>
-                        <p className="text-xs text-neutral-400 mt-2">{notification.time}</p>
+      {error ? (
+        <Card>
+          <div className="py-8 text-center">
+            <p className="text-sm text-red-600">{error}</p>
+            <Button type="button" variant="outline" className="mt-4" onClick={loadNotifications}>
+              <RotateCw className="size-4" aria-hidden="true" />
+              Retry
+            </Button>
+          </div>
+        </Card>
+      ) : isLoading ? (
+        <Card><LoadingSpinner label="Loading notifications..." /></Card>
+      ) : notifications.length === 0 ? (
+        <Card>
+          <EmptyState icon={Bell} title="No notifications" description="You're all caught up." />
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {notifications.map((notification) => {
+            const Icon = getIcon(notification.type)
+            return (
+              <button
+                type="button"
+                key={notification.id}
+                onClick={() => handleClick(notification)}
+                className="block w-full text-left"
+              >
+                <Card className={!notification.isRead ? 'border-l-4 border-l-primary-500' : ''}>
+                  <div className="p-4">
+                    <div className="flex items-start gap-4">
+                      <div className={`flex size-10 items-center justify-center rounded-xl ${getColorClass(notification.type)}`}>
+                        <Icon className="size-5" />
                       </div>
-                      <div className="flex gap-1">
-                        {!notification.read && (
-                          <button
-                            onClick={() => markAsRead(notification.id)}
-                            className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg"
-                          >
-                            <CheckCircle className="size-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => deleteNotification(notification.id)}
-                          className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-neutral-900">{notification.title}</h3>
+                        <p className="mt-1 text-sm text-neutral-600">{notification.body}</p>
+                        <p className="mt-2 text-xs text-neutral-400">{formatTime(notification.createdAt)}</p>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
+                </Card>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

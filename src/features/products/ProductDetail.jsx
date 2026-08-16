@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Boxes, Edit, IndianRupee, Package, Percent, Power, Trash2 } from 'lucide-react'
+import { ArrowLeft, Boxes, Edit, IndianRupee, Package, Paperclip, Percent, Power, Trash2, Upload } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -8,10 +8,26 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import StatCard from '../../components/ui/StatCard'
-import { deleteProduct, getProduct, updateProduct } from '../../api/products'
+import {
+  addProductAttachments,
+  deleteProduct,
+  deleteProductAttachment,
+  getProduct,
+  getProductBatches,
+  getProductSerials,
+  listProductAttachments,
+  updateProduct,
+} from '../../api/products'
 import { formatCurrency } from '../../utils/format'
 import { normalizeApiProduct } from './productUtils'
 import ProductForm from './ProductForm'
+
+function formatDateLabel(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
 export default function ProductDetail() {
   const { id } = useParams()
@@ -30,6 +46,13 @@ export default function ProductDetail() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
+  const [batches, setBatches] = useState([])
+  const [serials, setSerials] = useState([])
+  const [attachments, setAttachments] = useState([])
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
+  const [attachmentError, setAttachmentError] = useState('')
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState('')
+
   useEffect(() => {
     let isMounted = true
 
@@ -37,11 +60,22 @@ export default function ProductDetail() {
       setIsLoading(true)
       setLoadError('')
 
-      const result = await getProduct(id)
+      const [result, batchesResult, serialsResult, attachmentsResult] = await Promise.all([
+        getProduct(id),
+        getProductBatches(id),
+        getProductSerials(id),
+        listProductAttachments(id),
+      ])
 
       if (!isMounted) return
 
       setIsLoading(false)
+
+      // Batches/serials/attachments are best-effort extras - a product that isn't
+      // batch/serial-tracked simply returns an empty list, not an error.
+      if (batchesResult.success) setBatches(batchesResult.batches)
+      if (serialsResult.success) setSerials(serialsResult.serials)
+      if (attachmentsResult.success) setAttachments(attachmentsResult.attachments)
 
       if (!result.success) {
         setLoadError(result.error)
@@ -145,6 +179,42 @@ export default function ProductDetail() {
     }
 
     navigate('/admin/products')
+  }
+
+  const handleUploadAttachments = async (event) => {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (files.length === 0) return
+
+    setIsUploadingAttachment(true)
+    setAttachmentError('')
+
+    const result = await addProductAttachments(product.id, files)
+
+    setIsUploadingAttachment(false)
+
+    if (!result.success) {
+      setAttachmentError(result.error)
+      return
+    }
+
+    setAttachments(result.attachments)
+  }
+
+  const handleDeleteAttachment = async (attachmentId) => {
+    setDeletingAttachmentId(attachmentId)
+    setAttachmentError('')
+
+    const result = await deleteProductAttachment(product.id, attachmentId)
+
+    setDeletingAttachmentId('')
+
+    if (!result.success) {
+      setAttachmentError(result.error)
+      return
+    }
+
+    setAttachments((current) => current.filter((attachment) => (attachment.id || attachment.file_id) !== attachmentId))
   }
 
   if (isFormOpen) {
@@ -282,6 +352,112 @@ export default function ProductDetail() {
             </tbody>
           </table>
         </div>
+      </Card>
+
+      {batches.length > 0 && (
+        <Card title="Batches" subtitle="Batch/expiry-tracked stock lots for this product" className="p-0" bodyClassName="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <th className="whitespace-nowrap px-5 py-3">Batch #</th>
+                  <th className="whitespace-nowrap px-5 py-3">Warehouse</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">Quantity</th>
+                  <th className="whitespace-nowrap px-5 py-3">Expiry</th>
+                  <th className="whitespace-nowrap px-5 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-50">
+                {batches.map((batch, index) => (
+                  <tr key={batch.id || index}>
+                    <td className="whitespace-nowrap px-5 py-3 font-medium text-neutral-800">{batch.batch_number || '—'}</td>
+                    <td className="whitespace-nowrap px-5 py-3 text-neutral-500">{batch.warehouse_name || batch.warehouse?.name || '—'}</td>
+                    <td className="whitespace-nowrap px-5 py-3 text-right text-neutral-600">{batch.quantity ?? batch.in_stock_quantity ?? 0}</td>
+                    <td className="whitespace-nowrap px-5 py-3 text-neutral-500">{formatDateLabel(batch.expiry_date)}</td>
+                    <td className="whitespace-nowrap px-5 py-3">
+                      <Badge variant={batch.is_expired ? 'danger' : 'success'} dot>
+                        {batch.is_expired ? 'Expired' : `${batch.days_to_expiry ?? '?'}d left`}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {serials.length > 0 && (
+        <Card title="Serial Numbers" subtitle="Individually tracked units for this product" className="p-0" bodyClassName="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <th className="whitespace-nowrap px-5 py-3">Serial Number</th>
+                  <th className="whitespace-nowrap px-5 py-3">Status</th>
+                  <th className="whitespace-nowrap px-5 py-3">Sold At</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-50">
+                {serials.map((serial, index) => (
+                  <tr key={serial.id || index}>
+                    <td className="whitespace-nowrap px-5 py-3 font-medium text-neutral-800">{serial.serial_number}</td>
+                    <td className="whitespace-nowrap px-5 py-3">
+                      <Badge variant={serial.status === 'sold' ? 'neutral' : 'success'}>{serial.status}</Badge>
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 text-neutral-500">{formatDateLabel(serial.sold_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      <Card
+        title="Attachments"
+        subtitle="Extra files attached to this product (up to 10)"
+        action={
+          <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3.5 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+            {isUploadingAttachment ? 'Uploading...' : <><Upload className="size-3.5" aria-hidden="true" />Upload</>}
+            <input type="file" multiple className="sr-only" disabled={isUploadingAttachment || attachments.length >= 10} onChange={handleUploadAttachments} />
+          </label>
+        }
+      >
+        {attachmentError && (
+          <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{attachmentError}</div>
+        )}
+        {attachments.length === 0 ? (
+          <p className="py-4 text-center text-sm text-neutral-400">No attachments uploaded yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {attachments.map((attachment) => {
+              const attachmentId = attachment.id || attachment.file_id
+              return (
+                <div key={attachmentId} className="flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3.5 py-2.5">
+                  <a
+                    href={attachment.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-w-0 items-center gap-2 text-sm font-medium text-primary-700 hover:underline"
+                  >
+                    <Paperclip className="size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{attachment.name || attachment.filename || 'Attachment'}</span>
+                  </a>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    loading={deletingAttachmentId === attachmentId}
+                    onClick={() => handleDeleteAttachment(attachmentId)}
+                  >
+                    <Trash2 className="size-3.5" aria-hidden="true" />
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </Card>
 
       <Modal

@@ -20,11 +20,12 @@ import DatePicker from '../../components/ui/DatePicker'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES, roleHomePath } from '../../auth/roles'
-import { products } from '../../mockData/products'
-import { customers as seedCustomers } from '../../mockData/customers'
-import { buildOrder, orders as seedOrders } from '../../mockData/orders'
-import { vehicleStock } from '../../mockData/vehicleStock'
-import { users } from '../../mockData/users'
+import { listProducts } from '../../api/products'
+import { listCustomers } from '../../api/customers'
+import { listUsers } from '../../api/users'
+import { listWarehouses } from '../../api/warehouses'
+import { createOrder, assignDeliveryPartner } from '../../api/orders'
+import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
@@ -45,10 +46,8 @@ const paymentTermsOptions = [
   { value: '45', label: 'Credit (45 Days)' },
 ]
 
-const warehouseOptions = [{ value: 'main', label: 'Main Warehouse' }]
-
 const deliveryOptions = [
-  { value: 'takeaway', label: 'Takeaway / Self Pickup', description: 'Customer will collect the order from our store.', icon: Store },
+  { value: 'pickup', label: 'Takeaway / Self Pickup', description: 'Customer will collect the order from our store.', icon: Store },
   { value: 'delivery_boy', label: 'Home Delivery', description: 'We will deliver the order to customer address.', icon: Truck },
 ]
 
@@ -56,15 +55,6 @@ const discountTypeOptions = [
   { value: 'percentage', label: 'Percentage (%)' },
   { value: 'amount', label: 'Amount (₹)' },
 ]
-
-const normalizeCustomerSearchValue = (value = '') => String(value).trim().toLowerCase().replace(/\s+/g, ' ')
-const normalizePhone = (value = '') => String(value).replace(/\D/g, '')
-const phoneMatches = (registeredPhone = '', typedPhone = '') => {
-  const registered = normalizePhone(registeredPhone)
-  const typed = normalizePhone(typedPhone)
-
-  return Boolean(typed && (registered === typed || registered.endsWith(typed) || typed.endsWith(registered)))
-}
 
 function formatGstPercent(value) {
   if (!value) return '0'
@@ -83,21 +73,14 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
-  const availableProducts = useMemo(() => {
-    if (!restrictToVehicleStock) return products
 
-    return vehicleStock
-      .filter((entry) => entry.quantity > 0)
-      .map((entry) => {
-        const product = products.find((item) => item.id === entry.productId)
-        return product ? { ...product, stock: entry.quantity } : null
-      })
-      .filter(Boolean)
-  }, [restrictToVehicleStock])
+  const [availableProducts, setAvailableProducts] = useState([])
+  const [customerRecords, setCustomerRecords] = useState([])
+  const [deliveryBoys, setDeliveryBoys] = useState([])
+  const [warehouses, setWarehouses] = useState([])
+  const [isLoadingOptions, setIsLoadingOptions] = useState(true)
 
   // Customer / Company
-  const [customerRecords, setCustomerRecords] = useState(seedCustomers)
-  const [customerMode, setCustomerMode] = useState('existing')
   const [customerSearch, setCustomerSearch] = useState('')
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
   const [showQuickAddCustomer, setShowQuickAddCustomer] = useState(false)
@@ -105,7 +88,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   // Order details
   const [orderDate] = useState(new Date().toISOString().slice(0, 10))
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().slice(0, 10))
-  const [warehouse, setWarehouse] = useState('main')
+  const [warehouseId, setWarehouseId] = useState('')
 
   // Products
   const [orderItems, setOrderItems] = useState([])
@@ -127,6 +110,42 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const [deliveryAddress, setDeliveryAddress] = useState('')
 
   const [errors, setErrors] = useState({})
+  const [submitError, setSubmitError] = useState('')
+  const [stockShortages, setStockShortages] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadOptions() {
+      const [productsResult, customersResult, usersResult, warehousesResult] = await Promise.all([
+        listProducts(),
+        listCustomers(),
+        listUsers(),
+        listWarehouses(),
+      ])
+
+      if (!isMounted) return
+
+      if (productsResult.success) setAvailableProducts(productsResult.products)
+      if (customersResult.success) setCustomerRecords(customersResult.customers)
+      if (usersResult.success) {
+        setDeliveryBoys(usersResult.users.map(normalizeApiUser).filter((user) => user.role === ROLES.DELIVERY_PARTNER && user.isActive))
+      }
+      if (warehousesResult.success) {
+        setWarehouses(warehousesResult.warehouses)
+        const defaultWarehouse = warehousesResult.warehouses.find((warehouse) => warehouse.isDefault)
+        setWarehouseId(defaultWarehouse?.id || warehousesResult.warehouses[0]?.id || '')
+      }
+
+      setIsLoadingOptions(false)
+    }
+
+    loadOptions()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!restrictToVehicleStock || !currentUser?.id) return
@@ -147,23 +166,18 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isProductPickerOpen])
 
-  const deliveryBoys = useMemo(
-    () => users.filter((user) => user.role === ROLES.DELIVERY_PARTNER && user.status !== 'inactive'),
-    [],
-  )
-
   const selectedCustomer = useMemo(
     () => customerRecords.find((customer) => customer.id === selectedCustomerId) || null,
     [customerRecords, selectedCustomerId],
   )
 
   const customerOptions = useMemo(() => {
-    const search = normalizeCustomerSearchValue(customerSearch)
+    const search = customerSearch.trim().toLowerCase()
     const filtered = search
       ? customerRecords.filter((customer) => {
-          const matchesName = normalizeCustomerSearchValue(customer.name).includes(search)
-          const matchesPhone = phoneMatches(customer.phone, customerSearch)
-          const matchesEmail = normalizeCustomerSearchValue(customer.email).includes(search)
+          const matchesName = customer.name?.toLowerCase().includes(search)
+          const matchesPhone = customer.phone?.replace(/\D/g, '').includes(search.replace(/\D/g, ''))
+          const matchesEmail = customer.email?.toLowerCase().includes(search)
           return matchesName || matchesPhone || matchesEmail
         })
       : customerRecords
@@ -174,13 +188,12 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const filteredPickerProducts = useMemo(() => {
     const search = productSearch.trim().toLowerCase()
     if (!search) return availableProducts
-    return availableProducts.filter((product) => product.fullName.toLowerCase().includes(search))
+    return availableProducts.filter((product) => product.name?.toLowerCase().includes(search))
   }, [availableProducts, productSearch])
 
   const handleCustomerCreated = (createdCustomer) => {
     setCustomerRecords((current) => [createdCustomer, ...current])
     setSelectedCustomerId(createdCustomer.id)
-    setCustomerMode('existing')
     setShowQuickAddCustomer(false)
     setErrors((current) => ({ ...current, customer: '' }))
   }
@@ -193,7 +206,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
           index === existingIndex ? { ...item, quantity: item.quantity + 1 } : item,
         )
       }
-      return [...current, { productId: product.id, sellingPrice: product.sellingPrice, quantity: 1 }]
+      return [...current, { productId: product.id, unitPrice: product.price || 0, taxRate: product.tax_rate || 0, quantity: 1 }]
     })
     setErrors((current) => ({ ...current, items: '' }))
     setIsProductPickerOpen(false)
@@ -214,9 +227,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const totals = useMemo(() => {
     const lines = orderItems.map((item) => {
       const product = availableProducts.find((p) => p.id === item.productId)
-      const sellingPrice = Number(item.sellingPrice) || 0
+      const unitPrice = Number(item.unitPrice) || 0
       const quantity = Number(item.quantity) || 0
-      return { product, sellingPrice, quantity, lineSubtotal: sellingPrice * quantity }
+      const taxRate = Number(item.taxRate) || 0
+      return { product, unitPrice, quantity, taxRate, lineSubtotal: unitPrice * quantity }
     })
 
     const subtotal = lines.reduce((sum, line) => sum + line.lineSubtotal, 0)
@@ -225,18 +239,14 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     const discountAmount = Math.min(Math.max(rawDiscount, 0), subtotal)
     const discountRatio = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 0
 
-    const gstAmount = lines.reduce((sum, line) => {
-      if (!line.product) return sum
-      return sum + line.lineSubtotal * discountRatio * (line.product.gstRate || 0)
-    }, 0)
+    const gstAmount = lines.reduce((sum, line) => sum + line.lineSubtotal * discountRatio * (line.taxRate / 100), 0)
 
     const taxableAmount = subtotal - discountAmount
     const effectiveGstPercent = taxableAmount > 0 ? (gstAmount / taxableAmount) * 100 : 0
     const total = taxableAmount + gstAmount
     const totalQuantity = lines.reduce((sum, line) => sum + line.quantity, 0)
-    const discountPercentEquivalent = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0
 
-    return { subtotal, discountAmount, gstAmount, effectiveGstPercent, total, totalQuantity, discountPercentEquivalent }
+    return { subtotal, discountAmount, gstAmount, effectiveGstPercent, total, totalQuantity }
   }, [orderItems, availableProducts, discountType, discountValue])
 
   const canCreateOrder = restrictToVehicleStock || Boolean(deliveryType && (deliveryType !== 'delivery_boy' || deliveryBoyId))
@@ -258,48 +268,49 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     return Object.keys(nextErrors).length === 0
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
     if (!validateForm()) return
 
-    const isCod = paymentMethod === 'cod' || paymentMethod === 'credit'
-    const deliveryPartnerId = deliveryType === 'delivery_boy' ? deliveryBoyId : null
-    const newOrder = buildOrder({
-      id: `ORD-${Date.now()}`,
-      orderNumber: `SO-${new Date().getFullYear()}-${1000 + seedOrders.length + 1}`,
+    setIsSubmitting(true)
+    setSubmitError('')
+    setStockShortages(null)
+
+    const result = await createOrder({
       customerId: selectedCustomer.id,
-      customerName: selectedCustomer.name,
-      status: deliveryPartnerId ? 'Confirmed' : 'Draft',
-      orderDate,
-      expectedDeliveryDate: deliveryDate,
-      deliveryPartnerId,
-      amountPaid: isCod ? 0 : totals.total,
-      discountPercent: totals.discountPercentEquivalent,
-      lines: orderItems.map((item) => ({
+      warehouseId,
+      deliveryDate,
+      fulfilmentMethod: restrictToVehicleStock ? 'delivery' : deliveryType === 'delivery_boy' ? 'delivery' : 'pickup',
+      paymentType: paymentMethod,
+      paymentTermsDays: paymentMethod === 'credit' ? Number(paymentTerms) : 0,
+      discount: totals.discountAmount,
+      source: restrictToVehicleStock ? 'delivery_vehicle' : 'office',
+      notes: orderNotes.trim() || internalNotes.trim() ? `${orderNotes.trim()}${internalNotes.trim() ? `\n[Internal] ${internalNotes.trim()}` : ''}` : undefined,
+      items: orderItems.map((item) => ({
         productId: item.productId,
-        qty: Number(item.quantity) || 0,
-        price: Number(item.sellingPrice) || 0,
+        quantity: Number(item.quantity) || 0,
+        unitPrice: Number(item.unitPrice) || 0,
+        taxRate: Number(item.taxRate) || 0,
       })),
     })
 
-    seedOrders.unshift({
-      ...newOrder,
-      customerPhone: selectedCustomer.phone,
-      customerEmail: selectedCustomer.email || null,
-      paymentMethod,
-      paymentTerms: paymentMethod === 'credit' ? paymentTerms : null,
-      warehouse,
-      fulfillmentType: deliveryType,
-      deliveryAddress: deliveryAddress || null,
-      notes: orderNotes.trim() || null,
-      internalNotes: internalNotes.trim() || null,
-      source: restrictToVehicleStock ? 'delivery_vehicle' : 'standard',
-    })
+    if (!result.success) {
+      setSubmitError(result.error)
+      setStockShortages(result.shortages || null)
+      setIsSubmitting(false)
+      return
+    }
+
+    const partnerId = restrictToVehicleStock ? currentUser?.id : deliveryType === 'delivery_boy' ? deliveryBoyId : null
+    if (partnerId) {
+      await assignDeliveryPartner(result.order.id, partnerId)
+    }
 
     showToast({
       title: 'Order created',
-      message: `${newOrder.orderNumber} has been created successfully.`,
+      message: `${result.order.orderNumber} has been created successfully.`,
     })
+    setIsSubmitting(false)
     navigate(currentUser?.role === ROLES.ADMIN ? '/admin/orders' : roleHomePath[currentUser?.role] || '/')
   }
 
@@ -316,6 +327,22 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="space-y-5">
+          {submitError && (
+            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <p>{stockShortages ? 'Not enough stock to place this order:' : submitError}</p>
+              {stockShortages && (
+                <ul className="mt-2 space-y-1">
+                  {stockShortages.map((shortage, index) => (
+                    <li key={`${shortage.productId}-${index}`} className="flex items-center justify-between gap-3 text-xs">
+                      <span className="font-medium">{shortage.productName}</span>
+                      <span>requested {shortage.requested}, available {shortage.available}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {/* Customer + Order Details */}
           <div className="grid grid-cols-1 divide-y divide-neutral-100 rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card) lg:grid-cols-2 lg:divide-x lg:divide-y-0">
             <div className="space-y-4 p-5">
@@ -329,8 +356,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <input
                     type="radio"
                     name="customerMode"
-                    checked={customerMode === 'existing'}
-                    onChange={() => setCustomerMode('existing')}
+                    checked={!showQuickAddCustomer}
+                    onChange={() => setShowQuickAddCustomer(false)}
                     className="size-4 text-primary-600 focus:ring-primary-500"
                   />
                   Select Existing Customer
@@ -339,11 +366,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <input
                     type="radio"
                     name="customerMode"
-                    checked={customerMode === 'new'}
-                    onChange={() => {
-                      setCustomerMode('new')
-                      setShowQuickAddCustomer(true)
-                    }}
+                    checked={showQuickAddCustomer}
+                    onChange={() => setShowQuickAddCustomer(true)}
                     className="size-4 text-primary-600 focus:ring-primary-500"
                   />
                   Quick Add Customer
@@ -357,7 +381,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     type="search"
                     value={customerSearch}
                     onChange={(event) => setCustomerSearch(event.target.value)}
-                    placeholder="Search by name, phone, email or GSTIN..."
+                    placeholder="Search by name, phone or email..."
                     className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 pl-10 pr-4 text-sm text-neutral-900 transition-all focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                   />
                 </div>
@@ -368,7 +392,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     setSelectedCustomerId(event.target.value)
                     setErrors((current) => ({ ...current, customer: '' }))
                   }}
-                  placeholder={customerOptions.length ? 'Select a customer' : 'No matching customer found'}
+                  placeholder={isLoadingOptions ? 'Loading customers...' : customerOptions.length ? 'Select a customer' : 'No matching customer found'}
+                  disabled={isLoadingOptions}
                 />
                 {errors.customer && <p className="text-sm text-red-600">{errors.customer}</p>}
 
@@ -409,7 +434,15 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 </div>
               </div>
 
-              <Select label="Warehouse" required options={warehouseOptions} value={warehouse} onChange={(event) => setWarehouse(event.target.value)} />
+              <Select
+                label="Warehouse"
+                required
+                options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
+                value={warehouseId}
+                onChange={(event) => setWarehouseId(event.target.value)}
+                placeholder={isLoadingOptions ? 'Loading...' : 'Select warehouse'}
+                disabled={isLoadingOptions}
+              />
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-neutral-700">
@@ -444,7 +477,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 </div>
               </div>
               <div className="relative" ref={productPickerRef}>
-                <Button type="button" variant="outline" size="sm" onClick={() => setIsProductPickerOpen((current) => !current)}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsProductPickerOpen((current) => !current)} disabled={isLoadingOptions}>
                   <Plus className="size-4" aria-hidden="true" />
                   Add Product
                 </Button>
@@ -473,10 +506,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                             className="flex w-full items-center justify-between gap-3 rounded-xl px-2.5 py-2 text-left text-sm transition-colors hover:bg-primary-50/60"
                           >
                             <span className="min-w-0">
-                              <span className="block truncate font-medium text-neutral-900">{product.fullName}</span>
-                              <span className="block text-xs text-neutral-400">In Stock: {product.stock}</span>
+                              <span className="block truncate font-medium text-neutral-900">{product.name}</span>
+                              <span className="block text-xs text-neutral-400">In Stock: {product.total_stock ?? '-'}</span>
                             </span>
-                            <span className="shrink-0 text-xs font-semibold text-primary-700">{formatCurrency(product.sellingPrice)}</span>
+                            <span className="shrink-0 text-xs font-semibold text-primary-700">{formatCurrency(product.price || 0)}</span>
                           </button>
                         ))
                       )}
@@ -497,7 +530,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <thead>
                     <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
                       <th className="px-5 py-3">Product</th>
-                      <th className="px-3 py-3">UoM</th>
                       <th className="px-3 py-3">Unit Price (₹)</th>
                       <th className="px-3 py-3 text-center">Qty</th>
                       <th className="px-3 py-3">Tax (%)</th>
@@ -511,40 +543,37 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       if (!product) return null
 
                       const quantity = Number(item.quantity) || 0
-                      const sellingPrice = Number(item.sellingPrice) || 0
-                      const isLowStock = quantity > product.stock
+                      const unitPrice = Number(item.unitPrice) || 0
+                      const isLowStock = product.total_stock !== undefined && quantity > product.total_stock
 
                       return (
                         <tr key={item.productId}>
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
-                              {product.image ? (
-                                <img src={product.image} alt="" className="size-10 shrink-0 rounded-lg border border-neutral-100 object-cover" />
+                              {product.cover_image ? (
+                                <img src={product.cover_image} alt="" className="size-10 shrink-0 rounded-lg border border-neutral-100 object-cover" />
                               ) : (
                                 <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
                                   <Package className="size-5" aria-hidden="true" />
                                 </span>
                               )}
                               <div className="min-w-0">
-                                <p className="truncate font-medium text-neutral-900">{product.fullName}</p>
-                                <p className={`text-xs ${isLowStock ? 'text-red-600' : 'text-neutral-400'}`}>
-                                  In Stock: {product.stock}
-                                </p>
+                                <p className="truncate font-medium text-neutral-900">{product.name}</p>
+                                {product.total_stock !== undefined && (
+                                  <p className={`text-xs ${isLowStock ? 'text-red-600' : 'text-neutral-400'}`}>
+                                    In Stock: {product.total_stock}
+                                  </p>
+                                )}
                               </div>
                             </div>
-                          </td>
-                          <td className="px-3 py-3.5">
-                            <span className="inline-flex items-center rounded-lg bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-600">
-                              {product.unit}
-                            </span>
                           </td>
                           <td className="px-3 py-3.5">
                             <input
                               type="number"
                               min="0"
                               step="0.01"
-                              value={item.sellingPrice}
-                              onChange={(event) => updateOrderItem(item.productId, 'sellingPrice', event.target.value)}
+                              value={item.unitPrice}
+                              onChange={(event) => updateOrderItem(item.productId, 'unitPrice', event.target.value)}
                               className="h-9 w-24 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                             />
                           </td>
@@ -554,7 +583,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                                 type="button"
                                 onClick={() => updateOrderItem(item.productId, 'quantity', Math.max(1, quantity - 1))}
                                 className="flex size-7 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-50"
-                                aria-label={`Decrease quantity of ${product.fullName}`}
+                                aria-label={`Decrease quantity of ${product.name}`}
                               >
                                 <Minus className="size-3.5" aria-hidden="true" />
                               </button>
@@ -569,22 +598,22 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                                 type="button"
                                 onClick={() => updateOrderItem(item.productId, 'quantity', quantity + 1)}
                                 className="flex size-7 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-50"
-                                aria-label={`Increase quantity of ${product.fullName}`}
+                                aria-label={`Increase quantity of ${product.name}`}
                               >
                                 <Plus className="size-3.5" aria-hidden="true" />
                               </button>
                             </div>
                           </td>
-                          <td className="px-3 py-3.5 text-neutral-500">{formatGstPercent((product.gstRate || 0) * 100)}%</td>
+                          <td className="px-3 py-3.5 text-neutral-500">{formatGstPercent(item.taxRate || 0)}%</td>
                           <td className="px-3 py-3.5 text-right font-semibold text-neutral-900">
-                            {formatCurrency(sellingPrice * quantity)}
+                            {formatCurrency(unitPrice * quantity)}
                           </td>
                           <td className="px-3 py-3.5 text-right">
                             <button
                               type="button"
                               onClick={() => removeOrderItem(item.productId)}
                               className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
-                              aria-label={`Remove ${product.fullName}`}
+                              aria-label={`Remove ${product.name}`}
                             >
                               <Trash2 className="size-4" aria-hidden="true" />
                             </button>
@@ -647,7 +676,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                         type="button"
                         onClick={() => {
                           setDeliveryType(option.value)
-                          if (option.value === 'takeaway') setDeliveryBoyId('')
+                          if (option.value === 'pickup') setDeliveryBoyId('')
                           setErrors((current) => ({ ...current, deliveryType: '', deliveryBoyId: '' }))
                         }}
                         className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition-all focus:outline-none focus:ring-4 focus:ring-primary-500/12 ${
@@ -685,11 +714,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-medium text-neutral-700">Delivery Address (Optional)</label>
-                    <Select
-                      options={selectedCustomer ? [{ value: selectedCustomer.address || selectedCustomer.city || '', label: selectedCustomer.address || selectedCustomer.city || 'Customer address' }] : []}
+                    <Input
                       value={deliveryAddress}
                       onChange={(event) => setDeliveryAddress(event.target.value)}
-                      placeholder="Search and select address"
+                      placeholder={selectedCustomer?.billingAddress || 'Delivery address'}
                       disabled={!selectedCustomer}
                     />
                   </div>
@@ -706,7 +734,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-neutral-700">Order Notes (Visible to Customer)</label>
+                <label className="text-sm font-medium text-neutral-700">Order Notes</label>
                 <textarea
                   value={orderNotes}
                   maxLength={250}
@@ -716,7 +744,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 <p className="text-right text-xs text-neutral-400">{orderNotes.length} / 250</p>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-neutral-700">Internal Notes (Not Visible to Customer)</label>
+                <label className="text-sm font-medium text-neutral-700">Internal Notes</label>
                 <textarea
                   value={internalNotes}
                   maxLength={250}
@@ -779,11 +807,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 <span className="text-sm font-medium text-neutral-900">{formatCurrency(totals.gstAmount)}</span>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-neutral-600">Shipping / Delivery</span>
-                <span className="text-sm font-medium text-neutral-900">₹0.00</span>
-              </div>
-
               <div className="space-y-2 border-t border-neutral-100 pt-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-600">Total Quantity</span>
@@ -824,7 +847,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               </div>
             </div>
 
-            <Button type="submit" className="mt-5 w-full" disabled={!canCreateOrder}>
+            <Button type="submit" className="mt-5 w-full" disabled={!canCreateOrder} loading={isSubmitting}>
               <FileCheck2 className="size-4" aria-hidden="true" />
               Create Order
             </Button>
@@ -835,10 +858,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
       <QuickAddCustomerModal
         isOpen={showQuickAddCustomer}
-        onClose={() => {
-          setShowQuickAddCustomer(false)
-          setCustomerMode('existing')
-        }}
+        onClose={() => setShowQuickAddCustomer(false)}
         onCreated={handleCustomerCreated}
       />
     </div>

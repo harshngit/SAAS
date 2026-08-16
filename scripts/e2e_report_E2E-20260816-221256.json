@@ -1,0 +1,1452 @@
+{
+  "run_id": "E2E-20260816-221256",
+  "base_url": "https://crm-saas-backend-9nom.onrender.com",
+  "summary": {
+    "PASS": 112,
+    "FAIL": 2,
+    "SKIPPED": 0,
+    "WARNING": 2
+  },
+  "results": [
+    {
+      "tc_id": "TC01",
+      "name": "admin login",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC01",
+      "name": "sales login",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC01",
+      "name": "sales workspace",
+      "status": "PASS",
+      "detail": "workspace=sales",
+      "evidence": null
+    },
+    {
+      "tc_id": "TC01",
+      "name": "delivery login",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC01",
+      "name": "delivery workspace",
+      "status": "PASS",
+      "detail": "workspace=delivery",
+      "evidence": null
+    },
+    {
+      "tc_id": "TC01",
+      "name": "accountant login",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC01",
+      "name": "accountant workspace",
+      "status": "PASS",
+      "detail": "workspace=accounts",
+      "evidence": null
+    },
+    {
+      "tc_id": "TC01",
+      "name": "GET /auth/me (admin)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC01",
+      "name": "POST /auth/refresh",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC02",
+      "name": "upload category image via /files/upload",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC02",
+      "name": "create category",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "523b1422-8843-4a07-adde-6cb86d8a813d"
+      }
+    },
+    {
+      "tc_id": "TC02",
+      "name": "list categories",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC02",
+      "name": "get category",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC02",
+      "name": "update category",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC02",
+      "name": "POST /categories/bulk-delete contract",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC03",
+      "name": "create supplier",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "a0ae703e-9c36-4cc2-9ae3-986b75608cf2"
+      }
+    },
+    {
+      "tc_id": "TC03",
+      "name": "get supplier",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC03",
+      "name": "update supplier",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC04",
+      "name": "create product (no variant)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "2e0f74f2-22f1-4f98-850d-d4a836710b63"
+      }
+    },
+    {
+      "tc_id": "TC04",
+      "name": "upload cover_image",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC04",
+      "name": "upload product_manual",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC04",
+      "name": "upload product_datasheet",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC04",
+      "name": "get product",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC04",
+      "name": "update product price",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC04",
+      "name": "field persistence after re-fetch",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC05",
+      "name": "create product with variants",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "070a1e29-1189-46cf-9c5b-7df1d990e162",
+        "variant_ids": [
+          "32ed3ee9-22e8-4a80-8da2-c133d1996f71",
+          "a0fe87dd-3376-40eb-bee5-262b86e99860"
+        ]
+      }
+    },
+    {
+      "tc_id": "TC05",
+      "name": "GET returns same variant ids",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC05",
+      "name": "update variant + add new variant",
+      "status": "FAIL",
+      "detail": "preserved=False added_new=True(count=3) price_updated=False",
+      "evidence": [
+        {
+          "id": "ef3c3462-f11c-4a51-b337-e3c319c0f739",
+          "name": "500 ml",
+          "sku": "E2E-20260816-221256-JUICE-500ML",
+          "barcode": null,
+          "length": null,
+          "width": null,
+          "height": null,
+          "weight": null,
+          "price": 45.0,
+          "inventory": 60
+        },
+        {
+          "id": "2ad6552c-bcd4-447f-9ece-65aa60c0888e",
+          "name": "1 Litre",
+          "sku": "E2E-20260816-221256-JUICE-1L",
+          "barcode": null,
+          "length": null,
+          "width": null,
+          "height": null,
+          "weight": null,
+          "price": 70.0,
+          "inventory": 40
+        },
+        {
+          "id": "528e0b51-e3b6-45b4-b9b5-4661b41076aa",
+          "name": "2 Litre",
+          "sku": "E2E-20260816-221256-JUICE-2L",
+          "barcode": null,
+          "length": null,
+          "width": null,
+          "height": null,
+          "weight": null,
+          "price": 130.0,
+          "inventory": 20
+        }
+      ]
+    },
+    {
+      "tc_id": "TC06",
+      "name": "create customer A (cash)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "1e209222-a495-4d34-900d-5ad86431a4b3"
+      }
+    },
+    {
+      "tc_id": "TC06",
+      "name": "create customer B (credit)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "a0a8939b-ce9b-4a54-bbbe-2d7f474e1a65"
+      }
+    },
+    {
+      "tc_id": "TC06",
+      "name": "get customer A",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC06",
+      "name": "update customer A",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC06",
+      "name": "get customer B",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC06",
+      "name": "update customer B",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC07",
+      "name": "create draft quotation",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "1cf0bcda-e488-40f6-b51f-88d951ca7a62",
+        "status": "draft"
+      }
+    },
+    {
+      "tc_id": "TC07",
+      "name": "get quotation",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC07",
+      "name": "quotation totals correct (discount is a flat amount, not %)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC07",
+      "name": "update quotation",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC07",
+      "name": "accept quotation",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC07",
+      "name": "convert quotation to order",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "order_id": "df51d36f-bfc6-4b11-830f-261556c57079"
+      }
+    },
+    {
+      "tc_id": "TC07",
+      "name": "converted order references same customer (no duplicate)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC08",
+      "name": "create direct order",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "bb8071a2-6049-4c9e-9e9b-16f148d7d080",
+        "status": "placed"
+      }
+    },
+    {
+      "tc_id": "TC09",
+      "name": "read inventory before order creation",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "physical": 100.0,
+        "reserved": 5.0,
+        "available": 95.0,
+        "raw": [
+          {
+            "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+            "warehouse_name": "Main Warehouse",
+            "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+            "product_name": "E2E-20260816-221256 Water Bottle",
+            "variant_id": null,
+            "variant_name": null,
+            "on_hand": 100.0,
+            "reserved": 5.0,
+            "available": 95.0,
+            "minimum_stock_level": 10
+          }
+        ]
+      }
+    },
+    {
+      "tc_id": "TC09",
+      "name": "resolve order to active/confirmed state",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "status": "placed"
+      }
+    },
+    {
+      "tc_id": "TC09",
+      "name": "read inventory after order creation",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "physical": 100.0,
+        "reserved": 25.0,
+        "available": 75.0,
+        "raw": [
+          {
+            "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+            "warehouse_name": "Main Warehouse",
+            "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+            "product_name": "E2E-20260816-221256 Water Bottle",
+            "variant_id": null,
+            "variant_name": null,
+            "on_hand": 100.0,
+            "reserved": 25.0,
+            "available": 75.0,
+            "minimum_stock_level": 10
+          }
+        ]
+      }
+    },
+    {
+      "tc_id": "TC09",
+      "name": "reservation math correct (physical unchanged, reserved+qty, available-qty)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "before": {
+          "physical": 100.0,
+          "reserved": 5.0,
+          "available": 95.0,
+          "raw": [
+            {
+              "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+              "warehouse_name": "Main Warehouse",
+              "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+              "product_name": "E2E-20260816-221256 Water Bottle",
+              "variant_id": null,
+              "variant_name": null,
+              "on_hand": 100.0,
+              "reserved": 5.0,
+              "available": 95.0,
+              "minimum_stock_level": 10
+            }
+          ]
+        },
+        "after": {
+          "physical": 100.0,
+          "reserved": 25.0,
+          "available": 75.0,
+          "raw": [
+            {
+              "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+              "warehouse_name": "Main Warehouse",
+              "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+              "product_name": "E2E-20260816-221256 Water Bottle",
+              "variant_id": null,
+              "variant_name": null,
+              "on_hand": 100.0,
+              "reserved": 25.0,
+              "available": 75.0,
+              "minimum_stock_level": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tc_id": "TC10",
+      "name": "over-quantity order rejected with structured shortage",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "detail": {
+          "error": "INSUFFICIENT_STOCK",
+          "shortages": [
+            {
+              "order_item_id": null,
+              "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+              "variant_id": null,
+              "product_name": "E2E-20260816-221256 Water Bottle",
+              "required_quantity": 100075,
+              "available_quantity": 75.0,
+              "short_quantity": 100000.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tc_id": "TC10",
+      "name": "shortage attempt did not move stock",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC11",
+      "name": "plan delivery (delivery.id distinct from order.id)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "delivery_id": "d3ff8ba6-15b4-4923-8cb0-1b3c9a46c508",
+        "order_id": "bb8071a2-6049-4c9e-9e9b-16f148d7d080"
+      }
+    },
+    {
+      "tc_id": "TC12",
+      "name": "picking flow",
+      "status": "WARNING",
+      "detail": "No picking endpoint exists on this backend (checked /deliveries/{id}/pick, /picking - both 404). Physical warehouse stock is only debited at /deliveries/{id}/load. Picking is not a distinct API-tracked step.",
+      "evidence": null
+    },
+    {
+      "tc_id": "TC13",
+      "name": "transition delivery to 'ready'",
+      "status": "WARNING",
+      "detail": "No 'ready' state on this backend (422 rejecting status='ready'). Documented delivery lifecycle is planned -> loaded (via /load) -> in_transit -> delivered/partially_delivered/failed. There is no distinct 'Ready for Delivery' status/action.",
+      "evidence": {
+        "detail": [
+          {
+            "type": "string_pattern_mismatch",
+            "loc": [
+              "body",
+              "status"
+            ],
+            "msg": "String should match pattern '^(planned|in_transit|cancelled)$'",
+            "input": "ready",
+            "ctx": {
+              "pattern": "^(planned|in_transit|cancelled)$"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tc_id": "TC14",
+      "name": "inventory before load",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "physical": 100.0,
+        "reserved": 25.0,
+        "available": 75.0,
+        "raw": [
+          {
+            "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+            "warehouse_name": "Main Warehouse",
+            "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+            "product_name": "E2E-20260816-221256 Water Bottle",
+            "variant_id": null,
+            "variant_name": null,
+            "on_hand": 100.0,
+            "reserved": 25.0,
+            "available": 75.0,
+            "minimum_stock_level": 10
+          }
+        ]
+      }
+    },
+    {
+      "tc_id": "TC14",
+      "name": "load delivery onto vehicle",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "status": "loaded"
+      }
+    },
+    {
+      "tc_id": "TC14",
+      "name": "inventory after load",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "physical": 80.0,
+        "reserved": 5.0,
+        "available": 75.0,
+        "raw": [
+          {
+            "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+            "warehouse_name": "Main Warehouse",
+            "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+            "product_name": "E2E-20260816-221256 Water Bottle",
+            "variant_id": null,
+            "variant_name": null,
+            "on_hand": 80.0,
+            "reserved": 5.0,
+            "available": 75.0,
+            "minimum_stock_level": 10
+          }
+        ]
+      }
+    },
+    {
+      "tc_id": "TC14",
+      "name": "warehouse physical/reserved decreased by loaded qty",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "before": {
+          "physical": 100.0,
+          "reserved": 25.0,
+          "available": 75.0,
+          "raw": [
+            {
+              "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+              "warehouse_name": "Main Warehouse",
+              "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+              "product_name": "E2E-20260816-221256 Water Bottle",
+              "variant_id": null,
+              "variant_name": null,
+              "on_hand": 100.0,
+              "reserved": 25.0,
+              "available": 75.0,
+              "minimum_stock_level": 10
+            }
+          ]
+        },
+        "after": {
+          "physical": 80.0,
+          "reserved": 5.0,
+          "available": 75.0,
+          "raw": [
+            {
+              "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+              "warehouse_name": "Main Warehouse",
+              "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+              "product_name": "E2E-20260816-221256 Water Bottle",
+              "variant_id": null,
+              "variant_name": null,
+              "on_hand": 80.0,
+              "reserved": 5.0,
+              "available": 75.0,
+              "minimum_stock_level": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tc_id": "TC14",
+      "name": "GET /vehicle-stock/current shows loaded items",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC15",
+      "name": "dispatch (loaded -> in_transit)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "d3ff8ba6-15b4-4923-8cb0-1b3c9a46c508",
+        "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065",
+        "delivery_number": "DLV-2026-1025",
+        "order_id": "bb8071a2-6049-4c9e-9e9b-16f148d7d080",
+        "order_number": "SO-2026-1037",
+        "customer_id": "1e209222-a495-4d34-900d-5ad86431a4b3",
+        "customer": {
+          "id": "1e209222-a495-4d34-900d-5ad86431a4b3",
+          "name": "E2E-20260816-221256 Retail Store",
+          "business_name": null
+        },
+        "delivery_partner_id": "9494100e-a8fe-48d7-8790-bdc067a0dcf0",
+        "delivery_partner": {
+          "name": "Deepak Delivery",
+          "id": "9494100e-a8fe-48d7-8790-bdc067a0dcf0"
+        },
+        "vehicle_id": "61b50704-1091-4d55-8a66-0ea535ec88e8",
+        "vehicle": {
+          "id": "61b50704-1091-4d55-8a66-0ea535ec88e8",
+          "vehicle_number": "DEMO-20260816-220627-VEH-01"
+        },
+        "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+        "delivery_address": "E2E Delivery Address, Test Lane",
+        "scheduled_date": "2026-08-16T00:00:00Z",
+        "status": "in_transit",
+        "dispatched_at": "2026-08-16T16:43:53.485026Z",
+        "dispatched_by_id": "c7982e24-604d-43f1-b0f8-69be9692bb57",
+        "confirmed_at": null,
+        "failure_reason": null,
+        "notes": "E2E-20260816-221256 planned delivery",
+        "items": [
+          {
+            "id": "7b0db212-5c1e-443e-a7f9-81392effa855",
+            "order_item_id": "6dda2fb2-cbc3-4401-bbb3-24120b910745",
+            "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+            "variant_id": null,
+            "product_name": "E2E-20260816-221256 Water Bottle",
+            "planned_quantity": 20.0,
+            "loaded_quantity": 20.0,
+            "delivered_quantity": 0.0,
+            "pending_quantity": 20.0
+          }
+        ],
+        "planned_total": 20.0,
+        "loaded_total": 20.0,
+        "delivered_total": 0.0,
+        "pod": {
+          "photo_file_ids": [],
+          "signature_file_id": null
+        },
+        "amount_due": 2478.0,
+        "created_at": "2026-08-16T16:43:46.960229Z",
+        "updated_at": "2026-08-16T16:43:53.486524Z"
+      }
+    },
+    {
+      "tc_id": "TC15",
+      "name": "dispatched_at timestamp recorded",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC16",
+      "name": "upload POD photo",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC16",
+      "name": "upload signature",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC16",
+      "name": "confirm full delivery",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "status": "delivered"
+      }
+    },
+    {
+      "tc_id": "TC16",
+      "name": "delivery status = delivered",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC16",
+      "name": "order fulfilment_status reflects full delivery",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC16",
+      "name": "post-delivery inventory read",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "before": {
+          "physical": 80.0,
+          "reserved": 5.0,
+          "available": 75.0,
+          "raw": [
+            {
+              "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+              "warehouse_name": "Main Warehouse",
+              "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+              "product_name": "E2E-20260816-221256 Water Bottle",
+              "variant_id": null,
+              "variant_name": null,
+              "on_hand": 80.0,
+              "reserved": 5.0,
+              "available": 75.0,
+              "minimum_stock_level": 10
+            }
+          ]
+        },
+        "after": {
+          "physical": 80.0,
+          "reserved": 5.0,
+          "available": 75.0,
+          "raw": [
+            {
+              "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+              "warehouse_name": "Main Warehouse",
+              "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+              "product_name": "E2E-20260816-221256 Water Bottle",
+              "variant_id": null,
+              "variant_name": null,
+              "on_hand": 80.0,
+              "reserved": 5.0,
+              "available": 75.0,
+              "minimum_stock_level": 10
+            }
+          ]
+        },
+        "note": "vehicle stock is tracked separately from /inventory/{id} - see VehicleLoading records; physical/reserved should stay as they were after load"
+      }
+    },
+    {
+      "tc_id": "TC08",
+      "name": "create direct order",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "622eec22-d377-4128-abeb-8e82aec0dc15",
+        "status": "placed"
+      }
+    },
+    {
+      "tc_id": "TC17",
+      "name": "confirm order for partial delivery",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "status": "placed"
+      }
+    },
+    {
+      "tc_id": "TC11",
+      "name": "plan delivery (delivery.id distinct from order.id)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "delivery_id": "acd4c7bd-c69a-4638-8126-89798263736c",
+        "order_id": "622eec22-d377-4128-abeb-8e82aec0dc15"
+      }
+    },
+    {
+      "tc_id": "TC17",
+      "name": "load for partial delivery",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC17",
+      "name": "confirm partial delivery",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "status": "partially_delivered"
+      }
+    },
+    {
+      "tc_id": "TC17",
+      "name": "delivery status = partially_delivered",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC17",
+      "name": "order fulfilment_status = partially_delivered",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC17",
+      "name": "delivered_quantity == 12",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC17",
+      "name": "pending_quantity == 8 (identifiable)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC18",
+      "name": "invoice order",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "bbcf8d97-72a6-4b1f-a1a1-cde81b7fbbfc",
+        "invoice_number": "INV-2026-1026"
+      }
+    },
+    {
+      "tc_id": "TC18",
+      "name": "invoice has required fields",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC18",
+      "name": "invoice quantity follows delivered quantity (20)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC18",
+      "name": "invoice PDF: detailed and simple formats are the SAME record (two views)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "invoice_id": "bbcf8d97-72a6-4b1f-a1a1-cde81b7fbbfc"
+      }
+    },
+    {
+      "tc_id": "TC18",
+      "name": "prevent duplicate invoice for same order",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "tc_id": "TC19",
+      "name": "record full cash payment",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "amount": 2478.0
+      }
+    },
+    {
+      "tc_id": "TC19",
+      "name": "payment_status=Paid, balance=0",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC18",
+      "name": "invoice order",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "16b07c35-5746-4327-9f03-cc616822dbfb",
+        "invoice_number": "INV-2026-1027"
+      }
+    },
+    {
+      "tc_id": "TC18",
+      "name": "invoice has required fields",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC18",
+      "name": "invoice quantity follows delivered quantity (12)",
+      "status": "FAIL",
+      "detail": "invoice items sum to 20, expected 12",
+      "evidence": [
+        {
+          "id": "fad7f8dd-c095-43ae-b8bb-c812817c7103",
+          "product_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+          "variant_id": null,
+          "product_name": "E2E-20260816-221256 Water Bottle",
+          "hsn_code": "2201",
+          "quantity": 20,
+          "unit_price": 105.0,
+          "discount": 0.0,
+          "tax": 378.0,
+          "tax_rate": 18.0,
+          "line_total": 2100.0,
+          "batch_number": null,
+          "expiry_date": null,
+          "serial_numbers": null,
+          "delivery_item_id": null,
+          "order_item_id": "6b4d1e8d-2abb-4bcd-a778-1feba362a5cd"
+        }
+      ]
+    },
+    {
+      "tc_id": "TC18",
+      "name": "invoice PDF: detailed and simple formats are the SAME record (two views)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "invoice_id": "16b07c35-5746-4327-9f03-cc616822dbfb"
+      }
+    },
+    {
+      "tc_id": "TC18",
+      "name": "prevent duplicate invoice for same order",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "tc_id": "TC20",
+      "name": "record payment 1 (partial)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "amount": 991.2
+      }
+    },
+    {
+      "tc_id": "TC20",
+      "name": "payment_status=Partial after payment 1",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC20",
+      "name": "record payment 2 (remaining balance)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "amount": 1486.8
+      }
+    },
+    {
+      "tc_id": "TC20",
+      "name": "two distinct payment receipt records",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC20",
+      "name": "payment_status=Paid, balance=0 after both payments",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC08",
+      "name": "create direct order",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "dfa2fe27-f3ef-4782-a8f5-f6b476df4efd",
+        "status": "placed"
+      }
+    },
+    {
+      "tc_id": "TC21",
+      "name": "payment_terms_days=15 set at order creation",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC21",
+      "name": "confirm credit-customer order",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "status": "placed"
+      }
+    },
+    {
+      "tc_id": "TC11",
+      "name": "plan delivery (delivery.id distinct from order.id)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "delivery_id": "b768d3c9-af1f-41aa-906b-4fc5e6ad3425",
+        "order_id": "dfa2fe27-f3ef-4782-a8f5-f6b476df4efd"
+      }
+    },
+    {
+      "tc_id": "TC21",
+      "name": "issue invoice for credit customer (no payment)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "id": "43ce7996-66db-41b1-a819-53abe46061e3"
+      }
+    },
+    {
+      "tc_id": "TC21",
+      "name": "payment_status = Unpaid immediately after issue",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC21",
+      "name": "due_date = invoice_date + 15 days",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC21",
+      "name": "order operationally fulfilled while invoice remains unpaid (fulfilment independent of payment)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC22",
+      "name": "GET /users/{id} (sales)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC22",
+      "name": "overview.workspace == 'sales' (sales)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC22",
+      "name": "GET /users/{id} (delivery)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC22",
+      "name": "overview.workspace == 'delivery' (delivery)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC22",
+      "name": "GET /users/{id} (accountant)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC22",
+      "name": "overview.workspace == 'accounts' (accountant)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC23",
+      "name": "register throwaway Org B",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "org_id": "91b95dac-5024-4f74-9eea-41041852b709"
+      }
+    },
+    {
+      "tc_id": "TC23",
+      "name": "org B cannot access org A's customers",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC23",
+      "name": "org B cannot access org A's products",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC23",
+      "name": "org B cannot access org A's orders",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC24",
+      "name": "sales cannot create staff (admin-only)",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC24",
+      "name": "delivery cannot edit product master data",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC24",
+      "name": "accountant cannot perform inventory adjustments",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC24",
+      "name": "org admin cannot access superadmin endpoints",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC25",
+      "name": "upload image via /files/upload",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "file_id": "692c957d-fa9b-4d66-a45e-66b29fa3a660",
+        "url": "https://crm-saas-backend-9nom.onrender.com/files/692c957d-fa9b-4d66-a45e-66b29fa3a660"
+      }
+    },
+    {
+      "tc_id": "TC25",
+      "name": "retrieve image via GET /files/{id}",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "tc_id": "TC25",
+      "name": "upload pdf via /files/upload",
+      "status": "PASS",
+      "detail": null,
+      "evidence": {
+        "file_id": "8b2c43df-ce49-44ed-a0cc-4ba083044c55",
+        "url": "https://crm-saas-backend-9nom.onrender.com/files/8b2c43df-ce49-44ed-a0cc-4ba083044c55"
+      }
+    },
+    {
+      "tc_id": "TC25",
+      "name": "retrieve pdf via GET /files/{id}",
+      "status": "PASS",
+      "detail": null,
+      "evidence": null
+    }
+  ],
+  "bugs": [
+    {
+      "bug_id": "BUG-TC05-3",
+      "module": "Products",
+      "layer": "Backend",
+      "severity": "P0",
+      "endpoint": "/products/070a1e29-1189-46cf-9c5b-7df1d990e162",
+      "method": "PATCH",
+      "request_body": [
+        {
+          "id": "32ed3ee9-22e8-4a80-8da2-c133d1996f71",
+          "name": "500 ml",
+          "sku": "E2E-20260816-221256-JUICE-500ML",
+          "price": 45,
+          "inventory": 60,
+          "minimum_stock_level": 10
+        },
+        {
+          "id": "a0fe87dd-3376-40eb-bee5-262b86e99860",
+          "name": "1 Litre",
+          "sku": "E2E-20260816-221256-JUICE-1L",
+          "price": 70,
+          "inventory": 40,
+          "minimum_stock_level": 10
+        },
+        {
+          "name": "2 Litre",
+          "sku": "E2E-20260816-221256-JUICE-2L",
+          "price": 130,
+          "inventory": 20,
+          "minimum_stock_level": 5
+        }
+      ],
+      "actual_response": [
+        {
+          "id": "ef3c3462-f11c-4a51-b337-e3c319c0f739",
+          "name": "500 ml",
+          "sku": "E2E-20260816-221256-JUICE-500ML",
+          "barcode": null,
+          "length": null,
+          "width": null,
+          "height": null,
+          "weight": null,
+          "price": 45.0,
+          "inventory": 60
+        },
+        {
+          "id": "2ad6552c-bcd4-447f-9ece-65aa60c0888e",
+          "name": "1 Litre",
+          "sku": "E2E-20260816-221256-JUICE-1L",
+          "barcode": null,
+          "length": null,
+          "width": null,
+          "height": null,
+          "weight": null,
+          "price": 70.0,
+          "inventory": 40
+        },
+        {
+          "id": "528e0b51-e3b6-45b4-b9b5-4661b41076aa",
+          "name": "2 Litre",
+          "sku": "E2E-20260816-221256-JUICE-2L",
+          "barcode": null,
+          "length": null,
+          "width": null,
+          "height": null,
+          "weight": null,
+          "price": 130.0,
+          "inventory": 20
+        }
+      ],
+      "expected_behavior": "existing variant ids preserved, price updated, new variant added with a new id",
+      "business_impact": "Editing one variant could silently delete/recreate siblings, breaking stock history tied to the old variant id.",
+      "probable_cause": "PATCH variations may fully replace the set without preserving ids that were sent back, or may not honor sent ids.",
+      "recommended_fix": "Ensure variant PATCH matches incoming rows by id, only inserting rows with no id."
+    },
+    {
+      "bug_id": "BUG-TC18-2",
+      "module": "Invoices",
+      "layer": "Backend",
+      "severity": "P0",
+      "endpoint": "/orders/622eec22-d377-4128-abeb-8e82aec0dc15/invoice",
+      "method": "POST",
+      "request_body": {},
+      "actual_response": {
+        "invoice_items_qty_sum": 20
+      },
+      "expected_behavior": "invoice item quantity == delivered quantity (12), per invoice_timing=after_delivery and partial_delivery_invoice_mode=per_delivery",
+      "business_impact": "Customer would be billed for goods not yet physically delivered on a partially-delivered order - a real overbilling/accounting-correctness issue, not cosmetic.",
+      "probable_cause": "Order-to-invoice conversion appears to bill the full ORDERED quantity rather than the actually-DELIVERED quantity when the order was only partially delivered.",
+      "recommended_fix": "Verify the invoice line-item quantity source: should sum delivered_quantity from the order's deliveries, not the original order line quantity, when partial_delivery_invoice_mode=per_delivery."
+    }
+  ],
+  "status_observations": {
+    "quotation.status": {
+      "draft": [
+        "on create"
+      ],
+      "accepted": [
+        "after accept transition"
+      ]
+    },
+    "order.status": {
+      "placed": [
+        "on create (direct)",
+        "resolved/active before delivery planning",
+        "on create (direct)",
+        "on create (direct)"
+      ]
+    },
+    "order.fulfilment_status": {
+      "reserved": [
+        "resolved/active before delivery planning"
+      ],
+      "delivered": [
+        "after full delivery"
+      ],
+      "partially_delivered": [
+        "after partial delivery"
+      ]
+    },
+    "delivery.status": {
+      "planned": [
+        "on plan",
+        "on plan",
+        "on plan"
+      ],
+      "loaded": [
+        "after load"
+      ],
+      "in_transit": [
+        "after dispatch"
+      ],
+      "delivered": [
+        "after full confirm"
+      ],
+      "partially_delivered": [
+        "after partial confirm"
+      ]
+    },
+    "invoice.invoice_status": {
+      "Issued": [
+        "on create",
+        "on create"
+      ]
+    },
+    "invoice.payment_status": {
+      "Unpaid": [
+        "on create",
+        "on create"
+      ],
+      "Paid": [
+        "after full payment",
+        "after second payment (fully paid)"
+      ],
+      "Partial": [
+        "after first partial payment"
+      ]
+    }
+  },
+  "context_ids": {
+    "clients": {
+      "admin": "<__main__.Client object at 0x0000029332BB4500>",
+      "sales": "<__main__.Client object at 0x000002933074F530>",
+      "delivery": "<__main__.Client object at 0x0000029332A80950>",
+      "accountant": "<__main__.Client object at 0x0000029332BB6480>"
+    },
+    "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb",
+    "sales_officer_id": "85cfb240-3c14-4941-a78c-63c125db7caf",
+    "delivery_partner_id": "9494100e-a8fe-48d7-8790-bdc067a0dcf0",
+    "vehicle_id": "61b50704-1091-4d55-8a66-0ea535ec88e8",
+    "category_id": "523b1422-8843-4a07-adde-6cb86d8a813d",
+    "supplier_id": "a0ae703e-9c36-4cc2-9ae3-986b75608cf2",
+    "product_a_id": "2e0f74f2-22f1-4f98-850d-d4a836710b63",
+    "product_a_price": 105,
+    "product_b_id": "070a1e29-1189-46cf-9c5b-7df1d990e162",
+    "product_b_variants": [
+      {
+        "id": "32ed3ee9-22e8-4a80-8da2-c133d1996f71",
+        "name": "500 ml",
+        "sku": "E2E-20260816-221256-JUICE-500ML",
+        "barcode": null,
+        "length": null,
+        "width": null,
+        "height": null,
+        "weight": null,
+        "price": 40.0,
+        "inventory": 60
+      },
+      {
+        "id": "a0fe87dd-3376-40eb-bee5-262b86e99860",
+        "name": "1 Litre",
+        "sku": "E2E-20260816-221256-JUICE-1L",
+        "barcode": null,
+        "length": null,
+        "width": null,
+        "height": null,
+        "weight": null,
+        "price": 70.0,
+        "inventory": 40
+      }
+    ],
+    "customer_a_id": "1e209222-a495-4d34-900d-5ad86431a4b3",
+    "customer_b_id": "a0a8939b-ce9b-4a54-bbbe-2d7f474e1a65",
+    "quotation_order_id": "df51d36f-bfc6-4b11-830f-261556c57079",
+    "quotation_id": "1cf0bcda-e488-40f6-b51f-88d951ca7a62",
+    "order_a_id": "bb8071a2-6049-4c9e-9e9b-16f148d7d080",
+    "order_a_qty": 20,
+    "delivery_id": "b768d3c9-af1f-41aa-906b-4fc5e6ad3425",
+    "pod_confirmed_delivery_id": "d3ff8ba6-15b4-4923-8cb0-1b3c9a46c508",
+    "partial_order_id": "622eec22-d377-4128-abeb-8e82aec0dc15",
+    "partial_delivery_id": "acd4c7bd-c69a-4638-8126-89798263736c",
+    "partial_delivered_qty": 12,
+    "partial_pending_qty": 8,
+    "invoice_a_id": "16b07c35-5746-4327-9f03-cc616822dbfb",
+    "invoice_a_total": 2478.0
+  }
+}

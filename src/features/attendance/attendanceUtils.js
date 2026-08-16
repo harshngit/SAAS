@@ -52,6 +52,25 @@ export function workHoursLabel(checkIn, checkOut) {
   return formatMinutes(workMinutes(checkIn, checkOut))
 }
 
+export function normalizeAttendanceRecord(record) {
+  const checkIn = record.office_check_in || record.check_in || record.checkIn || null
+  const checkOut = record.final_check_out || record.check_out || record.checkOut || null
+
+  return {
+    userId: record.user_id || record.userId || '',
+    date: record.date || record.attendance_date || '',
+    // Backend only records checkpoint timestamps, not an explicit status - a row only
+    // exists once office_check_in has been recorded, so it always represents presence.
+    status: checkIn ? 'Present' : 'Absent',
+    checkIn,
+    checkOut,
+    departure: record.departure || null,
+    returnToOffice: record.return_to_office || null,
+    name: record.name || '',
+    role: record.role || '',
+  }
+}
+
 export function formatDateLabel(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return { full: value || '—', weekday: '' }

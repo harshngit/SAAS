@@ -1,16 +1,18 @@
+// Values must match the backend's report_type path segments exactly (hyphenated) -
+// GET /reports/{report_type} 404s on anything else.
 export const REPORT_TYPES = [
-  { value: 'daily_transaction', label: 'Daily Transaction' },
+  { value: 'daily-transaction', label: 'Daily Transaction' },
   { value: 'sales', label: 'Sales' },
   { value: 'purchase', label: 'Purchase' },
-  { value: 'customer_outstanding', label: 'Customer Outstanding' },
-  { value: 'supplier_outstanding', label: 'Supplier Outstanding' },
-  { value: 'payment_collection', label: 'Payment Collection' },
+  { value: 'customer-outstanding', label: 'Customer Outstanding' },
+  { value: 'supplier-outstanding', label: 'Supplier Outstanding' },
+  { value: 'payment-collection', label: 'Payment Collection' },
   { value: 'expense', label: 'Expense' },
-  { value: 'cash_collection', label: 'Cash Collection' },
-  { value: 'gst_summary', label: 'GST Summary' },
-  { value: 'sales_return', label: 'Sales Return' },
-  { value: 'purchase_return', label: 'Purchase Return' },
-  { value: 'profit_loss_summary', label: 'Profit & Loss Summary' },
+  { value: 'cash-collection', label: 'Cash Collection' },
+  { value: 'gst-summary', label: 'GST Summary' },
+  { value: 'sales-return', label: 'Sales Return' },
+  { value: 'purchase-return', label: 'Purchase Return' },
+  { value: 'profit-loss', label: 'Profit & Loss' },
 ]
 
 export const PERIOD_OPTIONS = [

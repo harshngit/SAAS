@@ -23,23 +23,6 @@ const emptyForm = {
   description: '',
 }
 
-const seedCategories = [
-  {
-    id: 'cat-water',
-    name: 'Water',
-    image: '',
-    description: 'Packaged drinking water products and size variants.',
-    createdAt: '2026-07-31',
-  },
-  {
-    id: 'cat-soft-drinks',
-    name: 'Soft Drinks',
-    image: '',
-    description: 'Carbonated drinks, juices, and refreshment items.',
-    createdAt: '2026-07-31',
-  },
-]
-
 const normalizeCategory = (category) => ({
   id: category.id,
   name: category.name || category.category_name || '',
@@ -213,7 +196,7 @@ export default function CategoryList() {
     const result = await listCategories({ search: searchTerm.trim() || undefined })
 
     if (!result.success) {
-      setCategories(seedCategories)
+      setCategories([])
       setListError(result.error)
       setIsLoading(false)
       return
@@ -366,7 +349,6 @@ export default function CategoryList() {
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
-              <p className="mt-1 text-xs text-neutral-400">Showing local sample categories until the API responds.</p>
               <Button type="button" variant="outline" className="mt-4" onClick={loadCategories}>
                 <RotateCw className="size-4" aria-hidden="true" />
                 Retry

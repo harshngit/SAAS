@@ -1,0 +1,629 @@
+{
+  "run_id": "DEMO-20260816-220627",
+  "base_url": "https://crm-saas-backend-9nom.onrender.com",
+  "counts": {
+    "staff_profiles_enriched": 3,
+    "vehicles": 1,
+    "categories": 5,
+    "suppliers": 4,
+    "products": 8,
+    "variants": 8,
+    "purchases": 5,
+    "leads": 10,
+    "customers": 8,
+    "quotations": 5,
+    "orders": 10,
+    "deliveries": 8,
+    "invoices": 9,
+    "sales_returns": 3,
+    "payments": 4,
+    "expenses": 6,
+    "location_pings": 1
+  },
+  "created_ids": {
+    "staff_profiles_enriched": [
+      {
+        "id": "85cfb240-3c14-4941-a78c-63c125db7caf",
+        "label": "sales profile updated (territory=North Delhi)"
+      },
+      {
+        "id": "9494100e-a8fe-48d7-8790-bdc067a0dcf0",
+        "label": "delivery profile updated (territory=South Delhi)"
+      },
+      {
+        "id": "e6f545a9-a200-4ba3-93c2-8cbe61e9e200",
+        "label": "accountant profile updated (territory=Head Office)"
+      }
+    ],
+    "vehicles": [
+      {
+        "id": "61b50704-1091-4d55-8a66-0ea535ec88e8",
+        "label": "DEMO-20260816-220627-VEH-01 (reassigned to delivery partner)"
+      }
+    ],
+    "categories": [
+      {
+        "id": "7231bcd2-1b38-4a8d-bf1c-c62f365c93f0",
+        "label": "DEMO-20260816-220627 Beverages"
+      },
+      {
+        "id": "45603a5c-190b-49e0-8c34-ea6650dbf5c1",
+        "label": "DEMO-20260816-220627 Snacks & Namkeen"
+      },
+      {
+        "id": "f93cb003-9935-48e3-918b-7606f124468a",
+        "label": "DEMO-20260816-220627 Personal Care"
+      },
+      {
+        "id": "b5a56ea0-6f43-40b6-9863-e74f2aa54cc6",
+        "label": "DEMO-20260816-220627 Electronics"
+      },
+      {
+        "id": "d19528d8-4f4a-4d7e-81a2-3d431dcab5a9",
+        "label": "DEMO-20260816-220627 Office Supplies"
+      }
+    ],
+    "suppliers": [
+      {
+        "id": "b56e6629-56db-427e-8311-8fdbe17864d6",
+        "label": "DEMO-20260816-220627 Bharat FMCG Distributors"
+      },
+      {
+        "id": "0f253053-650c-434d-bac3-2fdcdf2d7f59",
+        "label": "DEMO-20260816-220627 Sunrise Wholesale Co."
+      },
+      {
+        "id": "5ae08288-1a6e-43fd-81ed-2174b7ae5da6",
+        "label": "DEMO-20260816-220627 Metro Home Essentials"
+      },
+      {
+        "id": "2961d5ba-df70-40b7-af5e-8af78b57e36c",
+        "label": "DEMO-20260816-220627 Global Electronics Supply"
+      }
+    ],
+    "products": [
+      {
+        "id": "240c18d5-8f92-4d5f-b498-51faf9e83561",
+        "label": "DEMO-20260816-220627 Sparkling Mineral Water 1L"
+      },
+      {
+        "id": "7a48e52e-0417-47a3-952a-0e9ebc2778f8",
+        "label": "DEMO-20260816-220627 Cola Can 330ml (Case of 24)"
+      },
+      {
+        "id": "e493fbc0-f984-4887-95d9-8166be41ac91",
+        "label": "DEMO-20260816-220627 Classic Salted Chips 150g"
+      },
+      {
+        "id": "319e269f-a917-4266-aa0a-8274a6620845",
+        "label": "DEMO-20260816-220627 Herbal Shampoo 340ml"
+      },
+      {
+        "id": "db09221a-48ac-4307-97db-ef5ddfe5c14f",
+        "label": "DEMO-20260816-220627 USB-C Charging Cable 1m"
+      },
+      {
+        "id": "77086d3c-9255-4004-9c65-0c261656a00e",
+        "label": "DEMO-20260816-220627 Mango Juice (3 variants)"
+      },
+      {
+        "id": "f306a12d-9620-4995-a685-00913df24cf6",
+        "label": "DEMO-20260816-220627 Cotton T-Shirt (3 variants)"
+      },
+      {
+        "id": "e2c2ae8d-eca8-4928-8605-31c964cb4c70",
+        "label": "DEMO-20260816-220627 Ballpoint Pen Pack (2 variants)"
+      }
+    ],
+    "variants": [
+      {
+        "id": "94153ded-7c5e-4f27-83e0-bd92bb942f7f",
+        "label": "DEMO-20260816-220627 Mango Juice / 500 ml"
+      },
+      {
+        "id": "509ef55f-6bf6-4a20-8766-03a3b4df8eae",
+        "label": "DEMO-20260816-220627 Mango Juice / 1 Litre"
+      },
+      {
+        "id": "1b218d81-ff0b-4c4d-b502-45c3ac285842",
+        "label": "DEMO-20260816-220627 Mango Juice / 2 Litre"
+      },
+      {
+        "id": "fede456a-40ab-4fc4-8500-8f3780f65859",
+        "label": "DEMO-20260816-220627 Cotton T-Shirt / Small"
+      },
+      {
+        "id": "5774a296-58af-4751-996e-dc73d502785d",
+        "label": "DEMO-20260816-220627 Cotton T-Shirt / Medium"
+      },
+      {
+        "id": "6265cd98-c9fc-4ce2-97e7-4f45cb56b779",
+        "label": "DEMO-20260816-220627 Cotton T-Shirt / Large"
+      },
+      {
+        "id": "f162b776-4ff5-41c6-ac24-271403db72f7",
+        "label": "DEMO-20260816-220627 Ballpoint Pen Pack / Pack of 5"
+      },
+      {
+        "id": "9120ef21-84fa-4a54-aedb-5cefb73ee17e",
+        "label": "DEMO-20260816-220627 Ballpoint Pen Pack / Pack of 10"
+      }
+    ],
+    "purchases": [
+      {
+        "id": "888a92ad-c1f5-4a63-a830-70d062f38b13",
+        "label": "DEMO-20260816-220627-PUR-1 (approve/paid)"
+      },
+      {
+        "id": "ca7a0b5b-0a89-40f6-8dc5-76fb887453ba",
+        "label": "DEMO-20260816-220627-PUR-2 (approve/partial)"
+      },
+      {
+        "id": "dd40c554-c099-4598-ad0b-05c649e3778b",
+        "label": "DEMO-20260816-220627-PUR-3 (approve/unpaid)"
+      },
+      {
+        "id": "7a6f8289-e6a5-465d-bfb8-8b1d562f5bb7",
+        "label": "DEMO-20260816-220627-PUR-4 (approve/paid)"
+      },
+      {
+        "id": "a68e9e55-988a-46c3-9430-f39b1fac93c7",
+        "label": "DEMO-20260816-220627-PUR-5 (leave_pending/None)"
+      }
+    ],
+    "leads": [
+      {
+        "id": "542ce72c-c7bf-444d-92ec-0feac32c6268",
+        "label": "LEAD-2026-1011 (new)"
+      },
+      {
+        "id": "541af46d-2b40-41f5-b54d-5986c1385129",
+        "label": "LEAD-2026-1012 (new)"
+      },
+      {
+        "id": "5ea92493-2c30-42c3-8316-21ef2efa58a1",
+        "label": "LEAD-2026-1013 (contacted)"
+      },
+      {
+        "id": "94cd7030-f01c-4884-88b9-46f8c5b015a4",
+        "label": "LEAD-2026-1014 (contacted)"
+      },
+      {
+        "id": "5a483b09-e9b7-46f4-b1ae-bf333e94879b",
+        "label": "LEAD-2026-1015 (qualified)"
+      },
+      {
+        "id": "eb7ee5da-46d3-4069-9df6-d597bc96ab35",
+        "label": "LEAD-2026-1016 (qualified)"
+      },
+      {
+        "id": "f792acab-0a8e-4dbf-80de-4479e437462d",
+        "label": "LEAD-2026-1017 (won)"
+      },
+      {
+        "id": "dc2dd0f7-7fc7-4b73-819a-a5c1883a811f",
+        "label": "LEAD-2026-1018 (lost)"
+      },
+      {
+        "id": "b6ad2338-77af-424e-9aa2-660b8c52f9f5",
+        "label": "LEAD-2026-1019 (lost)"
+      },
+      {
+        "id": "03cdf720-47e0-4899-affd-985736d56ab3",
+        "label": "LEAD-2026-1020 (new)"
+      }
+    ],
+    "customers": [
+      {
+        "id": "cab0f624-4275-4bb1-b350-8356b43269fe",
+        "label": null
+      },
+      {
+        "id": "5808d3d0-c34d-4c1f-852a-ba856c053864",
+        "label": null
+      },
+      {
+        "id": "dce96277-7787-4bc5-9543-d152c1b6b7ca",
+        "label": null
+      },
+      {
+        "id": "0d79c76b-1fe0-455b-b6cd-cb84f7aab9e7",
+        "label": null
+      },
+      {
+        "id": "33f1dda9-2f19-4d6e-8cd9-d77f0c53c369",
+        "label": null
+      },
+      {
+        "id": "3d773573-973c-4de8-8967-a039b495dd73",
+        "label": null
+      },
+      {
+        "id": "198a18f7-1609-4a43-8eb6-4955852fe738",
+        "label": null
+      },
+      {
+        "id": "c485df7b-0b7d-457a-9868-c7153642f065",
+        "label": "None (from won lead)"
+      }
+    ],
+    "quotations": [
+      {
+        "id": "118712d4-f472-4d9b-8ead-1ff2475a4bfc",
+        "label": "QT-2026-1010 -> draft"
+      },
+      {
+        "id": "51c9a132-befa-44f9-9e49-3473bb70252e",
+        "label": "QT-2026-1011 -> draft"
+      },
+      {
+        "id": "be6a27ef-985f-4687-9d80-42c07006b782",
+        "label": "QT-2026-1012 -> accepted"
+      },
+      {
+        "id": "0e0219c7-7a9e-4b2c-9a39-798a2b88974b",
+        "label": "QT-2026-1013 -> accepted"
+      },
+      {
+        "id": "776d89d1-0756-40bd-ab72-c35821634df5",
+        "label": "QT-2026-1014 -> rejected"
+      }
+    ],
+    "orders": [
+      {
+        "id": "f23d8d32-e65f-4f1f-87ce-c3dfd9b18c5f",
+        "label": "SO-2026-1022 (from quotation QT-2026-1012)"
+      },
+      {
+        "id": "dbaa996d-ef0a-495d-b24f-d74a7f85f158",
+        "label": "SO-2026-1023 (from quotation QT-2026-1013)"
+      },
+      {
+        "id": "05f97ee1-b4c0-4a56-8388-d482693f7422",
+        "label": "SO-2026-1024 (None)"
+      },
+      {
+        "id": "f4c9b577-9a59-401f-b746-afb1206cb6ca",
+        "label": "SO-2026-1025 (None)"
+      },
+      {
+        "id": "012ceb6b-d1cc-43ed-9161-5eca97c118b4",
+        "label": "SO-2026-1026 (None)"
+      },
+      {
+        "id": "53b7d311-7985-4cec-a840-4bc2b9093d5e",
+        "label": "SO-2026-1027 (None)"
+      },
+      {
+        "id": "725c5002-f77c-4741-a4af-7132056b078a",
+        "label": "SO-2026-1028 (None)"
+      },
+      {
+        "id": "d05bc81f-a1fa-4959-8268-3114a8e65a8f",
+        "label": "SO-2026-1029 (None)"
+      },
+      {
+        "id": "92927a86-21f9-4fd5-8407-e7e65a41b7f8",
+        "label": "SO-2026-1030 (None)"
+      },
+      {
+        "id": "72ec06e0-ac08-4c78-ae42-da949f13b5ee",
+        "label": "SO-2026-1031 (None)"
+      }
+    ],
+    "deliveries": [
+      {
+        "id": "3944070a-0102-48ec-85cb-85e4ec022853",
+        "label": "for SO-2026-1022"
+      },
+      {
+        "id": "2e27c941-c07d-44e7-a418-350600403487",
+        "label": "for SO-2026-1023"
+      },
+      {
+        "id": "d2c6eda5-f2de-4b23-9ace-30ee64d10b2f",
+        "label": "for SO-2026-1024"
+      },
+      {
+        "id": "9db8596d-0156-4336-a6af-96a521105137",
+        "label": "for SO-2026-1025"
+      },
+      {
+        "id": "447a62f1-51ac-43dc-97cf-b0541a05bf3c",
+        "label": "for SO-2026-1026"
+      },
+      {
+        "id": "bcd835cc-e433-4212-ade8-4f0f99c0422a",
+        "label": "for SO-2026-1027"
+      },
+      {
+        "id": "3468304a-e133-4d3f-8267-abbd56cb9963",
+        "label": "for SO-2026-1028"
+      },
+      {
+        "id": "5c653b4d-1c5d-4731-99db-8019af566105",
+        "label": "for SO-2026-1029"
+      }
+    ],
+    "invoices": [
+      {
+        "id": "17cb1d2d-a176-4462-8977-6aaea5039f76",
+        "label": "INV-2026-1014 for SO-2026-1022"
+      },
+      {
+        "id": "9f12fbbd-a994-4c16-93e9-7c67f5f7fbd2",
+        "label": "INV-2026-1015 for SO-2026-1023"
+      },
+      {
+        "id": "1474ccf2-773b-4d29-898e-2398c12ce07c",
+        "label": "INV-2026-1016 for SO-2026-1024"
+      },
+      {
+        "id": "50246b88-61ef-4c27-9b5e-e4cfb4c134d5",
+        "label": "INV-2026-1017 for SO-2026-1025"
+      },
+      {
+        "id": "b7ba8c5f-5b2b-4381-9409-82feecccda38",
+        "label": "INV-2026-1018 for SO-2026-1026"
+      },
+      {
+        "id": "e0df3766-3f3a-462b-b182-0d9c8e914650",
+        "label": "INV-2026-1019 for SO-2026-1027"
+      },
+      {
+        "id": "8974e1dd-bbe3-4ea3-9dd0-d3f0abc9f5dd",
+        "label": "INV-2026-1020 for SO-2026-1028"
+      },
+      {
+        "id": "e20c8a17-278a-4c01-b777-202f7ef10a1d",
+        "label": "INV-2026-1021 for SO-2026-1029"
+      },
+      {
+        "id": "d2fec94f-676b-42d0-b219-7b7266d32e47",
+        "label": "INV-2026-1022 for SO-2026-1030"
+      }
+    ],
+    "sales_returns": [
+      {
+        "id": "92ca912c-c174-4049-8628-f455aba4da70",
+        "label": "RET-2026-1004 (full)"
+      },
+      {
+        "id": "983cb7d0-b62a-4d32-817c-be3a085c0bb5",
+        "label": "RET-2026-1005 (partial)"
+      },
+      {
+        "id": "6a2f1fa6-53b1-43dd-85d6-725e002c6028",
+        "label": "RET-2026-1006 (partial)"
+      }
+    ],
+    "payments": [
+      {
+        "id": "99d5fd1e-f949-4586-94d3-62a748a5408d",
+        "label": "full payment on INV-2026-1014"
+      },
+      {
+        "id": "561ec6ce-08df-4dc3-a946-8d3351647708",
+        "label": "partial payment 1 on INV-2026-1015"
+      },
+      {
+        "id": "2169712c-fc4e-4703-968d-c99166d9b740",
+        "label": "partial payment 2 (completes) on INV-2026-1015"
+      },
+      {
+        "id": "c0bbecb1-69f2-4a63-a6ce-fed0b70271d9",
+        "label": "partial payment (left outstanding) on INV-2026-1016"
+      }
+    ],
+    "expenses": [
+      {
+        "id": "c7e271c9-603c-4b09-8dcc-60128002f322",
+        "label": "Petrol/Diesel - Rs.1200"
+      },
+      {
+        "id": "155677a1-57d1-40e2-b64a-df8c780e5dd2",
+        "label": "Office Expenses - Rs.850"
+      },
+      {
+        "id": "1bff137b-526d-4088-b50f-c424ba04c65f",
+        "label": "Travel - Rs.2200"
+      },
+      {
+        "id": "9ed464b0-4d0c-4991-b1f1-b5d8b99e30a1",
+        "label": "Miscellaneous - Rs.450"
+      },
+      {
+        "id": "27c28349-1b34-40ea-99c0-f4092fb3db98",
+        "label": "Delivery - Rs.600"
+      },
+      {
+        "id": "a09bd965-d94d-4a37-a291-c3690005caea",
+        "label": "Staff Expenses - Rs.500"
+      }
+    ],
+    "location_pings": [
+      {
+        "id": "9494100e-a8fe-48d7-8790-bdc067a0dcf0",
+        "label": "delivery partner GPS ping"
+      }
+    ]
+  },
+  "errors": [],
+  "backend_gaps": [
+    {
+      "area": "Staff/Roles",
+      "description": "No 'Warehouse Staff' role exists on the backend (GET /roles only returns Accountant/Delivery Partner/Sales Officer/HR) - cannot create this staff type as requested."
+    },
+    {
+      "area": "Leads",
+      "description": "No POST /leads/{id}/convert endpoint exists - 'converting' a won lead to a customer means manually creating a Customer and linking it back via PUT /leads/{id} {customer_id}, not a single atomic conversion action."
+    },
+    {
+      "area": "Attendance",
+      "description": "Only real-time office_check_in/departure/return_to_office/final_check_out are supported (POST /attendance/check-in with today's server timestamp). There is no way to create historical attendance records for past dates, so multi-day attendance charts will only ever show today's point from this seeder - NOT backdated, per instructions."
+    }
+  ],
+  "frontend_gaps": [],
+  "notes": [
+    "admin logged in (hitarth Sharma, id=c7982e24-604d-43f1-b0f8-69be9692bb57)",
+    "sales logged in (Sunil Sales, id=85cfb240-3c14-4941-a78c-63c125db7caf)",
+    "delivery logged in (Deepak Delivery, id=9494100e-a8fe-48d7-8790-bdc067a0dcf0)",
+    "accountant logged in (Anil Accounts, id=e6f545a9-a200-4ba3-93c2-8cbe61e9e200)",
+    "reusing existing secondary warehouse: DEMO-20260816-215942 Secondary Warehouse",
+    "purchase DEMO-20260816-220627-PUR-5 left pending approval (for Purchases 'Pending Approval' card)",
+    "GET /leads confirms 20 lead(s) visible",
+    "linked won lead LEAD-2026-1017 to new customer via PUT /leads/{id} customer_id (no dedicated convert endpoint exists)",
+    "cancelled order SO-2026-1031 for status variety",
+    "confirmed FULL delivery for SO-2026-1022 -> delivered",
+    "confirmed FULL delivery for SO-2026-1023 -> delivered",
+    "confirmed FULL delivery for SO-2026-1024 -> delivered",
+    "confirmed PARTIAL delivery for SO-2026-1025 -> partially_delivered",
+    "confirmed FULL delivery for SO-2026-1026 -> delivered",
+    "confirmed FULL delivery for SO-2026-1027 -> delivered",
+    "confirmed FULL delivery for SO-2026-1028 -> delivered",
+    "confirmed PARTIAL delivery for SO-2026-1029 -> partially_delivered",
+    "approved return RET-2026-1004 - restocked + credit note issued",
+    "approved return RET-2026-1005 - restocked + credit note issued",
+    "approved return RET-2026-1006 - restocked + credit note issued",
+    "invoice INV-2026-1017 left unpaid deliberately (credit/receivable demo data)",
+    "invoice INV-2026-1018 left unpaid deliberately (credit/receivable demo data)",
+    "invoice INV-2026-1019 left unpaid deliberately (credit/receivable demo data)",
+    "invoice INV-2026-1020 left unpaid deliberately (credit/receivable demo data)",
+    "invoice INV-2026-1021 left unpaid deliberately (credit/receivable demo data)",
+    "invoice INV-2026-1022 left unpaid deliberately (credit/receivable demo data)",
+    "approved expense Petrol/Diesel",
+    "approved expense Travel",
+    "approved expense Delivery",
+    "sales already checked in today (400 'already recorded') - expected on reruns",
+    "delivery already checked in today (400 'already recorded') - expected on reruns",
+    "accountant check-in correctly denied (403) - this role's permission set has no 'attendance' module at all"
+  ],
+  "dashboard_coverage": [
+    {
+      "page": "Dashboard (Admin)",
+      "status": "POPULATED",
+      "endpoint": "GET /dashboard/admin",
+      "detail": "1 record(s)"
+    },
+    {
+      "page": "Customers",
+      "status": "POPULATED",
+      "endpoint": "GET /customers",
+      "detail": "31 record(s)"
+    },
+    {
+      "page": "Leads",
+      "status": "POPULATED",
+      "endpoint": "GET /leads",
+      "detail": "20 record(s)"
+    },
+    {
+      "page": "Quotations",
+      "status": "POPULATED",
+      "endpoint": "GET /quotations",
+      "detail": "14 record(s)"
+    },
+    {
+      "page": "Suppliers",
+      "status": "POPULATED",
+      "endpoint": "GET /suppliers",
+      "detail": "14 record(s)"
+    },
+    {
+      "page": "Categories",
+      "status": "POPULATED",
+      "endpoint": "GET /categories",
+      "detail": "19 record(s)"
+    },
+    {
+      "page": "Products",
+      "status": "POPULATED",
+      "endpoint": "GET /products",
+      "detail": "33 record(s)"
+    },
+    {
+      "page": "Inventory",
+      "status": "POPULATED",
+      "endpoint": "GET /inventory",
+      "detail": "33 record(s)"
+    },
+    {
+      "page": "Warehouses",
+      "status": "POPULATED",
+      "endpoint": "GET /warehouses",
+      "detail": "2 record(s)"
+    },
+    {
+      "page": "Orders",
+      "status": "POPULATED",
+      "endpoint": "GET /orders",
+      "detail": "31 record(s)"
+    },
+    {
+      "page": "Sales Returns",
+      "status": "POPULATED",
+      "endpoint": "GET /sales-returns",
+      "detail": "6 record(s)"
+    },
+    {
+      "page": "Vehicle Stock",
+      "status": "POPULATED",
+      "endpoint": "GET /vehicle-stock",
+      "detail": "1 record(s)"
+    },
+    {
+      "page": "Vehicles",
+      "status": "POPULATED",
+      "endpoint": "GET /vehicles",
+      "detail": "1 record(s)"
+    },
+    {
+      "page": "Purchases",
+      "status": "POPULATED",
+      "endpoint": "GET /purchase-invoices",
+      "detail": "10 record(s)"
+    },
+    {
+      "page": "Deliveries",
+      "status": "POPULATED",
+      "endpoint": "GET /deliveries",
+      "detail": "21 record(s)"
+    },
+    {
+      "page": "Invoices",
+      "status": "POPULATED",
+      "endpoint": "GET /invoices",
+      "detail": "28 record(s)"
+    },
+    {
+      "page": "Expenses",
+      "status": "POPULATED",
+      "endpoint": "GET /expenses",
+      "detail": "12 record(s)"
+    },
+    {
+      "page": "Reports",
+      "status": "POPULATED",
+      "endpoint": "GET /reports/daily-transaction",
+      "detail": "1 record(s)"
+    },
+    {
+      "page": "Staff",
+      "status": "POPULATED",
+      "endpoint": "GET /users",
+      "detail": "8 record(s)"
+    },
+    {
+      "page": "Attendance",
+      "status": "POPULATED",
+      "endpoint": "GET /attendance",
+      "detail": "2 record(s)"
+    },
+    {
+      "page": "Audit Logs",
+      "status": "EMPTY - BACKEND FEATURE NOT IMPLEMENTED",
+      "endpoint": "GET /audit-logs (probed)",
+      "detail": "404 - no such endpoint"
+    }
+  ]
+}

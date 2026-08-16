@@ -1,20 +1,77 @@
+import { useEffect, useState } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs'
 import Card from '../../components/ui/Card'
 import DataTable from '../../components/ui/DataTable'
 import Badge from '../../components/ui/Badge'
-import { customers } from '../../mockData/customers'
+import { getReport } from '../../api/reports'
 import { formatCurrency } from '../../utils/format'
-
-// Mock payables data
-const suppliers = [
-  { id: 'SUP-001', name: 'Prime Suppliers', totalOutstanding: 45000, overdue: 15000 },
-  { id: 'SUP-002', name: 'Packaging Co.', totalOutstanding: 32000, overdue: 0 },
-  { id: 'SUP-003', name: 'Logistics Partners', totalOutstanding: 28000, overdue: 8000 },
-]
 
 const statusVariant = {
   Overdue: 'danger',
   'No Overdue': 'success',
+}
+
+function normalizeRow(row, kind) {
+  return {
+    id: row.id || row.customer_id || row.supplier_id || row[`${kind}_id`],
+    name: row.name || row.customer_name || row.supplier_name || '—',
+    totalOutstanding: row.outstanding_amount ?? row.outstanding ?? row.total_outstanding ?? 0,
+    overdue: row.overdue_amount ?? row.overdue ?? 0,
+  }
+}
+
+function OutstandingPanel({ reportType, kind, emptyLabel }) {
+  const [rows, setRows] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let isMounted = true
+
+    getReport(reportType).then((result) => {
+      if (!isMounted) return
+      if (!result.success) {
+        setError(result.error)
+      } else {
+        setRows((result.report?.rows || []).map((row) => normalizeRow(row, kind)))
+      }
+      setIsLoading(false)
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [reportType, kind])
+
+  return (
+    <Card title={emptyLabel}>
+      {error && (
+        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+      <DataTable
+        loading={isLoading}
+        columns={[
+          { key: 'id', header: `${kind === 'customer' ? 'Customer' : 'Supplier'} ID`, sortable: true },
+          { key: 'name', header: `${kind === 'customer' ? 'Customer' : 'Supplier'} Name`, sortable: true },
+          { key: 'totalOutstanding', header: 'Total Outstanding', sortable: true, align: 'right', render: (row) => formatCurrency(row.totalOutstanding) },
+          { key: 'overdue', header: 'Overdue Amount', sortable: true, align: 'right', render: (row) => formatCurrency(row.overdue) },
+          {
+            key: 'status',
+            header: 'Status',
+            sortable: true,
+            render: (row) => (
+              <Badge variant={row.overdue > 0 ? statusVariant.Overdue : statusVariant['No Overdue']} dot>
+                {row.overdue > 0 ? 'Overdue' : 'No Overdue'}
+              </Badge>
+            ),
+          },
+        ]}
+        data={rows}
+        searchKeys={['id', 'name']}
+        searchPlaceholder={`Search ${kind === 'customer' ? 'customers' : 'suppliers'}...`}
+      />
+    </Card>
+  )
 }
 
 export default function ReceivablesPayables() {
@@ -32,55 +89,11 @@ export default function ReceivablesPayables() {
         </TabsList>
 
         <TabsContent value="receivables">
-          <Card title="Customer Receivables">
-            <DataTable
-              columns={[
-                { key: 'id', header: 'Customer ID', sortable: true },
-                { key: 'name', header: 'Customer Name', sortable: true },
-                { key: 'totalOutstanding', header: 'Total Outstanding', sortable: true, align: 'right', render: (row) => formatCurrency(row.totalOutstanding) },
-                { key: 'overdue', header: 'Overdue Amount', sortable: true, align: 'right', render: (row) => formatCurrency(row.overdue) },
-                {
-                  key: 'status',
-                  header: 'Status',
-                  sortable: true,
-                  render: (row) => (
-                    <Badge variant={row.overdue > 0 ? statusVariant.Overdue : statusVariant['No Overdue']} dot>
-                      {row.overdue > 0 ? 'Overdue' : 'No Overdue'}
-                    </Badge>
-                  ),
-                },
-              ]}
-              data={customers}
-              searchKeys={['id', 'name']}
-              searchPlaceholder="Search customers..."
-            />
-          </Card>
+          <OutstandingPanel reportType="customer-outstanding" kind="customer" emptyLabel="Customer Receivables" />
         </TabsContent>
 
         <TabsContent value="payables">
-          <Card title="Supplier Payables">
-            <DataTable
-              columns={[
-                { key: 'id', header: 'Supplier ID', sortable: true },
-                { key: 'name', header: 'Supplier Name', sortable: true },
-                { key: 'totalOutstanding', header: 'Total Outstanding', sortable: true, align: 'right', render: (row) => formatCurrency(row.totalOutstanding) },
-                { key: 'overdue', header: 'Overdue Amount', sortable: true, align: 'right', render: (row) => formatCurrency(row.overdue) },
-                {
-                  key: 'status',
-                  header: 'Status',
-                  sortable: true,
-                  render: (row) => (
-                    <Badge variant={row.overdue > 0 ? statusVariant.Overdue : statusVariant['No Overdue']} dot>
-                      {row.overdue > 0 ? 'Overdue' : 'No Overdue'}
-                    </Badge>
-                  ),
-                },
-              ]}
-              data={suppliers}
-              searchKeys={['id', 'name']}
-              searchPlaceholder="Search suppliers..."
-            />
-          </Card>
+          <OutstandingPanel reportType="supplier-outstanding" kind="supplier" emptyLabel="Supplier Payables" />
         </TabsContent>
       </Tabs>
     </div>

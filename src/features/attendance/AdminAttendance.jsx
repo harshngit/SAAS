@@ -20,7 +20,6 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import { getAttendance } from '../../api/attendance'
 import { listUsers } from '../../api/users'
-import { attendance as sampleAttendance } from '../../mockData/attendance'
 import { roleLabels } from '../../auth/roles'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 import {
@@ -28,6 +27,7 @@ import {
   formatDateLabel,
   formatTimeLabel,
   isCheckInOnTime,
+  normalizeAttendanceRecord,
   statusVariant,
   workHoursLabel,
   workMinutes,
@@ -71,29 +71,6 @@ function normalizeUser(user) {
   }
 }
 
-function normalizeAttendanceRecord(record) {
-  return {
-    userId: record.user_id || record.userId || '',
-    date: record.date || record.attendance_date || '',
-    status: record.status || 'Present',
-    checkIn: record.check_in || record.checkIn || null,
-    checkOut: record.check_out || record.checkOut || null,
-    name: record.name || '',
-    role: record.role || '',
-  }
-}
-
-function flattenSampleAttendance() {
-  return sampleAttendance.flatMap((user) =>
-    user.records.map((record) => ({
-      userId: user.userId,
-      name: user.name,
-      role: user.role,
-      ...record,
-    })),
-  )
-}
-
 export default function AdminAttendance() {
   const navigate = useNavigate()
   const [rows, setRows] = useState([])
@@ -119,13 +96,7 @@ export default function AdminAttendance() {
     )
     setUsersById(nextUsersById)
 
-    if (attendanceResult.success && attendanceResult.records.length > 0) {
-      setRows(attendanceResult.records.map(normalizeAttendanceRecord))
-      setIsLoading(false)
-      return
-    }
-
-    setRows(flattenSampleAttendance())
+    setRows(attendanceResult.success ? attendanceResult.records.map(normalizeAttendanceRecord) : [])
     setIsLoading(false)
   }
 

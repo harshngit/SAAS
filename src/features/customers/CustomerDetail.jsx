@@ -8,6 +8,7 @@ import {
   CalendarCheck2,
   CreditCard,
   FileText,
+  Landmark,
   Mail,
   MapPin,
   Pencil,
@@ -38,6 +39,7 @@ import { ROLES } from '../../auth/roles'
 import {
   deleteCustomer,
   getCustomer,
+  getCustomerLedger,
   getCustomerPaymentReceipt,
   getCustomerPayments,
   recordCustomerPayment,
@@ -45,25 +47,27 @@ import {
   voidCustomerPayment,
 } from '../../api/customers'
 import { listUsers } from '../../api/users'
-import { orders } from '../../mockData/orders'
+import { listOrders } from '../../api/orders'
 import { useAuthStore } from '../../store/authStore'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 import { formatCurrency } from '../../utils/format'
 import CustomerForm from './CustomerForm'
 import { customerBasePathByRole } from './customerConstants'
 
-const statusVariant = {
-  Draft: 'neutral',
-  Confirmed: 'info',
-  'Out for Delivery': 'warning',
-  Delivered: 'success',
-  Cancelled: 'danger',
+const orderStatusVariant = {
+  draft: 'neutral',
+  placed: 'info',
+  awaiting_approval: 'warning',
+  processing: 'primary',
+  completed: 'success',
+  cancelled: 'danger',
 }
 
-const paymentVariant = {
-  Paid: 'success',
-  Partial: 'warning',
-  Unpaid: 'danger',
+const ledgerTransactionVariant = {
+  invoice: 'primary',
+  payment: 'success',
+  credit_note: 'purple',
+  opening_balance: 'neutral',
 }
 
 const paymentModeOptions = [
@@ -278,6 +282,28 @@ export default function CustomerDetail() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [isDeletingCustomer, setIsDeletingCustomer] = useState(false)
+  const [customerOrders, setCustomerOrders] = useState([])
+  const [isLoadingOrders, setIsLoadingOrders] = useState(true)
+  const [ledger, setLedger] = useState(null)
+  const [isLoadingLedger, setIsLoadingLedger] = useState(true)
+  const [ledgerError, setLedgerError] = useState('')
+
+  const loadLedger = async () => {
+    setIsLoadingLedger(true)
+    setLedgerError('')
+
+    const result = await getCustomerLedger(id)
+
+    setIsLoadingLedger(false)
+
+    if (!result.success) {
+      setLedger(null)
+      setLedgerError(result.error)
+      return
+    }
+
+    setLedger(result.ledger)
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -287,20 +313,37 @@ export default function CustomerDetail() {
       setLoadError('')
       setIsLoadingPayments(true)
       setPaymentsError('')
+      setIsLoadingOrders(true)
+      setIsLoadingLedger(true)
+      setLedgerError('')
 
-      const [result, paymentsResult, usersResult] = await Promise.all([
+      const [result, paymentsResult, usersResult, ordersResult, ledgerResult] = await Promise.all([
         getCustomer(id),
         getCustomerPayments(id),
         listUsers(),
+        listOrders({ customer_id: id }),
+        getCustomerLedger(id),
       ])
 
       if (!isMounted) return
 
       setIsLoading(false)
       setIsLoadingPayments(false)
+      setIsLoadingOrders(false)
+      setIsLoadingLedger(false)
 
       if (usersResult.success) {
         setStaffUsers(usersResult.users.map(normalizeUser))
+      }
+
+      if (ordersResult.success) {
+        setCustomerOrders(ordersResult.orders)
+      }
+
+      if (ledgerResult.success) {
+        setLedger(ledgerResult.ledger)
+      } else {
+        setLedgerError(ledgerResult.error)
       }
 
       if (!result.success) {
@@ -326,11 +369,6 @@ export default function CustomerDetail() {
       isMounted = false
     }
   }, [id])
-
-  const customerOrders = useMemo(
-    () => (customer ? orders.filter((order) => order.customerId === customer.id) : []),
-    [customer],
-  )
 
   const salesOfficers = useMemo(
     () => staffUsers.filter((user) => user.role === ROLES.SALES_OFFICER && user.status === 'active'),
@@ -802,7 +840,9 @@ export default function CustomerDetail() {
       <div className="grid gap-4 xl:grid-cols-3">
         <Section number={7} title="Order & Transaction History" icon={ShoppingBag} className="xl:col-span-2">
           <div id="order-history" className="scroll-mt-6">
-            {customerOrders.length === 0 ? (
+            {isLoadingOrders ? (
+              <LoadingSpinner label="Loading orders..." />
+            ) : customerOrders.length === 0 ? (
               <p className="py-6 text-center text-sm text-neutral-400">No orders recorded for this customer yet.</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-neutral-100">
@@ -812,24 +852,24 @@ export default function CustomerDetail() {
                       <th className="whitespace-nowrap px-4 py-2.5">Order #</th>
                       <th className="whitespace-nowrap px-4 py-2.5">Date</th>
                       <th className="whitespace-nowrap px-4 py-2.5">Status</th>
-                      <th className="whitespace-nowrap px-4 py-2.5">Payment</th>
+                      <th className="whitespace-nowrap px-4 py-2.5">Fulfilment</th>
                       <th className="whitespace-nowrap px-4 py-2.5 text-right">Total</th>
-                      <th className="whitespace-nowrap px-4 py-2.5 text-right">Balance Due</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-50">
                     {customerOrders.map((order) => (
-                      <tr key={order.id} className="transition-colors hover:bg-primary-50/35">
+                      <tr
+                        key={order.id}
+                        onClick={() => navigate(`/admin/orders/${order.id}`)}
+                        className="cursor-pointer transition-colors hover:bg-primary-50/35"
+                      >
                         <td className="whitespace-nowrap px-4 py-3 font-medium text-neutral-800">{order.orderNumber}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{order.orderDate}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{order.orderDate ? order.orderDate.slice(0, 10) : '—'}</td>
                         <td className="whitespace-nowrap px-4 py-3">
-                          <Badge variant={statusVariant[order.status] || 'neutral'}>{order.status}</Badge>
+                          <Badge variant={orderStatusVariant[order.status] || 'neutral'}>{order.status?.replace(/_/g, ' ')}</Badge>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3">
-                          <Badge variant={paymentVariant[order.paymentStatus] || 'neutral'} dot>{order.paymentStatus}</Badge>
-                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{order.fulfilmentStatus?.replace(/_/g, ' ')}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(order.total)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-neutral-600">{formatCurrency(order.balanceDue)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -858,6 +898,86 @@ export default function CustomerDetail() {
           </div>
         </Section>
       </div>
+
+      <Section number={9} title="Account Statement" icon={Landmark}>
+        {ledgerError ? (
+          <div className="py-6 text-center">
+            <p className="text-sm text-red-600">{ledgerError}</p>
+            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={loadLedger}>Retry</Button>
+          </div>
+        ) : isLoadingLedger ? (
+          <LoadingSpinner label="Loading account statement..." />
+        ) : !ledger ? null : (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
+                <p className="text-xs text-neutral-400">Outstanding</p>
+                <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ledger.summary.outstanding)}</p>
+              </div>
+              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
+                <p className="text-xs text-neutral-400">Overdue</p>
+                <p className="mt-1 text-lg font-semibold text-red-600">{formatCurrency(ledger.summary.overdueAmount)}</p>
+              </div>
+              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
+                <p className="text-xs text-neutral-400">Available Credit</p>
+                <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ledger.summary.availableCredit)}</p>
+              </div>
+              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
+                <p className="text-xs text-neutral-400">Credit Limit</p>
+                <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ledger.summary.creditLimit)}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Ageing Analysis</p>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {['0-30', '31-60', '61-90', '90+'].map((bucket) => (
+                  <div key={bucket} className="rounded-xl border border-neutral-100 px-4 py-3">
+                    <p className="text-xs text-neutral-400">{bucket} days</p>
+                    <p className="mt-1 text-base font-semibold text-neutral-900">{formatCurrency(ledger.ageing[bucket])}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Transaction History</p>
+              {ledger.transactions.length === 0 ? (
+                <p className="py-6 text-center text-sm text-neutral-400">No ledger transactions recorded yet.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-neutral-100">
+                  <table className="w-full min-w-2xl text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                        <th className="whitespace-nowrap px-4 py-2.5">Date</th>
+                        <th className="whitespace-nowrap px-4 py-2.5">Type</th>
+                        <th className="whitespace-nowrap px-4 py-2.5">Description</th>
+                        <th className="whitespace-nowrap px-4 py-2.5 text-right">Debit</th>
+                        <th className="whitespace-nowrap px-4 py-2.5 text-right">Credit</th>
+                        <th className="whitespace-nowrap px-4 py-2.5 text-right">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-50">
+                      {ledger.transactions.map((entry, index) => (
+                        <tr key={`${entry.type}-${entry.date}-${index}`}>
+                          <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{entry.date ? entry.date.slice(0, 10) : '—'}</td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <Badge variant={ledgerTransactionVariant[entry.type] || 'neutral'}>{formatLabel(entry.type)}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-neutral-600">{entry.description || '—'}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-neutral-700">{entry.debit ? formatCurrency(entry.debit) : '—'}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-neutral-700">{entry.credit ? formatCurrency(entry.credit) : '—'}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(entry.balance)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Section>
 
       <Modal isOpen={isPaymentModalOpen} onClose={handleClosePaymentModal} title="Record Customer Payment">
         <form onSubmit={handleRecordPayment} className="space-y-4">

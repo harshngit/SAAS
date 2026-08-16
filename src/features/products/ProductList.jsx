@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Edit, Eye, Package, Plus, Power, RotateCw, Search, Trash2 } from 'lucide-react'
+import { Edit, Eye, Package, Plus, Power, RotateCw, ScanBarcode, Search, Trash2 } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -36,6 +36,9 @@ export default function ProductList() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [barcodeInput, setBarcodeInput] = useState('')
+  const [isScanningBarcode, setIsScanningBarcode] = useState(false)
+  const [barcodeError, setBarcodeError] = useState('')
 
   const categoryFilterOptions = useMemo(
     () => {
@@ -158,6 +161,33 @@ export default function ProductList() {
     setIsFormOpen(false)
   }
 
+  const handleBarcodeScan = async (event) => {
+    event.preventDefault()
+    const barcode = barcodeInput.trim()
+    if (!barcode) return
+
+    setIsScanningBarcode(true)
+    setBarcodeError('')
+
+    const result = await listProducts({ barcode })
+
+    setIsScanningBarcode(false)
+
+    if (!result.success) {
+      setBarcodeError(result.error)
+      return
+    }
+
+    const [match] = result.products
+    if (!match) {
+      setBarcodeError(`No product found for barcode "${barcode}".`)
+      return
+    }
+
+    setBarcodeInput('')
+    navigate(`/admin/products/${match.id}`)
+  }
+
   const handleToggleStatus = async () => {
     if (!statusProduct) return
 
@@ -233,7 +263,25 @@ export default function ProductList() {
         </div>
 
         <div className="border-b border-neutral-100 px-5 py-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <form onSubmit={handleBarcodeScan} className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
+              <div className="relative w-full sm:w-64">
+                <ScanBarcode className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  value={barcodeInput}
+                  onChange={(event) => {
+                    setBarcodeInput(event.target.value)
+                    setBarcodeError('')
+                  }}
+                  placeholder="Scan or enter barcode"
+                  className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+              </div>
+              <Button type="submit" variant="outline" size="sm" loading={isScanningBarcode} disabled={!barcodeInput.trim()}>
+                Find
+              </Button>
+            </form>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative w-full sm:w-80">
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
@@ -253,6 +301,7 @@ export default function ProductList() {
               />
             </div>
           </div>
+          {barcodeError && <p className="mt-2 text-xs text-red-600">{barcodeError}</p>}
         </div>
 
         <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">

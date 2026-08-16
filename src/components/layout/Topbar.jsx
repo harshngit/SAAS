@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bell, ChevronDown, HelpCircle, LogOut, Search, Settings } from 'lucide-react'
+import { Bell, CheckCheck, ChevronDown, HelpCircle, LogOut, Search, Settings } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
-import { roleLabels, roleMenus } from '../../auth/roles'
+import { ROLES, roleLabels, roleMenus } from '../../auth/roles'
 import { logout } from '../../api/auth'
+import { listNotifications, markAllNotificationsRead, markNotificationRead, getUnreadNotificationCount } from '../../api/notifications'
+
+function formatNotificationTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
 
 function formatPathTitle(pathname) {
   const segment = pathname.split('/').filter(Boolean).at(-1) || 'dashboard'
@@ -21,6 +29,12 @@ export default function Topbar() {
   const [logoutError, setLogoutError] = useState('')
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const menuRef = useRef(null)
+
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [notifications, setNotifications] = useState([])
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false)
+  const notificationsRef = useRef(null)
 
   useEffect(() => {
     if (!isMenuOpen) return
@@ -41,6 +55,71 @@ export default function Topbar() {
       document.removeEventListener('keydown', handleEscape)
     }
   }, [isMenuOpen])
+
+  useEffect(() => {
+    if (!currentUser) return undefined
+
+    let isMounted = true
+
+    const pollUnreadCount = async () => {
+      const result = await getUnreadNotificationCount()
+      if (isMounted && result.success) setUnreadCount(result.unread)
+    }
+
+    pollUnreadCount()
+    const interval = setInterval(pollUnreadCount, 60000)
+
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+    }
+  }, [currentUser])
+
+  useEffect(() => {
+    if (!isNotificationsOpen) return
+
+    const handleClickOutside = (event) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setIsNotificationsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isNotificationsOpen])
+
+  const toggleNotifications = async () => {
+    const nextOpen = !isNotificationsOpen
+    setIsNotificationsOpen(nextOpen)
+
+    if (nextOpen) {
+      setIsLoadingNotifications(true)
+      const result = await listNotifications()
+      if (result.success) setNotifications(result.notifications)
+      setIsLoadingNotifications(false)
+    }
+  }
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.isRead) {
+      const result = await markNotificationRead(notification.id)
+      if (result.success) {
+        setNotifications((current) => current.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)))
+        setUnreadCount((count) => Math.max(0, count - 1))
+      }
+    }
+
+    setIsNotificationsOpen(false)
+    if (notification.link) navigate(notification.link)
+  }
+
+  const handleMarkAllRead = async () => {
+    const result = await markAllNotificationsRead()
+    if (result.success) {
+      setNotifications((current) => current.map((n) => ({ ...n, isRead: true })))
+      setUnreadCount(0)
+    }
+  }
 
   if (!currentUser) return null
 
@@ -95,14 +174,67 @@ export default function Topbar() {
         >
           <HelpCircle className="size-4.5" />
         </button>
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="relative rounded-full bg-white p-2.5 text-neutral-500 shadow-(--shadow-xs) ring-1 ring-neutral-100 transition-colors hover:text-neutral-900"
-        >
-          <Bell className="size-4.5" />
-          <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500 ring-2 ring-white" />
-        </button>
+        <div className="relative" ref={notificationsRef}>
+          <button
+            type="button"
+            aria-label="Notifications"
+            aria-haspopup="menu"
+            aria-expanded={isNotificationsOpen}
+            onClick={toggleNotifications}
+            className="relative rounded-full bg-white p-2.5 text-neutral-500 shadow-(--shadow-xs) ring-1 ring-neutral-100 transition-colors hover:text-neutral-900"
+          >
+            <Bell className="size-4.5" />
+            {unreadCount > 0 && (
+              <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500 ring-2 ring-white" />
+            )}
+          </button>
+
+          {isNotificationsOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-popover)"
+            >
+              <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
+                <p className="text-sm font-semibold text-neutral-900">Notifications</p>
+                {unreadCount > 0 && (
+                  <button type="button" onClick={handleMarkAllRead} className="flex items-center gap-1 text-xs font-medium text-primary-700 hover:underline">
+                    <CheckCheck className="size-3.5" aria-hidden="true" />
+                    Mark all read
+                  </button>
+                )}
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {isLoadingNotifications ? (
+                  <p className="px-4 py-6 text-center text-sm text-neutral-400">Loading...</p>
+                ) : notifications.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-sm text-neutral-400">No notifications yet.</p>
+                ) : (
+                  notifications.slice(0, 10).map((notification) => (
+                    <button
+                      key={notification.id}
+                      type="button"
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`flex w-full flex-col gap-0.5 border-b border-neutral-50 px-4 py-3 text-left transition-colors hover:bg-neutral-50 ${!notification.isRead ? 'bg-primary-50/40' : ''}`}
+                    >
+                      <p className="text-sm font-medium text-neutral-900">{notification.title}</p>
+                      <p className="line-clamp-2 text-xs text-neutral-500">{notification.body}</p>
+                      <p className="mt-0.5 text-[0.65rem] text-neutral-400">{formatNotificationTime(notification.createdAt)}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+              {currentUser.role === ROLES.ADMIN && (
+                <button
+                  type="button"
+                  onClick={() => { setIsNotificationsOpen(false); navigate('/admin/notifications') }}
+                  className="block w-full border-t border-neutral-100 px-4 py-2.5 text-center text-xs font-medium text-primary-700 hover:bg-neutral-50"
+                >
+                  View all notifications
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="relative" ref={menuRef}>
           <button

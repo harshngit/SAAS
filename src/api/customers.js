@@ -537,6 +537,56 @@ export async function getCustomerPayments(customerId) {
   }
 }
 
+export async function getCustomerLedger(customerId) {
+  try {
+    const { data } = await apiClient.get(`/customers/${customerId}/ledger`, {
+      headers: authHeader(),
+    })
+
+    const summary = data?.summary || {}
+    const ageing = data?.ageing || {}
+
+    return {
+      success: true,
+      ledger: {
+        summary: {
+          totalBilled: summary.total_billed ?? 0,
+          totalReceived: summary.total_received ?? 0,
+          openingBalance: summary.opening_balance ?? 0,
+          outstanding: summary.outstanding ?? 0,
+          creditLimit: summary.credit_limit ?? 0,
+          availableCredit: summary.available_credit ?? 0,
+          overdueAmount: summary.overdue_amount ?? 0,
+        },
+        ageing: {
+          '0-30': ageing['0-30'] ?? 0,
+          '31-60': ageing['31-60'] ?? 0,
+          '61-90': ageing['61-90'] ?? 0,
+          '90+': ageing['90+'] ?? 0,
+        },
+        transactions: (Array.isArray(data?.transactions) ? data.transactions : []).map((entry) => ({
+          type: entry.type,
+          date: entry.date,
+          description: entry.description || '',
+          debit: entry.debit ?? 0,
+          credit: entry.credit ?? 0,
+          balance: entry.balance ?? 0,
+          dueDate: entry.due_date || null,
+          status: entry.status || '',
+        })),
+      },
+    }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load customer account statement. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function getCustomerPaymentReceipt(customerId, paymentId) {
   try {
     const { data } = await apiClient.get(`/customers/${customerId}/payments/receipt/${paymentId}`, {

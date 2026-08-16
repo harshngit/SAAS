@@ -83,6 +83,13 @@ export async function createProduct(payload) {
       price: Number(payload.price ?? variations[0]?.price) || 0,
       cover_image: payload.coverImage || payload.cover_image || '',
       images: payload.images || [],
+      product_video: payload.productVideo || payload.videoUrl || payload.product_video || '',
+      catalog_brochure: payload.catalogBrochure || payload.catalog_brochure || '',
+      manual: payload.manual || payload.productManual || '',
+      product_datasheet: payload.productDatasheet || payload.product_datasheet || '',
+      compliance_certificate: payload.complianceCertificate || payload.compliance_certificate || '',
+      warranty_document: payload.warrantyDocument || payload.warranty_document || '',
+      download_file: payload.downloadFile || payload.download_file || '',
       product_type: payload.productType || payload.product_type || payload.category || '',
       vendor: payload.vendor || '',
       brand: payload.brand?.trim() || '',
@@ -137,6 +144,27 @@ export async function updateProduct(productId, payload) {
       requestBody.cover_image = payload.coverImage ?? payload.cover_image ?? ''
     }
     if (payload.images !== undefined) requestBody.images = payload.images
+    if (payload.productVideo !== undefined || payload.videoUrl !== undefined || payload.product_video !== undefined) {
+      requestBody.product_video = payload.productVideo || payload.videoUrl || payload.product_video || ''
+    }
+    if (payload.catalogBrochure !== undefined || payload.catalog_brochure !== undefined) {
+      requestBody.catalog_brochure = payload.catalogBrochure || payload.catalog_brochure || ''
+    }
+    if (payload.manual !== undefined || payload.productManual !== undefined) {
+      requestBody.manual = payload.manual || payload.productManual || ''
+    }
+    if (payload.productDatasheet !== undefined || payload.product_datasheet !== undefined) {
+      requestBody.product_datasheet = payload.productDatasheet || payload.product_datasheet || ''
+    }
+    if (payload.complianceCertificate !== undefined || payload.compliance_certificate !== undefined) {
+      requestBody.compliance_certificate = payload.complianceCertificate || payload.compliance_certificate || ''
+    }
+    if (payload.warrantyDocument !== undefined || payload.warranty_document !== undefined) {
+      requestBody.warranty_document = payload.warrantyDocument || payload.warranty_document || ''
+    }
+    if (payload.downloadFile !== undefined || payload.download_file !== undefined) {
+      requestBody.download_file = payload.downloadFile || payload.download_file || ''
+    }
     if (payload.productType !== undefined || payload.product_type !== undefined || payload.category !== undefined) {
       requestBody.product_type = payload.productType || payload.product_type || payload.category || ''
     }
@@ -194,6 +222,111 @@ export async function deleteProduct(productId) {
   }
 }
 
+export async function getProductBatches(productId, params = {}) {
+  try {
+    const queryParams = {}
+    if (params.warehouse_id) queryParams.warehouse_id = params.warehouse_id
+    if (params.in_stock_only !== undefined) queryParams.in_stock_only = params.in_stock_only
+
+    const { data } = await apiClient.get(`/products/${productId}/batches`, {
+      headers: authHeader(),
+      params: queryParams,
+    })
+
+    return { success: true, batches: Array.isArray(data) ? data : data?.batches || [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load product batches. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function getProductSerials(productId, params = {}) {
+  try {
+    const queryParams = {}
+    if (params.status) queryParams.status = params.status
+
+    const { data } = await apiClient.get(`/products/${productId}/serials`, {
+      headers: authHeader(),
+      params: queryParams,
+    })
+
+    return { success: true, serials: Array.isArray(data) ? data : data?.serials || [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load product serial numbers. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function listProductAttachments(productId) {
+  try {
+    const { data } = await apiClient.get(`/products/${productId}/attachments`, {
+      headers: authHeader(),
+    })
+
+    return { success: true, attachments: Array.isArray(data) ? data : data?.attachments || [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load product attachments. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function addProductAttachments(productId, files) {
+  try {
+    const formData = new FormData()
+    files.forEach((file) => formData.append('files', file))
+
+    const { data } = await apiClient.post(`/products/${productId}/attachments`, formData, {
+      headers: {
+        ...authHeader(),
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+
+    return { success: true, attachments: Array.isArray(data) ? data : data?.attachments || [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to upload attachments. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function deleteProductAttachment(productId, attachmentId) {
+  try {
+    await apiClient.delete(`/products/${productId}/attachments/${attachmentId}`, {
+      headers: authHeader(),
+    })
+
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to delete attachment. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function deleteProductsBulk(productIds) {
   try {
     const { data } = await apiClient.post(
@@ -221,6 +354,7 @@ export async function listProducts(params = {}) {
     if (params.search) queryParams.search = params.search
     if (params.category_id) queryParams.category_id = params.category_id
     if (params.is_active !== undefined && params.is_active !== null) queryParams.is_active = params.is_active
+    if (params.barcode) queryParams.barcode = params.barcode
 
     const { data } = await apiClient.get('/products', {
       headers: authHeader(),

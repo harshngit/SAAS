@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BellRing,
@@ -8,6 +9,7 @@ import {
   FileText,
   MapPin,
   MoreVertical,
+  RotateCw,
   ShoppingCart,
   Sun,
   Truck,
@@ -16,17 +18,19 @@ import {
   UsersRound,
 } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
+import Button from '../../components/ui/Button'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useAuthStore } from '../../store/authStore'
-import { customers } from '../../mockData/customers'
-import { orders } from '../../mockData/orders'
+import { listCustomers } from '../../api/customers'
+import { listOrders } from '../../api/orders'
+import { listQuotations } from '../../api/quotations'
+import { getMyAttendance } from '../../api/attendance'
 import { visits } from '../../mockData/visits'
-import { quotations } from '../../mockData/quotations'
-import { attendance } from '../../mockData/attendance'
 import { formatCurrency } from '../../utils/format'
 
-const TODAY = '2026-07-17'
-const CURRENT_MONTH = '2026-07'
-const CURRENT_USER_ID = 'usr-3'
+// The visits mock file only models a single hardcoded sales officer ("usr-3") - Visits/Follow-ups
+// have no backend endpoint yet (see src/auth/roles.js roleMenus comment), so this stays mocked.
+const MOCK_VISITS_OFFICER_ID = 'usr-3'
 const MONTHLY_TARGET = 80000
 
 const visitStatusVariant = {
@@ -37,15 +41,15 @@ const visitStatusVariant = {
 }
 
 const orderStatusVariant = {
-  Draft: 'neutral',
-  Confirmed: 'info',
-  'Out for Delivery': 'warning',
-  Delivered: 'success',
-  Cancelled: 'danger',
+  draft: 'neutral',
+  placed: 'info',
+  awaiting_approval: 'warning',
+  processing: 'primary',
+  completed: 'success',
+  cancelled: 'danger',
 }
 
-const myOrders = orders.filter((order) => order.salesOfficerId === CURRENT_USER_ID)
-const myVisits = visits.filter((visit) => visit.salesOfficerId === CURRENT_USER_ID)
+const myVisits = visits.filter((visit) => visit.salesOfficerId === MOCK_VISITS_OFFICER_ID)
 
 function getGreeting() {
   const hour = new Date().getHours()
@@ -54,10 +58,20 @@ function getGreeting() {
   return 'Good Evening'
 }
 
-function formatTime12h(value) {
+function formatStatusLabel(value = '') {
+  return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function formatCheckInTime(value) {
   if (!value) return ''
-  const [hourString, minute] = value.split(':')
+  const date = new Date(value)
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+  // Fall back to a bare "HH:MM" string as some records store just a time-of-day.
+  const [hourString, minute] = String(value).split(':')
   const hour = Number(hourString)
+  if (Number.isNaN(hour) || minute === undefined) return String(value)
   const period = hour >= 12 ? 'PM' : 'AM'
   const hour12 = hour % 12 === 0 ? 12 : hour % 12
   return `${hour12}:${minute} ${period}`
@@ -137,30 +151,112 @@ function SectionCard({ icon: Icon, title, action, children, className = '' }) {
 export default function SalesOfficerDashboard() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
-  const firstName = (currentUser?.name || 'Vikram Singh').split(' ')[0]
+  const firstName = (currentUser?.name || 'there').split(' ')[0]
 
-  const assignedCustomers = customers.filter((customer) => customer.assignedSalesOfficerId === CURRENT_USER_ID)
-  const visitsToday = myVisits.filter((visit) => visit.date === TODAY).length
+  const [customers, setCustomers] = useState([])
+  const [orders, setOrders] = useState([])
+  const [quotations, setQuotations] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+
+  const [todaysAttendance, setTodaysAttendance] = useState(null)
+
+  const loadDashboardData = useCallback(async () => {
+    setIsLoading(true)
+    setLoadError('')
+
+    const [customersResult, ordersResult, quotationsResult] = await Promise.all([
+      listCustomers(),
+      listOrders(),
+      listQuotations(),
+    ])
+
+    setIsLoading(false)
+
+    if (!customersResult.success) {
+      setLoadError(customersResult.error)
+      return
+    }
+    if (!ordersResult.success) {
+      setLoadError(ordersResult.error)
+      return
+    }
+    if (!quotationsResult.success) {
+      setLoadError(quotationsResult.error)
+      return
+    }
+
+    setCustomers(customersResult.customers)
+    setOrders(ordersResult.orders)
+    setQuotations(quotationsResult.quotations)
+  }, [])
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [loadDashboardData])
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadAttendance() {
+      const result = await getMyAttendance()
+      if (!isMounted || !result.success) return
+
+      const today = new Date().toISOString().slice(0, 10)
+      const record = result.records.find((entry) => entry.date === today)
+      setTodaysAttendance(record || null)
+    }
+
+    loadAttendance()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  if (isLoading) {
+    return <LoadingSpinner label="Loading your dashboard..." />
+  }
+
+  if (loadError) {
+    return (
+      <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
+        <p className="text-sm text-red-600">{loadError}</p>
+        <Button type="button" variant="outline" className="mt-4" onClick={loadDashboardData}>
+          <RotateCw className="size-4" aria-hidden="true" />
+          Retry
+        </Button>
+      </div>
+    )
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+  const currentMonth = today.slice(0, 7)
+
+  const assignedCustomers = customers
+  const visitsToday = myVisits.filter((visit) => visit.date === today).length
   const pendingFollowUps = myVisits.filter((visit) => visit.status === 'Follow-up Required').length
-  const ordersThisMonth = myOrders.filter((order) => order.status !== 'Cancelled' && order.orderDate.startsWith(CURRENT_MONTH))
-  const monthlySales = ordersThisMonth.reduce((sum, order) => sum + order.total, 0)
+  const ordersThisMonth = orders.filter(
+    (order) => order.status !== 'cancelled' && (order.orderDate || '').slice(0, 7) === currentMonth,
+  )
+  const monthlySales = ordersThisMonth.reduce((sum, order) => sum + (order.total || 0), 0)
   const targetProgress = Math.min(100, Math.round((monthlySales / MONTHLY_TARGET) * 100))
-  const quotationsAwaitingResponse = quotations.filter((quotation) => quotation.status === 'Sent').length
-  const deliveriesToday = myOrders.filter((order) => order.expectedDeliveryDate === TODAY && order.status !== 'Cancelled').length
-
-  const todaysAttendance = attendance
-    .find((record) => record.userId === CURRENT_USER_ID)
-    ?.records.find((record) => record.date === TODAY)
+  const quotationsAwaitingResponse = quotations.filter((quotation) => quotation.status === 'sent').length
+  const deliveriesToday = orders.filter(
+    (order) => (order.deliveryDate || '').slice(0, 10) === today && order.status !== 'cancelled',
+  ).length
 
   const orderStatusCounts = {
-    Draft: myOrders.filter((order) => order.status === 'Draft').length,
-    Confirmed: myOrders.filter((order) => order.status === 'Confirmed').length,
-    'In Transit': myOrders.filter((order) => order.status === 'Out for Delivery').length,
-    Delivered: myOrders.filter((order) => order.status === 'Delivered').length,
+    draft: orders.filter((order) => order.status === 'draft').length,
+    placed: orders.filter((order) => order.status === 'placed').length,
+    processing: orders.filter((order) => order.status === 'processing' || order.status === 'awaiting_approval').length,
+    completed: orders.filter((order) => order.status === 'completed').length,
   }
 
   const upcomingVisits = [...myVisits].sort((a, b) => (a.date < b.date ? -1 : 1)).slice(0, 3)
-  const recentOrders = [...myOrders].sort((a, b) => (a.orderDate < b.orderDate ? 1 : -1)).slice(0, 3)
+  const recentOrders = [...orders]
+    .sort((a, b) => (a.orderDate < b.orderDate ? 1 : -1))
+    .slice(0, 3)
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -177,7 +273,7 @@ export default function SalesOfficerDashboard() {
             {todaysAttendance?.checkIn && (
               <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-100">
                 <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                Checked In · {formatTime12h(todaysAttendance.checkIn)}
+                Checked In · {formatCheckInTime(todaysAttendance.checkIn)}
               </span>
             )}
           </div>
@@ -255,10 +351,10 @@ export default function SalesOfficerDashboard() {
 
         <SectionCard icon={ShoppingCart} title="Order Status">
           <div className="flex gap-3">
-            <OrderStatusTile icon={FileText} iconClassName="bg-neutral-100 text-neutral-500" label="Draft" count={orderStatusCounts.Draft} />
-            <OrderStatusTile icon={CheckCircle2} iconClassName="bg-green-50 text-green-600" label="Confirmed" count={orderStatusCounts.Confirmed} />
-            <OrderStatusTile icon={Truck} iconClassName="bg-blue-50 text-blue-600" label="In Transit" count={orderStatusCounts['In Transit']} />
-            <OrderStatusTile icon={Box} iconClassName="bg-emerald-50 text-emerald-600" label="Delivered" count={orderStatusCounts.Delivered} />
+            <OrderStatusTile icon={FileText} iconClassName="bg-neutral-100 text-neutral-500" label="Draft" count={orderStatusCounts.draft} />
+            <OrderStatusTile icon={CheckCircle2} iconClassName="bg-green-50 text-green-600" label="Placed" count={orderStatusCounts.placed} />
+            <OrderStatusTile icon={Truck} iconClassName="bg-blue-50 text-blue-600" label="Processing" count={orderStatusCounts.processing} />
+            <OrderStatusTile icon={Box} iconClassName="bg-emerald-50 text-emerald-600" label="Completed" count={orderStatusCounts.completed} />
           </div>
           <button
             type="button"
@@ -336,7 +432,7 @@ export default function SalesOfficerDashboard() {
                     <td className="py-3 pr-3 text-neutral-500">{order.customerName}</td>
                     <td className="whitespace-nowrap py-3 pr-3 text-right font-medium text-neutral-900">{formatCurrency(order.total)}</td>
                     <td className="whitespace-nowrap py-3 pr-3">
-                      <Badge variant={orderStatusVariant[order.status] || 'neutral'} dot>{order.status}</Badge>
+                      <Badge variant={orderStatusVariant[order.status] || 'neutral'} dot>{formatStatusLabel(order.status)}</Badge>
                     </td>
                     <td className="whitespace-nowrap py-3 text-right">
                       <button type="button" className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700" aria-label="More actions">

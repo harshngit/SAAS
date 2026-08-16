@@ -9,7 +9,10 @@ import Select from '../../components/ui/Select'
 import { exportReport, getReport } from '../../api/reports'
 import { PERIOD_OPTIONS, REPORT_TYPES, getDateRangeForPeriod, humanizeKey } from './reportConstants'
 
-export default function FinancialReports() {
+export default function FinancialReports({
+  title = 'Financial Reports',
+  description = 'Generate, review and export every accounting report for your firm',
+}) {
   const [reportType, setReportType] = useState(REPORT_TYPES[0].value)
   const [period, setPeriod] = useState('monthly')
   const [customFrom, setCustomFrom] = useState('')
@@ -75,8 +78,8 @@ export default function FinancialReports() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Financial Reports</h1>
-        <p className="mt-1 text-sm text-neutral-500">Generate, review and export every accounting report for your firm</p>
+        <h1 className="text-2xl font-semibold text-neutral-900">{title}</h1>
+        <p className="mt-1 text-sm text-neutral-500">{description}</p>
       </div>
 
       <Card className="p-0">

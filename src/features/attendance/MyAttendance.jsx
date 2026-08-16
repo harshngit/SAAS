@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react'
-import { Building2, LogIn, LogOut, MapPin } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Building2, CalendarCheck, LogIn, LogOut, MapPin } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
+import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { checkIn, getMyAttendance } from '../../api/attendance'
-import { attendance as sampleAttendance } from '../../mockData/attendance'
-import { useAuthStore } from '../../store/authStore'
+import { normalizeAttendanceRecord } from './attendanceUtils'
 import { CHECKPOINTS, formatTime } from './attendanceConstants'
 
 const checkpointIcons = {
@@ -25,48 +25,54 @@ const statusVariant = {
 }
 
 const emptyToday = { office_check_in: null, departure: null, return_to_office: null, final_check_out: null }
+const todayIso = () => new Date().toISOString().slice(0, 10)
 
 export default function MyAttendance() {
-  const currentUser = useAuthStore((state) => state.currentUser)
-  const [today, setToday] = useState(emptyToday)
   const [history, setHistory] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [submittingType, setSubmittingType] = useState('')
+  const [checkInError, setCheckInError] = useState('')
+
+  const loadAttendance = async () => {
+    setIsLoading(true)
+    setLoadError('')
+
+    const result = await getMyAttendance({})
+
+    setIsLoading(false)
+
+    if (!result.success) {
+      setLoadError(result.error)
+      return
+    }
+
+    setHistory(result.records)
+  }
 
   useEffect(() => {
-    let isMounted = true
-
-    async function loadAttendance() {
-      setIsLoading(true)
-
-      const result = await getMyAttendance({})
-
-      if (!isMounted) return
-      setIsLoading(false)
-
-      if (result.success && result.records.length > 0) {
-        setHistory(result.records)
-        return
-      }
-
-      const sample = sampleAttendance.find((entry) => entry.role === currentUser?.role) || sampleAttendance[0]
-      setHistory(sample?.records || [])
-    }
-
     loadAttendance()
+  }, [])
 
-    return () => {
-      isMounted = false
-    }
-  }, [currentUser?.role])
+  const today = useMemo(
+    () => history.find((record) => record.date === todayIso()) || emptyToday,
+    [history],
+  )
+
+  const historyRows = useMemo(() => history.map(normalizeAttendanceRecord), [history])
 
   const handleCheckIn = async (type) => {
     setSubmittingType(type)
+    setCheckInError('')
     const result = await checkIn(type)
     setSubmittingType('')
 
-    const timestamp = result.success ? result.record?.timestamp || new Date().toISOString() : new Date().toISOString()
-    setToday((current) => ({ ...current, [type]: timestamp }))
+    if (!result.success) {
+      setCheckInError(result.error)
+      return
+    }
+
+    await loadAttendance()
   }
 
   return (
@@ -77,6 +83,11 @@ export default function MyAttendance() {
       </div>
 
       <Card title="Today's Checkpoints">
+        {checkInError && (
+          <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {checkInError}
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {CHECKPOINTS.map(({ type, label }) => {
             const Icon = checkpointIcons[type]
@@ -111,6 +122,15 @@ export default function MyAttendance() {
       <Card title="Attendance History">
         {isLoading ? (
           <LoadingSpinner label="Loading attendance history..." />
+        ) : loadError ? (
+          <div className="py-6 text-center">
+            <p className="text-sm text-red-600">{loadError}</p>
+            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={loadAttendance}>
+              Retry
+            </Button>
+          </div>
+        ) : historyRows.length === 0 ? (
+          <EmptyState icon={CalendarCheck} title="No attendance recorded yet" description="Mark today's checkpoints above to start building your history." />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-neutral-200">
@@ -123,7 +143,7 @@ export default function MyAttendance() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200 bg-white">
-                {history.map((record, index) => (
+                {historyRows.map((record, index) => (
                   <tr key={index}>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-neutral-900">{record.date}</td>
                     <td className="whitespace-nowrap px-4 py-3">
@@ -131,8 +151,8 @@ export default function MyAttendance() {
                         {record.status}
                       </Badge>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-neutral-600">{record.checkIn || '-'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-neutral-600">{record.checkOut || '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-neutral-600">{formatTime(record.checkIn) || '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-neutral-600">{formatTime(record.checkOut) || '-'}</td>
                   </tr>
                 ))}
               </tbody>

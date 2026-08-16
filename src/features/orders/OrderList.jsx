@@ -1,31 +1,32 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { ChevronDown, ChevronLeft, ChevronRight, Clock3, Plus, Search, ShoppingCart, Truck, Wallet } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Clock3, Plus, RotateCw, Search, ShoppingCart, Truck, Wallet } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
-import DatePicker from '../../components/ui/DatePicker'
 import EmptyState from '../../components/ui/EmptyState'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
 import { RequirePermission } from '../../auth/RequirePermission'
-import { ORDER_STATUSES, orderStatusBadgeVariant, orders as seedOrders } from '../../mockData/orders'
-import { users } from '../../mockData/users'
-import { getInvoiceByOrderNumber } from '../../mockData/invoices'
+import { ROLES } from '../../auth/roles'
+import { ORDER_STATUS_OPTIONS, listOrders } from '../../api/orders'
+import { listUsers } from '../../api/users'
+import { normalizeApiUser } from '../users/userRoleUtils'
 import { formatCurrency } from '../../utils/format'
 
-const statusTabs = [{ value: 'all', label: 'All' }, ...ORDER_STATUSES.map((status) => ({ value: status.value, label: status.label }))]
+const statusTabs = [{ value: 'all', label: 'All' }, ...ORDER_STATUS_OPTIONS]
 
-const paymentStatusOptions = [
-  { value: 'all', label: 'All payments' },
-  { value: 'Paid', label: 'Paid' },
-  { value: 'Partial', label: 'Partial' },
-  { value: 'Unpaid', label: 'Unpaid' },
-]
-
-const paymentBadgeVariant = { Paid: 'success', Partial: 'warning', Unpaid: 'danger' }
+const statusBadgeVariant = {
+  draft: 'neutral',
+  placed: 'info',
+  awaiting_approval: 'warning',
+  processing: 'primary',
+  completed: 'success',
+  cancelled: 'danger',
+}
 
 const formatDate = (value) => {
   if (!value) return '—'
@@ -36,65 +37,81 @@ const formatDate = (value) => {
   }
 }
 
-const salesOfficers = users.filter((user) => user.role === 'sales_officer')
-const salesOfficerOptions = [
-  { value: 'all', label: 'All sales officers' },
-  ...salesOfficers.map((officer) => ({ value: officer.id, label: officer.name })),
-]
-
-const deliveryPartnerUsers = users.filter((user) => user.role === 'delivery_partner')
-const deliveryPartnerOptions = [
-  { value: 'all', label: 'All delivery partners' },
-  ...deliveryPartnerUsers.map((partner) => ({ value: partner.id, label: partner.name })),
-]
-
 const pageSize = 10
 
 export default function OrderList() {
   const navigate = useNavigate()
-  const [orders] = useState(seedOrders)
+  const basePath = window.location.pathname.startsWith('/sales') ? '/sales/orders' : window.location.pathname.startsWith('/delivery') ? '/delivery/orders' : '/admin/orders'
+
+  const [orders, setOrders] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [listError, setListError] = useState('')
+  const [deliveryPartners, setDeliveryPartners] = useState([])
+
   const [statusFilter, setStatusFilter] = useState('all')
-  const [paymentFilter, setPaymentFilter] = useState('all')
-  const [officerFilter, setOfficerFilter] = useState('all')
   const [deliveryPartnerFilter, setDeliveryPartnerFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
 
-  const filteredOrders = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase()
+  const loadOrders = useCallback(async () => {
+    setIsLoading(true)
+    setListError('')
 
-    return orders.filter((order) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        [order.orderNumber, order.customerName].some((value) => String(value).toLowerCase().includes(normalizedSearch))
-      const matchesStatus = statusFilter === 'all' || order.status === statusFilter
-      const matchesPayment = paymentFilter === 'all' || order.paymentStatus === paymentFilter
-      const matchesOfficer = officerFilter === 'all' || order.salesOfficerId === officerFilter
-      const matchesDeliveryPartner = deliveryPartnerFilter === 'all' || order.deliveryPartnerId === deliveryPartnerFilter
-      const matchesFrom = !dateFrom || order.orderDate >= dateFrom
-      const matchesTo = !dateTo || order.orderDate <= dateTo
+    const params = {}
+    if (statusFilter !== 'all') params.status = statusFilter
+    if (deliveryPartnerFilter !== 'all') params.assigned_delivery_partner_id = deliveryPartnerFilter
+    if (searchTerm.trim()) params.search = searchTerm.trim()
 
-      return matchesSearch && matchesStatus && matchesPayment && matchesOfficer && matchesDeliveryPartner && matchesFrom && matchesTo
+    const result = await listOrders(params)
+
+    if (!result.success) {
+      setOrders([])
+      setListError(result.error)
+      setIsLoading(false)
+      return
+    }
+
+    setOrders(result.orders)
+    setIsLoading(false)
+  }, [statusFilter, deliveryPartnerFilter, searchTerm])
+
+  useEffect(() => {
+    loadOrders()
+  }, [loadOrders])
+
+  useEffect(() => {
+    let isMounted = true
+
+    listUsers().then((result) => {
+      if (!isMounted || !result.success) return
+      setDeliveryPartners(result.users.map(normalizeApiUser).filter((user) => user.role === ROLES.DELIVERY_PARTNER))
     })
-  }, [orders, searchTerm, statusFilter, paymentFilter, officerFilter, deliveryPartnerFilter, dateFrom, dateTo])
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const deliveryPartnerOptions = useMemo(
+    () => [{ value: 'all', label: 'All delivery partners' }, ...deliveryPartners.map((partner) => ({ value: partner.id, label: partner.name }))],
+    [deliveryPartners],
+  )
 
   const stats = useMemo(
     () => ({
       totalOrders: orders.length,
-      processing: orders.filter((order) => order.status === 'Processing').length,
-      outForDelivery: orders.filter((order) => order.status === 'Out for Delivery').length,
-      outstanding: orders.reduce((sum, order) => sum + order.balanceDue, 0),
+      awaitingApproval: orders.filter((order) => order.status === 'awaiting_approval').length,
+      processing: orders.filter((order) => order.status === 'processing').length,
+      outstandingValue: orders.filter((order) => order.status !== 'cancelled').reduce((sum, order) => sum + order.total, 0),
     }),
     [orders],
   )
 
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize))
+  const totalPages = Math.max(1, Math.ceil(orders.length / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-  const rangeStart = filteredOrders.length === 0 ? 0 : (currentPage - 1) * pageSize + 1
-  const rangeEnd = Math.min(filteredOrders.length, currentPage * pageSize)
+  const paginatedOrders = orders.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const rangeStart = orders.length === 0 ? 0 : (currentPage - 1) * pageSize + 1
+  const rangeEnd = Math.min(orders.length, currentPage * pageSize)
 
   const pageNumbers = useMemo(() => {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1)
@@ -107,9 +124,6 @@ export default function OrderList() {
     setPage(1)
   }
 
-  const getDeliveryPartnerName = (order) =>
-    order.deliveryPartnerId ? users.find((user) => user.id === order.deliveryPartnerId)?.name : null
-
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -118,7 +132,7 @@ export default function OrderList() {
           <p className="mt-1 text-sm text-neutral-500">Track, manage, and fulfill customer orders</p>
         </div>
         <RequirePermission module="sales_orders" action="create">
-          <Button size="sm" onClick={() => navigate('/admin/orders/create')} className="w-full sm:w-auto">
+          <Button size="sm" onClick={() => navigate(`${basePath}/create`)} className="w-full sm:w-auto">
             <Plus className="size-4" aria-hidden="true" />
             New Order
           </Button>
@@ -127,9 +141,9 @@ export default function OrderList() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={ShoppingCart} iconVariant="primary" label="Total Orders" value={stats.totalOrders} />
-        <StatCard icon={Clock3} iconVariant="warning" label="Processing" value={stats.processing} />
-        <StatCard icon={Truck} iconVariant="info" label="Out for Delivery" value={stats.outForDelivery} />
-        <StatCard icon={Wallet} iconVariant="danger" label="Outstanding Value" value={formatCurrency(stats.outstanding)} />
+        <StatCard icon={Clock3} iconVariant="warning" label="Awaiting Approval" value={stats.awaitingApproval} />
+        <StatCard icon={Truck} iconVariant="info" label="Processing" value={stats.processing} />
+        <StatCard icon={Wallet} iconVariant="danger" label="Order Value" value={formatCurrency(stats.outstandingValue)} />
       </div>
 
       <Card className="p-0">
@@ -141,18 +155,13 @@ export default function OrderList() {
                 <button
                   key={tab.value}
                   type="button"
-                  onClick={() => {
-                    setStatusFilter(tab.value)
-                    setPage(1)
-                  }}
+                  onClick={() => { setStatusFilter(tab.value); setPage(1) }}
                   className={`relative py-2 text-sm font-medium transition-colors ${
                     isActive ? 'text-primary-700' : 'text-neutral-500 hover:text-neutral-900'
                   }`}
                 >
                   {tab.label}
-                  {isActive && (
-                    <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-600" aria-hidden="true" />
-                  )}
+                  {isActive && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-600" aria-hidden="true" />}
                 </button>
               )
             })}
@@ -167,24 +176,30 @@ export default function OrderList() {
                 type="search"
                 value={searchTerm}
                 onChange={updateFilter(setSearchTerm)}
-                placeholder="Search order # or customer"
+                placeholder="Search order #"
                 className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
-            <Select options={paymentStatusOptions} value={paymentFilter} onChange={updateFilter(setPaymentFilter)} className="sm:w-44" />
-            <Select options={salesOfficerOptions} value={officerFilter} onChange={updateFilter(setOfficerFilter)} className="sm:w-52" />
             <Select options={deliveryPartnerOptions} value={deliveryPartnerFilter} onChange={updateFilter(setDeliveryPartnerFilter)} className="sm:w-52" />
-            <DatePicker value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} placeholder="From date" className="sm:w-44" />
-            <DatePicker value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} placeholder="To date" className="sm:w-44" />
           </div>
         </div>
 
         <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">
-          {paginatedOrders.length === 0 ? (
+          {listError ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-red-600">{listError}</p>
+              <Button type="button" variant="outline" className="mt-4" onClick={loadOrders}>
+                <RotateCw className="size-4" aria-hidden="true" />
+                Retry
+              </Button>
+            </div>
+          ) : isLoading ? (
+            <LoadingSpinner label="Loading orders..." />
+          ) : paginatedOrders.length === 0 ? (
             <EmptyState
               icon={ShoppingCart}
               title="No orders match these filters"
-              description="Try adjusting the status, payment, or date filters."
+              description="Try adjusting the status or delivery partner filters."
             />
           ) : (
             <table className="w-full text-left text-sm">
@@ -195,64 +210,42 @@ export default function OrderList() {
                   <th className="whitespace-nowrap px-4 py-3">Date</th>
                   <th className="whitespace-nowrap px-4 py-3">Items</th>
                   <th className="whitespace-nowrap px-4 py-3">Total</th>
-                  <th className="whitespace-nowrap px-4 py-3">Payment</th>
                   <th className="whitespace-nowrap px-4 py-3">Status</th>
+                  <th className="whitespace-nowrap px-4 py-3">Fulfilment</th>
                   <th className="whitespace-nowrap px-4 py-3">Delivery Partner</th>
-                  <th className="whitespace-nowrap px-4 py-3">Invoice</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedOrders.map((order) => {
-                  const deliveryPartnerName = getDeliveryPartnerName(order)
-                  const invoice = getInvoiceByOrderNumber(order.orderNumber)
-                  return (
-                    <tr
-                      key={order.id}
-                      onClick={() => navigate(`/admin/orders/${order.id}`)}
-                      className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
-                    >
-                      <td className="px-4 py-3.5 font-medium text-neutral-900">{order.orderNumber}</td>
-                      <td className="px-4 py-3.5 text-neutral-700">{order.customerName}</td>
-                      <td className="px-4 py-3.5 text-neutral-600">{formatDate(order.orderDate)}</td>
-                      <td className="px-4 py-3.5 text-neutral-600">{order.items.length}</td>
-                      <td className="px-4 py-3.5 font-medium text-neutral-700">{formatCurrency(order.total)}</td>
-                      <td className="px-4 py-3.5">
-                        <Badge variant={paymentBadgeVariant[order.paymentStatus]}>{order.paymentStatus}</Badge>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <Badge variant={orderStatusBadgeVariant(order.status)}>{order.status}</Badge>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {deliveryPartnerName ? (
-                          <span className="text-neutral-700">{deliveryPartnerName}</span>
-                        ) : (
-                          <span className="text-neutral-400">Unassigned</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5" onClick={(event) => event.stopPropagation()}>
-                        {invoice ? (
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/admin/invoices/${invoice.invoiceNumber}`)}
-                            className="font-medium text-primary-700 hover:underline"
-                          >
-                            {invoice.invoiceNumber}
-                          </button>
-                        ) : (
-                          <span className="text-neutral-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
-                        <ActionMenu
-                          items={[
-                            { label: 'View', icon: ShoppingCart, onClick: () => navigate(`/admin/orders/${order.id}`) },
-                          ]}
-                        />
-                      </td>
-                    </tr>
-                  )
-                })}
+                {paginatedOrders.map((order) => (
+                  <tr
+                    key={order.id}
+                    onClick={() => navigate(`${basePath}/${order.id}`)}
+                    className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                  >
+                    <td className="px-4 py-3.5 font-medium text-neutral-900">{order.orderNumber}</td>
+                    <td className="px-4 py-3.5 text-neutral-700">{order.customerName}</td>
+                    <td className="px-4 py-3.5 text-neutral-600">{formatDate(order.orderDate)}</td>
+                    <td className="px-4 py-3.5 text-neutral-600">{order.items.length}</td>
+                    <td className="px-4 py-3.5 font-medium text-neutral-700">{formatCurrency(order.total)}</td>
+                    <td className="px-4 py-3.5">
+                      <Badge variant={statusBadgeVariant[order.status] || 'neutral'}>{order.status.replace(/_/g, ' ')}</Badge>
+                    </td>
+                    <td className="px-4 py-3.5 text-neutral-600">{order.fulfilmentStatus.replace(/_/g, ' ')}</td>
+                    <td className="px-4 py-3.5">
+                      {order.assignedDeliveryPartnerName ? (
+                        <span className="text-neutral-700">{order.assignedDeliveryPartnerName}</span>
+                      ) : (
+                        <span className="text-neutral-400">Unassigned</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
+                      <ActionMenu
+                        items={[{ label: 'View', icon: ShoppingCart, onClick: () => navigate(`${basePath}/${order.id}`) }]}
+                      />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
@@ -260,12 +253,12 @@ export default function OrderList() {
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-3.5">
           <p className="text-xs text-neutral-400">
-            Showing {rangeStart} to {rangeEnd} of {filteredOrders.length} orders
+            Showing {rangeStart} to {rangeEnd} of {orders.length} orders
           </p>
           <div className="flex items-center gap-3">
-            <button type="button" className="flex items-center gap-1 rounded-full border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700">
+            <span className="flex items-center gap-1 rounded-full border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700">
               10 / page <ChevronDown className="size-3.5" />
-            </button>
+            </span>
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
