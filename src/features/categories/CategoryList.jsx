@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, Edit, Eye, ImageIcon, Plus, RotateCw, Search, Tags, Trash2, Upload } from 'lucide-react'
+import { Check, Edit, Eye, Filter, ImageIcon, Plus, RotateCw, Search, Tags, Trash2, Upload } from 'lucide-react'
 import {
   createCategory,
   deleteCategoriesBulk,
@@ -40,6 +40,13 @@ const getInitials = (name = '') =>
     .join('')
     .slice(0, 2)
     .toUpperCase()
+
+const formatDateLabel = (value) => {
+  if (!value) return 'Not available'
+
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
 function CategoryForm({ category, existingCategories, saving, formError, onClose, onSave }) {
   const [formData, setFormData] = useState(emptyForm)
@@ -158,10 +165,16 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
 
 export default function CategoryList() {
   const navigate = useNavigate()
+  const filterMenuRef = useRef(null)
+  const sortMenuRef = useRef(null)
   const [categories, setCategories] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [categorySort, setCategorySort] = useState('recent')
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false)
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
@@ -177,14 +190,24 @@ export default function CategoryList() {
   const filteredCategories = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
-    return categories.filter((category) => {
+    const filtered = categories.filter((category) => {
+      if (categoryFilter === 'with-image' && !category.image) return false
+      if (categoryFilter === 'without-image' && category.image) return false
       if (!normalizedSearch) return true
 
       return [category.name, category.description]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(normalizedSearch))
     })
-  }, [categories, searchTerm])
+
+    return filtered.sort((left, right) => {
+      const leftTime = new Date(left.createdAt || 0).getTime()
+      const rightTime = new Date(right.createdAt || 0).getTime()
+
+      if (categorySort === 'oldest') return leftTime - rightTime
+      return rightTime - leftTime
+    })
+  }, [categoryFilter, categorySort, categories, searchTerm])
 
   const allVisibleSelected =
     filteredCategories.length > 0 && filteredCategories.every((category) => selectedIds.includes(category.id))
@@ -209,6 +232,33 @@ export default function CategoryList() {
   useEffect(() => {
     loadCategories()
   }, [loadCategories])
+
+  useEffect(() => {
+    if (!isFilterMenuOpen && !isSortMenuOpen) return
+
+    const handleClickOutside = (event) => {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target)) {
+        setIsFilterMenuOpen(false)
+      }
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target)) {
+        setIsSortMenuOpen(false)
+      }
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsFilterMenuOpen(false)
+        setIsSortMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isFilterMenuOpen, isSortMenuOpen])
 
   const openForm = (category = null) => {
     setEditingCategory(category)
@@ -331,7 +381,7 @@ export default function CategoryList() {
         </div>
 
         <div className="border-b border-neutral-100 px-5 py-3">
-          <div className="flex justify-end">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
             <div className="relative w-full sm:w-96">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
               <input
@@ -341,6 +391,111 @@ export default function CategoryList() {
                 placeholder="Search categories"
                 className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
+            </div>
+
+            <div ref={filterMenuRef} className="relative shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-11 rounded-xl bg-white px-4"
+                onClick={() => setIsFilterMenuOpen((current) => !current)}
+                aria-haspopup="menu"
+                aria-expanded={isFilterMenuOpen}
+              >
+                <Filter className="size-4" aria-hidden="true" />
+                Filters
+              </Button>
+
+              {isFilterMenuOpen && (
+                <div
+                  role="menu"
+                  aria-label="Category filters"
+                  className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-56 rounded-2xl border border-neutral-100 bg-white p-2 shadow-(--shadow-popover)"
+                >
+                  <p className="px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                    Filter
+                  </p>
+                  {[
+                    { value: 'all', label: 'All categories' },
+                    { value: 'with-image', label: 'With image' },
+                    { value: 'without-image', label: 'Without image' },
+                  ].map((option) => {
+                    const active = categoryFilter === option.value
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={active}
+                        onClick={() => {
+                          setCategoryFilter(option.value)
+                          setIsFilterMenuOpen(false)
+                        }}
+                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
+                          active ? 'bg-primary-50 text-primary-700' : 'text-neutral-700 hover:bg-neutral-100'
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                        {active && <Check className="size-4" aria-hidden="true" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div ref={sortMenuRef} className="relative shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-11 rounded-xl bg-white px-4"
+                onClick={() => setIsSortMenuOpen((current) => !current)}
+                aria-haspopup="menu"
+                aria-expanded={isSortMenuOpen}
+              >
+                <RotateCw className="size-4" aria-hidden="true" />
+                Sort
+              </Button>
+
+              {isSortMenuOpen && (
+                <div
+                  role="menu"
+                  aria-label="Category sorting"
+                  className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-52 rounded-2xl border border-neutral-100 bg-white p-2 shadow-(--shadow-popover)"
+                >
+                  <p className="px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                    Sort by
+                  </p>
+                  {[
+                    { value: 'recent', label: 'Recent' },
+                    { value: 'oldest', label: 'Oldest' },
+                  ].map((option) => {
+                    const active = categorySort === option.value
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={active}
+                        onClick={() => {
+                          setCategorySort(option.value)
+                          setIsSortMenuOpen(false)
+                        }}
+                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
+                          active ? 'bg-primary-50 text-primary-700' : 'text-neutral-700 hover:bg-neutral-100'
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                        {active && <Check className="size-4" aria-hidden="true" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -366,7 +521,7 @@ export default function CategoryList() {
               </Button>
             </div>
           ) : filteredCategories.length === 0 ? (
-            <p className="py-8 text-center text-sm text-neutral-500">No categories match this search.</p>
+            <p className="py-8 text-center text-sm text-neutral-500">No categories match this search or filter.</p>
           ) : (
             <table className="w-full text-left text-sm">
               <thead>
@@ -474,7 +629,7 @@ export default function CategoryList() {
           setDetailsError('')
         }}
         title="Category Details"
-        className="max-w-lg"
+        className="max-w-2xl overflow-hidden"
       >
         {isDetailsLoading ? (
           <LoadingSpinner label="Loading category details..." />
@@ -485,22 +640,58 @@ export default function CategoryList() {
                 {detailsError}
               </div>
             )}
-            <div className="flex items-start gap-4">
-              {viewCategory?.image ? (
-                <img
-                  src={viewCategory.image}
-                  alt=""
-                  className="size-16 rounded-xl border border-neutral-100 object-cover"
-                />
-              ) : (
-                <div className="flex size-16 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
-                  <Tags className="size-6" aria-hidden="true" />
+            <div className="relative overflow-hidden rounded-3xl border border-neutral-100 bg-linear-to-br from-primary-50 via-white to-neutral-50 p-5 shadow-[0_1px_0_0_rgb(255_255_255/0.6)_inset] sm:p-6">
+              <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-primary-200/35 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-12 right-24 size-40 rounded-full bg-emerald-100/60 blur-3xl" />
+              <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start">
+                {viewCategory?.image ? (
+                  <img
+                    src={viewCategory.image}
+                    alt=""
+                    className="size-24 shrink-0 rounded-2xl border border-white/70 object-cover shadow-[0_10px_30px_-16px_rgb(0_0_0/0.35)] ring-1 ring-neutral-100"
+                  />
+                ) : (
+                  <div className="flex size-24 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 shadow-[0_10px_30px_-16px_rgb(6_59_0/0.3)] ring-1 ring-primary-100">
+                    <Tags className="size-8" aria-hidden="true" />
+                  </div>
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-primary-600 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-white">
+                      Category
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                      {viewCategory?.subcategories?.length || 0} subcategories
+                    </span>
+                  </div>
+
+                  <h3 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-950 text-balance">
+                    {viewCategory?.name || 'Unnamed category'}
+                  </h3>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-600 text-pretty">
+                    {viewCategory?.description || 'No description added.'}
+                  </p>
                 </div>
-              )}
-              <div>
-                <p className="text-lg font-semibold text-neutral-900">{viewCategory?.name}</p>
-                <p className="mt-1 text-sm leading-6 text-neutral-500">{viewCategory?.description || 'No description added.'}</p>
               </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-neutral-100 bg-white px-4 py-3 shadow-[0_1px_0_0_rgb(255_255_255/0.8)_inset]">
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400">Created</p>
+                <p className="mt-1.5 text-sm font-medium text-neutral-900">{formatDateLabel(viewCategory?.createdAt)}</p>
+              </div>
+              <div className="rounded-2xl border border-neutral-100 bg-white px-4 py-3 shadow-[0_1px_0_0_rgb(255_255_255/0.8)_inset]">
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400">Updated</p>
+                <p className="mt-1.5 text-sm font-medium text-neutral-900">{formatDateLabel(viewCategory?.updatedAt)}</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-neutral-100 bg-neutral-50/70 p-4">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400">Description</p>
+              <p className="mt-2 text-sm leading-6 text-neutral-700">
+                {viewCategory?.description || 'No description added.'}
+              </p>
             </div>
           </div>
         )}

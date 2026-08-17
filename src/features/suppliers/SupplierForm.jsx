@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import Select from '../../components/ui/Select'
-import { supplierCategoryOptions } from './supplierConstants'
 
 const gstNumberPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
 
@@ -18,7 +16,15 @@ const emptyForm = {
   openingBalance: '',
 }
 
-export default function SupplierForm({ isOpen, onClose, supplier, onSave, saving = false, formError = '' }) {
+export default function SupplierForm({
+  isOpen,
+  onClose,
+  supplier,
+  onSave,
+  saving = false,
+  formError = '',
+  categoryOptions = [],
+}) {
   const [formData, setFormData] = useState(emptyForm)
   const [errors, setErrors] = useState({})
 
@@ -95,7 +101,25 @@ export default function SupplierForm({ isOpen, onClose, supplier, onSave, saving
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Input label="Supplier Name" value={formData.name} onChange={(event) => updateField('name', event.target.value)} error={errors.name} required />
             <Input label="Contact Person" value={formData.contactPerson} onChange={(event) => updateField('contactPerson', event.target.value)} />
-            <Select label="Category" options={supplierCategoryOptions} placeholder="Select category" value={formData.category} onChange={(event) => updateField('category', event.target.value)} error={errors.category} />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-neutral-700">
+                Category
+                <span className="text-red-500"> *</span>
+              </label>
+              <Input
+                list="supplier-category-options"
+                placeholder="Type or pick a category"
+                value={formData.category}
+                onChange={(event) => updateField('category', event.target.value)}
+                error={errors.category}
+                required
+              />
+              <datalist id="supplier-category-options">
+                {Array.from(new Set(categoryOptions.filter(Boolean))).map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+            </div>
             <Input label="Phone" type="tel" value={formData.phone} onChange={(event) => updateField('phone', event.target.value)} error={errors.phone} required />
             <Input label="Email" type="email" value={formData.email} onChange={(event) => updateField('email', event.target.value)} />
             <Input label="GST Number" value={formData.gstNumber} onChange={(event) => updateField('gstNumber', event.target.value.toUpperCase())} error={errors.gstNumber} />

@@ -18,7 +18,7 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import { listCustomerDocuments, updateCustomer } from '../../api/customers'
+import { listCustomers, listCustomerDocuments, updateCustomer } from '../../api/customers'
 import { deleteFile, uploadFile, uploadFiles as uploadGenericFiles } from '../../api/files'
 import { formatCurrency } from '../../utils/format'
 
@@ -111,16 +111,15 @@ function toDateInputValue(value) {
   return date.toISOString().slice(0, 10)
 }
 
+function formatOptionLabel(value = '') {
+  return String(value)
+    .trim()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase())
+}
+
 const optionValues = {
   // The API enforces this exact lowercase enum — do not add/relabel values here.
-  customerType: [
-    { value: 'individual', label: 'Individual' },
-    { value: 'business', label: 'Business' },
-    { value: 'government', label: 'Government' },
-    { value: 'dealer', label: 'Dealer' },
-    { value: 'distributor', label: 'Distributor' },
-    { value: 'vendor', label: 'Vendor' },
-  ],
   industry: ['Food & Beverage', 'Retail', 'Wholesale', 'Corporate', 'Healthcare', 'Education', 'Hospitality', 'Manufacturing', 'Services'],
   customerCategory: ['Retail', 'Wholesale', 'Corporate', 'VIP', 'Dealer', 'Distributor'],
   status: [
@@ -483,6 +482,7 @@ export default function CustomerForm({
   const [activeSection, setActiveSection] = useState(formSections[0].id)
   const [uploadPreviews, setUploadPreviews] = useState({})
   const [uploadedFileUrls, setUploadedFileUrls] = useState({})
+  const [customerTypeOptions, setCustomerTypeOptions] = useState([])
   const uploadPreviewsRef = useRef({})
   // Tracks file_ids from POST /files/upload that aren't attached to a saved customer yet
   // (create mode, before the record exists) - so a discarded/replaced upload can be cleaned
@@ -579,6 +579,51 @@ export default function CustomerForm({
       isMounted = false
     }
   }, [isOpen, customer?.id])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    let isMounted = true
+
+    async function loadCustomerTypes() {
+      const result = await listCustomers()
+      if (!isMounted) return
+
+      const optionMap = new Map()
+
+      if (result.success) {
+        result.customers.forEach((customerItem) => {
+          const value = String(customerItem.customerType || customerItem.type || customerItem.category || '').trim()
+          if (!value || optionMap.has(value)) return
+          optionMap.set(value, { value, label: formatOptionLabel(value) })
+        })
+      }
+
+      const currentValue = String(
+        customer?.customerType || customer?.type || customer?.category || initialCustomer?.customerType || initialCustomer?.type || initialCustomer?.category || '',
+      ).trim()
+
+      if (currentValue && !optionMap.has(currentValue)) {
+        optionMap.set(currentValue, { value: currentValue, label: formatOptionLabel(currentValue) })
+      }
+
+      setCustomerTypeOptions(Array.from(optionMap.values()))
+    }
+
+    loadCustomerTypes()
+
+    return () => {
+      isMounted = false
+    }
+  }, [
+    customer?.category,
+    customer?.customerType,
+    customer?.type,
+    initialCustomer?.category,
+    initialCustomer?.customerType,
+    initialCustomer?.type,
+    isOpen,
+  ])
 
   useEffect(() => {
     return () => {
@@ -850,10 +895,12 @@ export default function CustomerForm({
     }
 
     if (field.input === 'select') {
+      const options = field.name === 'customerType' ? customerTypeOptions : toOptions(optionValues[field.name] || [])
+
       return (
         <Select
           {...commonProps}
-          options={toOptions(optionValues[field.name] || [])}
+          options={options}
           placeholder={`Select ${field.label.toLowerCase()}`}
         />
       )

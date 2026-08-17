@@ -17,7 +17,6 @@ import {
 } from '../../api/suppliers'
 import { formatCurrency } from '../../utils/format'
 import SupplierForm from './SupplierForm'
-import { supplierCategoryOptions } from './supplierConstants'
 import { normalizeApiSupplier } from './supplierUtils'
 
 const supplierStatusTabs = [
@@ -36,6 +35,7 @@ export default function SupplierList() {
   const [listError, setListError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [sortFilter, setSortFilter] = useState('recent')
   const [searchTerm, setSearchTerm] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState(null)
@@ -47,6 +47,8 @@ export default function SupplierList() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+
+  const [supplierCategoryOptions, setSupplierCategoryOptions] = useState([])
 
   const loadSuppliers = useCallback(async () => {
     setIsLoading(true)
@@ -69,14 +71,34 @@ export default function SupplierList() {
     setIsLoading(false)
   }, [categoryFilter, searchTerm, statusFilter])
 
+  const loadSupplierCategoryOptions = useCallback(async () => {
+    const result = await listSuppliers()
+
+    if (!result.success) return
+
+    const categories = []
+    result.suppliers.forEach((supplier) => {
+      const value = supplier.category?.trim()
+      if (value && !categories.includes(value)) {
+        categories.push(value)
+      }
+    })
+
+    setSupplierCategoryOptions(categories)
+  }, [])
+
   useEffect(() => {
     loadSuppliers()
   }, [loadSuppliers])
 
+  useEffect(() => {
+    loadSupplierCategoryOptions()
+  }, [loadSupplierCategoryOptions])
+
   const filteredSuppliers = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
-    return suppliers.filter((supplier) => {
+    const filtered = suppliers.filter((supplier) => {
       const matchesSearch =
         !normalizedSearch ||
         [supplier.name, supplier.contactPerson, supplier.phone]
@@ -87,7 +109,14 @@ export default function SupplierList() {
 
       return matchesSearch && matchesCategory && matchesStatus
     })
-  }, [categoryFilter, searchTerm, statusFilter, suppliers])
+
+    return filtered.sort((left, right) => {
+      const leftTime = new Date(left.createdAt || 0).getTime()
+      const rightTime = new Date(right.createdAt || 0).getTime()
+
+      return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
+    })
+  }, [categoryFilter, searchTerm, sortFilter, statusFilter, suppliers])
 
   const handleOpenForm = (supplier = null) => {
     setEditingSupplier(supplier)
@@ -179,6 +208,7 @@ export default function SupplierList() {
         onSave={handleSaveSupplier}
         saving={isSaving}
         formError={formError}
+        categoryOptions={supplierCategoryOptions}
       />
     )
   }
@@ -230,10 +260,19 @@ export default function SupplierList() {
                 />
               </div>
               <Select
-                options={[{ value: 'all', label: 'All categories' }, ...supplierCategoryOptions]}
+                options={[{ value: 'all', label: 'All categories' }, ...supplierCategoryOptions.map((category) => ({ value: category, label: category }))]}
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
                 className="sm:w-48"
+              />
+              <Select
+                options={[
+                  { value: 'recent', label: 'Recent' },
+                  { value: 'oldest', label: 'Oldest' },
+                ]}
+                value={sortFilter}
+                onChange={(event) => setSortFilter(event.target.value)}
+                className="sm:w-40"
               />
             </div>
           </div>

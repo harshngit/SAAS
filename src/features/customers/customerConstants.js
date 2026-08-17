@@ -6,15 +6,12 @@ export const customerBasePathByRole = {
   [ROLES.DELIVERY_PARTNER]: '/delivery/customers',
 }
 
-export const customerTypeOptions = [
-  'Hotel',
-  'Restaurant',
-  'Household',
+// Matches the customer_category enum the backend actually stores (see CustomerForm.jsx optionValues.customerCategory).
+export const customerCategoryOptions = [
   'Retail',
-  'Office',
-  'Institution',
-  'Society',
-  'Event Venue',
-  'Caterer',
-  'Other',
-].map((type) => ({ value: type, label: type }))
+  'Wholesale',
+  'Corporate',
+  'VIP',
+  'Dealer',
+  'Distributor',
+].map((category) => ({ value: category, label: category }))

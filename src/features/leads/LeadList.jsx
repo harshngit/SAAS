@@ -179,11 +179,26 @@ export default function LeadList() {
     let isMounted = true
 
     async function loadOptions() {
-      const [customersResult, usersResult] = await Promise.all([listCustomers(), listUsers()])
+      const customersPromise = listCustomers()
+      const usersPromise = currentUser?.role === ROLES.SALES_OFFICER ? Promise.resolve({ success: true, users: [] }) : listUsers()
+      const [customersResult, usersResult] = await Promise.all([customersPromise, usersPromise])
       if (!isMounted) return
 
       if (customersResult.success) setCustomers(customersResult.customers)
-      if (usersResult.success) {
+      if (currentUser?.role === ROLES.SALES_OFFICER) {
+        setSalespeople(
+          currentUser?.id
+            ? [
+                {
+                  id: currentUser.id,
+                  name: currentUser.name || 'Current user',
+                  role: currentUser.role,
+                  isActive: true,
+                },
+              ]
+            : [],
+        )
+      } else if (usersResult.success) {
         setSalespeople(
           usersResult.users
             .map(normalizeApiUser)

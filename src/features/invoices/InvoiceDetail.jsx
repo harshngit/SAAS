@@ -6,7 +6,11 @@ import {
   Download,
   FileText,
   IndianRupee,
+  Maximize2,
+  Minus,
+  Plus,
   Printer,
+  RefreshCw,
   Truck,
   User,
   Wallet,
@@ -14,7 +18,10 @@ import {
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import { downloadInvoicePdf, getInvoice } from '../../api/invoices'
+import Modal from '../../components/ui/Modal'
+import { downloadInvoicePdf, getInvoice, getInvoiceSettings } from '../../api/invoices'
+import { getOrganizationSettings } from '../../api/organizations'
+import { templateComponents, money as formatPreviewMoney } from './invoiceTemplates'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
 import { formatCurrency } from '../../utils/format'
 
@@ -40,6 +47,159 @@ function HeaderInfoItem({ icon: Icon, iconClassName, label, children }) {
   )
 }
 
+// Shapes real invoice + organization data exactly like invoiceTemplates.jsx's sampleInvoice,
+// so the same template renderers used on the Invoice Settings page work here unmodified.
+function buildInvoicePreviewData(invoice, org) {
+  const company = org || {}
+
+  return {
+    company: {
+      name: company.name || 'Your Company',
+      address: company.registered_address || company.address || '',
+      cityLine: [company.city, company.state, company.pin_code].filter(Boolean).join(', '),
+      gstin: company.gst_number || '',
+    },
+    invoiceNo: invoice.invoiceNumber,
+    invoiceDate: formatDateLabel(invoice.invoiceDate),
+    dueDate: formatDateLabel(invoice.dueDate),
+    billTo: {
+      name: invoice.customerName || invoice.walkInName || 'Walk-in Customer',
+      address: invoice.billingAddress || '',
+      cityLine: '',
+    },
+    items: (invoice.items || []).map((item) => ({
+      name: item.productName,
+      hsn: item.hsnCode,
+      qty: item.quantity,
+      unit: '',
+      rate: item.unitPrice,
+      taxRate: item.taxRate,
+      amount: item.lineTotal,
+    })),
+    subtotal: invoice.subtotal,
+    taxTotal: invoice.tax,
+    total: invoice.total,
+    bank: {
+      name: company.bank_name || '',
+      account: company.bank_account_details || '',
+      ifsc: company.bank_ifsc || '',
+    },
+  }
+}
+
+const ZOOM_MIN = 60
+const ZOOM_MAX = 150
+const ZOOM_STEP = 10
+const previewPaymentStatusClass = {
+  Paid: 'bg-green-100 text-green-700',
+  Partial: 'bg-amber-100 text-amber-700',
+  Unpaid: 'bg-red-100 text-red-700',
+}
+
+function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshing, onRefresh }) {
+  const [zoom, setZoom] = useState(100)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  const previewData = buildInvoicePreviewData(invoice, orgSettings)
+  const template = invoiceSettings?.template || 'classic'
+  const TemplateComponent = templateComponents[template] || templateComponents.classic
+  const primaryColor = invoiceSettings?.branding?.primaryColor || '#16A34A'
+  const fields = invoiceSettings?.fields || {}
+  const footerText = invoiceSettings?.footerText || ''
+  const terms = invoiceSettings?.terms || ''
+  const templateLabel = template.charAt(0).toUpperCase() + template.slice(1)
+
+  const previewDocument = (
+    <div className="relative">
+      <span
+        className={`absolute right-0 top-0 rounded-full px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-wide ${
+          previewPaymentStatusClass[invoice.paymentStatus] || 'bg-neutral-100 text-neutral-600'
+        }`}
+      >
+        {invoice.paymentStatus}
+      </span>
+      <TemplateComponent primaryColor={primaryColor} fields={fields} footerText={footerText} terms={terms} data={previewData} />
+      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-neutral-100 pt-3">
+        <div className="rounded-lg bg-neutral-50 px-3 py-2">
+          <p className="text-[0.62rem] uppercase tracking-wide text-neutral-400">Amount Paid</p>
+          <p className="text-sm font-semibold text-green-600">{formatPreviewMoney(invoice.amountPaid)}</p>
+        </div>
+        <div className="rounded-lg bg-amber-50 px-3 py-2">
+          <p className="text-[0.62rem] uppercase tracking-wide text-amber-600">Due Amount</p>
+          <p className="text-sm font-semibold text-amber-700">{formatPreviewMoney(invoice.outstandingAmount)}</p>
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-neutral-900">Invoice Preview</p>
+            <p className="text-xs text-neutral-400">{templateLabel} template</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP))}
+              disabled={zoom <= ZOOM_MIN}
+              aria-label="Zoom out"
+              className="flex size-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
+            >
+              <Minus className="size-3.5" aria-hidden="true" />
+            </button>
+            <span className="w-10 text-center text-xs font-medium tabular-nums text-neutral-500">{zoom}%</span>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP))}
+              disabled={zoom >= ZOOM_MAX}
+              aria-label="Zoom in"
+              className="flex size-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
+            >
+              <Plus className="size-3.5" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(true)}
+              aria-label="Expand preview"
+              className="flex size-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
+            >
+              <Maximize2 className="size-3.5" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={onRefresh}
+              aria-label="Refresh preview"
+              className="flex size-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
+            >
+              <RefreshCw className={`size-3.5 ${isRefreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 overflow-auto rounded-xl border border-neutral-100 bg-neutral-50/60 p-4" style={{ maxHeight: '38rem' }}>
+          <div
+            className="mx-auto origin-top bg-white p-5 text-xs text-neutral-600 shadow-(--shadow-xs)"
+            style={{ transform: `scale(${zoom / 100})`, width: '32rem' }}
+          >
+            {previewDocument}
+          </div>
+        </div>
+      </div>
+
+      <Modal isOpen={isFullscreen} onClose={() => setIsFullscreen(false)} title={`Invoice Preview — ${invoice.invoiceNumber}`} className="max-w-3xl">
+        <div className="max-h-[75vh] overflow-auto rounded-xl border border-neutral-100 bg-neutral-50/60 p-6">
+          <div className="mx-auto max-w-xl bg-white p-6 text-sm text-neutral-600 shadow-(--shadow-xs)">
+            {previewDocument}
+          </div>
+        </div>
+      </Modal>
+    </>
+  )
+}
+
 export default function InvoiceDetail() {
   const { invoiceNumber } = useParams()
   const navigate = useNavigate()
@@ -50,6 +210,9 @@ export default function InvoiceDetail() {
   const [isPaymentDrawerOpen, setIsPaymentDrawerOpen] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState('')
+  const [orgSettings, setOrgSettings] = useState(null)
+  const [invoiceSettings, setInvoiceSettings] = useState(null)
+  const [isRefreshingPreview, setIsRefreshingPreview] = useState(false)
 
   const loadInvoice = async () => {
     setIsLoading(true)
@@ -67,10 +230,26 @@ export default function InvoiceDetail() {
     setIsLoading(false)
   }
 
+  // Best-effort: the preview still works (just without company letterhead/branding details)
+  // if either of these fails or the current role can't reach organization-level settings.
+  const loadPreviewExtras = async () => {
+    setIsRefreshingPreview(true)
+    const [orgResult, invoiceSettingsResult] = await Promise.all([getOrganizationSettings(), getInvoiceSettings()])
+    if (orgResult.success) setOrgSettings(orgResult.organization)
+    if (invoiceSettingsResult.success) setInvoiceSettings(invoiceSettingsResult.settings)
+    setIsRefreshingPreview(false)
+  }
+
   useEffect(() => {
     loadInvoice()
+    loadPreviewExtras()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoiceNumber])
+
+  const handleRefreshPreview = () => {
+    loadInvoice()
+    loadPreviewExtras()
+  }
 
   if (isLoading) {
     return (
@@ -162,10 +341,13 @@ export default function InvoiceDetail() {
         </HeaderInfoItem>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
         <div className="space-y-5">
           <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-            <p className="text-sm font-semibold text-neutral-900">Invoice Summary</p>
+            <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
+              <FileText className="size-4 text-neutral-400" aria-hidden="true" />
+              Invoice Summary
+            </p>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-neutral-100 bg-neutral-50/50 p-4">
                 <p className="text-sm font-semibold text-neutral-700">Bill To</p>
@@ -197,10 +379,42 @@ export default function InvoiceDetail() {
           </div>
 
           <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-            <div className="overflow-x-auto rounded-xl border border-neutral-100">
+            <p className="text-sm font-semibold text-neutral-900">Payment Summary</p>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-700">
+                <IndianRupee className="size-5" />
+              </div>
+              <div>
+                <p className="text-xs text-neutral-400">Total Amount</p>
+                <p className="text-xl font-semibold text-neutral-900">{formatCurrency(invoice.total)}</p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-3 border-t border-neutral-100 pt-4 text-sm">
+              <div>
+                <p className="text-xs text-neutral-400">Paid Amount</p>
+                <p className="font-medium text-green-600">{formatCurrency(invoice.amountPaid)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-neutral-400">Due Amount</p>
+                <p className="font-medium text-amber-600">{formatCurrency(invoice.outstandingAmount)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-neutral-400">Due Date</p>
+                <p className="font-medium text-neutral-800">{formatDateLabel(invoice.dueDate)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
+              <FileText className="size-4 text-neutral-400" aria-hidden="true" />
+              Invoice Items
+            </p>
+            <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-100">
               <table className="w-full min-w-2xl text-left text-sm">
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                    <th className="px-3.5 py-2.5">#</th>
                     <th className="px-3.5 py-2.5">Item</th>
                     <th className="px-3.5 py-2.5">Qty</th>
                     <th className="px-3.5 py-2.5">Rate</th>
@@ -210,8 +424,9 @@ export default function InvoiceDetail() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
-                  {invoice.items.map((item) => (
+                  {invoice.items.map((item, index) => (
                     <tr key={item.id || item.productId}>
+                      <td className="px-3.5 py-2.5 text-neutral-400">{index + 1}</td>
                       <td className="px-3.5 py-2.5 text-neutral-800">{item.productName}</td>
                       <td className="px-3.5 py-2.5 text-neutral-500">{item.quantity}</td>
                       <td className="px-3.5 py-2.5 text-neutral-500">{formatCurrency(item.unitPrice)}</td>
@@ -266,35 +481,6 @@ export default function InvoiceDetail() {
               <p className="mt-2 text-sm text-neutral-600">{invoice.notes}</p>
             </div>
           )}
-        </div>
-
-        <div className="space-y-5">
-          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-            <p className="text-sm font-semibold text-neutral-900">Payment Summary</p>
-            <div className="mt-3 flex items-center gap-3">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-700">
-                <IndianRupee className="size-5" />
-              </div>
-              <div>
-                <p className="text-xs text-neutral-400">Total Amount</p>
-                <p className="text-xl font-semibold text-neutral-900">{formatCurrency(invoice.total)}</p>
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-3 border-t border-neutral-100 pt-4 text-sm">
-              <div>
-                <p className="text-xs text-neutral-400">Paid Amount</p>
-                <p className="font-medium text-green-600">{formatCurrency(invoice.amountPaid)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-neutral-400">Due Amount</p>
-                <p className="font-medium text-amber-600">{formatCurrency(invoice.outstandingAmount)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-neutral-400">Due Date</p>
-                <p className="font-medium text-neutral-800">{formatDateLabel(invoice.dueDate)}</p>
-              </div>
-            </div>
-          </div>
 
           {invoice.deliveryId && (
             <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
@@ -306,6 +492,16 @@ export default function InvoiceDetail() {
               </Link>
             </div>
           )}
+        </div>
+
+        <div>
+          <InvoicePreviewCard
+            invoice={invoice}
+            orgSettings={orgSettings}
+            invoiceSettings={invoiceSettings}
+            isRefreshing={isRefreshingPreview}
+            onRefresh={handleRefreshPreview}
+          />
         </div>
       </div>
 

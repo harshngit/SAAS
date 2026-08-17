@@ -251,7 +251,7 @@ export default function ProductDetail() {
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {product.brand && <Badge variant="neutral">{product.brand}</Badge>}
-              {product.category && <Badge variant="primary">{product.category}</Badge>}
+              {(product.categoryLabel || product.category) && <Badge variant="primary">{product.categoryLabel || product.category}</Badge>}
             </div>
           </div>
         </div>

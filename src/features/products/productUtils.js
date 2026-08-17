@@ -14,16 +14,36 @@ function normalizeVariantInventory(variant = {}) {
 
 export function normalizeApiProduct(product, fallback = {}) {
   const sourceVariants = product.variations?.length ? product.variations : fallback.variants || []
+  const categoryLabel =
+    product.category_name ||
+    product.categoryName ||
+    product.product_type ||
+    fallback.categoryLabel ||
+    fallback.category ||
+    ''
 
   return {
     ...fallback,
     id: product.id || fallback.id,
     name: product.name || fallback.name,
     brand: product.brand || fallback.brand || '',
+    manufacturer: product.manufacturer || fallback.manufacturer || '',
     sku: product.sku || fallback.sku || fallback.variants?.[0]?.sku || '',
+    price: product.price ?? fallback.price ?? 0,
     categoryId: product.category_id || fallback.categoryId || fallback.category_id || fallback.category || '',
-    category: fallback.category || product.product_type || product.category_id || '',
+    category: categoryLabel || product.category_id || '',
+    categoryLabel,
+    productType: product.product_type || fallback.productType || '',
+    subCategory: product.sub_category || fallback.subCategory || '',
+    unitOfMeasure: product.unit_of_measure || fallback.unitOfMeasure || '',
+    taxCategory: product.tax_category || fallback.taxCategory || '',
+    purchaseUnit: product.purchase_unit || fallback.purchaseUnit || '',
+    salesUnit: product.sales_unit || fallback.salesUnit || '',
+    currency: product.currency || fallback.currency || '',
+    countryOfOrigin: product.country_of_origin || fallback.countryOfOrigin || '',
     status: product.is_active === false ? 'inactive' : 'active',
+    createdAt: product.created_at || product.createdAt || fallback.createdAt || '',
+    updatedAt: product.updated_at || product.updatedAt || fallback.updatedAt || '',
     description: product.description || fallback.description || '',
     coverImage: product.cover_image || fallback.coverImage || '',
     images: product.images || fallback.images || [],

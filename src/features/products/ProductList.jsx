@@ -8,8 +8,10 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import { listCategories } from '../../api/categories'
 import { createProduct, deleteProduct, listProducts, updateProduct } from '../../api/products'
-import { normalizeApiProduct, priceRange } from './productUtils'
+import { formatCurrency } from '../../utils/format'
+import { normalizeApiProduct } from './productUtils'
 import ProductForm from './ProductForm'
 
 const productStatusTabs = [
@@ -25,7 +27,9 @@ export default function ProductList() {
   const [listError, setListError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [sortFilter, setSortFilter] = useState('recent')
   const [searchTerm, setSearchTerm] = useState('')
+  const [categoryOptions, setCategoryOptions] = useState([])
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [statusProduct, setStatusProduct] = useState(null)
@@ -41,21 +45,26 @@ export default function ProductList() {
   const [barcodeError, setBarcodeError] = useState('')
 
   const categoryFilterOptions = useMemo(
-    () => {
-      const categories = products.reduce((options, product) => {
-        const value = product.categoryId || product.category
-        if (!value || options.some((option) => option.value === value)) {
-          return options
-        }
-
-        options.push({ value, label: product.category || value })
-        return options
-      }, [])
-
-      return [{ value: 'all', label: 'All categories' }, ...categories]
-    },
-    [products],
+    () => [{ value: 'all', label: 'All categories' }, ...categoryOptions],
+    [categoryOptions],
   )
+
+  const loadCategoryOptions = useCallback(async () => {
+    const result = await listCategories()
+
+    if (!result.success) {
+      return
+    }
+
+    setCategoryOptions(
+      result.categories
+        .map((category) => ({
+          value: String(category.id),
+          label: category.name || category.category_name || '',
+        }))
+        .filter((option) => option.value && option.label),
+    )
+  }, [])
 
   const loadProducts = useCallback(async () => {
     setIsLoading(true)
@@ -82,17 +91,21 @@ export default function ProductList() {
     loadProducts()
   }, [loadProducts])
 
+  useEffect(() => {
+    loadCategoryOptions()
+  }, [loadCategoryOptions])
+
   const filteredProducts = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
-    return products.filter((product) => {
+    const filtered = products.filter((product) => {
       const matchesSearch =
         !normalizedSearch ||
         [
           product.name,
           product.brand,
           product.sku,
-          product.category,
+          product.categoryLabel || product.category,
           ...product.variants.map((variant) => variant.sku),
         ]
           .filter(Boolean)
@@ -103,7 +116,14 @@ export default function ProductList() {
 
       return matchesSearch && matchesCategory && matchesStatus
     })
-  }, [categoryFilter, products, searchTerm, statusFilter])
+
+    return filtered.sort((left, right) => {
+      const leftTime = new Date(left.createdAt || 0).getTime()
+      const rightTime = new Date(right.createdAt || 0).getTime()
+
+      return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
+    })
+  }, [categoryFilter, products, searchTerm, sortFilter, statusFilter])
 
   const handleAddProduct = () => {
     setEditingProduct(null)
@@ -225,6 +245,7 @@ export default function ProductList() {
         onSave={handleSaveProduct}
         saving={isSaving}
         formError={formError}
+        catalogProducts={products}
       />
     )
   }
@@ -299,6 +320,15 @@ export default function ProductList() {
                 onChange={(event) => setCategoryFilter(event.target.value)}
                 className="sm:w-52"
               />
+              <Select
+                options={[
+                  { value: 'recent', label: 'Recent' },
+                  { value: 'oldest', label: 'Oldest' },
+                ]}
+                value={sortFilter}
+                onChange={(event) => setSortFilter(event.target.value)}
+                className="sm:w-40"
+              />
             </div>
           </div>
           {barcodeError && <p className="mt-2 text-xs text-red-600">{barcodeError}</p>}
@@ -336,7 +366,7 @@ export default function ProductList() {
                   <th className="whitespace-nowrap px-4 py-3">Brand</th>
                   <th className="whitespace-nowrap px-4 py-3">Category</th>
                   <th className="whitespace-nowrap px-4 py-3">Variants</th>
-                  <th className="whitespace-nowrap px-4 py-3">Price Range</th>
+                  <th className="whitespace-nowrap px-4 py-3">Price</th>
                   <th className="whitespace-nowrap px-4 py-3">Status</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
                 </tr>
@@ -357,11 +387,13 @@ export default function ProductList() {
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-neutral-600">{product.brand}</td>
-                    <td className="px-4 py-3.5 text-neutral-600">{product.category}</td>
+                    <td className="px-4 py-3.5 text-neutral-600">{product.categoryLabel || product.category || '-'}</td>
                     <td className="px-4 py-3.5 text-neutral-600">
                       {product.variants.length} {product.variants.length === 1 ? 'size' : 'sizes'}
                     </td>
-                    <td className="px-4 py-3.5 font-medium text-neutral-700">{priceRange(product.variants)}</td>
+                    <td className="px-4 py-3.5 font-medium text-neutral-700">
+                      {formatCurrency(Number(product.price ?? product.variants?.[0]?.sellingPrice ?? 0))}
+                    </td>
                     <td className="px-4 py-3.5">
                       <Badge variant={product.status === 'active' ? 'success' : 'danger'}>
                         {product.status === 'active' ? 'Active' : 'Inactive'}

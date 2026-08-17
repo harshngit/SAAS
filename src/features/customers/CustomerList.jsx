@@ -22,7 +22,7 @@ import { listUsers } from '../../api/users'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import CustomerForm from './CustomerForm'
-import { customerTypeOptions } from './customerConstants'
+import { customerCategoryOptions } from './customerConstants'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 
 const customerStatusTabs = [
@@ -107,12 +107,28 @@ export default function CustomerList() {
   )
 
   const loadStaffUsers = useCallback(async () => {
+    if (isSalesOfficer) {
+      setStaffUsers(
+        currentUser?.id
+          ? [
+              {
+                id: currentUser.id,
+                name: currentUser.name || 'Current user',
+                role: currentUser.role,
+                status: 'active',
+              },
+            ]
+          : [],
+      )
+      return
+    }
+
     const userResult = await listUsers()
 
     if (userResult.success) {
       setStaffUsers(userResult.users.map(normalizeUser))
     }
-  }, [])
+  }, [currentUser?.id, currentUser?.name, currentUser?.role, isSalesOfficer])
 
   const loadCustomers = useCallback(async () => {
     setIsLoading(true)
@@ -358,7 +374,7 @@ export default function CustomerList() {
                 />
               </div>
               <Select
-                options={[{ value: 'all', label: 'All types' }, ...customerTypeOptions]}
+                options={[{ value: 'all', label: 'All categories' }, ...customerCategoryOptions]}
                 value={typeFilter}
                 onChange={(event) => setTypeFilter(event.target.value)}
                 className="sm:w-44"

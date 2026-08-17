@@ -55,13 +55,27 @@ export default function CustomerEdit() {
       setIsLoading(true)
       setLoadError('')
 
-      const [customerResult, usersResult] = await Promise.all([getCustomer(customerId), listUsers()])
+      const usersPromise = currentUser?.role === ROLES.SALES_OFFICER ? Promise.resolve({ success: true, users: [] }) : listUsers()
+      const [customerResult, usersResult] = await Promise.all([getCustomer(customerId), usersPromise])
 
       if (!isMounted) return
 
       setIsLoading(false)
 
-      if (usersResult.success) {
+      if (currentUser?.role === ROLES.SALES_OFFICER) {
+        setSalesOfficers(
+          currentUser?.id
+            ? [
+                {
+                  id: currentUser.id,
+                  name: currentUser.name || 'Current user',
+                  role: ROLES.SALES_OFFICER,
+                  status: 'active',
+                },
+              ]
+            : [],
+        )
+      } else if (usersResult.success) {
         setSalesOfficers(
           usersResult.users
             .map(normalizeUser)
@@ -83,7 +97,7 @@ export default function CustomerEdit() {
     return () => {
       isMounted = false
     }
-  }, [customerId])
+  }, [customerId, currentUser?.id, currentUser?.name, currentUser?.role])
 
   const handleSaveCustomer = async (customerData) => {
     setIsSaving(true)

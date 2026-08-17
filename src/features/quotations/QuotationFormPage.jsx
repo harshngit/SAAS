@@ -91,17 +91,33 @@ export default function QuotationFormPage() {
     let isMounted = true
 
     async function loadOptions() {
+      const customersPromise = listCustomers()
+      const productsPromise = listProducts()
+      const usersPromise = currentUser?.role === ROLES.SALES_OFFICER ? Promise.resolve({ success: true, users: [] }) : listUsers()
       const [customersResult, productsResult, usersResult] = await Promise.all([
-        listCustomers(),
-        listProducts(),
-        listUsers(),
+        customersPromise,
+        productsPromise,
+        usersPromise,
       ])
 
       if (!isMounted) return
 
       if (customersResult.success) setCustomers(customersResult.customers)
       if (productsResult.success) setProducts(productsResult.products)
-      if (usersResult.success) {
+      if (currentUser?.role === ROLES.SALES_OFFICER) {
+        setSalespeople(
+          currentUser?.id
+            ? [
+                {
+                  id: currentUser.id,
+                  name: currentUser.name || 'Current user',
+                  role: currentUser.role,
+                  isActive: true,
+                },
+              ]
+            : [],
+        )
+      } else if (usersResult.success) {
         setSalespeople(
           usersResult.users
             .map(normalizeApiUser)

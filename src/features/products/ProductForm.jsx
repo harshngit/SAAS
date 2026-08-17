@@ -19,6 +19,7 @@ import {
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
+import { listCategories } from '../../api/categories'
 import { formatCurrency } from '../../utils/format'
 import { readImageAsDataUrl } from '../../utils/imageFile'
 import { uploadFile } from '../../api/files'
@@ -140,22 +141,11 @@ const emptyForm = {
 }
 
 const options = {
-  productType: ['Physical Product', 'Service', 'Digital Product', 'Raw Material', 'Finished Goods', 'Asset', 'Consumable'],
-  category: ['Beverages', 'Food', 'Retail', 'Raw Material', 'Equipment', 'Services', 'Accessories'],
-  subCategory: ['Standard', 'Premium', 'Bulk', 'Refill', 'Trial'],
-  brand: ['In-house', 'AquaPure', 'FreshFlow', 'Vendor Brand'],
-  manufacturer: ['In-house', 'Third-party', 'OEM'],
   status: [
     { value: 'active', label: 'Active' },
     { value: 'inactive', label: 'Inactive' },
     { value: 'discontinued', label: 'Discontinued' },
   ],
-  currency: ['INR', 'USD', 'AED', 'SGD', 'GBP'],
-  unitOfMeasure: ['Piece', 'Kg', 'Litre', 'Meter', 'Box', 'Bottle', 'Pack'],
-  taxCategory: ['GST', 'VAT', 'Exempt', 'Zero Rated'],
-  purchaseUnit: ['Piece', 'Kg', 'Litre', 'Box', 'Pack'],
-  salesUnit: ['Piece', 'Kg', 'Litre', 'Box', 'Pack'],
-  countryOfOrigin: ['India', 'United States', 'United Arab Emirates', 'Singapore', 'United Kingdom'],
 }
 
 const sectionMeta = {
@@ -310,7 +300,8 @@ function hydrateProduct(product) {
     ...product,
     productId: product?.productId || product?.id || makeProductId(),
     productCode,
-    category: product?.category || product?.categoryId || '',
+    category: String(product?.category_id || product?.categoryId || product?.category || ''),
+    categoryId: String(product?.category_id || product?.categoryId || ''),
     productType: product?.productType || product?.category || '',
     purchasePrice: product?.purchasePrice ?? firstVariant.purchasePrice ?? '',
     sellingPrice: product?.sellingPrice ?? firstVariant.sellingPrice ?? '',
@@ -385,9 +376,18 @@ function ProductUploadField({ field, value, isUploading, onFileSelected, onRemov
   )
 }
 
-export default function ProductForm({ isOpen, onClose, product, onSave, saving = false, formError = '' }) {
+export default function ProductForm({
+  isOpen,
+  onClose,
+  product,
+  onSave,
+  saving = false,
+  formError = '',
+  catalogProducts = [],
+}) {
   const [formData, setFormData] = useState(emptyForm)
   const [initialFormData, setInitialFormData] = useState(emptyForm)
+  const [categoryOptions, setCategoryOptions] = useState([])
   const [activeSection, setActiveSection] = useState(productSections[0].id)
   const [errors, setErrors] = useState({})
   const [imageError, setImageError] = useState('')
@@ -404,6 +404,32 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
   const isLastSection = activeSectionIndex === productSections.length - 1
   const hasChanges = !product || JSON.stringify(formData) !== JSON.stringify(initialFormData)
   const totalImageCount = (formData.coverImage ? 1 : 0) + formData.images.length
+  const suggestionOptions = useMemo(() => {
+    const collect = (...groups) =>
+      Array.from(
+        new Set(
+          groups
+            .flat()
+            .map((value) => String(value ?? '').trim())
+            .filter(Boolean),
+        ),
+      ).map((value) => ({ value, label: value }))
+
+    return {
+      productType: collect(catalogProducts.map((item) => item.productType || item.categoryLabel || item.category)),
+      subCategory: collect(catalogProducts.map((item) => item.subCategory)),
+      brand: collect(catalogProducts.map((item) => item.brand)),
+      manufacturer: collect(catalogProducts.map((item) => item.manufacturer)),
+      unitOfMeasure: collect(
+        catalogProducts.flatMap((item) => [item.unitOfMeasure, ...(item.variants || []).map((variant) => variant.unit)]),
+      ),
+      taxCategory: collect(catalogProducts.map((item) => item.taxCategory)),
+      purchaseUnit: collect(catalogProducts.map((item) => item.purchaseUnit)),
+      salesUnit: collect(catalogProducts.map((item) => item.salesUnit)),
+      currency: collect(catalogProducts.map((item) => item.currency)),
+      countryOfOrigin: collect(catalogProducts.map((item) => item.countryOfOrigin)),
+    }
+  }, [catalogProducts])
 
   useEffect(() => {
     if (!isOpen) return
@@ -416,6 +442,43 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
     setImageError('')
     setOpenVariantIndex(-1)
   }, [product, isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const loadCategoryOptions = async () => {
+      const result = await listCategories()
+      if (!result.success) return
+
+      setCategoryOptions(
+        result.categories
+          .map((category) => ({
+            value: String(category.id),
+            label: category.name || category.category_name || '',
+          }))
+          .filter((option) => option.value && option.label),
+      )
+    }
+
+    loadCategoryOptions()
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!categoryOptions.length || !formData.category) return
+    if (categoryOptions.some((option) => option.value === formData.category)) return
+
+    const match = categoryOptions.find(
+      (option) => option.label.trim().toLowerCase() === String(formData.category).trim().toLowerCase(),
+    )
+
+    if (!match) return
+
+    setFormData((current) => ({
+      ...current,
+      category: match.value,
+      categoryId: match.value,
+    }))
+  }, [categoryOptions, formData.category])
 
   if (!isOpen) return null
 
@@ -566,7 +629,7 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
       name: syncedData.name.trim(),
       brand: syncedData.brand,
       category: syncedData.category,
-      categoryId: syncedData.category,
+      categoryId: syncedData.categoryId || syncedData.category,
       productType: syncedData.productType || syncedData.category,
       price: Number(syncedData.sellingPrice) || 0,
       totalInventory: totalVariantInventory || Number(syncedData.openingStock) || 0,
@@ -689,14 +752,46 @@ export default function ProductForm({ isOpen, onClose, product, onSave, saving =
     }
 
     if (field.input === 'select') {
+      if (field.name === 'category') {
+        return (
+          <Select
+            {...commonProps}
+            className="w-full max-w-full"
+            triggerClassName="w-full max-w-full"
+            options={categoryOptions}
+            placeholder={`Select ${field.label.toLowerCase()}`}
+          />
+        )
+      }
+
+      if (field.name === 'status') {
+        return (
+          <Select
+            {...commonProps}
+            className="w-full max-w-full"
+            triggerClassName="w-full max-w-full"
+            options={toOptions(options.status)}
+            placeholder={`Select ${field.label.toLowerCase()}`}
+          />
+        )
+      }
+
+      const suggestionListId = `product-${field.name}-options`
+      const suggestions = suggestionOptions[field.name] || []
+
       return (
-        <Select
-          {...commonProps}
-          className="w-full max-w-full"
-          triggerClassName="w-full max-w-full"
-          options={toOptions(options[field.name] || [])}
-          placeholder={`Select ${field.label.toLowerCase()}`}
-        />
+        <div className="flex flex-col gap-1.5">
+          <Input
+            {...commonProps}
+            list={suggestionListId}
+            placeholder={`Type or pick ${field.label.toLowerCase()}`}
+          />
+          <datalist id={suggestionListId}>
+            {suggestions.map((option) => (
+              <option key={option.value} value={option.value} />
+            ))}
+          </datalist>
+        </div>
       )
     }
 

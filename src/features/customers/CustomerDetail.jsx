@@ -317,10 +317,11 @@ export default function CustomerDetail() {
       setIsLoadingLedger(true)
       setLedgerError('')
 
+      const usersPromise = currentUser?.role === ROLES.SALES_OFFICER ? Promise.resolve({ success: true, users: [] }) : listUsers()
       const [result, paymentsResult, usersResult, ordersResult, ledgerResult] = await Promise.all([
         getCustomer(id),
         getCustomerPayments(id),
-        listUsers(),
+        usersPromise,
         listOrders({ customer_id: id }),
         getCustomerLedger(id),
       ])
@@ -332,7 +333,20 @@ export default function CustomerDetail() {
       setIsLoadingOrders(false)
       setIsLoadingLedger(false)
 
-      if (usersResult.success) {
+      if (currentUser?.role === ROLES.SALES_OFFICER) {
+        setStaffUsers(
+          currentUser?.id
+            ? [
+                {
+                  id: currentUser.id,
+                  name: currentUser.name || 'Current user',
+                  role: ROLES.SALES_OFFICER,
+                  status: 'active',
+                },
+              ]
+            : [],
+        )
+      } else if (usersResult.success) {
         setStaffUsers(usersResult.users.map(normalizeUser))
       }
 
@@ -368,7 +382,7 @@ export default function CustomerDetail() {
     return () => {
       isMounted = false
     }
-  }, [id])
+  }, [currentUser?.id, currentUser?.name, currentUser?.role, id])
 
   const salesOfficers = useMemo(
     () => staffUsers.filter((user) => user.role === ROLES.SALES_OFFICER && user.status === 'active'),
