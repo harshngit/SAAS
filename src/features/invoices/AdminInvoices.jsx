@@ -21,6 +21,7 @@ import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { listInvoices } from '../../api/invoices'
+import { listOrders } from '../../api/orders'
 import { listPurchases } from '../../api/purchases'
 import { formatCurrency } from '../../utils/format'
 
@@ -44,6 +45,7 @@ function formatDateLabel(dateString) {
 function SalesInvoicesPanel() {
   const navigate = useNavigate()
   const [invoices, setInvoices] = useState([])
+  const [orderNumbersById, setOrderNumbersById] = useState({})
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [search, setSearch] = useState('')
@@ -55,7 +57,7 @@ function SalesInvoicesPanel() {
     setIsLoading(true)
     setListError('')
 
-    const result = await listInvoices()
+    const [result, ordersResult] = await Promise.all([listInvoices(), listOrders()])
 
     if (!result.success) {
       setInvoices([])
@@ -65,6 +67,9 @@ function SalesInvoicesPanel() {
     }
 
     setInvoices(result.invoices)
+    if (ordersResult.success) {
+      setOrderNumbersById(Object.fromEntries(ordersResult.orders.map((order) => [order.id, order.orderNumber])))
+    }
     setIsLoading(false)
   }, [])
 
@@ -94,12 +99,14 @@ function SalesInvoicesPanel() {
     return invoices.filter((invoice) => {
       if (paymentStatus !== 'all' && invoice.paymentStatus !== paymentStatus) return false
       if (!term) return true
+      const orderNumber = orderNumbersById[invoice.orderId] || ''
       return (
         invoice.invoiceNumber.toLowerCase().includes(term) ||
-        (invoice.customerName || '').toLowerCase().includes(term)
+        (invoice.customerName || '').toLowerCase().includes(term) ||
+        orderNumber.toLowerCase().includes(term)
       )
     })
-  }, [invoices, search, paymentStatus])
+  }, [invoices, search, paymentStatus, orderNumbersById])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -171,6 +178,7 @@ function SalesInvoicesPanel() {
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/80">
                     <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Invoice No.</th>
+                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Order #</th>
                     <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Customer</th>
                     <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Invoice Date</th>
                     <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Due Date</th>
@@ -187,6 +195,22 @@ function SalesInvoicesPanel() {
                     <tr key={invoice.id} className="transition-colors hover:bg-primary-50/30">
                       <td className="cursor-pointer whitespace-nowrap px-4 py-3.5 font-medium text-primary-700" onClick={() => navigate(`/admin/invoices/${invoice.id}`)}>
                         {invoice.invoiceNumber}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-neutral-500">
+                        {invoice.orderId ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              navigate(`/admin/orders/${invoice.orderId}`)
+                            }}
+                            className="font-medium text-neutral-700 hover:text-primary-700 hover:underline"
+                          >
+                            {orderNumbersById[invoice.orderId] || 'View Order'}
+                          </button>
+                        ) : (
+                          <span className="text-neutral-400">Direct</span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3.5 text-neutral-800">{invoice.customerName || invoice.walkInName || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3.5 text-neutral-500">{formatDateLabel(invoice.invoiceDate)}</td>

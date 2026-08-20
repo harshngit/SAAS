@@ -201,6 +201,7 @@ export async function listInvoices(params = {}) {
     const queryParams = {}
     if (params.customer_id) queryParams.customer_id = params.customer_id
     if (params.status) queryParams.status = params.status
+    if (params.order_id) queryParams.order_id = params.order_id
 
     const { data } = await apiClient.get('/invoices', {
       headers: authHeader(),

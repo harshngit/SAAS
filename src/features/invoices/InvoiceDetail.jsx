@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -28,6 +28,42 @@ import { formatCurrency } from '../../utils/format'
 function formatDateLabel(dateString) {
   if (!dateString) return '—'
   return new Date(dateString).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+async function downloadPreviewAsPdf(element, filename) {
+  if (!element) {
+    throw new Error('Invoice preview is not ready yet.')
+  }
+
+  const html2pdfModule = await import('html2pdf.js')
+  const html2pdf = html2pdfModule.default || html2pdfModule
+
+  return html2pdf()
+    .set({
+      margin: 6,
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        onclone(clonedDoc) {
+          const clonedRoot = clonedDoc.querySelector('[data-invoice-export-root]')
+          if (clonedRoot) {
+            clonedRoot.style.transform = 'none'
+            clonedRoot.style.width = '32rem'
+            clonedRoot.style.maxWidth = '100%'
+            clonedRoot.style.boxShadow = 'none'
+          }
+        },
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+    })
+    .from(element)
+    .save()
 }
 
 const invoiceStatusVariant = { Issued: 'success', Draft: 'neutral', Cancelled: 'danger' }
@@ -96,7 +132,7 @@ const previewPaymentStatusClass = {
   Unpaid: 'bg-red-100 text-red-700',
 }
 
-function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshing, onRefresh }) {
+function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshing, onRefresh, exportRef }) {
   const [zoom, setZoom] = useState(100)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
@@ -181,6 +217,8 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
 
         <div className="mt-4 overflow-auto rounded-xl border border-neutral-100 bg-neutral-50/60 p-4" style={{ maxHeight: '38rem' }}>
           <div
+            ref={exportRef}
+            data-invoice-export-root
             className="mx-auto origin-top bg-white p-5 text-xs text-neutral-600 shadow-(--shadow-xs)"
             style={{ transform: `scale(${zoom / 100})`, width: '32rem' }}
           >
@@ -213,6 +251,7 @@ export default function InvoiceDetail() {
   const [orgSettings, setOrgSettings] = useState(null)
   const [invoiceSettings, setInvoiceSettings] = useState(null)
   const [isRefreshingPreview, setIsRefreshingPreview] = useState(false)
+  const previewExportRef = useRef(null)
 
   const loadInvoice = async () => {
     setIsLoading(true)
@@ -274,10 +313,19 @@ export default function InvoiceDetail() {
     setIsDownloading(true)
     setDownloadError('')
 
-    const result = await downloadInvoicePdf(invoice.id, invoice.invoiceNumber, format)
+    try {
+      if (format === 'detailed') {
+        await downloadPreviewAsPdf(previewExportRef.current, `${invoice.invoiceNumber || invoice.id}.pdf`)
+        return
+      }
 
-    if (!result.success) setDownloadError(result.error)
-    setIsDownloading(false)
+      const result = await downloadInvoicePdf(invoice.id, invoice.invoiceNumber, format)
+      if (!result.success) setDownloadError(result.error)
+    } catch (error) {
+      setDownloadError(error?.message || 'Unable to download invoice PDF. Please try again.')
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   const handlePaymentSaved = () => {
@@ -501,6 +549,7 @@ export default function InvoiceDetail() {
             invoiceSettings={invoiceSettings}
             isRefreshing={isRefreshingPreview}
             onRefresh={handleRefreshPreview}
+            exportRef={previewExportRef}
           />
         </div>
       </div>

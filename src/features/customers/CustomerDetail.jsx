@@ -39,7 +39,7 @@ import { ROLES } from '../../auth/roles'
 import {
   deleteCustomer,
   getCustomer,
-  getCustomerLedger,
+  getCustomerAccountStatement,
   getCustomerPaymentReceipt,
   getCustomerPayments,
   recordCustomerPayment,
@@ -287,12 +287,14 @@ export default function CustomerDetail() {
   const [ledger, setLedger] = useState(null)
   const [isLoadingLedger, setIsLoadingLedger] = useState(true)
   const [ledgerError, setLedgerError] = useState('')
+  const [statementDateFrom, setStatementDateFrom] = useState('')
+  const [statementDateTo, setStatementDateTo] = useState('')
 
-  const loadLedger = async () => {
+  const loadLedger = async (params = {}) => {
     setIsLoadingLedger(true)
     setLedgerError('')
 
-    const result = await getCustomerLedger(id)
+    const result = await getCustomerAccountStatement(id, params)
 
     setIsLoadingLedger(false)
 
@@ -303,6 +305,16 @@ export default function CustomerDetail() {
     }
 
     setLedger(result.ledger)
+  }
+
+  const handleApplyStatementFilter = () => {
+    loadLedger({ dateFrom: statementDateFrom || undefined, dateTo: statementDateTo || undefined })
+  }
+
+  const handleClearStatementFilter = () => {
+    setStatementDateFrom('')
+    setStatementDateTo('')
+    loadLedger()
   }
 
   useEffect(() => {
@@ -323,7 +335,7 @@ export default function CustomerDetail() {
         getCustomerPayments(id),
         usersPromise,
         listOrders({ customer_id: id }),
-        getCustomerLedger(id),
+        getCustomerAccountStatement(id),
       ])
 
       if (!isMounted) return
@@ -852,7 +864,7 @@ export default function CustomerDetail() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <Section number={7} title="Order & Transaction History" icon={ShoppingBag} className="xl:col-span-2">
+        <Section number={7} title="Order History" icon={ShoppingBag} className="xl:col-span-2">
           <div id="order-history" className="scroll-mt-6">
             {isLoadingOrders ? (
               <LoadingSpinner label="Loading orders..." />
@@ -913,17 +925,49 @@ export default function CustomerDetail() {
         </Section>
       </div>
 
-      <Section number={9} title="Account Statement" icon={Landmark}>
+      <Section
+        number={9}
+        title="Account Statement"
+        icon={Landmark}
+        actions={
+          <div className="flex flex-wrap items-end gap-2">
+            <DatePicker
+              label="From"
+              value={statementDateFrom}
+              onChange={setStatementDateFrom}
+              className="w-36"
+            />
+            <DatePicker
+              label="To"
+              value={statementDateTo}
+              onChange={setStatementDateTo}
+              className="w-36"
+            />
+            <Button type="button" variant="outline" size="sm" onClick={handleApplyStatementFilter}>Apply</Button>
+            {(statementDateFrom || statementDateTo) && (
+              <Button type="button" variant="ghost" size="sm" onClick={handleClearStatementFilter}>Clear</Button>
+            )}
+          </div>
+        }
+      >
         {ledgerError ? (
           <div className="py-6 text-center">
             <p className="text-sm text-red-600">{ledgerError}</p>
-            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={loadLedger}>Retry</Button>
+            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => loadLedger()}>Retry</Button>
           </div>
         ) : isLoadingLedger ? (
           <LoadingSpinner label="Loading account statement..." />
         ) : !ledger ? null : (
           <div className="space-y-5">
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
+                <p className="text-xs text-neutral-400">Total Billed</p>
+                <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ledger.summary.totalBilled)}</p>
+              </div>
+              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
+                <p className="text-xs text-neutral-400">Total Received</p>
+                <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ledger.summary.totalReceived)}</p>
+              </div>
               <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
                 <p className="text-xs text-neutral-400">Outstanding</p>
                 <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ledger.summary.outstanding)}</p>

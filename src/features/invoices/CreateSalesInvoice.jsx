@@ -1,18 +1,39 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { format, parseISO } from 'date-fns'
 import { ArrowLeft, FileCheck2, Plus, Trash2, Upload } from 'lucide-react'
+import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useToast } from '../../components/ui/toastContext'
-import { createInvoice, invoiceOrder } from '../../api/invoices'
+import { createInvoice, invoiceOrder, listInvoices } from '../../api/invoices'
 import { listCustomers } from '../../api/customers'
-import { listDeliveries } from '../../api/deliveries'
+import { getDelivery, listDeliveries } from '../../api/deliveries'
+import { listOrders, getOrder } from '../../api/orders'
 import { listProducts } from '../../api/products'
 import { listWarehouses } from '../../api/warehouses'
-import { getOrder } from '../../api/orders'
+import { getSalesWorkflowSettings } from '../../api/settings'
 import { formatCurrency } from '../../utils/format'
+
+const orderStatusBadgeVariant = {
+  draft: 'neutral',
+  placed: 'info',
+  awaiting_approval: 'warning',
+  processing: 'primary',
+  completed: 'success',
+  cancelled: 'danger',
+}
+
+function formatOrderDate(value) {
+  if (!value) return '—'
+  try {
+    return format(parseISO(value), 'dd MMM yyyy')
+  } catch {
+    return value
+  }
+}
 
 const paymentTypeOptions = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
@@ -31,15 +52,31 @@ function todayIso() {
 }
 
 // Order-based invoicing bills what the order already has (rates/discounts/tax snapshotted
-// server-side) - no manual item entry, just a summary + confirm.
+// server-side) - no manual item entry, just a summary + confirm. Invoice quantity is always
+// the actual delivered quantity, never the ordered quantity.
 const billableDeliveryStatuses = ['delivered', 'partially_delivered']
+
+const invoiceErrorHints = [
+  { match: 'no delivered quantity', hint: 'This order has no delivered quantity to invoice yet.' },
+  { match: 'pending delivery quantity', hint: 'Complete the pending delivery before creating the final invoice.' },
+  { match: 'bills per delivery', hint: 'Select a delivery to invoice, then try again.' },
+]
+
+function friendlyInvoiceError(message) {
+  const lower = (message || '').toLowerCase()
+  const hint = invoiceErrorHints.find((entry) => lower.includes(entry.match))
+  return hint ? hint.hint : message
+}
 
 function OrderInvoicePanel({ orderId }) {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const [order, setOrder] = useState(null)
   const [deliveries, setDeliveries] = useState([])
+  const [wholeOrderInvoice, setWholeOrderInvoice] = useState(null)
+  const [invoiceMode, setInvoiceMode] = useState('per_delivery')
   const [selectedDeliveryId, setSelectedDeliveryId] = useState('')
+  const [previewDelivery, setPreviewDelivery] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -48,7 +85,12 @@ function OrderInvoicePanel({ orderId }) {
   useEffect(() => {
     let isMounted = true
 
-    Promise.all([getOrder(orderId), listDeliveries({ order_id: orderId })]).then(([orderResult, deliveriesResult]) => {
+    Promise.all([
+      getOrder(orderId),
+      listDeliveries({ order_id: orderId }),
+      listInvoices({ order_id: orderId }),
+      getSalesWorkflowSettings(),
+    ]).then(([orderResult, deliveriesResult, invoicesResult, settingsResult]) => {
       if (!isMounted) return
       if (!orderResult.success) {
         setLoadError(orderResult.error)
@@ -58,11 +100,21 @@ function OrderInvoicePanel({ orderId }) {
 
       setOrder(orderResult.order)
 
+      const invoices = invoicesResult.success ? invoicesResult.invoices : []
+      const wholeOrder = invoices.find((invoice) => !invoice.deliveryId) || null
+      setWholeOrderInvoice(wholeOrder)
+
+      const mode = settingsResult.success ? settingsResult.settings.partialDeliveryInvoiceMode : 'per_delivery'
+      setInvoiceMode(mode)
+
+      const invoicedDeliveryIds = new Set(invoices.map((invoice) => invoice.deliveryId).filter(Boolean))
       const billable = deliveriesResult.success
-        ? deliveriesResult.deliveries.filter((delivery) => billableDeliveryStatuses.includes(delivery.status))
+        ? deliveriesResult.deliveries.filter(
+            (delivery) => billableDeliveryStatuses.includes(delivery.status) && !invoicedDeliveryIds.has(delivery.id),
+          )
         : []
       setDeliveries(billable)
-      if (billable.length === 1) setSelectedDeliveryId(billable[0].id)
+      if (mode === 'per_delivery' && billable.length === 1) setSelectedDeliveryId(billable[0].id)
 
       setIsLoading(false)
     })
@@ -72,19 +124,74 @@ function OrderInvoicePanel({ orderId }) {
     }
   }, [orderId])
 
+  useEffect(() => {
+    if (invoiceMode !== 'per_delivery' || !selectedDeliveryId) {
+      setPreviewDelivery(null)
+      return
+    }
+
+    let isMounted = true
+
+    getDelivery(selectedDeliveryId).then((result) => {
+      if (!isMounted) return
+      setPreviewDelivery(result.success ? result.delivery : null)
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [invoiceMode, selectedDeliveryId])
+
+  // Preview must reflect what actually gets invoiced - the delivered quantity on the
+  // selected delivery (per_delivery mode) or across the whole order (after_full_order mode) -
+  // never the ordered quantity. Rate/tax still come from the order line since delivery lines
+  // don't carry pricing.
+  const previewItems = useMemo(() => {
+    if (!order) return []
+    if (!previewDelivery) {
+      return order.items
+        .filter((item) => (item.deliveredQuantity || 0) > 0)
+        .map((item) => ({ ...item, deliveredQuantity: item.deliveredQuantity || 0 }))
+    }
+
+    return previewDelivery.items
+      .filter((deliveryItem) => (deliveryItem.deliveredQuantity || 0) > 0)
+      .map((deliveryItem) => {
+        const orderItem = order.items.find((item) => item.id === deliveryItem.orderItemId) || {}
+        return {
+          id: deliveryItem.id,
+          productName: deliveryItem.productName || orderItem.productName,
+          deliveredQuantity: deliveryItem.deliveredQuantity || 0,
+          unitPrice: orderItem.unitPrice || 0,
+          discount: orderItem.discount || 0,
+          taxRate: orderItem.taxRate || 0,
+        }
+      })
+  }, [order, previewDelivery])
+
+  const previewLineAmounts = previewItems.map((item) => {
+    const gross = (item.deliveredQuantity || 0) * (item.unitPrice || 0)
+    const taxable = gross - gross * ((item.discount || 0) / 100)
+    const tax = taxable * ((item.taxRate || 0) / 100)
+    return { subtotal: taxable, tax, total: taxable + tax }
+  })
+  const previewSubtotal = previewLineAmounts.reduce((sum, line) => sum + line.subtotal, 0)
+  const previewTax = previewLineAmounts.reduce((sum, line) => sum + line.tax, 0)
+  const previewTotal = previewSubtotal + previewTax
+
   const handleIssue = async () => {
     setIsSubmitting(true)
     setSubmitError('')
 
-    const result = await invoiceOrder(orderId, selectedDeliveryId || undefined)
+    const result = await invoiceOrder(orderId, invoiceMode === 'per_delivery' ? selectedDeliveryId : undefined)
 
     if (!result.success) {
-      setSubmitError(result.error)
+      setSubmitError(friendlyInvoiceError(result.error))
       setIsSubmitting(false)
       return
     }
 
-    showToast({ title: 'Invoice issued', message: `${result.invoice.invoiceNumber} created from ${order?.orderNumber}.` })
+    showToast({ title: 'Invoice created successfully', message: `${result.invoice.invoiceNumber} created from ${order?.orderNumber}.` })
     navigate(`/admin/invoices/${result.invoice.id}`)
   }
 
@@ -96,8 +203,41 @@ function OrderInvoicePanel({ orderId }) {
     return <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError || 'Order not found.'}</div>
   }
 
-  const needsDeliveryChoice = deliveries.length > 1
-  const noBillableDelivery = deliveries.length === 0
+  const isAfterFullOrderMode = invoiceMode === 'after_full_order'
+  const orderFullyDelivered = order.fulfilmentStatus === 'delivered'
+  const needsDeliveryChoice = invoiceMode === 'per_delivery' && deliveries.length > 1
+  const noBillableDelivery = invoiceMode === 'per_delivery' && deliveries.length === 0 && !wholeOrderInvoice
+
+  // Already-invoiced states short-circuit the whole panel - never let the user attempt a duplicate.
+  if (wholeOrderInvoice) {
+    return (
+      <div className="space-y-5">
+        <div className="rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3 text-sm text-primary-800">
+          Invoice already exists for this order.
+        </div>
+        <Button type="button" className="w-full" onClick={() => navigate(`/admin/invoices/${wholeOrderInvoice.id}`)}>
+          <FileCheck2 className="size-4" aria-hidden="true" />
+          View Invoice {wholeOrderInvoice.invoiceNumber}
+        </Button>
+      </div>
+    )
+  }
+
+  if (isAfterFullOrderMode && !orderFullyDelivered) {
+    return (
+      <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+        Complete the pending delivery before creating the final invoice. This organization only invoices an order once it is fully delivered.
+      </div>
+    )
+  }
+
+  if (noBillableDelivery) {
+    return (
+      <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+        This order has no delivered quantity to invoice yet.
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -109,34 +249,30 @@ function OrderInvoicePanel({ orderId }) {
             <thead>
               <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
                 <th className="px-3.5 py-2.5">Product</th>
-                <th className="px-3.5 py-2.5 text-right">Qty</th>
-                <th className="px-3.5 py-2.5 text-right">Unit Price</th>
-                <th className="px-3.5 py-2.5 text-right">Line Total</th>
+                <th className="px-3.5 py-2.5 text-right">Delivered Qty</th>
+                <th className="px-3.5 py-2.5 text-right">Rate</th>
+                <th className="px-3.5 py-2.5 text-right">Subtotal</th>
+                <th className="px-3.5 py-2.5 text-right">GST</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-50">
-              {order.items.map((item) => (
+              {previewItems.map((item, index) => (
                 <tr key={item.id || item.productId}>
                   <td className="px-3.5 py-2.5 text-neutral-800">{item.productName}</td>
-                  <td className="px-3.5 py-2.5 text-right text-neutral-600">{item.quantity}</td>
+                  <td className="px-3.5 py-2.5 text-right text-neutral-600">{item.deliveredQuantity}</td>
                   <td className="px-3.5 py-2.5 text-right text-neutral-600">{formatCurrency(item.unitPrice)}</td>
-                  <td className="px-3.5 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
+                  <td className="px-3.5 py-2.5 text-right text-neutral-600">{formatCurrency(previewLineAmounts[index]?.subtotal)}</td>
+                  <td className="px-3.5 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(previewLineAmounts[index]?.tax)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <div className="mt-4 flex items-center justify-between border-t border-neutral-100 pt-4">
-          <span className="text-sm font-semibold text-neutral-900">Order Total</span>
-          <span className="text-lg font-semibold text-primary-700">{formatCurrency(order.total)}</span>
+          <span className="text-sm font-semibold text-neutral-900">Total</span>
+          <span className="text-lg font-semibold text-primary-700">{formatCurrency(previewTotal)}</span>
         </div>
       </div>
-
-      {noBillableDelivery && (
-        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-          This organization invoices from a delivery, and nothing has been delivered against this order yet. Deliver at least part of the order before invoicing it.
-        </div>
-      )}
 
       {needsDeliveryChoice && (
         <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
@@ -150,7 +286,7 @@ function OrderInvoicePanel({ orderId }) {
             onChange={(event) => setSelectedDeliveryId(event.target.value)}
             placeholder="Select which delivery this invoice covers"
           />
-          <p className="mt-2 text-xs text-neutral-400">This order has more than one delivery, so each is billed separately.</p>
+          <p className="mt-2 text-xs text-neutral-400">This organization bills per delivery, and this order has more than one.</p>
         </div>
       )}
 
@@ -162,12 +298,152 @@ function OrderInvoicePanel({ orderId }) {
         type="button"
         className="w-full"
         loading={isSubmitting}
-        disabled={noBillableDelivery || (needsDeliveryChoice && !selectedDeliveryId)}
+        disabled={needsDeliveryChoice && !selectedDeliveryId}
         onClick={handleIssue}
       >
         <FileCheck2 className="size-4" aria-hidden="true" />
-        Issue Invoice from Order
+        Issue Invoice
       </Button>
+    </div>
+  )
+}
+
+// Select a customer, then show every order they have (invoiceable or not) so nothing is
+// hidden - each order's action reflects its real state: not yet delivered, ready to invoice,
+// or already invoiced (possibly more than once, for per-delivery billing).
+function FromOrderFlow({ onBack }) {
+  const navigate = useNavigate()
+  const [customers, setCustomers] = useState([])
+  const [customerId, setCustomerId] = useState('')
+  const [orders, setOrders] = useState([])
+  const [invoicesByOrder, setInvoicesByOrder] = useState({})
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(true)
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false)
+
+  useEffect(() => {
+    listCustomers().then((result) => {
+      if (result.success) setCustomers(result.customers)
+      setIsLoadingCustomers(false)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!customerId) {
+      setOrders([])
+      setInvoicesByOrder({})
+      return
+    }
+
+    let isMounted = true
+    setIsLoadingOrders(true)
+
+    Promise.all([listOrders({ customer_id: customerId }), listInvoices({ customer_id: customerId })]).then(
+      ([ordersResult, invoicesResult]) => {
+        if (!isMounted) return
+
+        setOrders(ordersResult.success ? ordersResult.orders : [])
+
+        const map = {}
+        if (invoicesResult.success) {
+          invoicesResult.invoices.forEach((invoice) => {
+            if (!invoice.orderId) return
+            map[invoice.orderId] = [...(map[invoice.orderId] || []), invoice]
+          })
+        }
+        setInvoicesByOrder(map)
+        setIsLoadingOrders(false)
+      },
+    )
+
+    return () => {
+      isMounted = false
+    }
+  }, [customerId])
+
+  const customerOptions = useMemo(() => customers.map((customer) => ({ value: customer.id, label: customer.name })), [customers])
+  const selectedCustomer = customers.find((customer) => customer.id === customerId)
+
+  return (
+    <div className="space-y-5">
+      <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-800">
+        <ArrowLeft className="size-4" aria-hidden="true" />
+        Back
+      </button>
+
+      <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+        <Select
+          label="Select Customer"
+          options={customerOptions}
+          value={customerId}
+          onChange={(event) => setCustomerId(event.target.value)}
+          placeholder={isLoadingCustomers ? 'Loading...' : 'Search and select a customer'}
+          disabled={isLoadingCustomers}
+        />
+      </div>
+
+      {customerId && (
+        isLoadingOrders ? (
+          <LoadingSpinner label="Loading orders..." />
+        ) : orders.length === 0 ? (
+          <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
+            {selectedCustomer?.name || 'This customer'} has no orders yet.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {orders.map((order) => {
+              const orderInvoices = invoicesByOrder[order.id] || []
+              const hasDelivered = order.items.some((item) => (item.deliveredQuantity || 0) > 0)
+
+              return (
+                <div
+                  key={order.id}
+                  className="rounded-[1.25rem] border border-neutral-100 bg-white p-4 shadow-(--shadow-card) sm:flex sm:items-center sm:justify-between sm:gap-4"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-neutral-900">{order.orderNumber}</p>
+                      <Badge variant={orderStatusBadgeVariant[order.status] || 'neutral'}>{order.status.replace(/_/g, ' ')}</Badge>
+                      <Badge variant={order.fulfilmentStatus === 'delivered' ? 'success' : 'warning'}>
+                        {order.fulfilmentStatus.replace(/_/g, ' ')}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-neutral-400">
+                      {formatOrderDate(order.orderDate)} · Total {formatCurrency(order.total)}
+                      {!hasDelivered && orderInvoices.length === 0 && ' · No delivered quantity'}
+                    </p>
+                  </div>
+                  <div className="mt-3 shrink-0 sm:mt-0">
+                    {orderInvoices.length > 0 ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/admin/invoices/${orderInvoices[0].id}`)}
+                      >
+                        {orderInvoices.length > 1 ? `View Invoices (${orderInvoices.length})` : `View Invoice ${orderInvoices[0].invoiceNumber}`}
+                      </Button>
+                    ) : hasDelivered ? (
+                      <Button type="button" size="sm" onClick={() => navigate(`/admin/invoices/new?orderId=${order.id}`)}>
+                        Create Invoice
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled
+                        title="No delivered quantity is available for invoicing"
+                      >
+                        Not Available
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      )}
     </div>
   )
 }
@@ -177,6 +453,8 @@ export default function CreateSalesInvoice() {
   const { showToast } = useToast()
   const [searchParams] = useSearchParams()
   const orderId = searchParams.get('orderId')
+
+  const [createMode, setCreateMode] = useState('choice')
 
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
@@ -201,7 +479,7 @@ export default function CreateSalesInvoice() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    if (orderId) return
+    if (createMode !== 'direct') return
 
     let isMounted = true
 
@@ -220,7 +498,7 @@ export default function CreateSalesInvoice() {
     return () => {
       isMounted = false
     }
-  }, [orderId])
+  }, [createMode])
 
   const customerOptions = useMemo(() => customers.map((customer) => ({ value: customer.id, label: customer.name })), [customers])
   const productOptions = useMemo(() => products.map((product) => ({ value: product.id, label: product.name, product })), [products])
@@ -371,9 +649,17 @@ export default function CreateSalesInvoice() {
             <ArrowLeft className="size-4" />
           </button>
           <div>
-            <h1 className="text-2xl font-semibold text-neutral-900">{orderId ? 'Invoice Order' : 'Create Sales Invoice'}</h1>
+            <h1 className="text-2xl font-semibold text-neutral-900">
+              {orderId ? 'Invoice Order' : createMode === 'from-order' ? 'From Sales Order' : createMode === 'direct' ? 'Direct / Walk-in Invoice' : 'Create Invoice'}
+            </h1>
             <p className="mt-1 text-sm text-neutral-500">
-              {orderId ? 'Bill the selected sales order.' : 'Create a direct invoice for a customer or walk-in.'}
+              {orderId
+                ? 'Bill the selected sales order.'
+                : createMode === 'from-order'
+                  ? 'Generate from an existing customer’s delivered sales order.'
+                  : createMode === 'direct'
+                    ? 'Create a quick/manual invoice without a sales order.'
+                    : 'How would you like to create this invoice?'}
             </p>
           </div>
         </div>
@@ -381,7 +667,39 @@ export default function CreateSalesInvoice() {
 
       {orderId ? (
         <OrderInvoicePanel orderId={orderId} />
+      ) : createMode === 'choice' ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setCreateMode('from-order')}
+            className="rounded-[1.25rem] border border-neutral-100 bg-white p-6 text-left shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card-hover)"
+          >
+            <FileCheck2 className="size-6 text-primary-700" aria-hidden="true" />
+            <p className="mt-3 text-base font-semibold text-neutral-900">From Sales Order</p>
+            <p className="mt-1 text-sm text-neutral-500">Generate from an existing customer's delivered Sales Order.</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreateMode('direct')}
+            className="rounded-[1.25rem] border border-neutral-100 bg-white p-6 text-left shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card-hover)"
+          >
+            <Upload className="size-6 text-primary-700" aria-hidden="true" />
+            <p className="mt-3 text-base font-semibold text-neutral-900">Direct / Walk-in Invoice</p>
+            <p className="mt-1 text-sm text-neutral-500">Create a quick/manual invoice without a Sales Order.</p>
+          </button>
+        </div>
+      ) : createMode === 'from-order' ? (
+        <FromOrderFlow onBack={() => setCreateMode('choice')} />
       ) : (
+        <>
+        <button
+          type="button"
+          onClick={() => setCreateMode('choice')}
+          className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-800"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Back
+        </button>
         <form onSubmit={handleIssueInvoice} className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
           <div className="space-y-5">
             {submitError && (
@@ -650,6 +968,7 @@ export default function CreateSalesInvoice() {
             </Button>
           </div>
         </form>
+        </>
       )}
     </div>
   )

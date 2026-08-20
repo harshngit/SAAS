@@ -169,6 +169,7 @@ export default function OrderDetail() {
   const isLoaded = ['loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)
   const isInTransit = ['in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)
   const isDelivered = order.fulfilmentStatus === 'delivered'
+  const hasDeliveredQuantity = order.items.some((item) => (item.deliveredQuantity || 0) > 0)
 
   const fulfillmentSteps = [
     { label: 'Order Placed', status: 'done' },
@@ -298,7 +299,13 @@ export default function OrderDetail() {
             </Button>
           )}
           {['placed', 'processing', 'completed'].includes(order.status) && (
-            <Button variant="primary" size="sm" onClick={() => navigate(`/admin/invoices/new?orderId=${order.id}`)}>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!hasDeliveredQuantity}
+              title={hasDeliveredQuantity ? undefined : 'No delivered quantity is available for invoicing'}
+              onClick={() => navigate(`/admin/invoices/new?orderId=${order.id}`)}
+            >
               <FileText className="size-4" aria-hidden="true" />
               Create Invoice
             </Button>

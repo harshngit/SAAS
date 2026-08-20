@@ -141,26 +141,19 @@ export default function AdminSettings() {
       </Card>
 
       <Card title="Invoicing" subtitle="When and how invoices are generated">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <Select
-            label="Invoice timing"
-            value={settings.invoiceTiming}
-            onChange={(event) => updateField('invoiceTiming')(event.target.value)}
-            options={[
-              { value: 'after_delivery', label: 'After delivery' },
-              { value: 'on_order', label: 'On order placement' },
-            ]}
-          />
-          <Select
-            label="Partial delivery invoice mode"
-            value={settings.partialDeliveryInvoiceMode}
-            onChange={(event) => updateField('partialDeliveryInvoiceMode')(event.target.value)}
-            options={[
-              { value: 'per_delivery', label: 'Invoice per delivery' },
-              { value: 'after_full_order', label: 'Invoice after full order delivered' },
-            ]}
-          />
-        </div>
+        <Select
+          label="Partial delivery invoice mode"
+          value={settings.partialDeliveryInvoiceMode}
+          onChange={(event) => updateField('partialDeliveryInvoiceMode')(event.target.value)}
+          options={[
+            { value: 'per_delivery', label: 'Invoice per delivery' },
+            { value: 'after_full_order', label: 'Invoice after full order delivered' },
+          ]}
+          className="max-w-sm"
+        />
+        <p className="mt-2 text-xs text-neutral-400">
+          Invoices always bill the actual delivered quantity — there is no separate invoice-timing setting.
+        </p>
         <div className="mt-4">
           <Toggle
             label="Allow direct invoicing"

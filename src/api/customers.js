@@ -537,10 +537,15 @@ export async function getCustomerPayments(customerId) {
   }
 }
 
-export async function getCustomerLedger(customerId) {
+export async function getCustomerAccountStatement(customerId, params = {}) {
   try {
-    const { data } = await apiClient.get(`/customers/${customerId}/ledger`, {
+    const queryParams = {}
+    if (params.dateFrom || params.date_from) queryParams.date_from = params.dateFrom || params.date_from
+    if (params.dateTo || params.date_to) queryParams.date_to = params.dateTo || params.date_to
+
+    const { data } = await apiClient.get(`/customers/${customerId}/account-statement`, {
       headers: authHeader(),
+      params: queryParams,
     })
 
     const summary = data?.summary || {}
@@ -556,21 +561,22 @@ export async function getCustomerLedger(customerId) {
           outstanding: summary.outstanding ?? 0,
           creditLimit: summary.credit_limit ?? 0,
           availableCredit: summary.available_credit ?? 0,
-          overdueAmount: summary.overdue_amount ?? 0,
+          overdueAmount: summary.overdue_amount ?? summary.overdue ?? 0,
         },
         ageing: {
-          '0-30': ageing['0-30'] ?? 0,
-          '31-60': ageing['31-60'] ?? 0,
-          '61-90': ageing['61-90'] ?? 0,
-          '90+': ageing['90+'] ?? 0,
+          '0-30': ageing['0_30'] ?? 0,
+          '31-60': ageing['31_60'] ?? 0,
+          '61-90': ageing['61_90'] ?? 0,
+          '90+': ageing['90_plus'] ?? 0,
         },
         transactions: (Array.isArray(data?.transactions) ? data.transactions : []).map((entry) => ({
           type: entry.type,
           date: entry.date,
           description: entry.description || '',
+          referenceNumber: entry.reference_number || '',
           debit: entry.debit ?? 0,
           credit: entry.credit ?? 0,
-          balance: entry.balance ?? 0,
+          balance: entry.balance_after ?? entry.balance ?? 0,
           dueDate: entry.due_date || null,
           status: entry.status || '',
         })),
