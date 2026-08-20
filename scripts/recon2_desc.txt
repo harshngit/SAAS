@@ -1,0 +1,33 @@
+=== POST /deliveries/{delivery_id}/load ===
+Load the planned goods onto the partner's vehicle.
+
+This is the one place stock physically leaves the warehouse:
+
+    warehouse on hand ↓   reservation consumed ↓   vehicle stock ↑   loaded_quantity ↑
+
+All of it in one transaction. Safe to call twice: a line can only ever be loaded
+up to its planned quantity, so a repeat call loads whatever is left and then
+nothing — the same units are never deducted twice.
+
+To load specific quantities rather than everything planned, use
+POST /vehicle-stock/loading with `delivery_id` and per-item quantities.
+
+=== POST /deliveries/{delivery_id}/confirm ===
+Record what was actually handed over, with the proof of delivery.
+
+Delivering less than was loaded leaves the rest **on the vehicle** — it is not put
+back into the warehouse. It stays there until a re-attempt or the end-of-day
+return. The delivery becomes `delivered` or `partially_delivered` accordingly, and
+the order follows across all of its deliveries.
+
+A failed attempt (`failed: true` with a `failure_reason`) hands nothing over and
+leaves vehicle stock untouched.
+
+POD photos and the signature are ordinary uploads: POST /files/upload and send the
+`file_id`s here.
+
+=== POST /deliveries/{delivery_id}/accept ===
+Accept a planned delivery. Partner-specific action that marks status as accepted.
+
+=== POST /deliveries/{delivery_id}/reject ===
+Reject a planned delivery. Partner-specific action that clears partner & vehicle and notifies admins.

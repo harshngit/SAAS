@@ -3,7 +3,6 @@ import { ROLES } from '../../auth/roles'
 export const customerBasePathByRole = {
   [ROLES.ADMIN]: '/admin/customers',
   [ROLES.SALES_OFFICER]: '/sales/customers',
-  [ROLES.DELIVERY_PARTNER]: '/delivery/customers',
 }
 
 // Matches the customer_category enum the backend actually stores (see CustomerForm.jsx optionValues.customerCategory).

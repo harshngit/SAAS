@@ -1,0 +1,10 @@
+--- DeliveryLineOut (required=['id', 'product_name']) ---
+id: {"type": "string", "title": "Id"}
+order_item_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Order Item Id"}
+product_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Product Id"}
+variant_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Variant Id"}
+product_name: {"type": "string", "title": "Product Name"}
+planned_quantity: {"type": "number", "title": "Planned Quantity", "default": 0}
+loaded_quantity: {"type": "number", "title": "Loaded Quantity", "default": 0}
+delivered_quantity: {"type": "number", "title": "Delivered Quantity", "default": 0}
+pending_quantity: {"type": "number", "title": "Pending Quantity", "default": 0}

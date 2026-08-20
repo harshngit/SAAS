@@ -131,6 +131,12 @@ export default function AdminSettings() {
             checked={settings.deliveryCollectionAllowed}
             onChange={updateField('deliveryCollectionAllowed')}
           />
+          <Toggle
+            label="Allow draft orders"
+            description="Sales staff can save an order as a draft before it reserves stock, then confirm it later"
+            checked={settings.draftOrdersEnabled}
+            onChange={updateField('draftOrdersEnabled')}
+          />
         </div>
       </Card>
 

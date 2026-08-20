@@ -50,6 +50,7 @@ function normalizeWorkflowSettings(settings) {
     creditLimitAction: settings.credit_limit_action || 'warn',
     deliveryCollectionAllowed: settings.delivery_collection_allowed !== false,
     partialDeliveryInvoiceMode: settings.partial_delivery_invoice_mode || 'per_delivery',
+    draftOrdersEnabled: Boolean(settings.draft_orders_enabled),
   }
 }
 
@@ -83,6 +84,7 @@ export async function updateSalesWorkflowSettings(payload) {
       credit_limit_action: payload.creditLimitAction,
       delivery_collection_allowed: payload.deliveryCollectionAllowed,
       partial_delivery_invoice_mode: payload.partialDeliveryInvoiceMode,
+      draft_orders_enabled: payload.draftOrdersEnabled,
     }
 
     const { data } = await apiClient.patch('/sales-workflow-settings', requestBody, {

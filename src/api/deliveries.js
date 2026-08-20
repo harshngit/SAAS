@@ -39,6 +39,9 @@ function authHeader() {
 
 export const DELIVERY_STATUS_OPTIONS = [
   { value: 'planned', label: 'Planned' },
+  { value: 'accepted', label: 'Accepted' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'ready', label: 'Ready' },
   { value: 'loaded', label: 'Loaded' },
   { value: 'in_transit', label: 'In Transit' },
   { value: 'partially_delivered', label: 'Partially Delivered' },
@@ -56,9 +59,13 @@ function normalizeDeliveryItem(item) {
     variantId: item.variant_id,
     productName: item.product_name || item.name || '',
     plannedQuantity: item.planned_quantity ?? item.quantity ?? 0,
+    pickedQuantity: item.picked_quantity ?? 0,
     loadedQuantity: item.loaded_quantity ?? 0,
     deliveredQuantity: item.delivered_quantity ?? 0,
-    unitPrice: item.unit_price ?? 0,
+    pendingQuantity: item.pending_quantity ?? Math.max((item.planned_quantity ?? item.quantity ?? 0) - (item.delivered_quantity ?? 0), 0),
+    batchNumber: item.batch_number || '',
+    expiryDate: item.expiry_date || null,
+    serialNumbers: Array.isArray(item.serial_numbers) ? item.serial_numbers : [],
   }
 }
 
@@ -67,17 +74,46 @@ function normalizeDelivery(delivery) {
 
   return {
     id: delivery.id,
+    deliveryNumber: delivery.delivery_number || delivery.deliveryNumber || delivery.id,
     orderId: delivery.order_id || '',
     orderNumber: delivery.order_number || delivery.order?.order_number || '',
+    orderStatus: delivery.order_status || delivery.order?.status || '',
+    orderTotal: delivery.order_total ?? delivery.order?.total ?? 0,
+    fulfilmentStatus: delivery.fulfilment_status || delivery.order?.fulfilment_status || '',
+    pickingStatus: delivery.picking_status || 'not_started',
+    order: delivery.order
+      ? {
+          id: delivery.order.id,
+          orderNumber: delivery.order.order_number || '',
+          status: delivery.order.status || '',
+          fulfilmentStatus: delivery.order.fulfilment_status || '',
+          total: delivery.order.total ?? 0,
+        }
+      : null,
+    customerId: delivery.customer_id || delivery.customer?.id || '',
     customerName: delivery.customer?.name || delivery.customer_name || '',
+    customerBusinessName: delivery.customer?.business_name || '',
+    customerPhone: delivery.customer?.phone || delivery.customer_phone || '',
+    customerEmail: delivery.customer?.email || delivery.customer_email || '',
+    customerDeliveryAddress: delivery.customer?.delivery_address || delivery.delivery_address || '',
     status: delivery.status || 'planned',
     deliveryPartnerId: delivery.delivery_partner_id || delivery.delivery_partner?.id || '',
     deliveryPartnerName: delivery.delivery_partner?.name || '',
+    deliveryPartnerPhone: delivery.delivery_partner?.phone || delivery.delivery_partner_phone || '',
+    deliveryPartnerEmail: delivery.delivery_partner?.email || delivery.delivery_partner_email || '',
+    deliveryPartnerEmployeeId: delivery.delivery_partner?.employee_id || delivery.delivery_partner_employee_id || '',
     vehicleId: delivery.vehicle_id || delivery.vehicle?.id || '',
     vehicleNumber: delivery.vehicle?.vehicle_number || '',
+    vehicleType: delivery.vehicle?.vehicle_type || '',
+    vehicleCapacityKg: delivery.vehicle?.capacity_kg ?? null,
     warehouseId: delivery.warehouse_id || '',
+    warehouseName: delivery.warehouse?.name || '',
     scheduledDate: delivery.scheduled_date,
     deliveryAddress: delivery.delivery_address || '',
+    dispatchedAt: delivery.dispatched_at || null,
+    dispatchedById: delivery.dispatched_by_id || '',
+    confirmedAt: delivery.confirmed_at || null,
+    failureReason: delivery.failure_reason || '',
     notes: delivery.notes || '',
     items: (delivery.items || []).map(normalizeDeliveryItem),
     plannedTotal: delivery.planned_total ?? 0,
@@ -85,7 +121,6 @@ function normalizeDelivery(delivery) {
     deliveredTotal: delivery.delivered_total ?? 0,
     amountDue: delivery.amount_due ?? 0,
     pod: delivery.pod || null,
-    dispatchedAt: delivery.dispatched_at || null,
     createdAt: delivery.created_at,
     updatedAt: delivery.updated_at,
   }
@@ -147,6 +182,14 @@ export async function planDelivery(payload) {
     if (payload.scheduledDate || payload.scheduled_date) requestBody.scheduled_date = payload.scheduledDate || payload.scheduled_date
     if (payload.deliveryAddress || payload.delivery_address) requestBody.delivery_address = payload.deliveryAddress || payload.delivery_address
     if (payload.notes) requestBody.notes = payload.notes
+
+    const items = payload.items || []
+    if (items.length) {
+      requestBody.items = items.map((item) => ({
+        order_item_id: item.orderItemId || item.order_item_id,
+        planned_quantity: Number(item.plannedQuantity ?? item.planned_quantity) || 0,
+      }))
+    }
 
     const { data } = await apiClient.post('/deliveries', requestBody, {
       headers: authHeader(),
@@ -211,6 +254,97 @@ export async function loadDeliveryOntoVehicle(deliveryId) {
 
     return { success: false, error: message }
   }
+}
+
+export async function acceptDelivery(deliveryId) {
+  try {
+    const { data } = await apiClient.post(`/deliveries/${deliveryId}/accept`, {}, {
+      headers: authHeader(),
+    })
+
+    return { success: true, delivery: normalizeDelivery(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to accept this delivery. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function rejectDelivery(deliveryId, reason) {
+  try {
+    const requestBody = {}
+    if (reason && reason.trim()) requestBody.reason = reason.trim()
+
+    const { data } = await apiClient.post(`/deliveries/${deliveryId}/reject`, requestBody, {
+      headers: authHeader(),
+    })
+
+    return { success: true, delivery: normalizeDelivery(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to reject this delivery. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function pickDeliveryItems(deliveryId, items) {
+  try {
+    const requestBody = {
+      items: (items || []).map((item) => ({
+        delivery_item_id: item.deliveryItemId || item.delivery_item_id,
+        picked_quantity: Number(item.pickedQuantity ?? item.picked_quantity) || 0,
+      })),
+    }
+
+    const { data } = await apiClient.post(`/deliveries/${deliveryId}/pick`, requestBody, {
+      headers: authHeader(),
+    })
+
+    return { success: true, delivery: normalizeDelivery(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to record picked items. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function markDeliveryReady(deliveryId) {
+  try {
+    const { data } = await apiClient.post(`/deliveries/${deliveryId}/ready`, {}, {
+      headers: authHeader(),
+    })
+
+    return { success: true, delivery: normalizeDelivery(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to mark this delivery ready. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function reassignDelivery(deliveryId, payload) {
+  return updateDeliveryPlan(deliveryId, {
+    deliveryPartnerId: payload.deliveryPartnerId,
+    vehicleId: payload.vehicleId,
+    scheduledDate: payload.scheduledDate,
+    status: 'planned',
+  })
 }
 
 export async function confirmDelivery(deliveryId, payload) {

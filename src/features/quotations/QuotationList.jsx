@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, RotateCw, Search } from 'lucide-react'
+import { Eye, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import { QUOTATION_STATUS_OPTIONS, listQuotations } from '../../api/quotations'
+import { QUOTATION_STATUS_OPTIONS, deleteQuotation, listQuotations } from '../../api/quotations'
 import { formatCurrency } from '../../utils/format'
 
 const statusVariant = {
@@ -33,6 +35,9 @@ export default function QuotationList() {
   const [listError, setListError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const loadQuotations = useCallback(async () => {
     setIsLoading(true)
@@ -69,6 +74,25 @@ export default function QuotationList() {
       return matchesSearch && matchesStatus
     })
   }, [quotations, searchTerm, statusFilter])
+
+  const handleDeleteQuotation = async () => {
+    if (!deleteTarget) return
+
+    setIsDeleting(true)
+    setDeleteError('')
+
+    const result = await deleteQuotation(deleteTarget.id)
+
+    if (!result.success) {
+      setDeleteError(result.error)
+      setIsDeleting(false)
+      return
+    }
+
+    setQuotations((current) => current.filter((quotation) => quotation.id !== deleteTarget.id))
+    setIsDeleting(false)
+    setDeleteTarget(null)
+  }
 
   return (
     <div className="space-y-5">
@@ -132,6 +156,7 @@ export default function QuotationList() {
                   <th className="whitespace-nowrap px-4 py-3">Valid Until</th>
                   <th className="whitespace-nowrap px-4 py-3">Amount</th>
                   <th className="whitespace-nowrap px-4 py-3">Status</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -153,6 +178,27 @@ export default function QuotationList() {
                     <td className="px-4 py-3.5">
                       <Badge variant={statusVariant[quotation.status] || 'neutral'}>{quotation.status}</Badge>
                     </td>
+                    <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
+                      <ActionMenu
+                        items={[
+                          {
+                            label: 'View Details',
+                            icon: Eye,
+                            onClick: () => navigate(`${basePath}/${encodeURIComponent(quotation.id)}`),
+                          },
+                          ...(quotation.status !== 'converted'
+                            ? [
+                                {
+                                  label: 'Delete',
+                                  icon: Trash2,
+                                  danger: true,
+                                  onClick: () => setDeleteTarget(quotation),
+                                },
+                              ]
+                            : []),
+                        ]}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -167,6 +213,43 @@ export default function QuotationList() {
           <span>Quotations</span>
         </div>
       </Card>
+
+      <Modal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => {
+          if (isDeleting) return
+          setDeleteError('')
+          setDeleteTarget(null)
+        }}
+        title="Delete Quotation"
+      >
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-neutral-600">
+            Delete {deleteTarget?.quotationNumber || 'this quotation'}? This cannot be undone.
+          </p>
+          {deleteError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {deleteError}
+            </div>
+          )}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isDeleting}
+              onClick={() => {
+                setDeleteError('')
+                setDeleteTarget(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" loading={isDeleting} onClick={handleDeleteQuotation}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

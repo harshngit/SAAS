@@ -10,7 +10,7 @@ import { getCurrentVehicleStock, listVehicleStockSessions } from '../../api/vehi
 import { useAuthStore } from '../../store/authStore'
 
 function SessionCard({ session }) {
-  const totalStock = session.items.reduce((sum, item) => sum + item.loadedQuantity, 0)
+  const remainingTotal = session.items.reduce((sum, item) => sum + item.remainingQuantity, 0)
 
   return (
     <Card>
@@ -19,27 +19,53 @@ function SessionCard({ session }) {
           <div className="flex size-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
             <Car className="size-5" />
           </div>
-          <div>
-            <h3 className="font-semibold text-neutral-900">{session.vehicleNumber || 'Vehicle'}</h3>
-            <p className="text-sm text-neutral-500">Driver: {session.deliveryPartnerName || '—'}</p>
+          <div className="min-w-0">
+            <h3 className="truncate font-semibold text-neutral-900">{session.vehicleNumber || 'Vehicle not assigned'}</h3>
+            <p className="truncate text-sm text-neutral-500">
+              {session.vehicleType || 'Vehicle'} · Driver: {session.deliveryPartnerName || '—'}
+            </p>
           </div>
-          <Badge variant={session.status === 'active' ? 'success' : 'neutral'} className="ml-auto">{session.status}</Badge>
+          <Badge variant={session.status === 'active' ? 'success' : 'neutral'} className="ml-auto shrink-0">{session.status}</Badge>
         </div>
         <div className="space-y-3">
-          {session.items.map((item, idx) => (
-            <div key={idx} className="flex items-center justify-between rounded-xl bg-neutral-50 p-3">
-              <div className="flex items-center gap-2">
-                <Package className="size-4 text-neutral-500" />
-                <span className="text-sm font-medium text-neutral-700">{item.productName}</span>
+          {session.items.length === 0 ? (
+            <p className="rounded-xl bg-neutral-50 p-3 text-center text-sm text-neutral-400">Nothing loaded in this session.</p>
+          ) : (
+            session.items.map((item, idx) => (
+              <div key={idx} className="rounded-xl bg-neutral-50 p-3">
+                <div className="flex items-center gap-2">
+                  <Package className="size-4 shrink-0 text-neutral-500" />
+                  <span className="truncate text-sm font-medium text-neutral-700">
+                    {item.productName}
+                    {item.variantId && <span className="text-neutral-400"> · {item.variantId}</span>}
+                  </span>
+                </div>
+                <div className="mt-2 grid grid-cols-4 gap-2 text-center">
+                  <div>
+                    <p className="text-[0.65rem] uppercase tracking-wide text-neutral-400">Loaded</p>
+                    <p className="text-sm font-semibold text-neutral-900">{item.loadedQuantity}</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.65rem] uppercase tracking-wide text-neutral-400">Delivered</p>
+                    <p className="text-sm font-semibold text-neutral-900">{item.deliveredQuantity}</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.65rem] uppercase tracking-wide text-neutral-400">Returned</p>
+                    <p className="text-sm font-semibold text-neutral-900">{item.returnedQuantity}</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.65rem] uppercase tracking-wide text-primary-600">Remaining</p>
+                    <p className="text-sm font-semibold text-primary-700">{item.remainingQuantity}</p>
+                  </div>
+                </div>
               </div>
-              <span className="text-sm font-semibold text-primary-700">{item.loadedQuantity} units</span>
-            </div>
-          ))}
+            ))
+          )}
         </div>
         <div className="mt-4 border-t border-neutral-100 pt-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-neutral-500">Total Stock</span>
-            <span className="text-lg font-bold text-neutral-900">{totalStock} units</span>
+            <span className="text-sm text-neutral-500">Remaining Vehicle Stock</span>
+            <span className="text-lg font-bold text-neutral-900">{remainingTotal} units</span>
           </div>
         </div>
       </div>

@@ -206,6 +206,7 @@ export default function AppRoutes() {
           <Route path="/admin/vehicles" element={<VehicleList />} />
           <Route path="/admin/purchases" element={<PurchaseInvoiceList />} />
           <Route path="/admin/deliveries" element={<AdminDeliveries />} />
+          <Route path="/admin/deliveries/:id" element={<DeliveryDetail />} />
           <Route path="/admin/expenses" element={<AdminExpenses />} />
           <Route path="/admin/invoices" element={<AdminInvoices />} />
           <Route path="/admin/invoices/new" element={<CreateSalesInvoice />} />
@@ -236,6 +237,7 @@ export default function AppRoutes() {
           <Route path="/sales/quotations" element={<QuotationList />} />
           <Route path="/sales/quotations/new" element={<QuotationFormPage />} />
           <Route path="/sales/quotations/:id" element={<QuotationDetail />} />
+          <Route path="/sales/orders" element={<OrderList />} />
           <Route
             path="/sales/orders/create"
             element={
@@ -244,6 +246,7 @@ export default function AppRoutes() {
               </RequirePermissionRoute>
             }
           />
+          <Route path="/sales/orders/:id" element={<OrderDetail />} />
           <Route path="/sales/stock" element={<StockBoard readOnly />} />
           <Route path="/sales/visits" element={<VisitCheckIn />} />
           <Route path="/sales/followups" element={<FollowUpsList />} />
@@ -259,8 +262,6 @@ export default function AppRoutes() {
           }
         >
           <Route path="/delivery/dashboard" element={<DeliveryPartnerDashboard />} />
-          <Route path="/delivery/customers" element={<CustomerList />} />
-          <Route path="/delivery/customers/:id" element={<CustomerDetail />} />
           <Route
             path="/delivery/orders/create"
             element={

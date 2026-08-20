@@ -1,0 +1,27 @@
+Traceback (most recent call last):
+  File "<string>", line 16, in <module>
+  File "C:\Users\suraj\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2193' in position 140: character maps to <undefined>
+--- DeliveryOut ---
+['amount_due', 'confirmed_at', 'created_at', 'customer', 'customer_id', 'delivered_total', 'delivery_address', 'delivery_number', 'delivery_partner', 'delivery_partner_id', 'dispatched_at', 'dispatched_by_id', 'failure_reason', 'fulfilment_status', 'id', 'items', 'loaded_total', 'notes', 'order', 'order_id', 'order_number', 'order_status', 'order_total', 'organization_id', 'picking_status', 'planned_total', 'pod', 'scheduled_date', 'status', 'updated_at', 'vehicle', 'vehicle_id', 'warehouse_id']
+
+--- DeliveryLineOut ---
+['batch_number', 'delivered_quantity', 'expiry_date', 'id', 'loaded_quantity', 'order_item_id', 'pending_quantity', 'picked_quantity', 'planned_quantity', 'product_id', 'product_name', 'serial_numbers', 'variant_id']
+
+--- VehicleLoadingOut ---
+['created_at', 'date', 'delivery_partner_id', 'id', 'items', 'organization_id', 'status', 'updated_at']
+
+--- DeliveryPlanUpdate ---
+['delivery_address', 'delivery_partner_id', 'notes', 'scheduled_date', 'status', 'vehicle_id']
+
+pick guard/desc: Record picked quantities for a delivery (warehouse picking). This is a
+preparatory step: it does not move stock, only records how many units were
+picked from shelves for each delivery item.
+
+ready guard/desc: Mark a delivery as `ready` once picking is complete. This moves the
+delivery into the `ready` lifecycle step — loading may only proceed from
+`ready`.
+
+load guard/desc: 

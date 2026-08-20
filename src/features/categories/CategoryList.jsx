@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, Edit, Eye, Filter, ImageIcon, Plus, RotateCw, Search, Tags, Trash2, Upload } from 'lucide-react'
+import { CalendarPlus, CalendarClock, Check, Edit, Eye, Filter, ImageIcon, Plus, RotateCw, Search, Tags, Trash2, Upload } from 'lucide-react'
 import {
   createCategory,
   deleteCategoriesBulk,
@@ -52,11 +52,13 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
   const [formData, setFormData] = useState(emptyForm)
   const [errors, setErrors] = useState({})
   const [imageError, setImageError] = useState('')
+  const [previewFailed, setPreviewFailed] = useState(false)
 
   useEffect(() => {
     setFormData(category ? { ...emptyForm, ...category } : emptyForm)
     setErrors({})
     setImageError('')
+    setPreviewFailed(false)
   }, [category])
 
   const validate = () => {
@@ -87,6 +89,7 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
 
     try {
       const dataUrl = await readImageAsDataUrl(file)
+      setPreviewFailed(false)
       setFormData((current) => ({ ...current, image: dataUrl }))
     } catch (error) {
       setImageError(error.message)
@@ -118,17 +121,34 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-neutral-700">Category Image</label>
         <p className="text-xs font-medium text-neutral-400">Paste image URL or upload an image</p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-          <Input
-            placeholder="https://example.com/image.jpg"
-            value={formData.image}
-            onChange={(event) => setFormData((current) => ({ ...current, image: event.target.value }))}
-          />
-          <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-medium tracking-tight text-primary-700 transition-all hover:border-primary-300 hover:bg-primary-50/60">
-            <Upload className="size-4" aria-hidden="true" />
-            Upload
-            <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={handleImageUpload} />
-          </label>
+        <div className="flex items-start gap-4">
+          {formData.image && !previewFailed ? (
+            <img
+              src={formData.image}
+              alt=""
+              className="size-20 shrink-0 rounded-2xl border border-neutral-100 object-cover"
+              onError={() => setPreviewFailed(true)}
+            />
+          ) : (
+            <div className="flex size-20 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+              <Tags className="size-7" aria-hidden="true" />
+            </div>
+          )}
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-2">
+            <Input
+              placeholder="https://example.com/image.jpg"
+              value={formData.image}
+              onChange={(event) => {
+                setPreviewFailed(false)
+                setFormData((current) => ({ ...current, image: event.target.value }))
+              }}
+            />
+            <label className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-medium tracking-tight text-primary-700 transition-all hover:border-primary-300 hover:bg-primary-50/60">
+              <Upload className="size-4" aria-hidden="true" />
+              Upload Image
+              <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={handleImageUpload} />
+            </label>
+          </div>
         </div>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -313,6 +333,15 @@ export default function CategoryList() {
 
     setViewCategory(normalizeCategory(result.category))
     setIsDetailsLoading(false)
+  }
+
+  const handleEditFromDetails = () => {
+    if (!viewCategory) return
+
+    setEditingCategory(viewCategory)
+    setViewCategory(null)
+    setDetailsError('')
+    setIsFormOpen(true)
   }
 
   const toggleSelected = (categoryId) => {
@@ -563,9 +592,9 @@ export default function CategoryList() {
                     </td>
                     <td className="px-4 py-3.5">
                       {category.image ? (
-                        <img
+                      <img
                           src={category.image}
-                          alt=""
+                          alt={`${category.name} category image`}
                           className="size-10 rounded-lg border border-neutral-100 object-cover"
                         />
                       ) : (
@@ -628,8 +657,8 @@ export default function CategoryList() {
           setViewCategory(null)
           setDetailsError('')
         }}
-        title="Category Details"
-        className="max-w-2xl overflow-hidden"
+        title="Category details"
+        className="max-w-xl overflow-hidden"
       >
         {isDetailsLoading ? (
           <LoadingSpinner label="Loading category details..." />
@@ -640,36 +669,39 @@ export default function CategoryList() {
                 {detailsError}
               </div>
             )}
-            <div className="relative overflow-hidden rounded-3xl border border-neutral-100 bg-linear-to-br from-primary-50 via-white to-neutral-50 p-5 shadow-[0_1px_0_0_rgb(255_255_255/0.6)_inset] sm:p-6">
-              <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-primary-200/35 blur-3xl" />
-              <div className="pointer-events-none absolute -bottom-12 right-24 size-40 rounded-full bg-emerald-100/60 blur-3xl" />
-              <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start">
-                {viewCategory?.image ? (
-                  <img
-                    src={viewCategory.image}
-                    alt=""
-                    className="size-24 shrink-0 rounded-2xl border border-white/70 object-cover shadow-[0_10px_30px_-16px_rgb(0_0_0/0.35)] ring-1 ring-neutral-100"
-                  />
-                ) : (
-                  <div className="flex size-24 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 shadow-[0_10px_30px_-16px_rgb(6_59_0/0.3)] ring-1 ring-primary-100">
-                    <Tags className="size-8" aria-hidden="true" />
-                  </div>
-                )}
+
+            <div className="rounded-xl border border-neutral-200 bg-white p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                <div className="shrink-0">
+                  {viewCategory?.image ? (
+                    <img
+                      src={viewCategory.image}
+                      alt={`${viewCategory?.name || 'Category'} image`}
+                      className="size-20 rounded-lg border border-neutral-200 object-cover"
+                    />
+                  ) : (
+                    <div className="flex size-20 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
+                      <Tags className="size-6" aria-hidden="true" />
+                    </div>
+                  )}
+                </div>
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center rounded-full bg-primary-600 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-white">
+                    <span className="rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-600">
                       Category
                     </span>
-                    <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-500">
-                      {viewCategory?.subcategories?.length || 0} subcategories
-                    </span>
+                    <span className="text-xs text-neutral-400">Catalog record</span>
+                    {viewCategory?.subcategories?.length ? (
+                      <span className="rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+                        {viewCategory.subcategories.length} subcategories
+                      </span>
+                    ) : null}
                   </div>
-
-                  <h3 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-950 text-balance">
+                  <h3 className="mt-3 text-xl font-semibold tracking-[-0.02em] text-neutral-900 text-balance">
                     {viewCategory?.name || 'Unnamed category'}
                   </h3>
-                  <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-600 text-pretty">
+                  <p className="mt-2 max-w-prose text-sm leading-6 text-neutral-600 text-pretty">
                     {viewCategory?.description || 'No description added.'}
                   </p>
                 </div>
@@ -677,21 +709,53 @@ export default function CategoryList() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-neutral-100 bg-white px-4 py-3 shadow-[0_1px_0_0_rgb(255_255_255/0.8)_inset]">
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400">Created</p>
-                <p className="mt-1.5 text-sm font-medium text-neutral-900">{formatDateLabel(viewCategory?.createdAt)}</p>
+              <div className="rounded-xl border border-neutral-200 bg-white px-4 py-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-500">
+                    <CalendarPlus className="size-4" aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Created</p>
+                    <p className="mt-0.5 text-sm text-neutral-800">{formatDateLabel(viewCategory?.createdAt)}</p>
+                  </div>
+                </div>
               </div>
-              <div className="rounded-2xl border border-neutral-100 bg-white px-4 py-3 shadow-[0_1px_0_0_rgb(255_255_255/0.8)_inset]">
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400">Updated</p>
-                <p className="mt-1.5 text-sm font-medium text-neutral-900">{formatDateLabel(viewCategory?.updatedAt)}</p>
+              <div className="rounded-xl border border-neutral-200 bg-white px-4 py-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-500">
+                    <CalendarClock className="size-4" aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Updated</p>
+                    <p className="mt-0.5 text-sm text-neutral-800">{formatDateLabel(viewCategory?.updatedAt)}</p>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-neutral-100 bg-neutral-50/70 p-4">
-              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-neutral-400">Description</p>
-              <p className="mt-2 text-sm leading-6 text-neutral-700">
-                {viewCategory?.description || 'No description added.'}
+            <div className="flex flex-col-reverse gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs leading-5 text-neutral-500">
+                This category label is used across catalog filters and product organization.
               </p>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="rounded-md px-3 py-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => setViewCategory(null)}
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-md border-neutral-300 bg-transparent px-3 py-2 text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50"
+                  onClick={handleEditFromDetails}
+                >
+                  <Edit className="size-4" aria-hidden="true" />
+                  Edit category
+                </Button>
+              </div>
             </div>
           </div>
         )}

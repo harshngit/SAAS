@@ -1,0 +1,2 @@
+ready (from accepted, picking not started): 400 {"detail":"Can only mark planned deliveries as ready"}
+load (from accepted): 200 {"id":"eabccc1f-b366-4353-89df-828f59a3a3e0","organization_id":"9c612c6c-29e2-4c88-90da-05e7b3cc9065","delivery_number":"DLV-2026-1036","order_id":"c5e7bb23-3b4c-427a-9924-cd2598edf7bd","order_number":"SO-2026-1048","order_status":"processing","order_total":118.0,"fulfilment_status":"loaded","order":{"id":"c5e7bb23-3b4c-427a-9924-cd2598edf7bd","order_number":"SO-2026-1048","status":"processing","f

@@ -8,6 +8,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useToast } from '../../components/ui/toastContext'
 import { createInvoice, invoiceOrder } from '../../api/invoices'
 import { listCustomers } from '../../api/customers'
+import { listDeliveries } from '../../api/deliveries'
 import { listProducts } from '../../api/products'
 import { listWarehouses } from '../../api/warehouses'
 import { getOrder } from '../../api/orders'
@@ -31,10 +32,14 @@ function todayIso() {
 
 // Order-based invoicing bills what the order already has (rates/discounts/tax snapshotted
 // server-side) - no manual item entry, just a summary + confirm.
+const billableDeliveryStatuses = ['delivered', 'partially_delivered']
+
 function OrderInvoicePanel({ orderId }) {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const [order, setOrder] = useState(null)
+  const [deliveries, setDeliveries] = useState([])
+  const [selectedDeliveryId, setSelectedDeliveryId] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -43,13 +48,22 @@ function OrderInvoicePanel({ orderId }) {
   useEffect(() => {
     let isMounted = true
 
-    getOrder(orderId).then((result) => {
+    Promise.all([getOrder(orderId), listDeliveries({ order_id: orderId })]).then(([orderResult, deliveriesResult]) => {
       if (!isMounted) return
-      if (!result.success) {
-        setLoadError(result.error)
-      } else {
-        setOrder(result.order)
+      if (!orderResult.success) {
+        setLoadError(orderResult.error)
+        setIsLoading(false)
+        return
       }
+
+      setOrder(orderResult.order)
+
+      const billable = deliveriesResult.success
+        ? deliveriesResult.deliveries.filter((delivery) => billableDeliveryStatuses.includes(delivery.status))
+        : []
+      setDeliveries(billable)
+      if (billable.length === 1) setSelectedDeliveryId(billable[0].id)
+
       setIsLoading(false)
     })
 
@@ -62,7 +76,7 @@ function OrderInvoicePanel({ orderId }) {
     setIsSubmitting(true)
     setSubmitError('')
 
-    const result = await invoiceOrder(orderId)
+    const result = await invoiceOrder(orderId, selectedDeliveryId || undefined)
 
     if (!result.success) {
       setSubmitError(result.error)
@@ -81,6 +95,9 @@ function OrderInvoicePanel({ orderId }) {
   if (loadError || !order) {
     return <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError || 'Order not found.'}</div>
   }
+
+  const needsDeliveryChoice = deliveries.length > 1
+  const noBillableDelivery = deliveries.length === 0
 
   return (
     <div className="space-y-5">
@@ -115,11 +132,39 @@ function OrderInvoicePanel({ orderId }) {
         </div>
       </div>
 
+      {noBillableDelivery && (
+        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          This organization invoices from a delivery, and nothing has been delivered against this order yet. Deliver at least part of the order before invoicing it.
+        </div>
+      )}
+
+      {needsDeliveryChoice && (
+        <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <Select
+            label="Delivery to Invoice"
+            options={deliveries.map((delivery) => ({
+              value: delivery.id,
+              label: `${delivery.deliveryNumber} · ${delivery.status.replace(/_/g, ' ')}`,
+            }))}
+            value={selectedDeliveryId}
+            onChange={(event) => setSelectedDeliveryId(event.target.value)}
+            placeholder="Select which delivery this invoice covers"
+          />
+          <p className="mt-2 text-xs text-neutral-400">This order has more than one delivery, so each is billed separately.</p>
+        </div>
+      )}
+
       {submitError && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{submitError}</div>
       )}
 
-      <Button type="button" className="w-full" loading={isSubmitting} onClick={handleIssue}>
+      <Button
+        type="button"
+        className="w-full"
+        loading={isSubmitting}
+        disabled={noBillableDelivery || (needsDeliveryChoice && !selectedDeliveryId)}
+        onClick={handleIssue}
+      >
         <FileCheck2 className="size-4" aria-hidden="true" />
         Issue Invoice from Order
       </Button>

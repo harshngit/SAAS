@@ -257,6 +257,24 @@ export async function createOrder(payload) {
   }
 }
 
+export async function confirmOrder(orderId) {
+  try {
+    const { data } = await apiClient.post(`/orders/${orderId}/confirm`, {}, {
+      headers: authHeader(),
+    })
+
+    return { success: true, order: normalizeOrder(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to confirm order. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function approveOrder(orderId) {
   try {
     const { data } = await apiClient.patch(`/orders/${orderId}/approve`, {}, {

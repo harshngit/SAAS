@@ -1,0 +1,9 @@
+--- DeliveryPlanCreate (required=['order_id']) ---
+order_id: {"type": "string", "title": "Order Id"}
+delivery_partner_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Delivery Partner Id"}
+vehicle_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Vehicle Id"}
+warehouse_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Warehouse Id", "description": "Defaults to the order's own warehouse"}
+scheduled_date: {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Scheduled Date"}
+delivery_address: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Delivery Address"}
+notes: {"anyOf": [{"type": "string", "maxLength": 1000}, {"type": "null"}], "title": "Notes"}
+items: {"anyOf": [{"items": {"$ref": "#/components/schemas/DeliveryPlanItem"}, "type": "array"}, {"type": "null"}], "title": "Items"}

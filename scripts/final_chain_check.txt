@@ -1,0 +1,14 @@
+1. order: 201
+2. plan delivery: 201 planned
+3. pick before accept (expect 400): 400 {"detail":"Delivery must be accepted before picking"}
+4. accept: 200 accepted
+5. pick after accept (expect 200): 200 status= accepted picking_status= picked
+   item picked_quantity= 3.0
+6. ready (expect 200): 200 ready
+7. load (expect 200): 200 loaded
+   stock before: 75.0 3.0 -> after: 72.0 0.0
+   vehicle session: 200 {"id": "6790f7ad-65b8-47ca-ba5a-930ae14a0e17", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656", "vehicle": {"id": "29321ed5-1184-4a70-8c6e-89ebb8e87656", "vehicle_number": "MH 02 AB 
+8. confirm before dispatch (expect 400): 400 {"detail":"Delivery must be in transit before confirmation"}
+9. dispatch (expect 200): 200 in_transit
+10. confirm after dispatch (expect 200): 200 delivered delivered_total= 3.0
+   vehicle session after confirm: 200 {"id": "6790f7ad-65b8-47ca-ba5a-930ae14a0e17", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656", "vehicle": {"id": "29321ed5-1184-4a70-8c6e-89ebb8e87656", "vehicle_number": "MH 02 AB 

@@ -33,6 +33,9 @@ const deliveryStatusVariant = {
   delivered: 'success',
   in_transit: 'warning',
   planned: 'info',
+  accepted: 'success',
+  rejected: 'danger',
+  ready: 'success',
   loaded: 'info',
   partially_delivered: 'warning',
   failed: 'danger',
@@ -218,11 +221,12 @@ export default function DeliveryPartnerDashboard() {
   const todaysDeliveries = deliveries.filter((delivery) => (delivery.scheduledDate || '').slice(0, 10) === today)
 
   const completedToday = todaysDeliveries.filter((delivery) => delivery.status === 'delivered').length
-  const pendingToday = todaysDeliveries.filter((delivery) => ['planned', 'loaded', 'in_transit'].includes(delivery.status)).length
+  const pendingToday = todaysDeliveries.filter((delivery) => ['planned', 'accepted', 'loaded', 'in_transit'].includes(delivery.status)).length
   const paymentPendingToday = todaysDeliveries.filter((delivery) => (delivery.amountDue || 0) > 0).length
   const failedToday = todaysDeliveries.filter((delivery) => delivery.status === 'failed').length
   const partialToday = todaysDeliveries.filter((delivery) => delivery.status === 'partially_delivered').length
-  const readyToday = todaysDeliveries.filter((delivery) => ['planned', 'loaded'].includes(delivery.status)).length
+  const awaitingAcceptanceToday = todaysDeliveries.filter((delivery) => delivery.status === 'planned').length
+  const readyToday = todaysDeliveries.filter((delivery) => ['accepted', 'loaded'].includes(delivery.status)).length
   const inTransitToday = todaysDeliveries.filter((delivery) => delivery.status === 'in_transit').length
   const completedPercent = todaysDeliveries.length > 0 ? Math.round((completedToday / todaysDeliveries.length) * 100) : 0
 
@@ -266,6 +270,13 @@ export default function DeliveryPartnerDashboard() {
 
   const priorities = [
     {
+      label: 'Needs your response',
+      description: 'Accept or reject before loading can start',
+      count: awaitingAcceptanceToday,
+      icon: AlertTriangle,
+      iconClassName: 'bg-red-50 text-red-500',
+    },
+    {
       label: 'Pending deliveries',
       description: 'Deliveries yet to be completed',
       count: pendingToday,
@@ -296,6 +307,7 @@ export default function DeliveryPartnerDashboard() {
   ]
 
   const deliveryStatusTiles = [
+    { label: 'Awaiting Acceptance', value: awaitingAcceptanceToday, icon: Clock, iconClassName: 'bg-red-50 text-red-500' },
     { label: 'Ready', value: readyToday, icon: Truck, iconClassName: 'bg-neutral-50 text-neutral-500' },
     { label: 'In Transit', value: inTransitToday, icon: Truck, iconClassName: 'bg-blue-50 text-blue-600' },
     { label: 'Delivered', value: completedToday, icon: CheckCircle2, iconClassName: 'bg-green-50 text-green-600' },

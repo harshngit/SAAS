@@ -698,19 +698,25 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-medium text-neutral-700">
-                      Assign Delivery Partner{deliveryType === 'delivery_boy' && <span className="text-red-500"> *</span>}
+                      Assign Delivery Partner <span className="text-red-500">*</span>
                     </label>
                     <Select
                       options={deliveryBoys.map((user) => ({ value: user.id, label: user.name }))}
                       value={deliveryBoyId}
                       onChange={(event) => {
+                        if (event.target.value) {
+                          setDeliveryType('delivery_boy')
+                        }
                         setDeliveryBoyId(event.target.value)
                         setErrors((current) => ({ ...current, deliveryBoyId: '' }))
                       }}
-                      placeholder="Choose delivery partner"
+                      placeholder={deliveryBoys.length ? 'Choose delivery partner' : 'No delivery partners available'}
                       error={errors.deliveryBoyId}
-                      disabled={deliveryType !== 'delivery_boy'}
+                      disabled={deliveryBoys.length === 0}
                     />
+                    {!deliveryBoys.length && !isLoadingOptions && (
+                      <p className="text-xs text-neutral-400">Add an active delivery partner in staff before assigning one here.</p>
+                    )}
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-medium text-neutral-700">Delivery Address (Optional)</label>

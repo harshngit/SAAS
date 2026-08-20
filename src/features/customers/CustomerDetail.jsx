@@ -993,46 +993,72 @@ export default function CustomerDetail() {
         )}
       </Section>
 
-      <Modal isOpen={isPaymentModalOpen} onClose={handleClosePaymentModal} title="Record Customer Payment">
-        <form onSubmit={handleRecordPayment} className="space-y-4">
+      <Modal isOpen={isPaymentModalOpen} onClose={handleClosePaymentModal} title="Record Customer Payment" className="max-w-lg">
+        <form onSubmit={handleRecordPayment} className="space-y-5">
           {paymentFormError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
               {paymentFormError}
             </div>
           )}
+
+          <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
+            <div className="min-w-0">
+              <p className="text-xs text-neutral-400">Customer</p>
+              <p className="truncate text-sm font-medium text-neutral-900">{customer.businessName || customer.name}</p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-xs text-neutral-400">Outstanding</p>
+              <p className={`text-sm font-semibold ${customer.outstandingBalance > 0 ? 'text-amber-600' : 'text-neutral-900'}`}>
+                {formatCurrency(customer.outstandingBalance)}
+              </p>
+            </div>
+          </div>
+
           <Input
             label="Amount"
             type="number"
             min="0"
             step="0.01"
+            placeholder="0.00"
             value={paymentForm.amount}
             onChange={(event) => setPaymentForm((current) => ({ ...current, amount: event.target.value }))}
+            inputClassName="text-lg font-semibold"
             required
           />
-          <Select
-            label="Payment Mode"
-            options={paymentModeOptions}
-            value={paymentForm.paymentMode}
-            onChange={(event) => setPaymentForm((current) => ({ ...current, paymentMode: event.target.value }))}
-            required
-          />
-          <DatePicker
-            label="Received On"
-            value={paymentForm.receivedOn}
-            onChange={(value) => setPaymentForm((current) => ({ ...current, receivedOn: value }))}
-          />
-          <Input
-            label="Invoice ID"
-            placeholder="Optional invoice ID to settle"
-            value={paymentForm.invoiceId}
-            onChange={(event) => setPaymentForm((current) => ({ ...current, invoiceId: event.target.value }))}
-          />
-          <Input
-            label="Order ID"
-            placeholder="Optional order ID"
-            value={paymentForm.orderId}
-            onChange={(event) => setPaymentForm((current) => ({ ...current, orderId: event.target.value }))}
-          />
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Select
+              label="Payment Mode"
+              options={paymentModeOptions}
+              value={paymentForm.paymentMode}
+              onChange={(event) => setPaymentForm((current) => ({ ...current, paymentMode: event.target.value }))}
+              required
+            />
+            <DatePicker
+              label="Received On"
+              value={paymentForm.receivedOn}
+              onChange={(value) => setPaymentForm((current) => ({ ...current, receivedOn: value }))}
+            />
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-neutral-400">Settle Against (Optional)</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                label="Invoice ID"
+                placeholder="Leave blank for advance"
+                value={paymentForm.invoiceId}
+                onChange={(event) => setPaymentForm((current) => ({ ...current, invoiceId: event.target.value }))}
+              />
+              <Input
+                label="Order ID"
+                placeholder="Optional order ID"
+                value={paymentForm.orderId}
+                onChange={(event) => setPaymentForm((current) => ({ ...current, orderId: event.target.value }))}
+              />
+            </div>
+          </div>
+
           <Input
             label="Reference"
             placeholder="Transaction ID, cheque no., etc."
@@ -1042,9 +1068,11 @@ export default function CustomerDetail() {
           <Input
             label="Note"
             as="textarea"
+            placeholder="Optional note about this payment"
             value={paymentForm.note}
             onChange={(event) => setPaymentForm((current) => ({ ...current, note: event.target.value }))}
           />
+
           <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" onClick={handleClosePaymentModal} disabled={isSavingPayment}>
               Cancel

@@ -1,0 +1,4 @@
+confirm (from loaded, not dispatched): 200 {"id":"eabccc1f-b366-4353-89df-828f59a3a3e0","organization_id":"9c612c6c-29e2-4c88-90da-05e7b3cc9065","delivery_number":"DLV-2026-1036","order_id":"c5e7bb23-3b4c-427a-9924-cd2598edf7bd","order_number":"SO-2026-1048","order_status":"completed","order_total":118.0,"fulfilment_status":"delivered","orde
+
+reusing rejected delivery: 1771b78f-1ad4-4ba4-9a9a-82194d7aeb9d
+reassign rejected->planned: 400 {"detail":"A 'rejected' delivery cannot go back to planned"}

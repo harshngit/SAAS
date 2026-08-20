@@ -40,13 +40,20 @@ function authHeader() {
 function normalizeSessionItem(item) {
   if (!item) return item
 
+  const loadedQuantity = item.loaded_qty ?? item.loaded_quantity ?? item.quantity ?? 0
+  const deliveredQuantity = item.delivered_qty ?? item.delivered_quantity ?? 0
+  const returnedQuantity = item.returned_qty ?? item.returned_quantity ?? 0
+  const extraQuantity = item.extra_qty ?? item.extra_quantity ?? 0
+
   return {
     productId: item.product_id,
     variantId: item.variant_id,
     productName: item.product_name || item.name || '',
-    loadedQuantity: item.loaded_qty ?? item.loaded_quantity ?? item.quantity ?? 0,
-    returnedQuantity: item.returned_qty ?? item.returned_quantity ?? null,
-    soldQuantity: item.sold_qty ?? item.sold_quantity ?? null,
+    loadedQuantity,
+    extraQuantity,
+    deliveredQuantity,
+    returnedQuantity,
+    remainingQuantity: Math.max(loadedQuantity + extraQuantity - deliveredQuantity - returnedQuantity, 0),
   }
 }
 
@@ -57,8 +64,10 @@ function normalizeSession(session) {
     id: session.id,
     deliveryPartnerId: session.delivery_partner_id || session.delivery_partner?.id || '',
     deliveryPartnerName: session.delivery_partner?.name || '',
-    vehicleId: session.vehicle_id || '',
+    vehicleId: session.vehicle_id || session.vehicle?.id || '',
     vehicleNumber: session.vehicle?.vehicle_number || '',
+    vehicleType: session.vehicle?.vehicle_type || '',
+    vehicleCapacityKg: session.vehicle?.capacity_kg ?? null,
     date: session.date,
     status: session.status || 'active',
     items: (session.items || []).map(normalizeSessionItem),

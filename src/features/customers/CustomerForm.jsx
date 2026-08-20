@@ -168,7 +168,7 @@ function section(title, fields) {
 const formSections = [
   section('Basic Information', [
     { name: 'customerId', label: 'Customer ID', description: 'Unique customer identifier. Auto-generated.', type: 'Text (Auto Number)', required: true, input: 'readonly' },
-    { name: 'customerType', label: 'Customer Type', description: 'Individual, Business, Government, Dealer, Distributor, Vendor.', type: 'Dropdown', required: true, input: 'select' },
+    { name: 'customerType', label: 'Customer Type', description: 'Individual, Business, Government, Dealer, Distributor, Vendor.', type: 'Text', required: true },
     { name: 'customerName', label: 'Customer Name', description: 'Name of the customer or business.', type: 'Text (Max 100 chars)', required: true, maxLength: 100 },
     { name: 'legalBusinessName', label: 'Legal Business Name', description: 'Registered business name for companies.', type: 'Text' },
     { name: 'displayName', label: 'Display Name', description: 'Name displayed in invoices and reports.', type: 'Text' },

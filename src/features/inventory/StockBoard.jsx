@@ -9,6 +9,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
 import { getExpiringBatches, getStockBoard, recordStockAdjustment } from '../../api/inventory'
+import { listProducts } from '../../api/products'
 import StockEntryForm from './StockEntryForm'
 
 function ExpiringBatchesPanel() {
@@ -76,6 +77,35 @@ const stockStatusTabs = [
   { value: 'inactive', label: 'Inactive' },
 ]
 
+const sortOptions = [
+  { value: 'name-asc', label: 'Name (A-Z)' },
+  { value: 'name-desc', label: 'Name (Z-A)' },
+  { value: 'stock-desc', label: 'Stock (High to Low)' },
+  { value: 'stock-asc', label: 'Stock (Low to High)' },
+  { value: 'sku-asc', label: 'SKU (A-Z)' },
+  { value: 'recent', label: 'Recently Added' },
+]
+
+function sortItems(items, sortBy) {
+  const sorted = [...items]
+
+  switch (sortBy) {
+    case 'name-desc':
+      return sorted.sort((a, b) => (b.name || '').localeCompare(a.name || ''))
+    case 'stock-desc':
+      return sorted.sort((a, b) => (b.total_stock || 0) - (a.total_stock || 0))
+    case 'stock-asc':
+      return sorted.sort((a, b) => (a.total_stock || 0) - (b.total_stock || 0))
+    case 'sku-asc':
+      return sorted.sort((a, b) => (a.sku || '').localeCompare(b.sku || ''))
+    case 'recent':
+      return sorted.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    case 'name-asc':
+    default:
+      return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  }
+}
+
 export default function StockBoard({ readOnly = false }) {
   const navigate = useNavigate()
   const [items, setItems] = useState([])
@@ -83,6 +113,7 @@ export default function StockBoard({ readOnly = false }) {
   const [listError, setListError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('name-asc')
   const [searchTerm, setSearchTerm] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [adjustingProduct, setAdjustingProduct] = useState(null)
@@ -107,10 +138,15 @@ export default function StockBoard({ readOnly = false }) {
     setIsLoading(true)
     setListError('')
 
-    const result = await getStockBoard({
-      search: searchTerm.trim() || undefined,
-      category_id: categoryFilter === 'all' ? undefined : categoryFilter,
-    })
+    const [result, productsResult] = await Promise.all([
+      getStockBoard({
+        search: searchTerm.trim() || undefined,
+        category_id: categoryFilter === 'all' ? undefined : categoryFilter,
+      }),
+      // The stock board endpoint doesn't return created_at - pull it from /products so
+      // "Recently Added" sorting reflects a real timestamp instead of guessing from row order.
+      listProducts(),
+    ])
 
     if (!result.success) {
       setItems([])
@@ -119,7 +155,11 @@ export default function StockBoard({ readOnly = false }) {
       return
     }
 
-    setItems(result.items)
+    const createdAtById = new Map(
+      productsResult.success ? productsResult.products.map((product) => [product.id, product.created_at]) : [],
+    )
+
+    setItems(result.items.map((item) => ({ ...item, created_at: createdAtById.get(item.id) || null })))
     setIsLoading(false)
   }, [categoryFilter, searchTerm])
 
@@ -138,13 +178,15 @@ export default function StockBoard({ readOnly = false }) {
   )
 
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
+    const filtered = items.filter((item) => {
       if (statusFilter === 'active') return item.is_active
       if (statusFilter === 'inactive') return !item.is_active
       if (statusFilter === 'out') return (item.total_stock || 0) <= 0
       return true
     })
-  }, [items, statusFilter])
+
+    return sortItems(filtered, sortBy)
+  }, [items, statusFilter, sortBy])
 
   const handleOpenEntryForm = (item) => {
     setAdjustingProduct(item)
@@ -246,6 +288,12 @@ export default function StockBoard({ readOnly = false }) {
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
                 className="sm:w-52"
+              />
+              <Select
+                options={sortOptions}
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value)}
+                className="sm:w-48"
               />
             </div>
           </div>

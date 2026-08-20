@@ -1,0 +1,81 @@
+Re-plan or dispatch a delivery.
+
+Setting `status` to `in_transit` is the **dispatch** step: it stamps
+`dispatched_at` and `dispatched_by_id`, and only then does the partner see the
+delivery as live. Goods must already be loaded. `cancelled` abandons a plan that
+has not been loaded.
+
+Recording the outcome is POST /deliveries/{delivery_id}/confirm, not this.
+
+{
+  "delivery_partner_id": {
+    "anyOf": [
+      {
+        "type": "string"
+      },
+      {
+        "type": "null"
+      }
+    ],
+    "title": "Delivery Partner Id"
+  },
+  "vehicle_id": {
+    "anyOf": [
+      {
+        "type": "string"
+      },
+      {
+        "type": "null"
+      }
+    ],
+    "title": "Vehicle Id"
+  },
+  "scheduled_date": {
+    "anyOf": [
+      {
+        "type": "string",
+        "format": "date-time"
+      },
+      {
+        "type": "null"
+      }
+    ],
+    "title": "Scheduled Date"
+  },
+  "delivery_address": {
+    "anyOf": [
+      {
+        "type": "string"
+      },
+      {
+        "type": "null"
+      }
+    ],
+    "title": "Delivery Address"
+  },
+  "notes": {
+    "anyOf": [
+      {
+        "type": "string",
+        "maxLength": 1000
+      },
+      {
+        "type": "null"
+      }
+    ],
+    "title": "Notes"
+  },
+  "status": {
+    "anyOf": [
+      {
+        "type": "string",
+        "pattern": "^(planned|in_transit|cancelled)$"
+      },
+      {
+        "type": "null"
+      }
+    ],
+    "title": "Status",
+    "description": "in_transit dispatches it; cancelled abandons the plan"
+  }
+}

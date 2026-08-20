@@ -1,0 +1,553 @@
+==============================================================================
+SMOKE TEST RUN: 20260818-171308
+==============================================================================
+
+[PASS] Step 1 - Login as Admin
+  POST /auth/login
+  Request: {"email": "admin@demo.com"}
+  Expected: 200, user.organization present, system_role=admin
+  Actual:   200: {"user": {"id": "c7982e24-604d-43f1-b0f8-69be9692bb57", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "name": "hitarth Sharma", "email": "admin@demo.com", "username": null, "phone": "+91 9876543210", "system_role": "admin", "role_id": null, "role_detail": null, "role": "admin", "is_active": true, "created_at": "2026-07-21T16:54:51.357927Z", "employee_id": null, "first_name": null, "last_name": null, "display_name": "hitarth Sharma", "gender": null, "date_of_birth": null, "marital_status": null, "blood_group": null, "nationality": null, "alternate_mobile_number": null, "personal_em
+
+[PASS] Step 1 - Verify admin org/workspace
+  GET /auth/me
+  Expected: organization_id present, system_role=admin
+  Actual:   org=9c612c6c-29e2-4c88-90da-05e7b3cc9065, system_role=admin
+
+[PASS] Step 2a - Resolve default warehouse
+  GET /warehouses
+  Expected: a default warehouse exists
+  Actual:   warehouse_id=efae9a2c-f634-44c4-9bf4-40dcbdab5ecb (Main Warehouse)
+
+[PASS] Step 2b - Reuse/create category 'Packaged Beverages'
+  POST /categories
+  Request: {"name": "Packaged Beverages"}
+  Expected: category exists (reused or created)
+  Actual:   category_id=20a022b7-4e08-451b-b1e4-009bc997b69c
+
+[PASS] Step 2c - Create product 'Bisleri Packaged Drinking Water 1L'
+  POST /products
+  Request: {"name": "Bisleri Packaged Drinking Water 1L", "sku": "BISLERI-1L-SMOKE-171308", "category_id": "20a022b7-4e08-451b-b1e4-009bc997b69c", "price": 20.0, "tax_rate": 18.0}
+  Expected: 201 created
+  Actual:   201: {"product_id": "PROD-2026-1048", "barcode": null, "short_name": null, "sub_category": null, "manufacturer": null, "model_number": null, "product_video": null, "product_catalog_brochure": null, "product_manual": null, "msrp_mrp": null, "wholesale_price": null, "dealer_price": null, "discount": null, "tax_inclusive_price": false, "currency": null, "inventory_tracking": true, "opening_stock": null, "minimum_stock_level": null, "maximum_stock_level": null, "reorder_level": null, "reorder_quantity": null, "bin_shelf_location": null, "batch_tracking": false, "serial_number_tracking": false, "expiry_
+
+[PASS] Step 2d - Set opening stock to 100 (adjusting by 100)
+  POST /warehouses/efae9a2c-f634-44c4-9bf4-40dcbdab5ecb/stock/adjust
+  Request: {"product_id": "7bfd81c3-21fb-4286-a921-caabd74d265b", "quantity": 100, "movement_type": "opening"}
+  Expected: 200/201, on_hand becomes 100
+  Actual:   200: {"warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb", "warehouse_name": "Main Warehouse", "product_id": "7bfd81c3-21fb-4286-a921-caabd74d265b", "product_name": "Bisleri Packaged Drinking Water 1L", "variant_id": null, "variant_name": null, "on_hand": 100.0, "reserved": 0.0, "available": 100.0, "minimum_stock_level": null}
+
+[PASS] Step 2e - Read warehouse stock after opening balance
+  GET /warehouses/stock
+  Expected: Physical=100, Reserved=0, Available=100
+  Actual:   Physical=100.0, Reserved=0.0, Available=100.0
+
+[PASS] Step 3 - Create customer 'Balaji Retail Mart'
+  POST /customers
+  Request: {"customer_name": "Balaji Retail Mart", "mobile_number": "9817130801", "email_address": "balaji.retail.171308@example.com"}
+  Expected: 201 created, customer_id returned
+  Actual:   201: {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer_id": "CUST-2026-1041", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "basic_information": {"customer_type": null, "customer_name": "Balaji Retail Mart", "legal_business_name": null, "display_name": "Balaji Retail Mart", "industry": null, "customer_category": null, "customer_since": null, "status": null, "profile_image_id": null}, "contact_information": {"primary_contact_person": null, "designation": null, "mobile_number": "9817130801", "alternate_mobile_number": null, "email_address": "balaji.retail.171308@example.com", "web
+
+[PASS] Step 4a - Create order with order_status='draft'
+  POST /orders
+  Request: {"customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb", "fulfilment_method": "delivery", "payment_type": "cash", "order_status": "draft", "items": [{"product_id": "7bfd81c3-21fb-4286-a921-caabd74d265b", "quantity": 20, "unit_price": 20.0, "tax_rate": 18}]}
+  Expected: 201 created
+  Actual:   201: {"id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "status": "placed", "fulfilment_status": "reserved", "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb", "quotation_id": null, "delivery_date": null, "fulfilment_method": "delivery", "payment_type": "cash", "payment_terms_days": null, "source": "office", "assigned_delivery_partner_id": nul
+
+[FAIL] Step 4b - Order status is 'draft' (not reserved yet)
+  GET (from create response)
+  Expected: status=draft, fulfilment_status=not_started
+  Actual:   status='placed', fulfilment_status='reserved'
+
+[FAIL] Step 4c - Draft order must NOT reserve/deduct stock
+  GET /warehouses/stock
+  Expected: Physical=100, Reserved=0, Available=100
+  Actual:   Physical=100.0, Reserved=20.0, Available=80.0
+
+[FAIL] Step 5a - Confirm the order
+  POST /orders/b398d595-cf63-4019-8f46-af4e8adbaf20/confirm
+  Expected: 200, status becomes placed/awaiting_approval, fulfilment_status=reserved
+  Actual:   400: {"detail": "Only a draft order may be confirmed (this is 'placed')"}
+
+[PASS] Step 5b - Order confirmed state
+  GET (from confirm response)
+  Expected: status in {placed, awaiting_approval}, fulfilment_status=reserved
+  Actual:   status='placed', fulfilment_status='reserved'
+
+[PASS] Step 5c - Confirm reserves exactly the ordered quantity
+  GET /warehouses/stock
+  Expected: Physical=100, Reserved=20, Available=80
+  Actual:   Physical=100.0, Reserved=20.0, Available=80.0
+
+[PASS] Step 5d - Repeat confirm must not double-reserve
+  POST /orders/b398d595-cf63-4019-8f46-af4e8adbaf20/confirm
+  Expected: second call rejects (4xx) OR is a safe no-op (reserved stays 20)
+  Actual:   400: {"detail": "Only a draft order may be confirmed (this is 'placed')"}; reserved after retry=20.0
+
+[PASS] Step 6a - Create Delivery Partner 'Rahul Patil'
+  POST /users
+  Request: {"basic_information": {"first_name": "Rahul", "last_name": "Patil"}, "contact_information": {"official_email": "rahul.patil.171308@example.com"}}
+  Expected: 201 created
+  Actual:   201: {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "employee_id": "EMP-0013", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "name": "Rahul Patil", "system_role": "staff", "basic_information": {"first_name": "Rahul", "last_name": "Patil", "display_name": null, "gender": null, "date_of_birth": null, "marital_status": null, "blood_group": null, "nationality": null, "profile_photo": null}, "contact_information": {"mobile_number": "9817130802", "alternate_mobile_number": null, "personal_email": null, "official_email": "rahul.patil.171308@example.com", "emergency_contact_name": null, "emerg
+
+[PASS] Step 6b - Create vehicle 'MH 02 AB 4587'
+  POST /vehicles
+  Request: {"vehicle_number": "MH 02 AB 4587-171308"}
+  Expected: 201 created
+  Actual:   201: {"id": "29321ed5-1184-4a70-8c6e-89ebb8e87656", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "vehicle_number": "MH 02 AB 4587-171308", "vehicle_type": "Tempo", "capacity_kg": 500.0, "default_driver_id": null, "is_active": true, "created_at": "2026-08-18T11:43:40.309053Z", "updated_at": "2026-08-18T11:43:40.309056Z"}
+
+[PASS] Step 6c - Plan delivery (real Delivery record, not just order.assign-delivery-partner)
+  POST /deliveries
+  Request: {"order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656", "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb"}
+  Expected: 201 created, status=planned, delivery.id != order.id
+  Actual:   201: {"id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_number": "DLV-2026-1034", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656"
+
+[PASS] Step 6d - Delivery is planned and distinct from the order
+  GET (from plan response)
+  Expected: status=planned, delivery.id != order.id
+  Actual:   status='planned', delivery_id=c1297fb0-ff42-435c-bdfa-1f0a12789a06, order_id=b398d595-cf63-4019-8f46-af4e8adbaf20
+
+[PASS] Step 7 - Vehicle load is blocked while delivery is 'planned'
+  POST /deliveries/c1297fb0-ff42-435c-bdfa-1f0a12789a06/load
+  Request: {}
+  Expected: 400, reason indicates acceptance is required, no inventory movement
+  Actual:   400: {"detail": "The delivery partner has not accepted this delivery yet"}
+
+[PASS] Step 7b - Inventory unchanged after blocked load attempt
+  GET /warehouses/stock
+  Expected: Physical=100, Reserved=20, Available=80, Vehicle=0
+  Actual:   Physical=100.0, Reserved=20.0, Available=80.0
+
+[PASS] Step 8a - Rahul Patil logs in
+  POST /auth/login
+  Request: {"email": "rahul.patil.171308@example.com"}
+  Expected: 200
+  Actual:   200: {"user": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "name": "Rahul Patil", "email": "rahul.patil.171308@example.com", "username": null, "phone": "9817130802", "system_role": "staff", "role_id": "4c13e4e4-9929-4e33-8f1f-d29e1f0e7e19", "role_detail": {"id": "4c13e4e4-9929-4e33-8f1f-d29e1f0e7e19", "name": "Delivery Partner", "workspace": "delivery", "data_scope": "own", "is_default": true, "permissions": {"dashboard": {"view": true, "create": false, "edit": false, "delete": false, "approve": false, "export": false, "download": false},
+
+[PASS] Step 8b - Non-assigned partner (existing demo delivery@demo.com) cannot accept
+  POST /deliveries/c1297fb0-ff42-435c-bdfa-1f0a12789a06/accept
+  Request: {}
+  Expected: 403 or 404 (not the assigned partner)
+  Actual:   404: {"detail": "Delivery not found"}
+
+[PASS] Step 8c - Assigned partner (Rahul Patil) accepts
+  POST /deliveries/c1297fb0-ff42-435c-bdfa-1f0a12789a06/accept
+  Request: {}
+  Expected: 200, status=accepted
+  Actual:   200: {"id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_number": "DLV-2026-1034", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656"
+
+[PASS] Step 8d - Delivery status is 'accepted'
+  None None
+  Expected: status=accepted
+  Actual:   status='accepted'
+
+[FAIL] Step 9 - Vehicle load is blocked right after acceptance (must not skip pick/ready)
+  POST /deliveries/c1297fb0-ff42-435c-bdfa-1f0a12789a06/load
+  Request: {}
+  Expected: 400 - accepted must not mean ready-for-loading
+  Actual:   200: {"id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_number": "DLV-2026-1034", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656"
+
+[FAIL] Step 9b - Inventory unchanged
+  GET /warehouses/stock
+  Expected: Physical=100, Reserved=20, Available=80
+  Actual:   Physical=80.0, Reserved=0.0, Available=80.0
+
+[FAIL] Step 10a - Pick all 20 bottles
+  POST /deliveries/c1297fb0-ff42-435c-bdfa-1f0a12789a06/pick
+  Request: {"items": [{"delivery_item_id": "fa820acc-7646-417d-a69a-57dce081db28", "picked_quantity": 20}]}
+  Expected: 200, picked_quantity=20, picking_status=picked
+  Actual:   400: {"detail": "Picking may only be done for planned deliveries"}
+
+[FAIL] Step 10b - DeliveryOut exposes picking_status / picked_quantity
+  GET (pick response body)
+  Expected: response includes picking_status and per-item picked_quantity
+  Actual:   picking_status present=False, per-item picked_quantity present=False, top-level keys=['amount_due', 'confirmed_at', 'created_at', 'customer', 'customer_id', 'delivered_total', 'delivery_address', 'delivery_number', 'delivery_partner', 'delivery_partner_id', 'dispatched_at', 'dispatched_by_id', 'failure_reason', 'id', 'items', 'loaded_total', 'notes', 'order_id', 'order_number', 'organization_id', 'planned_total', 'pod', 'scheduled_date', 'status', 'updated_at', 'vehicle', 'vehicle_id', 'warehouse_id']
+
+[FAIL] Step 10c - Picking does not move physical/reserved stock
+  GET /warehouses/stock
+  Expected: Physical=100, Reserved=20, Available=80, Vehicle=0
+  Actual:   Physical=80.0, Reserved=0.0, Available=80.0
+
+[FAIL] Step 11 - Mark fully-picked delivery Ready
+  POST /deliveries/c1297fb0-ff42-435c-bdfa-1f0a12789a06/ready
+  Request: {}
+  Expected: 200, status=ready
+  Actual:   400: {"detail": "Can only mark planned deliveries as ready"}
+
+[FAIL] Step 11b - Delivery status is 'ready'
+  None None
+  Expected: status=ready
+  Actual:   status='accepted'
+
+[FAIL] Step 12a - Load the 20 bottles (from ready)
+  POST /deliveries/c1297fb0-ff42-435c-bdfa-1f0a12789a06/load
+  Request: {}
+  Expected: 200, status=loaded
+  Actual:   400: {"detail": "Everything planned on this delivery is already loaded"}
+
+[FAIL] Step 12b - Load moves stock correctly
+  GET /warehouses/stock + /vehicle-stock/current/{partner_id}
+  Expected: Physical=80, Reserved=0, Available=80, Vehicle=20
+  Actual:   Physical=80.0, Reserved=0.0, Available=80.0, Vehicle=20
+
+[PASS] Step 12c - Repeat load does not deduct the same 20 bottles twice
+  POST /deliveries/c1297fb0-ff42-435c-bdfa-1f0a12789a06/load
+  Request: {}
+  Expected: Physical stays 80, Vehicle stays 20
+  Actual:   400: Physical=80.0, Vehicle=20
+
+[FAIL] Step 13 - Confirm is blocked while status is only 'loaded' (must dispatch first)
+  POST /deliveries/c1297fb0-ff42-435c-bdfa-1f0a12789a06/confirm
+  Request: {"items": "..."}
+  Expected: 400 - loaded -> delivered directly must not be permitted
+  Actual:   200: {"id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_number": "DLV-2026-1034", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656"
+
+[FAIL] Step 14a - Dispatch the delivery
+  PATCH /deliveries/by-id/c1297fb0-ff42-435c-bdfa-1f0a12789a06
+  Request: {"status": "in_transit"}
+  Expected: 200, status=in_transit, dispatched_at populated
+  Actual:   400: {"detail": "A 'delivered' delivery cannot be dispatched"}
+
+[FAIL] Step 14b - Dispatch state correct
+  None None
+  Expected: status=in_transit, dispatched_at set
+  Actual:   status='accepted', dispatched_at=None
+
+[PASS] Step 14c - No additional warehouse stock movement on dispatch
+  GET /warehouses/stock
+  Expected: Physical=80, Reserved=0, Available=80 (unchanged from step 12)
+  Actual:   Physical=80.0, Reserved=0.0, Available=80.0
+
+[FAIL] Step 15a - Confirm full delivery with POD
+  POST /deliveries/c1297fb0-ff42-435c-bdfa-1f0a12789a06/confirm
+  Request: {"items": [{"delivery_item_id": "fa820acc-7646-417d-a69a-57dce081db28", "delivered_quantity": 20}], "notes": "Smoke test full delivery", "pod_photo_file_ids": ["4b0249d9-296c-483a-a3e6-d453ad2708de"]}
+  Expected: 200, status=delivered
+  Actual:   400: {"detail": "This delivery is already delivered"}
+
+[FAIL] Step 15b - Delivery fully delivered
+  None None
+  Expected: status=delivered, delivered_quantity=20, pending_quantity=0
+  Actual:   status='accepted', delivered_quantity=0.0, pending_quantity=20.0
+
+[PASS] Step 15c - Vehicle stock is now 0
+  None None
+  Expected: Vehicle=0
+  Actual:   Vehicle=0
+
+[PASS] Step 15d - Order fulfilment reflects delivery
+  None None
+  Expected: fulfilment_status=delivered
+  Actual:   fulfilment_status='delivered'
+
+[PASS] Step 15e - Warehouse remains Physical=80, Reserved=0, Available=80
+  GET /warehouses/stock
+  Expected: Physical=80, Reserved=0, Available=80
+  Actual:   Physical=80.0, Reserved=0.0, Available=80.0
+
+[PASS] Step 16a - Create the invoice (per-delivery billing)
+  POST /orders/b398d595-cf63-4019-8f46-af4e8adbaf20/invoice
+  Request: {"delivery_id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06"}
+  Expected: 201 created
+  Actual:   201: {"id": "96ccbd3e-5c08-432f-a01f-5f9d00106ebf", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "invoice_number": "INV-2026-1031", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "walk_in_name": null, "walk_in_phone": null, "delivery_id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "invoice_date": "2026-08-18T11:44:24.450456Z", "due_date": null, "status": "unpaid", "subtotal": 400.0, "discount": 0.0, "tax": 72.0, "addi
+
+[PASS] Step 16b - Exactly one invoice record for this order
+  GET /invoices
+  Expected: 1 invoice record
+  Actual:   1 invoice(s) found for order b398d595-cf63-4019-8f46-af4e8adbaf20
+
+[PASS] Step 16c - Invoice line item matches order
+  None None
+  Expected: Bisleri Packaged Drinking Water 1L, qty=20, rate=Rs.20
+  Actual:   items=[{"id": "35779b8c-2f7d-4ae6-9941-625cd9db905b", "product_id": "7bfd81c3-21fb-4286-a921-caabd74d265b", "variant_id": null, "product_name": "Bisleri Packaged Drinking Water 1L", "hsn_code": null, "quantity": 20, "unit_price": 20.0, "discount": 0.0, "tax": 72.0, "tax_rate": 18.0, "line_total": 400.0, "batch_number": null, "expiry_date": null, "serial_numbers": null, "delivery_item_id": "fa820acc-7646
+
+[PASS] Step 16d - Invoice calculation
+  None None
+  Expected: Subtotal=400, GST=72, Total=472, Outstanding=472
+  Actual:   Subtotal=400.0, Tax=72.0, Total=472.0, Outstanding=472.0
+
+[PASS] Step 16e - Payment status is unpaid before any payment
+  None None
+  Expected: payment_status=unpaid
+  Actual:   payment_status='Unpaid'
+
+[PASS] Step 16f - Simple/Detailed PDF are two views of the SAME invoice, not two records
+  GET /invoices/96ccbd3e-5c08-432f-a01f-5f9d00106ebf/pdf?format=simple|detailed
+  Expected: both 200, same invoice_id used for both, no second invoice created
+  Actual:   simple=200, detailed=200
+
+[PASS] Step 17a - Record full cash payment of Rs.472
+  POST /payment-receipts
+  Request: {"invoice_reference_id": "96ccbd3e-5c08-432f-a01f-5f9d00106ebf", "amount_received": 472.0, "payment_method": "cash"}
+  Expected: 201 created
+  Actual:   201: {"id": "fbeb8400-36fc-40e7-b7c7-4ebf8a0c5ea6", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "receipt_number": "RCPT-2026-1027", "receipt_date": "2026-08-18T11:44:29.824246Z", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "invoice_reference_id": "96ccbd3e-5c08-432f-a01f-5f9d00106ebf", "invoice_id": "96ccbd3e-5c08-432f-a01f-5f9d00106ebf", "amount_received": 472.0, "payment_method": "cash", "transaction_reference": null, "note": null, "invoice_total": 472.0, "total_paid": 472.0, "outstanding_amount": 0.0, "payment_status": "paid", "created_at": "2026-08-18T11:44:29.827087Z"
+
+[PASS] Step 17b - Invoice fully paid
+  None None
+  Expected: payment_status=Paid, Outstanding=0
+  Actual:   payment_status='Paid', outstanding=0.0
+
+[PASS] Step 18 - Final business state across all records
+  None None
+  Expected: order.fulfilment_status=delivered, delivery.status=delivered, invoice.payment_status=Paid, Physical=80/Reserved=0/Available=80, Vehicle=0
+  Actual:   order.status='completed'/fulfilment_status='delivered', delivery.status='delivered', invoice.payment_status='Paid', Physical=80.0, Reserved=0.0, Available=80.0, Vehicle=0
+
+==============================================================================
+REJECTION / REASSIGNMENT REVIEW (inspecting existing data, no new delivery created)
+==============================================================================
+  Reusing existing rejected delivery 1771b78f-1ad4-4ba4-9a9a-82194d7aeb9d (DLV-2026-1033) from a prior run.
+  Current state: partner=None, vehicle=None, status=rejected
+
+[FAIL] Reassignment - PATCH /deliveries/by-id/{id} can reassign partner+vehicle and reset status to planned
+  PATCH /deliveries/by-id/1771b78f-1ad4-4ba4-9a9a-82194d7aeb9d
+  Request: {"delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656", "status": "planned"}
+  Expected: 200, status becomes planned with new partner/vehicle
+  Actual:   400: {"detail": "A 'rejected' delivery cannot go back to planned"}
+
+[PASS] Notification - New-partner notification on plan (inspection only, from SESSION_CHANGES_DELIVERY_ACCEPT_REJECT.md)
+  None None
+  Expected: plan_delivery() calls notification_service on create when a partner is named
+  Actual:   Confirmed present in the backend change doc provided earlier this session; not independently re-verified here (no notification-read endpoint was probed) - reported as documented, not tested live.
+
+
+====================================================================================================
+STEP SUMMARY TABLE
+====================================================================================================
+Step       Status Expected / Actual
+----------------------------------------------------------------------------------------------------
+Step 1     PASS   Login as Admin
+                  expected: 200, user.organization present, system_role=admin
+                  actual:   200: {"user": {"id": "c7982e24-604d-43f1-b0f8-69be9692bb57", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "name": "hitarth Sharma", "email": "admin@demo.com", "username": null, "phone": "+91 9876543210", "system_role": "admin", "role_id": null, "role_detail": null, "role": "admin", "is_active": true, "created_at": "2026-07-21T16:54:51.357927Z", "employee_id": null, "first_name": null, "last_name": null, "display_name": "hitarth Sharma", "gender": null, "date_of_birth": null, "marital_status": null, "blood_group": null, "nationality": null, "alternate_mobile_number": null, "personal_em
+Step 1     PASS   Verify admin org/workspace
+                  expected: organization_id present, system_role=admin
+                  actual:   org=9c612c6c-29e2-4c88-90da-05e7b3cc9065, system_role=admin
+Step 2a    PASS   Resolve default warehouse
+                  expected: a default warehouse exists
+                  actual:   warehouse_id=efae9a2c-f634-44c4-9bf4-40dcbdab5ecb (Main Warehouse)
+Step 2b    PASS   Reuse/create category 'Packaged Beverages'
+                  expected: category exists (reused or created)
+                  actual:   category_id=20a022b7-4e08-451b-b1e4-009bc997b69c
+Step 2c    PASS   Create product 'Bisleri Packaged Drinking Water 1L'
+                  expected: 201 created
+                  actual:   201: {"product_id": "PROD-2026-1048", "barcode": null, "short_name": null, "sub_category": null, "manufacturer": null, "model_number": null, "product_video": null, "product_catalog_brochure": null, "product_manual": null, "msrp_mrp": null, "wholesale_price": null, "dealer_price": null, "discount": null, "tax_inclusive_price": false, "currency": null, "inventory_tracking": true, "opening_stock": null, "minimum_stock_level": null, "maximum_stock_level": null, "reorder_level": null, "reorder_quantity": null, "bin_shelf_location": null, "batch_tracking": false, "serial_number_tracking": false, "expiry_
+Step 2d    PASS   Set opening stock to 100 (adjusting by 100)
+                  expected: 200/201, on_hand becomes 100
+                  actual:   200: {"warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb", "warehouse_name": "Main Warehouse", "product_id": "7bfd81c3-21fb-4286-a921-caabd74d265b", "product_name": "Bisleri Packaged Drinking Water 1L", "variant_id": null, "variant_name": null, "on_hand": 100.0, "reserved": 0.0, "available": 100.0, "minimum_stock_level": null}
+Step 2e    PASS   Read warehouse stock after opening balance
+                  expected: Physical=100, Reserved=0, Available=100
+                  actual:   Physical=100.0, Reserved=0.0, Available=100.0
+Step 3     PASS   Create customer 'Balaji Retail Mart'
+                  expected: 201 created, customer_id returned
+                  actual:   201: {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer_id": "CUST-2026-1041", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "basic_information": {"customer_type": null, "customer_name": "Balaji Retail Mart", "legal_business_name": null, "display_name": "Balaji Retail Mart", "industry": null, "customer_category": null, "customer_since": null, "status": null, "profile_image_id": null}, "contact_information": {"primary_contact_person": null, "designation": null, "mobile_number": "9817130801", "alternate_mobile_number": null, "email_address": "balaji.retail.171308@example.com", "web
+Step 4a    PASS   Create order with order_status='draft'
+                  expected: 201 created
+                  actual:   201: {"id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "status": "placed", "fulfilment_status": "reserved", "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb", "quotation_id": null, "delivery_date": null, "fulfilment_method": "delivery", "payment_type": "cash", "payment_terms_days": null, "source": "office", "assigned_delivery_partner_id": nul
+Step 4b    FAIL   Order status is 'draft' (not reserved yet)
+                  expected: status=draft, fulfilment_status=not_started
+                  actual:   status='placed', fulfilment_status='reserved'
+Step 4c    FAIL   Draft order must NOT reserve/deduct stock
+                  expected: Physical=100, Reserved=0, Available=100
+                  actual:   Physical=100.0, Reserved=20.0, Available=80.0
+Step 5a    FAIL   Confirm the order
+                  expected: 200, status becomes placed/awaiting_approval, fulfilment_status=reserved
+                  actual:   400: {"detail": "Only a draft order may be confirmed (this is 'placed')"}
+Step 5b    PASS   Order confirmed state
+                  expected: status in {placed, awaiting_approval}, fulfilment_status=reserved
+                  actual:   status='placed', fulfilment_status='reserved'
+Step 5c    PASS   Confirm reserves exactly the ordered quantity
+                  expected: Physical=100, Reserved=20, Available=80
+                  actual:   Physical=100.0, Reserved=20.0, Available=80.0
+Step 5d    PASS   Repeat confirm must not double-reserve
+                  expected: second call rejects (4xx) OR is a safe no-op (reserved stays 20)
+                  actual:   400: {"detail": "Only a draft order may be confirmed (this is 'placed')"}; reserved after retry=20.0
+Step 6a    PASS   Create Delivery Partner 'Rahul Patil'
+                  expected: 201 created
+                  actual:   201: {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "employee_id": "EMP-0013", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "name": "Rahul Patil", "system_role": "staff", "basic_information": {"first_name": "Rahul", "last_name": "Patil", "display_name": null, "gender": null, "date_of_birth": null, "marital_status": null, "blood_group": null, "nationality": null, "profile_photo": null}, "contact_information": {"mobile_number": "9817130802", "alternate_mobile_number": null, "personal_email": null, "official_email": "rahul.patil.171308@example.com", "emergency_contact_name": null, "emerg
+Step 6b    PASS   Create vehicle 'MH 02 AB 4587'
+                  expected: 201 created
+                  actual:   201: {"id": "29321ed5-1184-4a70-8c6e-89ebb8e87656", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "vehicle_number": "MH 02 AB 4587-171308", "vehicle_type": "Tempo", "capacity_kg": 500.0, "default_driver_id": null, "is_active": true, "created_at": "2026-08-18T11:43:40.309053Z", "updated_at": "2026-08-18T11:43:40.309056Z"}
+Step 6c    PASS   Plan delivery (real Delivery record, not just order.assign-delivery-partner)
+                  expected: 201 created, status=planned, delivery.id != order.id
+                  actual:   201: {"id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_number": "DLV-2026-1034", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656"
+Step 6d    PASS   Delivery is planned and distinct from the order
+                  expected: status=planned, delivery.id != order.id
+                  actual:   status='planned', delivery_id=c1297fb0-ff42-435c-bdfa-1f0a12789a06, order_id=b398d595-cf63-4019-8f46-af4e8adbaf20
+Step 7     PASS   Vehicle load is blocked while delivery is 'planned'
+                  expected: 400, reason indicates acceptance is required, no inventory movement
+                  actual:   400: {"detail": "The delivery partner has not accepted this delivery yet"}
+Step 7b    PASS   Inventory unchanged after blocked load attempt
+                  expected: Physical=100, Reserved=20, Available=80, Vehicle=0
+                  actual:   Physical=100.0, Reserved=20.0, Available=80.0
+Step 8a    PASS   Rahul Patil logs in
+                  expected: 200
+                  actual:   200: {"user": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "name": "Rahul Patil", "email": "rahul.patil.171308@example.com", "username": null, "phone": "9817130802", "system_role": "staff", "role_id": "4c13e4e4-9929-4e33-8f1f-d29e1f0e7e19", "role_detail": {"id": "4c13e4e4-9929-4e33-8f1f-d29e1f0e7e19", "name": "Delivery Partner", "workspace": "delivery", "data_scope": "own", "is_default": true, "permissions": {"dashboard": {"view": true, "create": false, "edit": false, "delete": false, "approve": false, "export": false, "download": false},
+Step 8b    PASS   Non-assigned partner (existing demo delivery@demo.com) cannot accept
+                  expected: 403 or 404 (not the assigned partner)
+                  actual:   404: {"detail": "Delivery not found"}
+Step 8c    PASS   Assigned partner (Rahul Patil) accepts
+                  expected: 200, status=accepted
+                  actual:   200: {"id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_number": "DLV-2026-1034", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656"
+Step 8d    PASS   Delivery status is 'accepted'
+                  expected: status=accepted
+                  actual:   status='accepted'
+Step 9     FAIL   Vehicle load is blocked right after acceptance (must not skip pick/ready)
+                  expected: 400 - accepted must not mean ready-for-loading
+                  actual:   200: {"id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_number": "DLV-2026-1034", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656"
+Step 9b    FAIL   Inventory unchanged
+                  expected: Physical=100, Reserved=20, Available=80
+                  actual:   Physical=80.0, Reserved=0.0, Available=80.0
+Step 10a   FAIL   Pick all 20 bottles
+                  expected: 200, picked_quantity=20, picking_status=picked
+                  actual:   400: {"detail": "Picking may only be done for planned deliveries"}
+Step 10b   FAIL   DeliveryOut exposes picking_status / picked_quantity
+                  expected: response includes picking_status and per-item picked_quantity
+                  actual:   picking_status present=False, per-item picked_quantity present=False, top-level keys=['amount_due', 'confirmed_at', 'created_at', 'customer', 'customer_id', 'delivered_total', 'delivery_address', 'delivery_number', 'delivery_partner', 'delivery_partner_id', 'dispatched_at', 'dispatched_by_id', 'failure_reason', 'id', 'items', 'loaded_total', 'notes', 'order_id', 'order_number', 'organization_id', 'planned_total', 'pod', 'scheduled_date', 'status', 'updated_at', 'vehicle', 'vehicle_id', 'warehouse_id']
+Step 10c   FAIL   Picking does not move physical/reserved stock
+                  expected: Physical=100, Reserved=20, Available=80, Vehicle=0
+                  actual:   Physical=80.0, Reserved=0.0, Available=80.0
+Step 11    FAIL   Mark fully-picked delivery Ready
+                  expected: 200, status=ready
+                  actual:   400: {"detail": "Can only mark planned deliveries as ready"}
+Step 11b   FAIL   Delivery status is 'ready'
+                  expected: status=ready
+                  actual:   status='accepted'
+Step 12a   FAIL   Load the 20 bottles (from ready)
+                  expected: 200, status=loaded
+                  actual:   400: {"detail": "Everything planned on this delivery is already loaded"}
+Step 12b   FAIL   Load moves stock correctly
+                  expected: Physical=80, Reserved=0, Available=80, Vehicle=20
+                  actual:   Physical=80.0, Reserved=0.0, Available=80.0, Vehicle=20
+Step 12c   PASS   Repeat load does not deduct the same 20 bottles twice
+                  expected: Physical stays 80, Vehicle stays 20
+                  actual:   400: Physical=80.0, Vehicle=20
+Step 13    FAIL   Confirm is blocked while status is only 'loaded' (must dispatch first)
+                  expected: 400 - loaded -> delivered directly must not be permitted
+                  actual:   200: {"id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_number": "DLV-2026-1034", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656"
+Step 14a   FAIL   Dispatch the delivery
+                  expected: 200, status=in_transit, dispatched_at populated
+                  actual:   400: {"detail": "A 'delivered' delivery cannot be dispatched"}
+Step 14b   FAIL   Dispatch state correct
+                  expected: status=in_transit, dispatched_at set
+                  actual:   status='accepted', dispatched_at=None
+Step 14c   PASS   No additional warehouse stock movement on dispatch
+                  expected: Physical=80, Reserved=0, Available=80 (unchanged from step 12)
+                  actual:   Physical=80.0, Reserved=0.0, Available=80.0
+Step 15a   FAIL   Confirm full delivery with POD
+                  expected: 200, status=delivered
+                  actual:   400: {"detail": "This delivery is already delivered"}
+Step 15b   FAIL   Delivery fully delivered
+                  expected: status=delivered, delivered_quantity=20, pending_quantity=0
+                  actual:   status='accepted', delivered_quantity=0.0, pending_quantity=20.0
+Step 15c   PASS   Vehicle stock is now 0
+                  expected: Vehicle=0
+                  actual:   Vehicle=0
+Step 15d   PASS   Order fulfilment reflects delivery
+                  expected: fulfilment_status=delivered
+                  actual:   fulfilment_status='delivered'
+Step 15e   PASS   Warehouse remains Physical=80, Reserved=0, Available=80
+                  expected: Physical=80, Reserved=0, Available=80
+                  actual:   Physical=80.0, Reserved=0.0, Available=80.0
+Step 16a   PASS   Create the invoice (per-delivery billing)
+                  expected: 201 created
+                  actual:   201: {"id": "96ccbd3e-5c08-432f-a01f-5f9d00106ebf", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "invoice_number": "INV-2026-1031", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "walk_in_name": null, "walk_in_phone": null, "delivery_id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "invoice_date": "2026-08-18T11:44:24.450456Z", "due_date": null, "status": "unpaid", "subtotal": 400.0, "discount": 0.0, "tax": 72.0, "addi
+Step 16b   PASS   Exactly one invoice record for this order
+                  expected: 1 invoice record
+                  actual:   1 invoice(s) found for order b398d595-cf63-4019-8f46-af4e8adbaf20
+Step 16c   PASS   Invoice line item matches order
+                  expected: Bisleri Packaged Drinking Water 1L, qty=20, rate=Rs.20
+                  actual:   items=[{"id": "35779b8c-2f7d-4ae6-9941-625cd9db905b", "product_id": "7bfd81c3-21fb-4286-a921-caabd74d265b", "variant_id": null, "product_name": "Bisleri Packaged Drinking Water 1L", "hsn_code": null, "quantity": 20, "unit_price": 20.0, "discount": 0.0, "tax": 72.0, "tax_rate": 18.0, "line_total": 400.0, "batch_number": null, "expiry_date": null, "serial_numbers": null, "delivery_item_id": "fa820acc-7646
+Step 16d   PASS   Invoice calculation
+                  expected: Subtotal=400, GST=72, Total=472, Outstanding=472
+                  actual:   Subtotal=400.0, Tax=72.0, Total=472.0, Outstanding=472.0
+Step 16e   PASS   Payment status is unpaid before any payment
+                  expected: payment_status=unpaid
+                  actual:   payment_status='Unpaid'
+Step 16f   PASS   Simple/Detailed PDF are two views of the SAME invoice, not two records
+                  expected: both 200, same invoice_id used for both, no second invoice created
+                  actual:   simple=200, detailed=200
+Step 17a   PASS   Record full cash payment of Rs.472
+                  expected: 201 created
+                  actual:   201: {"id": "fbeb8400-36fc-40e7-b7c7-4ebf8a0c5ea6", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "receipt_number": "RCPT-2026-1027", "receipt_date": "2026-08-18T11:44:29.824246Z", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "invoice_reference_id": "96ccbd3e-5c08-432f-a01f-5f9d00106ebf", "invoice_id": "96ccbd3e-5c08-432f-a01f-5f9d00106ebf", "amount_received": 472.0, "payment_method": "cash", "transaction_reference": null, "note": null, "invoice_total": 472.0, "total_paid": 472.0, "outstanding_amount": 0.0, "payment_status": "paid", "created_at": "2026-08-18T11:44:29.827087Z"
+Step 17b   PASS   Invoice fully paid
+                  expected: payment_status=Paid, Outstanding=0
+                  actual:   payment_status='Paid', outstanding=0.0
+Step 18    PASS   Final business state across all records
+                  expected: order.fulfilment_status=delivered, delivery.status=delivered, invoice.payment_status=Paid, Physical=80/Reserved=0/Available=80, Vehicle=0
+                  actual:   order.status='completed'/fulfilment_status='delivered', delivery.status='delivered', invoice.payment_status='Paid', Physical=80.0, Reserved=0.0, Available=80.0, Vehicle=0
+Reassignment FAIL   PATCH /deliveries/by-id/{id} can reassign partner+vehicle and reset status to planned
+                  expected: 200, status becomes planned with new partner/vehicle
+                  actual:   400: {"detail": "A 'rejected' delivery cannot go back to planned"}
+Notification PASS   New-partner notification on plan (inspection only, from SESSION_CHANGES_DELIVERY_ACCEPT_REJECT.md)
+                  expected: plan_delivery() calls notification_service on create when a partner is named
+                  actual:   Confirmed present in the backend change doc provided earlier this session; not independently re-verified here (no notification-read endpoint was probed) - reported as documented, not tested live.
+
+====================================================================================================
+SMOKE VERDICT: FAIL  (37 passed, 18 failed)
+====================================================================================================
+
+P0 BLOCKERS:
+
+  [BUG-STEP4-1] Orders (Backend)
+    File: app/services/order_service.py (place_order) + app/schemas/order.py (OrderCreate.order_status)
+    Endpoint: POST /orders
+    Repro: POST /orders with order_status='draft' and reserve_stock_on_order=true (GET /sales-workflow-settings). Body: {"customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "warehouse_id": "efae9a2c-f634-44c4-9bf4-40dcbdab5ecb", "fulfilment_method": "delivery", "payment_type": "cash", "order_status": "draft", "items": [{"product_id": "7bfd81c3-21fb-4286-a921-caabd74d265b", "quantity": 20, "unit_price": 20.0, "tax_rate": 18}]}
+    Actual:   status='placed', fulfilment_status='reserved', stock after create: on_hand=100.0, reserved=20.0, available=80.0
+    Expected: Per OrderCreate.order_status field description ('Draft, Confirmed, Processing, Completed, Cancelled') and the /orders/{id}/confirm docstring ('Confirm a draft order: perform stock checks, reserve and move to placed/awaiting_approval'), a caller should be able to create a genuine unreserved draft by passing order_status='draft'. Expected: status='draft', fulfilment_status='not_started', stock unchanged (Physical=100, Reserved=0, Available=100).
+    Impact: If actual reservation still happens on create regardless of order_status: sales staff cannot save a tentative/negotiation-stage order without instantly locking warehouse stock against it - conflicts directly with the documented Confirm-Order step, and with org setting reserve_stock_on_order appearing to be unconditional rather than gated by order_status.
+    Fix: Either make POST /orders honor order_status='draft' by skipping the reserve step entirely (only /confirm reserves), or - if 'draft' is intentionally not a real creatable state via this endpoint - remove/clarify the order_status field description and the frontend must never offer a 'Save as Draft' action that calls POST /orders directly.
+
+  [BUG-STEP9-1] Deliveries (Backend)
+    File: app/services/delivery_service.py (load)
+    Endpoint: POST /deliveries/{id}/load
+    Repro: Accept a delivery, then immediately call POST /deliveries/c1297fb0-ff42-435c-bdfa-1f0a12789a06/load without picking/marking ready
+    Actual:   200: {"id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_number": "DLV-2026-1034", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656"
+    Expected: 400 - load() should require status='ready', not just 'accepted', now that pick/ready exist as real steps
+    Impact: Skips the picking/ready checkpoints entirely - the frontend's Load button would fire successfully straight from 'accepted', defeating the whole point of adding a picking stage.
+    Fix: Change load()'s status guard from `status == 'accepted'` to `status == 'ready'`, and gate accept->pick with its own guard too.
+
+  [BUG-REASSIGN-2] Deliveries (Backend)
+    File: app/services/delivery_service.py / app/routers/deliveries.py
+    Endpoint: PATCH /deliveries/by-id/{id}
+    Repro: PATCH a rejected delivery with delivery_partner_id, vehicle_id, status='planned'
+    Actual:   400: {"detail": "A 'rejected' delivery cannot go back to planned"}
+    Expected: 200 - reassignment should be possible via this endpoint per its own schema (accepts delivery_partner_id/vehicle_id/status=planned)
+    Impact: There is no way for Admin/Dispatch to reassign a rejected delivery at all if this rejects, despite the schema advertising support for it.
+    Fix: Check whether re_plan()/update_delivery() has a status guard that excludes 'rejected' as a source state, and add it if missing.
+
+P1 IMPORTANT:
+
+  [BUG-STEP10-1] Deliveries (Backend API contract)
+    File: app/schemas/delivery.py (DeliveryOut, DeliveryLineOut)
+    Endpoint: GET /deliveries/by-id/{id}, POST /deliveries/{id}/pick
+    Repro: Call POST /deliveries/{id}/pick, inspect the response body
+    Actual:   DeliveryOut has no `picking_status` field and DeliveryLineOut has no `picked_quantity` field (confirmed via live /openapi.json schema: DeliveryLineOut fields are id, order_item_id, product_id, variant_id, product_name, planned_quantity, loaded_quantity, delivered_quantity, pending_quantity - no picked_quantity)
+    Expected: DeliveryOut/DeliveryLineOut include `picking_status` and per-line `picked_quantity` so the frontend can render picking progress without a second call
+    Impact: Frontend cannot show 'X of Y picked' or a picking-complete indicator at all - the backend records the data (POST /pick succeeds) but never gives it back, so the UI has no way to reflect picking progress.
+    Fix: Add `picking_status` (not_started|picking|picked) to DeliveryOut and `picked_quantity` to DeliveryLineOut, populated from whatever internal model already stores what POST /pick just wrote.
+
+  [BUG-STEP13-1] Deliveries (Backend)
+    File: app/services/delivery_service.py (confirm)
+    Endpoint: POST /deliveries/{id}/confirm
+    Repro: Call confirm on a delivery whose status is 'loaded' (not yet dispatched to in_transit)
+    Actual:   200: {"id": "c1297fb0-ff42-435c-bdfa-1f0a12789a06", "organization_id": "9c612c6c-29e2-4c88-90da-05e7b3cc9065", "delivery_number": "DLV-2026-1034", "order_id": "b398d595-cf63-4019-8f46-af4e8adbaf20", "order_number": "SO-2026-1046", "customer_id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "customer": {"id": "a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9", "name": "Balaji Retail Mart", "business_name": null}, "delivery_partner_id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "delivery_partner": {"id": "f2ab23f6-badc-4579-bee5-9ec3b9be5bc7", "name": "Rahul Patil"}, "vehicle_id": "29321ed5-1184-4a70-8c6e-89ebb8e87656"
+    Expected: 400 - confirm should require status='in_transit'
+    Impact: A driver could mark a delivery 'delivered' before it was ever dispatched, corrupting the in_transit/dispatched_at audit trail.
+    Fix: Add a status guard to confirm(): reject unless delivery.status == 'in_transit'.
+
+P2 MINOR:
+  (none)
+
+FINAL INVENTORY:
+  Physical:  80.0
+  Reserved:  0.0
+  Available: 80.0
+  Vehicle:   0
+
+CREATED TEST RECORDS:
+  product_id: 7bfd81c3-21fb-4286-a921-caabd74d265b
+  warehouse_id: efae9a2c-f634-44c4-9bf4-40dcbdab5ecb
+  customer_id: a8f5c7e8-ef55-4bfc-8d82-82a9e1476eb9
+  order_id: b398d595-cf63-4019-8f46-af4e8adbaf20
+  delivery_partner_id: f2ab23f6-badc-4579-bee5-9ec3b9be5bc7
+  vehicle_id: 29321ed5-1184-4a70-8c6e-89ebb8e87656
+  delivery_id: c1297fb0-ff42-435c-bdfa-1f0a12789a06
+  invoice_id: 96ccbd3e-5c08-432f-a01f-5f9d00106ebf
+  payment_receipt_id: fbeb8400-36fc-40e7-b7c7-4ebf8a0c5ea6

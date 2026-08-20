@@ -1,0 +1,19 @@
+{
+  "properties": {
+    "delivery_item_id": {
+      "type": "string",
+      "title": "Delivery Item Id"
+    },
+    "picked_quantity": {
+      "type": "number",
+      "exclusiveMinimum": 0.0,
+      "title": "Picked Quantity"
+    }
+  },
+  "type": "object",
+  "required": [
+    "delivery_item_id",
+    "picked_quantity"
+  ],
+  "title": "DeliveryPickItem"
+}

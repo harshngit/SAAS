@@ -178,6 +178,14 @@ function section(title, fields) {
   }
 }
 
+function findSectionForErrorField(sections, fieldName) {
+  if (fieldName.startsWith('variantInventory.')) {
+    return sections.find((sectionItem) => sectionItem.id === 'variants-attributes')
+  }
+
+  return sections.find((sectionItem) => sectionItem.fields.some((field) => field.name === fieldName))
+}
+
 const productSections = [
   section('Basic Information', [
     { name: 'productCode', label: 'Product Code / SKU', required: true, maxLength: 50 },
@@ -394,6 +402,7 @@ export default function ProductForm({
   const [openVariantIndex, setOpenVariantIndex] = useState(-1)
   const [uploadingFields, setUploadingFields] = useState({})
   const [documentUploadError, setDocumentUploadError] = useState('')
+  const [validationBanner, setValidationBanner] = useState('')
 
   const activeFormSection = useMemo(
     () => productSections.find((sectionItem) => sectionItem.id === activeSection) || productSections[0],
@@ -541,7 +550,7 @@ export default function ProductForm({
     })
 
     setErrors(nextErrors)
-    return Object.keys(nextErrors).length === 0
+    return nextErrors
   }
 
   const handleCoverImageChange = async (event) => {
@@ -617,7 +626,23 @@ export default function ProductForm({
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    if (!validate()) return
+    setValidationBanner('')
+
+    const nextErrors = validate()
+    const errorFieldNames = Object.keys(nextErrors)
+
+    if (errorFieldNames.length > 0) {
+      const sectionWithError = findSectionForErrorField(productSections, errorFieldNames[0])
+
+      if (sectionWithError && sectionWithError.id !== activeSection) {
+        setActiveSection(sectionWithError.id)
+      }
+
+      setValidationBanner(
+        `Can't save yet — ${errorFieldNames.length} field${errorFieldNames.length > 1 ? 's' : ''} need${errorFieldNames.length > 1 ? '' : 's'} attention${sectionWithError ? ` on the "${sectionWithError.title}" tab` : ''}.`,
+      )
+      return
+    }
 
     const syncedData = syncVariants(formData)
 
@@ -759,7 +784,8 @@ export default function ProductForm({
             className="w-full max-w-full"
             triggerClassName="w-full max-w-full"
             options={categoryOptions}
-            placeholder={`Select ${field.label.toLowerCase()}`}
+            placeholder={`Type or select ${field.label.toLowerCase()}`}
+            searchable
           />
         )
       }
@@ -1321,9 +1347,9 @@ export default function ProductForm({
             </Button>
           </div>
 
-          {(formError || imageError || documentUploadError) && (
+          {(formError || imageError || documentUploadError || validationBanner) && (
             <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {formError || imageError || documentUploadError}
+              {formError || imageError || documentUploadError || validationBanner}
             </div>
           )}
 

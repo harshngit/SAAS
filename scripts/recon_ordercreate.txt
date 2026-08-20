@@ -1,0 +1,15 @@
+customer_id: {"type": "string", "title": "Customer Id"}
+warehouse_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Warehouse Id", "description": "Which warehouse to reserve from. Defaults to the firm's default."}
+quotation_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Quotation Id"}
+delivery_date: {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Delivery Date"}
+fulfilment_method: {"anyOf": [{"type": "string", "maxLength": 30}, {"type": "null"}], "title": "Fulfilment Method", "description": "delivery | pickup"}
+payment_type: {"anyOf": [{"type": "string", "maxLength": 20}, {"type": "null"}], "title": "Payment Type", "description": "cash | credit | upi | \u2026"}
+payment_terms_days: {"anyOf": [{"type": "integer", "maximum": 365.0, "minimum": 0.0}, {"type": "null"}], "title": "Payment Terms Days"}
+source: {"type": "string", "title": "Source", "description": "office | delivery_vehicle", "default": "office"}
+discount: {"type": "number", "minimum": 0.0, "title": "Discount", "default": 0}
+tax: {"type": "number", "minimum": 0.0, "title": "Tax", "default": 0}
+notes: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Notes"}
+items: {"items": {"$ref": "#/components/schemas/OrderItemIn"}, "type": "array", "minItems": 1, "title": "Items"}
+order_date: {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Order Date"}
+salesperson_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Salesperson Id", "description": "Assigned salesperson"}
+order_status: {"anyOf": [{"type": "string", "maxLength": 30}, {"type": "null"}], "title": "Order Status", "description": "Draft, Confirmed, Processing, Completed, Cancelled"}

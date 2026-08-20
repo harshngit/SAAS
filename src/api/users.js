@@ -623,6 +623,24 @@ export async function deleteUser(userId) {
   }
 }
 
+export async function permanentlyDeleteUser(userId) {
+  try {
+    const { data } = await apiClient.delete(`/auth/users/${userId}/permanent`, {
+      headers: authHeader(),
+    })
+
+    return { success: true, message: data?.message || 'User permanently deleted.', userId: data?.user_id || userId }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to permanently delete staff member. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function resetUserPassword(userId, newPassword) {
   try {
     const { data } = await apiClient.post(

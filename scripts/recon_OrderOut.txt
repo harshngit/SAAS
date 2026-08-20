@@ -1,0 +1,33 @@
+--- OrderOut (required=['id', 'organization_id', 'order_number', 'customer_id', 'customer', 'status', 'source', 'assigned_delivery_partner_id', 'created_by', 'subtotal', 'discount', 'tax', 'total', 'notes', 'reject_reason', 'items', 'approved_at', 'created_at', 'updated_at']) ---
+id: {"type": "string", "title": "Id"}
+organization_id: {"type": "string", "title": "Organization Id"}
+order_number: {"type": "string", "title": "Order Number"}
+customer_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Customer Id"}
+customer: {"anyOf": [{"$ref": "#/components/schemas/CustomerBrief"}, {"type": "null"}]}
+status: {"type": "string", "title": "Status", "description": "draft | placed | awaiting_approval | processing | completed | cancelled"}
+fulfilment_status: {"type": "string", "title": "Fulfilment Status", "description": "not_started | reserved | planned | loaded | in_transit | partially_delivered | delivered | failed", "default": "not_started"}
+warehouse_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Warehouse Id"}
+quotation_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Quotation Id"}
+delivery_date: {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Delivery Date"}
+fulfilment_method: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Fulfilment Method"}
+payment_type: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Payment Type"}
+payment_terms_days: {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Payment Terms Days"}
+source: {"type": "string", "title": "Source"}
+assigned_delivery_partner_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Assigned Delivery Partner Id"}
+created_by: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Created By"}
+subtotal: {"type": "number", "title": "Subtotal"}
+discount: {"type": "number", "title": "Discount"}
+tax: {"type": "number", "title": "Tax"}
+total: {"type": "number", "title": "Total"}
+notes: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Notes"}
+reject_reason: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Reject Reason"}
+items: {"items": {"$ref": "#/components/schemas/OrderItemOut"}, "type": "array", "title": "Items"}
+approved_at: {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Approved At"}
+created_at: {"type": "string", "format": "date-time", "title": "Created At"}
+updated_at: {"type": "string", "format": "date-time", "title": "Updated At"}
+sales_order_number: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Sales Order Number"}
+order_date: {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Order Date"}
+salesperson_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Salesperson Id"}
+order_status: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Order Status"}
+stock_summary: {"items": {"type": "object"}, "type": "array", "title": "Stock Summary"}
+warnings: {"items": {"type": "string"}, "type": "array", "title": "Warnings"}

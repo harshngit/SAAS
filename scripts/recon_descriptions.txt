@@ -1,0 +1,44 @@
+=== POST /deliveries/{delivery_id}/load ===
+Load the planned goods onto the partner's vehicle.
+
+This is the one place stock physically leaves the warehouse:
+
+    warehouse on hand ↓   reservation consumed ↓   vehicle stock ↑   loaded_quantity ↑
+
+All of it in one transaction. Safe to call twice: a line can only ever be loaded
+up to its planned quantity, so a repeat call loads whatever is left and then
+nothing — the same units are never deducted twice.
+
+To load specific quantities rather than everything planned, use
+POST /vehicle-stock/loading with `delivery_id` and per-item quantities.
+
+=== POST /deliveries/{delivery_id}/confirm ===
+Record what was actually handed over, with the proof of delivery.
+
+Delivering less than was loaded leaves the rest **on the vehicle** — it is not put
+back into the warehouse. It stays there until a re-attempt or the end-of-day
+return. The delivery becomes `delivered` or `partially_delivered` accordingly, and
+the order follows across all of its deliveries.
+
+A failed attempt (`failed: true` with a `failure_reason`) hands nothing over and
+leaves vehicle stock untouched.
+
+POD photos and the signature are ordinary uploads: POST /files/upload and send the
+`file_id`s here.
+
+=== POST /orders ===
+Place a sales order.
+
+Validated, priced, reserved and **placed** in one call — no Admin approval step
+unless the firm has turned `order_requires_approval` on. Warehouse stock is held,
+not deducted (that happens when a vehicle is loaded), and no receivable is
+created (that starts at the invoice).
+
+`warehouse_id` defaults to the firm's default warehouse. Each line snapshots the
+tax rate it was sold at — its own `tax_rate`, else the product's — so an invoice
+raised later bills the agreed figure.
+
+A shortage returns 400 with `{"error": "INSUFFICIENT_STOCK", "shortages": [...]}`
+naming what is short, unless the firm allows backorders. The response carries
+`stock_summary` (on hand / reserved / available) and any `warnings`, such as the
+customer going past their credit limit.

@@ -18,7 +18,6 @@ import {
   UserRound,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -31,7 +30,7 @@ import { ROLES, roleLabels } from '../../auth/roles'
 import { RequirePermission } from '../../auth/RequirePermission'
 import { useAuthStore } from '../../store/authStore'
 import { uploadFiles as uploadGenericFiles } from '../../api/files'
-import { createUser, deleteUser, listRoles, listUsers, updateUserStatus } from '../../api/users'
+import { createUser, listRoles, listUsers, permanentlyDeleteUser, updateUserStatus } from '../../api/users'
 import { getSystemRoleFromRoleName, normalizeApiUser, staffRoleOptions } from './userRoleUtils'
 import ResetPasswordModal from './ResetPasswordModal'
 
@@ -112,6 +111,8 @@ const systemStatusOptions = [
   { value: 'suspended', label: 'Suspended' },
   { value: 'locked', label: 'Locked' },
 ]
+
+const pageSizeOptions = [10, 25, 50].map((value) => ({ value: String(value), label: `${value} / page` }))
 
 // Purely a UI preview so the field never looks blank/confusing while filling the form - the
 // backend is free to assign its own employee_id if the admin leaves this untouched.
@@ -458,10 +459,13 @@ export default function UserManagement() {
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
   const isAdmin = currentUser?.role === ROLES.ADMIN
+  const isSuperAdmin = currentUser?.role === ROLES.SUPER_ADMIN
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
   const [activeRoleFilter, setActiveRoleFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [pageSize, setPageSize] = useState('10')
+  const [currentPage, setCurrentPage] = useState(1)
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
   const [listError, setListError] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -471,8 +475,8 @@ export default function UserManagement() {
   const [statusError, setStatusError] = useState('')
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [resetPasswordUser, setResetPasswordUser] = useState(null)
-  const [deleteTarget, setDeleteTarget] = useState(null)
-  const [deleteError, setDeleteError] = useState('')
+  const [permanentDeleteTarget, setPermanentDeleteTarget] = useState(null)
+  const [permanentDeleteError, setPermanentDeleteError] = useState('')
   const [isDeletingUser, setIsDeletingUser] = useState(false)
   const [formData, setFormData] = useState(initialStaffFormData)
   const [uploadPreviews, setUploadPreviews] = useState({})
@@ -786,26 +790,26 @@ export default function UserManagement() {
     handleCloseModal()
   }
 
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return
+  const handleConfirmPermanentDelete = async () => {
+    if (!permanentDeleteTarget || permanentDeleteTarget.id === currentUser?.id) return
 
     setIsDeletingUser(true)
-    setDeleteError('')
+    setPermanentDeleteError('')
 
-    const result = await deleteUser(deleteTarget.id)
+    const result = await permanentlyDeleteUser(permanentDeleteTarget.id)
 
     setIsDeletingUser(false)
 
     if (!result.success) {
-      setDeleteError(result.error)
+      setPermanentDeleteError(result.error)
       return
     }
 
     await refreshUsers({ showLoading: false })
-    setDeleteTarget(null)
+    setPermanentDeleteTarget(null)
     showToast({
-      title: 'Staff deleted',
-      message: `${deleteTarget.name || 'Staff member'} deleted successfully.`,
+      title: 'User permanently deleted',
+      message: `${permanentDeleteTarget.name || 'User'} removed from the database.`,
     })
   }
 
@@ -850,6 +854,32 @@ export default function UserManagement() {
 
     return matchesRole && matchesSearch
   })
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / Number(pageSize)))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const paginatedUsers = filteredUsers.slice((safeCurrentPage - 1) * Number(pageSize), safeCurrentPage * Number(pageSize))
+  const rangeStart = filteredUsers.length === 0 ? 0 : (safeCurrentPage - 1) * Number(pageSize) + 1
+  const rangeEnd = Math.min(filteredUsers.length, safeCurrentPage * Number(pageSize))
+  const paginationPages = (() => {
+    const pages = new Set([
+      1,
+      totalPages,
+      safeCurrentPage - 1,
+      safeCurrentPage,
+      safeCurrentPage + 1,
+    ])
+
+    return Array.from(pages)
+      .filter((pageNumber) => pageNumber >= 1 && pageNumber <= totalPages)
+      .sort((a, b) => a - b)
+  })()
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [activeRoleFilter, searchTerm, pageSize])
+
+  useEffect(() => {
+    setCurrentPage((current) => Math.min(current, totalPages))
+  }, [totalPages])
   const activeStaffFormSection = staffFormSections.find((section) => section.number === activeStaffSection) || staffFormSections[0]
   const activeStaffSectionIndex = staffFormSections.findIndex((section) => section.number === activeStaffSection)
   const isFirstStaffSection = activeStaffSectionIndex <= 0
@@ -1253,21 +1283,21 @@ export default function UserManagement() {
         }}
       />
       <Modal
-        isOpen={Boolean(deleteTarget)}
+        isOpen={Boolean(permanentDeleteTarget)}
         onClose={() => {
           if (isDeletingUser) return
-          setDeleteTarget(null)
-          setDeleteError('')
+          setPermanentDeleteTarget(null)
+          setPermanentDeleteError('')
         }}
-        title="Delete Staff Member"
+        title="Permanently Delete User"
       >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-neutral-600">
-            Delete {deleteTarget?.name || 'this staff member'}? This cannot be undone.
+            Permanently delete {permanentDeleteTarget?.name || 'this user'}? This cannot be undone and all data will be removed.
           </p>
-          {deleteError && (
+          {permanentDeleteError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {deleteError}
+              {permanentDeleteError}
             </div>
           )}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -1276,14 +1306,14 @@ export default function UserManagement() {
               variant="secondary"
               disabled={isDeletingUser}
               onClick={() => {
-                setDeleteTarget(null)
-                setDeleteError('')
+                setPermanentDeleteTarget(null)
+                setPermanentDeleteError('')
               }}
             >
               Cancel
             </Button>
-            <Button type="button" variant="danger" onClick={handleConfirmDelete} loading={isDeletingUser}>
-              Delete
+            <Button type="button" variant="danger" onClick={handleConfirmPermanentDelete} loading={isDeletingUser}>
+              Permanently Delete
             </Button>
           </div>
         </div>
@@ -1352,78 +1382,160 @@ export default function UserManagement() {
           ) : filteredUsers.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No staff found.</p>
           ) : (
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  <th className="whitespace-nowrap px-4 py-3">User</th>
-                  <th className="whitespace-nowrap px-4 py-3">Email</th>
-                  <th className="whitespace-nowrap px-4 py-3">Role</th>
-                  <th className="whitespace-nowrap px-4 py-3">Status</th>
-                  <th className="whitespace-nowrap px-4 py-3">Joined</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="space-y-2">
-                {filteredUsers.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
-                  >
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <StaffAvatar name={user.name} photoUrl={user.profilePhoto} />
-                        <div>
-                          <Link
-                            to={`/admin/users/${user.id}`}
-                            className="font-medium text-neutral-900 transition-colors hover:text-primary-700"
-                          >
-                            {user.name}
-                          </Link>
-                          {user.phone && <p className="mt-0.5 text-xs text-neutral-400">{user.phone}</p>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 text-neutral-600">{user.email}</td>
-                    <td className="px-4 py-3.5">
-                      <Badge variant="primary">{roleLabels[user.role] || user.roleDetail?.name || user.role}</Badge>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <Badge variant={user.isActive ? 'success' : 'danger'}>
-                        {user.isActive ? 'active' : 'inactive'}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3.5 text-neutral-500">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</td>
-                    <td className="px-4 py-3.5 text-right">
-                      <ActionMenu
-                        items={[
-                          { label: 'Edit', icon: Edit, onClick: () => navigate(`/admin/users/edit/${user.id}`) },
-                          { label: 'Change Status', icon: RefreshCw, onClick: () => handleOpenStatusModal(user) },
-                          ...(isAdmin
-                            ? [{ label: 'Reset Password', icon: KeyRound, onClick: () => setResetPasswordUser(user) }]
-                            : []),
-                          {
-                            label: 'Delete',
-                            icon: Trash2,
-                            danger: true,
-                            onClick: () => {
-                              setDeleteError('')
-                              setDeleteTarget(user)
-                            },
-                          },
-                        ]}
-                      />
-                    </td>
+            <>
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                    <th className="whitespace-nowrap px-4 py-3">User</th>
+                    <th className="whitespace-nowrap px-4 py-3">Email</th>
+                    <th className="whitespace-nowrap px-4 py-3">Role</th>
+                    <th className="whitespace-nowrap px-4 py-3">Status</th>
+                    <th className="whitespace-nowrap px-4 py-3">Joined</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="space-y-2">
+                  {paginatedUsers.map((user) => (
+                    <tr
+                      key={user.id}
+                      className="bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                    >
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <StaffAvatar name={user.name} photoUrl={user.profilePhoto} />
+                          <div>
+                            <Link
+                              to={`/admin/users/${user.id}`}
+                              className="font-medium text-neutral-900 transition-colors hover:text-primary-700"
+                            >
+                              {user.name}
+                            </Link>
+                            {user.phone && <p className="mt-0.5 text-xs text-neutral-400">{user.phone}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-neutral-600">{user.email}</td>
+                      <td className="px-4 py-3.5">
+                        <Badge variant="primary">{roleLabels[user.role] || user.roleDetail?.name || user.role}</Badge>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <Badge variant={user.isActive ? 'success' : 'danger'}>
+                          {user.isActive ? 'active' : 'inactive'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3.5 text-neutral-500">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</td>
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/admin/users/edit/${user.id}`)}
+                            className="flex size-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                            aria-label={`Edit ${user.name}`}
+                            title="Edit"
+                          >
+                            <Edit className="size-4" aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenStatusModal(user)}
+                            className="flex size-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                            aria-label={`Change status for ${user.name}`}
+                            title="Change Status"
+                          >
+                            <RefreshCw className="size-4" aria-hidden="true" />
+                          </button>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => setResetPasswordUser(user)}
+                              className="flex size-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                              aria-label={`Reset password for ${user.name}`}
+                              title="Reset Password"
+                            >
+                              <KeyRound className="size-4" aria-hidden="true" />
+                            </button>
+                          )}
+                          {isSuperAdmin && user.id !== currentUser?.id && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPermanentDeleteError('')
+                                setPermanentDeleteTarget(user)
+                              }}
+                              className="flex size-8 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                              aria-label={`Permanently delete ${user.name}`}
+                              title="Delete Permanently"
+                            >
+                              <Trash2 className="size-4" aria-hidden="true" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="flex flex-col gap-3 border-t border-neutral-100 px-4 py-3 text-xs text-neutral-400 lg:flex-row lg:items-center lg:justify-between">
+                <span>
+                  Showing <span className="font-semibold text-neutral-700">{rangeStart}</span> to{' '}
+                  <span className="font-semibold text-neutral-700">{rangeEnd}</span> of{' '}
+                  <span className="font-semibold text-neutral-700">{filteredUsers.length}</span> users
+                </span>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={safeCurrentPage === 1}
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent"
+                    aria-label="Previous page"
+                  >
+                    <span aria-hidden="true">‹</span>
+                  </button>
+
+                  {paginationPages.map((pageNumber, index) => {
+                    const previousPage = paginationPages[index - 1]
+                    const isGap = previousPage && pageNumber - previousPage > 1
+
+                    return (
+                      <span key={pageNumber} className="flex items-center gap-2">
+                        {isGap && <span className="px-1 text-neutral-300">…</span>}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(pageNumber)}
+                          className={`flex size-8 items-center justify-center rounded-full text-sm font-medium transition-colors ${
+                            pageNumber === safeCurrentPage
+                              ? 'bg-primary-600 text-white'
+                              : 'text-neutral-600 hover:bg-neutral-100'
+                          }`}
+                        >
+                          {pageNumber}
+                        </button>
+                      </span>
+                    )
+                  })}
+
+                  <button
+                    type="button"
+                    disabled={safeCurrentPage === totalPages}
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent"
+                    aria-label="Next page"
+                  >
+                    <span aria-hidden="true">›</span>
+                  </button>
+
+                  <Select
+                    options={pageSizeOptions}
+                    value={pageSize}
+                    onChange={(event) => setPageSize(event.target.value)}
+                    className="w-28"
+                  />
+                </div>
+              </div>
+            </>
           )}
-        </div>
-        <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-3 text-xs text-neutral-400">
-          <span>
-            {filteredUsers.length === 0 ? '0' : `1 to ${filteredUsers.length}`} of {users.length}
-          </span>
-          <span>Staff members</span>
         </div>
       </Card>
     </div>

@@ -1,0 +1,29 @@
+--- DeliveryOut (required=['id', 'organization_id', 'delivery_number', 'status', 'items', 'created_at', 'updated_at']) ---
+id: {"type": "string", "title": "Id"}
+organization_id: {"type": "string", "title": "Organization Id"}
+delivery_number: {"type": "string", "title": "Delivery Number", "description": "Human code, DLV-\u2026 / DN-\u2026"}
+order_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Order Id"}
+order_number: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Order Number"}
+customer_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Customer Id"}
+customer: {"anyOf": [{"$ref": "#/components/schemas/DeliveryCustomerBrief"}, {"type": "null"}]}
+delivery_partner_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Delivery Partner Id"}
+delivery_partner: {"anyOf": [{"$ref": "#/components/schemas/DeliveryPartnerBrief"}, {"type": "null"}]}
+vehicle_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Vehicle Id"}
+vehicle: {"anyOf": [{"$ref": "#/components/schemas/VehicleBrief"}, {"type": "null"}]}
+warehouse_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Warehouse Id"}
+delivery_address: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Delivery Address"}
+scheduled_date: {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Scheduled Date"}
+status: {"type": "string", "title": "Status", "description": "planned | loaded | in_transit | partially_delivered | delivered | failed | cancelled"}
+dispatched_at: {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Dispatched At"}
+dispatched_by_id: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Dispatched By Id"}
+confirmed_at: {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Confirmed At"}
+failure_reason: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Failure Reason"}
+notes: {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Notes"}
+items: {"items": {"$ref": "#/components/schemas/DeliveryLineOut"}, "type": "array", "title": "Items"}
+planned_total: {"type": "number", "title": "Planned Total", "default": 0}
+loaded_total: {"type": "number", "title": "Loaded Total", "default": 0}
+delivered_total: {"type": "number", "title": "Delivered Total", "default": 0}
+pod: {"$ref": "#/components/schemas/DeliveryPod"}
+amount_due: {"type": "number", "title": "Amount Due", "description": "Order total less what has been received against it", "default": 0}
+created_at: {"type": "string", "format": "date-time", "title": "Created At"}
+updated_at: {"type": "string", "format": "date-time", "title": "Updated At"}

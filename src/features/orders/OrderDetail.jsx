@@ -24,12 +24,15 @@ import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
 import {
   approveOrder,
-  assignDeliveryPartner,
   cancelOrder,
+  confirmOrder,
   getOrder,
   rejectOrder,
 } from '../../api/orders'
+import { planDelivery } from '../../api/deliveries'
 import { listUsers } from '../../api/users'
+import { listVehicles } from '../../api/vehicles'
+import { listWarehouses } from '../../api/warehouses'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { formatCurrency } from '../../utils/format'
 
@@ -89,8 +92,13 @@ export default function OrderDetail() {
   const [isActing, setIsActing] = useState(false)
 
   const [deliveryPartners, setDeliveryPartners] = useState([])
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
-  const [selectedPartnerId, setSelectedPartnerId] = useState('')
+  const [vehicles, setVehicles] = useState([])
+  const [warehouses, setWarehouses] = useState([])
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
+  const [planForm, setPlanForm] = useState({ deliveryPartnerId: '', vehicleId: '', warehouseId: '', scheduledDate: '', deliveryAddress: '' })
+  const [planItemQuantities, setPlanItemQuantities] = useState({})
+  const [planError, setPlanError] = useState('')
+  const [isPlanning, setIsPlanning] = useState(false)
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
@@ -118,9 +126,13 @@ export default function OrderDetail() {
   useEffect(() => {
     let isMounted = true
 
-    listUsers().then((result) => {
-      if (!isMounted || !result.success) return
-      setDeliveryPartners(result.users.map(normalizeApiUser).filter((user) => user.role === ROLES.DELIVERY_PARTNER))
+    Promise.all([listUsers(), listVehicles(), listWarehouses()]).then(([usersResult, vehiclesResult, warehousesResult]) => {
+      if (!isMounted) return
+      if (usersResult.success) {
+        setDeliveryPartners(usersResult.users.map(normalizeApiUser).filter((user) => user.role === ROLES.DELIVERY_PARTNER))
+      }
+      if (vehiclesResult.success) setVehicles(vehiclesResult.vehicles)
+      if (warehousesResult.success) setWarehouses(warehousesResult.warehouses)
     })
 
     return () => {
@@ -149,8 +161,9 @@ export default function OrderDetail() {
     )
   }
 
+  const canConfirmDraft = order.status === 'draft'
   const canApprove = order.status === 'awaiting_approval'
-  const canAssignPartner = !['cancelled', 'completed'].includes(order.status) && !order.assignedDeliveryPartnerId
+  const canPlanDelivery = !['cancelled', 'completed'].includes(order.status) && !order.assignedDeliveryPartnerId
   const canCancel = cancellableStatuses.includes(order.status)
   const isReserved = ['reserved', 'planned', 'loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)
   const isLoaded = ['loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)
@@ -160,7 +173,7 @@ export default function OrderDetail() {
   const fulfillmentSteps = [
     { label: 'Order Placed', status: 'done' },
     { label: 'Stock Reserved', status: isReserved ? 'done' : 'current' },
-    { label: 'Delivery Assigned', status: order.assignedDeliveryPartnerId ? 'done' : canAssignPartner ? 'current' : 'pending' },
+    { label: 'Delivery Assigned', status: order.assignedDeliveryPartnerId ? 'done' : canPlanDelivery ? 'current' : 'pending' },
     { label: 'Loaded', status: isLoaded ? 'done' : order.assignedDeliveryPartnerId ? 'current' : 'pending' },
     { label: 'In Transit', status: isInTransit ? 'done' : isLoaded ? 'current' : 'pending' },
     { label: 'Delivered', status: isDelivered ? 'done' : isInTransit ? 'current' : 'pending' },
@@ -183,16 +196,55 @@ export default function OrderDetail() {
     return true
   }
 
+  const handleConfirmDraft = () => runAction(() => confirmOrder(order.id))
   const handleApprove = () => runAction(() => approveOrder(order.id))
   const handleReject = () => runAction(() => rejectOrder(order.id))
 
-  const handleAssignPartner = async () => {
-    if (!selectedPartnerId) return
-    const ok = await runAction(() => assignDeliveryPartner(order.id, selectedPartnerId))
-    if (ok) {
-      setIsAssignModalOpen(false)
-      setSelectedPartnerId('')
+  const openPlanModal = () => {
+    setPlanForm({
+      deliveryPartnerId: '',
+      vehicleId: '',
+      warehouseId: order.warehouseId || '',
+      scheduledDate: '',
+      deliveryAddress: '',
+    })
+    setPlanItemQuantities(Object.fromEntries(order.items.map((item) => [item.id, item.quantity])))
+    setPlanError('')
+    setIsPlanModalOpen(true)
+  }
+
+  const handlePlanDelivery = async () => {
+    if (!planForm.deliveryPartnerId) {
+      setPlanError('Select a delivery partner.')
+      return
     }
+    if (!planForm.warehouseId) {
+      setPlanError('Select a warehouse.')
+      return
+    }
+
+    setIsPlanning(true)
+    setPlanError('')
+
+    const result = await planDelivery({
+      orderId: order.id,
+      deliveryPartnerId: planForm.deliveryPartnerId,
+      vehicleId: planForm.vehicleId || undefined,
+      warehouseId: planForm.warehouseId,
+      scheduledDate: planForm.scheduledDate || undefined,
+      deliveryAddress: planForm.deliveryAddress || undefined,
+      items: order.items.map((item) => ({ orderItemId: item.id, plannedQuantity: planItemQuantities[item.id] ?? item.quantity })),
+    })
+
+    setIsPlanning(false)
+
+    if (!result.success) {
+      setPlanError(result.error)
+      return
+    }
+
+    setIsPlanModalOpen(false)
+    navigate(`/admin/deliveries/${result.delivery.id}`)
   }
 
   const handleCancel = async () => {
@@ -221,6 +273,12 @@ export default function OrderDetail() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {canConfirmDraft && (
+            <Button variant="primary" size="sm" loading={isActing} onClick={handleConfirmDraft}>
+              <Check className="size-4" aria-hidden="true" />
+              Confirm Order
+            </Button>
+          )}
           {canApprove && (
             <>
               <Button variant="danger" size="sm" loading={isActing} onClick={handleReject}>
@@ -233,10 +291,10 @@ export default function OrderDetail() {
               </Button>
             </>
           )}
-          {canAssignPartner && (
-            <Button variant="outline" size="sm" onClick={() => setIsAssignModalOpen(true)}>
+          {canPlanDelivery && (
+            <Button variant="outline" size="sm" onClick={openPlanModal}>
               <Truck className="size-4" aria-hidden="true" />
-              Assign Delivery
+              Plan Delivery
             </Button>
           )}
           {['placed', 'processing', 'completed'].includes(order.status) && (
@@ -399,23 +457,88 @@ export default function OrderDetail() {
       </div>
 
       <Modal
-        isOpen={isAssignModalOpen}
-        onClose={() => setIsAssignModalOpen(false)}
-        title="Assign Delivery Partner"
+        isOpen={isPlanModalOpen}
+        onClose={() => {
+          if (isPlanning) return
+          setIsPlanModalOpen(false)
+        }}
+        title="Plan Delivery"
+        className="max-w-lg"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setIsAssignModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" disabled={!selectedPartnerId} loading={isActing} onClick={handleAssignPartner}>Assign</Button>
+            <Button variant="secondary" onClick={() => setIsPlanModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" loading={isPlanning} onClick={handlePlanDelivery}>Plan Delivery</Button>
           </>
         }
       >
-        <Select
-          label="Delivery Partner"
-          placeholder="Select a delivery partner"
-          options={deliveryPartners.map((partner) => ({ value: partner.id, label: partner.name }))}
-          value={selectedPartnerId}
-          onChange={(event) => setSelectedPartnerId(event.target.value)}
-        />
+        <div className="space-y-4">
+          {planError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{planError}</div>
+          )}
+          <Select
+            label="Delivery Partner"
+            placeholder="Select a delivery partner"
+            options={deliveryPartners.map((partner) => ({ value: partner.id, label: partner.name }))}
+            value={planForm.deliveryPartnerId}
+            onChange={(event) => setPlanForm((current) => ({ ...current, deliveryPartnerId: event.target.value }))}
+          />
+          <Select
+            label="Vehicle"
+            placeholder="Select a vehicle"
+            options={vehicles.map((vehicle) => ({ value: vehicle.id, label: vehicle.vehicleNumber }))}
+            value={planForm.vehicleId}
+            onChange={(event) => setPlanForm((current) => ({ ...current, vehicleId: event.target.value }))}
+          />
+          <Select
+            label="Warehouse"
+            placeholder="Select a warehouse"
+            options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
+            value={planForm.warehouseId}
+            onChange={(event) => setPlanForm((current) => ({ ...current, warehouseId: event.target.value }))}
+          />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-neutral-700">Scheduled Date</label>
+            <input
+              type="date"
+              value={planForm.scheduledDate}
+              onChange={(event) => setPlanForm((current) => ({ ...current, scheduledDate: event.target.value }))}
+              className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-neutral-700">Delivery Address</label>
+            <textarea
+              value={planForm.deliveryAddress}
+              onChange={(event) => setPlanForm((current) => ({ ...current, deliveryAddress: event.target.value }))}
+              placeholder="Delivery address (optional)"
+              maxLength={500}
+              className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-neutral-700">Items / Planned Qty</label>
+            <div className="space-y-2">
+              {order.items.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-neutral-800">{item.productName}</p>
+                    <p className="text-xs text-neutral-400">Ordered: {item.quantity}</p>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max={item.quantity}
+                    value={planItemQuantities[item.id] ?? item.quantity}
+                    onChange={(event) =>
+                      setPlanItemQuantities((current) => ({ ...current, [item.id]: Number(event.target.value) }))
+                    }
+                    className="h-9 w-24 shrink-0 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </Modal>
 
       <Modal isOpen={isCancelModalOpen} onClose={() => setIsCancelModalOpen(false)} title="Cancel Order">
