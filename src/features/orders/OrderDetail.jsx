@@ -29,7 +29,9 @@ import {
   getOrder,
   rejectOrder,
 } from '../../api/orders'
-import { planDelivery } from '../../api/deliveries'
+import { listDeliveries, planDelivery } from '../../api/deliveries'
+import { listInvoices } from '../../api/invoices'
+import { getSalesWorkflowSettings } from '../../api/settings'
 import { listUsers } from '../../api/users'
 import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
@@ -46,6 +48,7 @@ const statusBadgeVariant = {
 }
 
 const cancellableStatuses = ['draft', 'placed', 'processing']
+const billableDeliveryStatuses = ['delivered', 'partially_delivered']
 
 const formatDate = (value) => {
   if (!value) return '—'
@@ -101,6 +104,9 @@ export default function OrderDetail() {
   const [isPlanning, setIsPlanning] = useState(false)
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  const [orderInvoices, setOrderInvoices] = useState([])
+  const [hasMoreToInvoice, setHasMoreToInvoice] = useState(false)
+  const [invoiceMode, setInvoiceMode] = useState('per_delivery')
 
   const loadOrder = async () => {
     setIsLoading(true)
@@ -124,16 +130,56 @@ export default function OrderDetail() {
   }, [id])
 
   useEffect(() => {
+    if (!order?.id) {
+      setOrderInvoices([])
+      setHasMoreToInvoice(false)
+      return
+    }
+
     let isMounted = true
 
-    Promise.all([listUsers(), listVehicles(), listWarehouses()]).then(([usersResult, vehiclesResult, warehousesResult]) => {
+    listInvoices({ order_id: order.id }).then((invoicesResult) => {
       if (!isMounted) return
-      if (usersResult.success) {
-        setDeliveryPartners(usersResult.users.map(normalizeApiUser).filter((user) => user.role === ROLES.DELIVERY_PARTNER))
+      const invoices = invoicesResult.success ? invoicesResult.invoices : []
+      setOrderInvoices(invoices)
+
+      const wholeOrderInvoice = invoices.find((invoice) => !invoice.deliveryId)
+      if (invoices.length === 0 || wholeOrderInvoice) {
+        setHasMoreToInvoice(false)
+        return
       }
-      if (vehiclesResult.success) setVehicles(vehiclesResult.vehicles)
-      if (warehousesResult.success) setWarehouses(warehousesResult.warehouses)
+
+      // Some deliveries may still be uninvoiced (per-delivery billing) - check before
+      // deciding whether "Create Next Invoice" should appear alongside "View Invoice(s)".
+      listDeliveries({ order_id: order.id }).then((deliveriesResult) => {
+        if (!isMounted) return
+        const deliveries = deliveriesResult.success ? deliveriesResult.deliveries : []
+        const invoicedDeliveryIds = new Set(invoices.map((invoice) => invoice.deliveryId).filter(Boolean))
+        setHasMoreToInvoice(
+          deliveries.some((delivery) => billableDeliveryStatuses.includes(delivery.status) && !invoicedDeliveryIds.has(delivery.id)),
+        )
+      })
     })
+
+    return () => {
+      isMounted = false
+    }
+  }, [order?.id])
+
+  useEffect(() => {
+    let isMounted = true
+
+    Promise.all([listUsers(), listVehicles(), listWarehouses(), getSalesWorkflowSettings()]).then(
+      ([usersResult, vehiclesResult, warehousesResult, settingsResult]) => {
+        if (!isMounted) return
+        if (usersResult.success) {
+          setDeliveryPartners(usersResult.users.map(normalizeApiUser).filter((user) => user.role === ROLES.DELIVERY_PARTNER))
+        }
+        if (vehiclesResult.success) setVehicles(vehiclesResult.vehicles)
+        if (warehousesResult.success) setWarehouses(warehousesResult.warehouses)
+        if (settingsResult.success) setInvoiceMode(settingsResult.settings.partialDeliveryInvoiceMode)
+      },
+    )
 
     return () => {
       isMounted = false
@@ -163,7 +209,7 @@ export default function OrderDetail() {
 
   const canConfirmDraft = order.status === 'draft'
   const canApprove = order.status === 'awaiting_approval'
-  const canPlanDelivery = !['cancelled', 'completed'].includes(order.status) && !order.assignedDeliveryPartnerId
+  const canPlanDelivery = ['placed', 'processing'].includes(order.status) && !order.assignedDeliveryPartnerId
   const canCancel = cancellableStatuses.includes(order.status)
   const isReserved = ['reserved', 'planned', 'loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)
   const isLoaded = ['loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)
@@ -298,18 +344,55 @@ export default function OrderDetail() {
               Plan Delivery
             </Button>
           )}
-          {['placed', 'processing', 'completed'].includes(order.status) && (
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={!hasDeliveredQuantity}
-              title={hasDeliveredQuantity ? undefined : 'No delivered quantity is available for invoicing'}
-              onClick={() => navigate(`/admin/invoices/new?orderId=${order.id}`)}
-            >
-              <FileText className="size-4" aria-hidden="true" />
-              Create Invoice
-            </Button>
-          )}
+          {['placed', 'processing', 'completed'].includes(order.status) && (() => {
+            const wholeOrderInvoice = orderInvoices.find((invoice) => !invoice.deliveryId)
+
+            if (wholeOrderInvoice) {
+              return (
+                <Button variant="primary" size="sm" onClick={() => navigate(`/admin/invoices/${wholeOrderInvoice.id}`)}>
+                  <FileText className="size-4" aria-hidden="true" />
+                  View Invoice {wholeOrderInvoice.invoiceNumber}
+                </Button>
+              )
+            }
+
+            if (orderInvoices.length > 0) {
+              return (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => navigate(`/admin/invoices/${orderInvoices[0].id}`)}>
+                    <FileText className="size-4" aria-hidden="true" />
+                    {orderInvoices.length > 1 ? `View Invoices (${orderInvoices.length})` : `View Invoice ${orderInvoices[0].invoiceNumber}`}
+                  </Button>
+                  {hasMoreToInvoice && (
+                    <Button variant="primary" size="sm" onClick={() => navigate(`/admin/invoices/new?orderId=${order.id}`)}>
+                      <FileText className="size-4" aria-hidden="true" />
+                      Create Next Invoice
+                    </Button>
+                  )}
+                </>
+              )
+            }
+
+            const canCreateInvoice = invoiceMode === 'after_full_order' ? isDelivered : hasDeliveredQuantity
+            const disabledReason = !hasDeliveredQuantity
+              ? 'No delivered quantity is available for invoicing'
+              : !canCreateInvoice
+                ? 'Complete the pending delivery before creating the final invoice'
+                : undefined
+
+            return (
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={!canCreateInvoice}
+                title={disabledReason}
+                onClick={() => navigate(`/admin/invoices/new?orderId=${order.id}`)}
+              >
+                <FileText className="size-4" aria-hidden="true" />
+                Create Invoice
+              </Button>
+            )
+          })()}
           {canCancel && (
             <Button variant="danger" size="sm" onClick={() => setIsCancelModalOpen(true)}>
               <Ban className="size-4" aria-hidden="true" />

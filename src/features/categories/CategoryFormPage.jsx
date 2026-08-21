@@ -5,18 +5,21 @@ import { createCategory, listCategories } from '../../api/categories'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import Select from '../../components/ui/Select'
 import { readImageAsDataUrl } from '../../utils/imageFile'
 
 const emptyForm = {
   name: '',
   image: '',
   description: '',
+  parentId: '',
   subcategories: [],
 }
 
 const normalizeCategory = (category) => ({
   id: category.id,
   name: category.name || category.category_name || '',
+  parentId: category.parent_id || category.parentId || '',
 })
 
 export default function CategoryFormPage() {
@@ -115,12 +118,28 @@ export default function CategoryFormPage() {
     setIsSaving(true)
     setFormError('')
 
-    const result = await createCategory(formData)
+    const result = await createCategory({ name: formData.name, image: formData.image, description: formData.description, parentId: formData.parentId })
 
     if (!result.success) {
       setFormError(result.error)
       setIsSaving(false)
       return
+    }
+
+    const parentId = result.category?.id
+    if (formData.subcategories.length > 0 && parentId) {
+      const childResults = await Promise.all(
+        formData.subcategories.map((name) => createCategory({ name, parentId })),
+      )
+      const failedNames = childResults
+        .map((childResult, index) => (childResult.success ? null : formData.subcategories[index]))
+        .filter(Boolean)
+
+      if (failedNames.length > 0) {
+        setFormError(`Category saved, but these subcategories could not be created: ${failedNames.join(', ')}.`)
+        setIsSaving(false)
+        return
+      }
     }
 
     navigate('/admin/categories')
@@ -175,6 +194,18 @@ export default function CategoryFormPage() {
           </div>
 
           <div className="flex flex-col gap-1">
+            <Select
+              label="Parent Category (optional)"
+              searchable
+              options={[{ value: '', label: '— None (top-level category) —' }, ...categories.map((item) => ({ value: item.id, label: item.name }))]}
+              value={formData.parentId}
+              onChange={(event) => updateField('parentId', event.target.value)}
+              placeholder="None — this is a top-level category"
+            />
+            <p className="text-xs text-neutral-400">Pick an existing category to make this a subcategory of it.</p>
+          </div>
+
+          <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-neutral-700">Image URL</label>
             <div className="flex items-center gap-2">
               <Input
@@ -209,7 +240,7 @@ export default function CategoryFormPage() {
 
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-neutral-700">Subcategories</label>
-            <p className="text-xs text-neutral-400">Press Enter or click Add to include a subcategory.</p>
+            <p className="text-xs text-neutral-400">Each name here is created as its own category under this one. Press Enter or click Add.</p>
             <div className="mt-0.5 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <Input
                 placeholder="Type a subcategory name"

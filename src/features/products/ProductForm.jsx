@@ -20,6 +20,8 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { listCategories } from '../../api/categories'
+import { listBrands } from '../../api/brands'
+import { listSuppliers } from '../../api/suppliers'
 import { formatCurrency } from '../../utils/format'
 import { readImageAsDataUrl } from '../../utils/imageFile'
 import { uploadFile } from '../../api/files'
@@ -66,7 +68,9 @@ const emptyForm = {
   productType: '',
   category: '',
   subCategory: '',
+  subCategoryId: '',
   brand: '',
+  brandId: '',
   manufacturer: '',
   modelNumber: '',
   description: '',
@@ -101,6 +105,7 @@ const emptyForm = {
   hsnSacCode: '',
   taxInclusive: false,
   preferredSupplier: '',
+  preferredSupplierId: '',
   supplierProductCode: '',
   leadTime: '',
   minimumOrderQuantity: '',
@@ -110,6 +115,7 @@ const emptyForm = {
   commissionPercent: '',
   defaultDiscount: '',
   weight: '',
+  weightUnit: 'kg',
   length: '',
   width: '',
   height: '',
@@ -127,7 +133,9 @@ const emptyForm = {
   licenseKeyRequired: false,
   downloadLimit: '',
   warrantyPeriod: '',
+  warrantyPeriodUnit: 'months',
   shelfLife: '',
+  shelfLifeUnit: 'months',
   countryOfOrigin: '',
   launchDate: '',
   endOfLifeDate: '',
@@ -145,6 +153,17 @@ const options = {
     { value: 'active', label: 'Active' },
     { value: 'inactive', label: 'Inactive' },
     { value: 'discontinued', label: 'Discontinued' },
+  ],
+  weightUnit: [
+    { value: 'kg', label: 'kg' },
+    { value: 'g', label: 'g' },
+    { value: 'lb', label: 'lb' },
+    { value: 'oz', label: 'oz' },
+  ],
+  durationUnit: [
+    { value: 'days', label: 'Days' },
+    { value: 'months', label: 'Months' },
+    { value: 'years', label: 'Years' },
   ],
 }
 
@@ -189,7 +208,7 @@ function findSectionForErrorField(sections, fieldName) {
 const productSections = [
   section('Basic Information', [
     { name: 'productCode', label: 'Product Code / SKU', required: true, maxLength: 50 },
-    { name: 'barcodeAction', label: 'Barcode', input: 'button' },
+    { name: 'barcode', label: 'Barcode' },
     { name: 'name', label: 'Product Name', required: true, maxLength: 150 },
     { name: 'shortName', label: 'Short Name' },
     { name: 'productType', label: 'Product Type', input: 'select' },
@@ -232,7 +251,7 @@ const productSections = [
     { name: 'taxInclusive', label: 'Tax Inclusive', input: 'checkbox' },
   ]),
   section('Purchase Information', [
-    { name: 'preferredSupplier', label: 'Preferred Supplier' },
+    { name: 'preferredSupplier', label: 'Preferred Supplier', input: 'select' },
     { name: 'supplierProductCode', label: 'Supplier Product Code' },
     { name: 'leadTime', label: 'Lead Time', input: 'number' },
     { name: 'minimumOrderQuantity', label: 'Minimum Order Quantity', input: 'number' },
@@ -240,6 +259,7 @@ const productSections = [
   ]),
   section('Physical Specifications', [
     { name: 'weight', label: 'Weight', input: 'number' },
+    { name: 'weightUnit', label: 'Weight Unit', input: 'select' },
     { name: 'length', label: 'Length', input: 'number' },
     { name: 'width', label: 'Width', input: 'number' },
     { name: 'height', label: 'Height', input: 'number' },
@@ -256,7 +276,9 @@ const productSections = [
   ]),
   section('Additional Information', [
     { name: 'warrantyPeriod', label: 'Warranty Period' },
+    { name: 'warrantyPeriodUnit', label: 'Warranty Period Unit', input: 'select' },
     { name: 'shelfLife', label: 'Shelf Life' },
+    { name: 'shelfLifeUnit', label: 'Shelf Life Unit', input: 'select' },
     { name: 'countryOfOrigin', label: 'Country of Origin', input: 'select' },
     { name: 'launchDate', label: 'Launch Date', input: 'date' },
     { name: 'endOfLifeDate', label: 'End of Life Date', input: 'date' },
@@ -319,7 +341,7 @@ function hydrateProduct(product) {
     gstVatRate: product?.gstVatRate ?? firstVariant.gstRate ?? '',
     coverImage: product?.coverImage || '',
     images: product?.images || [],
-    status: product?.status || 'active',
+    status: product?.statusValue || product?.status || 'active',
     variants: product?.variants?.length
       ? product.variants.map((variant, index) => ({
         ...makeEmptyVariant(),
@@ -396,6 +418,9 @@ export default function ProductForm({
   const [formData, setFormData] = useState(emptyForm)
   const [initialFormData, setInitialFormData] = useState(emptyForm)
   const [categoryOptions, setCategoryOptions] = useState([])
+  const [subCategoryOptionsAll, setSubCategoryOptionsAll] = useState([])
+  const [brandOptions, setBrandOptions] = useState([])
+  const [supplierOptions, setSupplierOptions] = useState([])
   const [activeSection, setActiveSection] = useState(productSections[0].id)
   const [errors, setErrors] = useState({})
   const [imageError, setImageError] = useState('')
@@ -455,22 +480,42 @@ export default function ProductForm({
   useEffect(() => {
     if (!isOpen) return
 
-    const loadCategoryOptions = async () => {
-      const result = await listCategories()
-      if (!result.success) return
-
-      setCategoryOptions(
-        result.categories
+    Promise.all([listCategories(), listBrands(), listSuppliers()]).then(([categoriesResult, brandsResult, suppliersResult]) => {
+      if (categoriesResult.success) {
+        const allCategories = categoriesResult.categories
           .map((category) => ({
             value: String(category.id),
             label: category.name || category.category_name || '',
+            parentId: category.parent_id || category.parentId || '',
           }))
-          .filter((option) => option.value && option.label),
-      )
-    }
+          .filter((option) => option.value && option.label)
 
-    loadCategoryOptions()
+        setCategoryOptions(allCategories.filter((option) => !option.parentId))
+        setSubCategoryOptionsAll(allCategories)
+      }
+
+      if (brandsResult.success) {
+        setBrandOptions(
+          brandsResult.brands
+            .map((brand) => ({ value: String(brand.id), label: brand.name || '' }))
+            .filter((option) => option.value && option.label),
+        )
+      }
+
+      if (suppliersResult.success) {
+        setSupplierOptions(
+          suppliersResult.suppliers
+            .map((supplier) => ({ value: String(supplier.id), label: supplier.name || supplier.supplier_name || '' }))
+            .filter((option) => option.value && option.label),
+        )
+      }
+    })
   }, [isOpen])
+
+  const subCategoryOptions = useMemo(
+    () => subCategoryOptionsAll.filter((option) => option.parentId === formData.category),
+    [subCategoryOptionsAll, formData.category],
+  )
 
   useEffect(() => {
     if (!categoryOptions.length || !formData.category) return
@@ -785,6 +830,16 @@ export default function ProductForm({
             triggerClassName="w-full max-w-full"
             options={categoryOptions}
             placeholder={`Type or select ${field.label.toLowerCase()}`}
+            onChange={(event) => {
+              setFormData((current) => ({
+                ...current,
+                category: event.target.value,
+                categoryId: event.target.value,
+                subCategory: '',
+                subCategoryId: '',
+              }))
+              setErrors((current) => ({ ...current, category: '' }))
+            }}
             searchable
           />
         )
@@ -797,6 +852,73 @@ export default function ProductForm({
             className="w-full max-w-full"
             triggerClassName="w-full max-w-full"
             options={toOptions(options.status)}
+            placeholder={`Select ${field.label.toLowerCase()}`}
+          />
+        )
+      }
+
+      if (field.name === 'subCategory') {
+        return (
+          <Select
+            label={field.label}
+            className="w-full max-w-full"
+            triggerClassName="w-full max-w-full"
+            options={subCategoryOptions}
+            value={formData.subCategoryId}
+            onChange={(event) => {
+              const option = subCategoryOptions.find((opt) => opt.value === event.target.value)
+              setFormData((current) => ({ ...current, subCategoryId: event.target.value, subCategory: option?.label || '' }))
+            }}
+            placeholder={formData.category ? 'Select sub category' : 'Select a category first'}
+            disabled={!formData.category}
+            searchable
+          />
+        )
+      }
+
+      if (field.name === 'brand') {
+        return (
+          <Select
+            label={field.label}
+            className="w-full max-w-full"
+            triggerClassName="w-full max-w-full"
+            options={brandOptions}
+            value={formData.brandId}
+            onChange={(event) => {
+              const option = brandOptions.find((opt) => opt.value === event.target.value)
+              setFormData((current) => ({ ...current, brandId: event.target.value, brand: option?.label || '' }))
+            }}
+            placeholder="Search and select a brand"
+            searchable
+          />
+        )
+      }
+
+      if (field.name === 'preferredSupplier') {
+        return (
+          <Select
+            label={field.label}
+            className="w-full max-w-full"
+            triggerClassName="w-full max-w-full"
+            options={supplierOptions}
+            value={formData.preferredSupplierId}
+            onChange={(event) => {
+              const option = supplierOptions.find((opt) => opt.value === event.target.value)
+              setFormData((current) => ({ ...current, preferredSupplierId: event.target.value, preferredSupplier: option?.label || '' }))
+            }}
+            placeholder="Search and select a supplier"
+            searchable
+          />
+        )
+      }
+
+      if (field.name === 'weightUnit' || field.name === 'warrantyPeriodUnit' || field.name === 'shelfLifeUnit') {
+        return (
+          <Select
+            {...commonProps}
+            className="w-full max-w-full"
+            triggerClassName="w-full max-w-full"
+            options={field.name === 'weightUnit' ? options.weightUnit : options.durationUnit}
             placeholder={`Select ${field.label.toLowerCase()}`}
           />
         )

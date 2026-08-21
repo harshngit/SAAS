@@ -15,12 +15,14 @@ import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
+import Select from '../../components/ui/Select'
 import { readImageAsDataUrl } from '../../utils/imageFile'
 
 const emptyForm = {
   name: '',
   image: '',
   description: '',
+  parentId: '',
 }
 
 const normalizeCategory = (category) => ({
@@ -28,7 +30,7 @@ const normalizeCategory = (category) => ({
   name: category.name || category.category_name || '',
   image: category.image || category.category_image || '',
   description: category.description || category.category_description || '',
-  subcategories: category.subcategories || category.sub_categories || [],
+  parentId: category.parent_id || category.parentId || '',
   createdAt: category.created_at || category.createdAt || '',
   updatedAt: category.updated_at || category.updatedAt || '',
 })
@@ -49,6 +51,11 @@ const formatDateLabel = (value) => {
 }
 
 function CategoryForm({ category, existingCategories, saving, formError, onClose, onSave }) {
+  const parentOptions = [
+    { value: '', label: '— None (top-level category) —' },
+    ...existingCategories.filter((item) => item.id !== category?.id).map((item) => ({ value: item.id, label: item.name })),
+  ]
+
   const [formData, setFormData] = useState(emptyForm)
   const [errors, setErrors] = useState({})
   const [imageError, setImageError] = useState('')
@@ -117,6 +124,14 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
         onChange={(event) => setFormData((current) => ({ ...current, name: event.target.value }))}
         error={errors.name}
         required
+      />
+      <Select
+        label="Parent Category (optional)"
+        searchable
+        options={parentOptions}
+        value={formData.parentId || ''}
+        onChange={(event) => setFormData((current) => ({ ...current, parentId: event.target.value }))}
+        placeholder="None — this is a top-level category"
       />
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-neutral-700">Category Image</label>
@@ -565,6 +580,7 @@ export default function CategoryList() {
                     />
                   </th>
                   <th className="whitespace-nowrap px-4 py-3">Category</th>
+                  <th className="whitespace-nowrap px-4 py-3">Parent</th>
                   <th className="whitespace-nowrap px-4 py-3">Image</th>
                   <th className="whitespace-nowrap px-4 py-3">Description</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
@@ -589,6 +605,11 @@ export default function CategoryList() {
                         </div>
                         <span className="font-medium text-neutral-900">{category.name}</span>
                       </div>
+                    </td>
+                    <td className="px-4 py-3.5 text-neutral-600">
+                      {category.parentId ? categories.find((item) => item.id === category.parentId)?.name || '—' : (
+                        <span className="text-neutral-300">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3.5">
                       {category.image ? (
@@ -692,15 +713,23 @@ export default function CategoryList() {
                       Category
                     </span>
                     <span className="text-xs text-neutral-400">Catalog record</span>
-                    {viewCategory?.subcategories?.length ? (
+                    {viewCategory && categories.filter((item) => item.parentId === viewCategory.id).length > 0 ? (
                       <span className="rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-500">
-                        {viewCategory.subcategories.length} subcategories
+                        {categories.filter((item) => item.parentId === viewCategory.id).length} subcategories
                       </span>
                     ) : null}
                   </div>
                   <h3 className="mt-3 text-xl font-semibold tracking-[-0.02em] text-neutral-900 text-balance">
                     {viewCategory?.name || 'Unnamed category'}
                   </h3>
+                  {viewCategory?.parentId && (
+                    <p className="mt-1 text-sm text-neutral-500">
+                      Subcategory of{' '}
+                      <span className="font-medium text-neutral-700">
+                        {categories.find((item) => item.id === viewCategory.parentId)?.name || 'another category'}
+                      </span>
+                    </p>
+                  )}
                   <p className="mt-2 max-w-prose text-sm leading-6 text-neutral-600 text-pretty">
                     {viewCategory?.description || 'No description added.'}
                   </p>

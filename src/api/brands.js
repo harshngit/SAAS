@@ -37,117 +37,101 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
-function buildCategoryBody(payload) {
+// Live schema (confirmed via /openapi.json) only exposes name/description/is_active on
+// BrandCreate/BrandUpdate - no code or logo_url column exists yet despite earlier docs.
+function buildBrandBody(payload) {
   const body = {
-    name: payload.name?.trim() || payload.category_name?.trim() || '',
-    image: payload.image?.trim() || payload.category_image?.trim() || '',
-    description: payload.description?.trim() || payload.category_description?.trim() || '',
+    name: payload.name?.trim() || '',
+    description: payload.description?.trim() || '',
   }
 
-  const parentId = payload.parentId ?? payload.parent_id
-  if (parentId !== undefined) body.parent_id = parentId || null
+  if (payload.isActive !== undefined || payload.is_active !== undefined) {
+    body.is_active = payload.isActive ?? payload.is_active
+  }
 
   return body
 }
 
-export async function createCategory(payload) {
+export async function createBrand(payload) {
   try {
-    const { data } = await apiClient.post('/categories', buildCategoryBody(payload), {
+    const { data } = await apiClient.post('/brands', buildBrandBody(payload), {
       headers: authHeader(),
     })
 
-    return { success: true, category: data }
+    return { success: true, brand: data }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to create category. Please try again.',
+      'Unable to create brand. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
-export async function listCategories(params = {}) {
+export async function listBrands(params = {}) {
   try {
     const queryParams = {}
-
     if (params.search) queryParams.search = params.search
+    if (params.is_active !== undefined && params.is_active !== null) queryParams.is_active = params.is_active
 
-    const { data } = await apiClient.get('/categories', {
+    const { data } = await apiClient.get('/brands', {
       headers: authHeader(),
       params: queryParams,
     })
 
-    return { success: true, categories: Array.isArray(data) ? data : data?.categories || [] }
+    return { success: true, brands: Array.isArray(data) ? data : data?.brands || [] }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to load categories. Please try again.',
+      'Unable to load brands. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
-export async function getCategory(categoryId) {
+export async function getBrand(brandId) {
   try {
-    const { data } = await apiClient.get(`/categories/${categoryId}`, {
+    const { data } = await apiClient.get(`/brands/${brandId}`, {
       headers: authHeader(),
     })
 
-    return { success: true, category: data }
+    return { success: true, brand: data }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to load category details. Please try again.',
+      'Unable to load brand details. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
-export async function updateCategory(categoryId, payload) {
+export async function updateBrand(brandId, payload) {
   try {
-    const { data } = await apiClient.patch(`/categories/${categoryId}`, buildCategoryBody(payload), {
+    const { data } = await apiClient.patch(`/brands/${brandId}`, buildBrandBody(payload), {
       headers: authHeader(),
     })
 
-    return { success: true, category: data }
+    return { success: true, brand: data }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to update category. Please try again.',
+      'Unable to update brand. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
-export async function deleteCategory(categoryId) {
+export async function deleteBrand(brandId) {
   try {
-    await apiClient.delete(`/categories/${categoryId}`, {
-      headers: authHeader(),
-    })
-
-    return { success: true }
-  } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to delete category. Please try again.',
-    )
-
-    return { success: false, error: message }
-  }
-}
-
-export async function deleteCategoriesBulk(categoryIds) {
-  try {
-    await apiClient.post('/categories/bulk-delete', { ids: categoryIds }, {
+    await apiClient.delete(`/brands/${brandId}`, {
       headers: authHeader(),
     })
 
@@ -156,7 +140,25 @@ export async function deleteCategoriesBulk(categoryIds) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to delete selected categories. Please try again.',
+      'Unable to delete brand. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function deleteBrandsBulk(brandIds) {
+  try {
+    await apiClient.post('/brands/bulk-delete', { ids: brandIds }, {
+      headers: authHeader(),
+    })
+
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to delete selected brands. Please try again.',
     )
 
     return { success: false, error: message }

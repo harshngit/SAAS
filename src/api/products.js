@@ -49,6 +49,88 @@ function normalizeVariantInventory(variant = {}) {
   }
 }
 
+// Every remaining product field the form already collects but the request body never sent -
+// [camelCase form field, snake_case backend field, value kind]. Kept as a table instead of one
+// `if` per field since the mapping itself (not the coercion logic) is the only thing that varies.
+const PRODUCT_FIELD_MAP = [
+  ['barcode', 'barcode', 'string'],
+  ['shortName', 'short_name', 'string'],
+  ['manufacturer', 'manufacturer', 'string'],
+  ['modelNumber', 'model_number', 'string'],
+  ['status', 'status', 'string'],
+  ['mrp', 'msrp_mrp', 'number'],
+  ['wholesalePrice', 'wholesale_price', 'number'],
+  ['dealerPrice', 'dealer_price', 'number'],
+  ['discountPercent', 'discount', 'number'],
+  ['taxInclusivePrice', 'tax_inclusive_price', 'boolean'],
+  ['currency', 'currency', 'string'],
+  ['inventoryTracking', 'inventory_tracking', 'boolean'],
+  ['openingStock', 'opening_stock', 'number'],
+  ['minimumStockLevel', 'minimum_stock_level', 'number'],
+  ['maximumStockLevel', 'maximum_stock_level', 'number'],
+  ['reorderLevel', 'reorder_level', 'number'],
+  ['reorderQuantity', 'reorder_quantity', 'number'],
+  ['binShelfLocation', 'bin_shelf_location', 'string'],
+  ['batchTracking', 'batch_tracking', 'boolean'],
+  ['serialNumberTracking', 'serial_number_tracking', 'boolean'],
+  ['expiryTracking', 'expiry_tracking', 'boolean'],
+  ['hsnSacCode', 'hsn_code', 'string'],
+  ['gstVatRate', 'tax_rate', 'number'],
+  ['taxCategory', 'tax_category', 'string'],
+  ['taxInclusive', 'tax_inclusive', 'boolean'],
+  ['preferredSupplierId', 'preferred_supplier_id', 'string'],
+  ['supplierProductCode', 'supplier_product_code', 'string'],
+  ['leadTime', 'lead_time', 'number'],
+  ['minimumOrderQuantity', 'minimum_order_quantity', 'number'],
+  ['purchaseUnit', 'purchase_unit', 'string'],
+  ['salesUnit', 'sales_unit', 'string'],
+  ['commissionEligible', 'commission_eligible', 'boolean'],
+  ['commissionPercent', 'commission', 'number'],
+  ['defaultDiscount', 'default_discount', 'number'],
+  ['weight', 'weight', 'number'],
+  ['weightUnit', 'weight_unit', 'string'],
+  ['length', 'length', 'number'],
+  ['width', 'width', 'number'],
+  ['height', 'height', 'number'],
+  ['volume', 'volume', 'number'],
+  ['color', 'color', 'string'],
+  ['material', 'material', 'string'],
+  ['size', 'physical_size', 'string'],
+  ['hasVariants', 'has_variants', 'boolean'],
+  ['variantAttributes', 'variant_attributes', 'string'],
+  ['downloadableProduct', 'downloadable_product', 'boolean'],
+  ['licenseKeyRequired', 'license_key_required', 'boolean'],
+  ['downloadLimit', 'download_limit', 'number'],
+  ['warrantyPeriod', 'warranty_period', 'string'],
+  ['warrantyPeriodUnit', 'warranty_period_unit', 'string'],
+  ['shelfLife', 'shelf_life', 'string'],
+  ['shelfLifeUnit', 'shelf_life_unit', 'string'],
+  ['countryOfOrigin', 'country_of_origin', 'string'],
+  ['launchDate', 'launch_date', 'string'],
+  ['endOfLifeDate', 'end_of_life_date', 'string'],
+  ['productTags', 'product_tags', 'string'],
+  ['notes', 'notes', 'string'],
+  ['uom', 'uom', 'string'],
+  ['subCategoryId', 'sub_category_id', 'string'],
+  ['brandId', 'brand_id', 'string'],
+]
+
+function coerceFieldValue(kind, value) {
+  if (kind === 'number') return Number(value) || 0
+  if (kind === 'boolean') return Boolean(value)
+  return value ?? ''
+}
+
+// `unitOfMeasure` is the form's existing name for what the backend calls `uom` - map it in
+// alongside the rest rather than making callers rename it. Guarding on `!== undefined` lets the
+// same table serve both full-object creation and partial PATCH updates.
+function applyProductFieldMap(requestBody, payload) {
+  PRODUCT_FIELD_MAP.forEach(([formField, backendField, kind]) => {
+    const value = formField === 'uom' ? (payload.uom ?? payload.unitOfMeasure) : payload[formField]
+    if (value !== undefined) requestBody[backendField] = coerceFieldValue(kind, value)
+  })
+}
+
 function toVariationPayload(variant, includeId = false) {
   const inventory = normalizeVariantInventory(variant)
   const variation = {
@@ -84,8 +166,8 @@ export async function createProduct(payload) {
       cover_image: payload.coverImage || payload.cover_image || '',
       images: payload.images || [],
       product_video: payload.productVideo || payload.videoUrl || payload.product_video || '',
-      catalog_brochure: payload.catalogBrochure || payload.catalog_brochure || '',
-      manual: payload.manual || payload.productManual || '',
+      product_catalog_brochure: payload.catalogBrochure || payload.product_catalog_brochure || '',
+      product_manual: payload.productManual || payload.product_manual || '',
       product_datasheet: payload.productDatasheet || payload.product_datasheet || '',
       compliance_certificate: payload.complianceCertificate || payload.compliance_certificate || '',
       warranty_document: payload.warrantyDocument || payload.warranty_document || '',
@@ -98,6 +180,8 @@ export async function createProduct(payload) {
       total_inventory: Number(payload.totalInventory ?? payload.total_inventory) || variations.reduce((sum, variant) => sum + variant.inventory, 0),
       variations,
     }
+
+    applyProductFieldMap(requestBody, payload)
 
     const { data } = await apiClient.post('/products', requestBody, {
       headers: authHeader(),
@@ -147,11 +231,11 @@ export async function updateProduct(productId, payload) {
     if (payload.productVideo !== undefined || payload.videoUrl !== undefined || payload.product_video !== undefined) {
       requestBody.product_video = payload.productVideo || payload.videoUrl || payload.product_video || ''
     }
-    if (payload.catalogBrochure !== undefined || payload.catalog_brochure !== undefined) {
-      requestBody.catalog_brochure = payload.catalogBrochure || payload.catalog_brochure || ''
+    if (payload.catalogBrochure !== undefined || payload.product_catalog_brochure !== undefined) {
+      requestBody.product_catalog_brochure = payload.catalogBrochure || payload.product_catalog_brochure || ''
     }
-    if (payload.manual !== undefined || payload.productManual !== undefined) {
-      requestBody.manual = payload.manual || payload.productManual || ''
+    if (payload.productManual !== undefined || payload.product_manual !== undefined) {
+      requestBody.product_manual = payload.productManual || payload.product_manual || ''
     }
     if (payload.productDatasheet !== undefined || payload.product_datasheet !== undefined) {
       requestBody.product_datasheet = payload.productDatasheet || payload.product_datasheet || ''
@@ -187,6 +271,8 @@ export async function updateProduct(productId, payload) {
         requestBody.total_inventory = requestBody.variations.reduce((sum, variant) => sum + variant.inventory, 0)
       }
     }
+
+    applyProductFieldMap(requestBody, payload)
 
     const { data } = await apiClient.patch(`/products/${productId}`, requestBody, {
       headers: authHeader(),

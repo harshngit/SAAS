@@ -2,7 +2,7 @@ import axios from 'axios'
 import { showGlobalToast } from '../components/ui/toastContext'
 import { useAuthStore } from '../store/authStore'
 
-export const API_BASE_URL = 'https://crm-saas-backend-9nom.onrender.com/'
+export const API_BASE_URL = 'https://saasbackend-1-f6v3.onrender.com/'
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

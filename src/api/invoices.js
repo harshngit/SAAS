@@ -258,6 +258,15 @@ export async function createInvoice(payload) {
   }
 }
 
+function extractDuplicateInvoiceRef(message) {
+  if (typeof message !== 'string') return null
+  const uuidMatch = message.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/)
+  if (uuidMatch) return { id: uuidMatch[0] }
+  const numberMatch = message.match(/INV-\d{4}-\d+/)
+  if (numberMatch) return { invoiceNumber: numberMatch[0] }
+  return null
+}
+
 export async function invoiceOrder(orderId, deliveryId) {
   try {
     const { data } = await apiClient.post(`/orders/${orderId}/invoice`, deliveryId ? { delivery_id: deliveryId } : {}, {
@@ -271,8 +280,13 @@ export async function invoiceOrder(orderId, deliveryId) {
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to invoice this order. Please try again.',
     )
+    const isDuplicate = error.response?.status === 409
 
-    return { success: false, error: message }
+    return {
+      success: false,
+      error: message,
+      duplicateRef: isDuplicate ? extractDuplicateInvoiceRef(message) : null,
+    }
   }
 }
 

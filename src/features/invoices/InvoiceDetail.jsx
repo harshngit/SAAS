@@ -535,7 +535,7 @@ export default function InvoiceDetail() {
               <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
                 <Truck className="size-4 text-neutral-400" /> Linked Delivery
               </p>
-              <Link to={`/admin/deliveries/by-id/${invoice.deliveryId}`} className="mt-2 inline-block text-sm text-primary-700 hover:underline">
+              <Link to={`/admin/deliveries/${invoice.deliveryId}`} className="mt-2 inline-block text-sm text-primary-700 hover:underline">
                 View delivery
               </Link>
             </div>

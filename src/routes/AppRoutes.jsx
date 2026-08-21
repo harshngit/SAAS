@@ -40,6 +40,7 @@ import SupplierList from '../features/suppliers/SupplierList'
 import SupplierDetail from '../features/suppliers/SupplierDetail'
 import CategoryList from '../features/categories/CategoryList'
 import CategoryFormPage from '../features/categories/CategoryFormPage'
+import BrandList from '../features/brands/BrandList'
 import CreateSalesOrder from '../features/orders/CreateSalesOrder'
 import OrderList from '../features/orders/OrderList'
 import OrderDetail from '../features/orders/OrderDetail'
@@ -197,6 +198,7 @@ export default function AppRoutes() {
           <Route path="/admin/suppliers/:id" element={<SupplierDetail />} />
           <Route path="/admin/categories" element={<CategoryList />} />
           <Route path="/admin/categories/new" element={<CategoryFormPage />} />
+          <Route path="/admin/brands" element={<BrandList />} />
           <Route path="/admin/products" element={<ProductList />} />
           <Route path="/admin/products/:id" element={<ProductDetail />} />
           <Route path="/admin/inventory" element={<StockBoard />} />

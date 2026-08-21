@@ -72,7 +72,8 @@ function OrderInvoicePanel({ orderId }) {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const [order, setOrder] = useState(null)
-  const [deliveries, setDeliveries] = useState([])
+  const [allDeliveries, setAllDeliveries] = useState([])
+  const [invoices, setInvoices] = useState([])
   const [wholeOrderInvoice, setWholeOrderInvoice] = useState(null)
   const [invoiceMode, setInvoiceMode] = useState('per_delivery')
   const [selectedDeliveryId, setSelectedDeliveryId] = useState('')
@@ -81,17 +82,17 @@ function OrderInvoicePanel({ orderId }) {
   const [loadError, setLoadError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [duplicateInvoice, setDuplicateInvoice] = useState(null)
 
-  useEffect(() => {
-    let isMounted = true
+  const loadData = () => {
+    setIsLoading(true)
 
-    Promise.all([
+    return Promise.all([
       getOrder(orderId),
       listDeliveries({ order_id: orderId }),
       listInvoices({ order_id: orderId }),
       getSalesWorkflowSettings(),
     ]).then(([orderResult, deliveriesResult, invoicesResult, settingsResult]) => {
-      if (!isMounted) return
       if (!orderResult.success) {
         setLoadError(orderResult.error)
         setIsLoading(false)
@@ -100,28 +101,30 @@ function OrderInvoicePanel({ orderId }) {
 
       setOrder(orderResult.order)
 
-      const invoices = invoicesResult.success ? invoicesResult.invoices : []
-      const wholeOrder = invoices.find((invoice) => !invoice.deliveryId) || null
+      const invoiceList = invoicesResult.success ? invoicesResult.invoices : []
+      setInvoices(invoiceList)
+      const wholeOrder = invoiceList.find((invoice) => !invoice.deliveryId) || null
       setWholeOrderInvoice(wholeOrder)
 
       const mode = settingsResult.success ? settingsResult.settings.partialDeliveryInvoiceMode : 'per_delivery'
       setInvoiceMode(mode)
 
-      const invoicedDeliveryIds = new Set(invoices.map((invoice) => invoice.deliveryId).filter(Boolean))
-      const billable = deliveriesResult.success
-        ? deliveriesResult.deliveries.filter(
-            (delivery) => billableDeliveryStatuses.includes(delivery.status) && !invoicedDeliveryIds.has(delivery.id),
-          )
-        : []
-      setDeliveries(billable)
+      const invoicedDeliveryIds = new Set(invoiceList.map((invoice) => invoice.deliveryId).filter(Boolean))
+      const deliveries = deliveriesResult.success ? deliveriesResult.deliveries : []
+      setAllDeliveries(deliveries)
+
+      const billable = deliveries.filter(
+        (delivery) => billableDeliveryStatuses.includes(delivery.status) && !invoicedDeliveryIds.has(delivery.id),
+      )
       if (mode === 'per_delivery' && billable.length === 1) setSelectedDeliveryId(billable[0].id)
 
       setIsLoading(false)
     })
+  }
 
-    return () => {
-      isMounted = false
-    }
+  useEffect(() => {
+    loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
 
   useEffect(() => {
@@ -179,13 +182,42 @@ function OrderInvoicePanel({ orderId }) {
   const previewTax = previewLineAmounts.reduce((sum, line) => sum + line.tax, 0)
   const previewTotal = previewSubtotal + previewTax
 
+  const invoicedByDeliveryId = useMemo(() => {
+    const map = {}
+    invoices.forEach((invoice) => {
+      if (invoice.deliveryId) map[invoice.deliveryId] = invoice
+    })
+    return map
+  }, [invoices])
+
+  const billableUninvoicedDeliveries = allDeliveries.filter(
+    (delivery) => billableDeliveryStatuses.includes(delivery.status) && !invoicedByDeliveryId[delivery.id],
+  )
+
   const handleIssue = async () => {
     setIsSubmitting(true)
     setSubmitError('')
+    setDuplicateInvoice(null)
 
     const result = await invoiceOrder(orderId, invoiceMode === 'per_delivery' ? selectedDeliveryId : undefined)
 
     if (!result.success) {
+      if (result.duplicateRef) {
+        let invoiceId = result.duplicateRef.id
+        let invoiceNumber = result.duplicateRef.invoiceNumber
+
+        if (!invoiceId) {
+          const lookup = await listInvoices({ order_id: orderId })
+          const match = lookup.success
+            ? lookup.invoices.find((invoice) => invoice.invoiceNumber === invoiceNumber || invoice.id === invoiceId)
+            : null
+          invoiceId = match?.id
+          invoiceNumber = match?.invoiceNumber || invoiceNumber
+        }
+
+        if (invoiceId) setDuplicateInvoice({ id: invoiceId, invoiceNumber })
+      }
+
       setSubmitError(friendlyInvoiceError(result.error))
       setIsSubmitting(false)
       return
@@ -205,8 +237,8 @@ function OrderInvoicePanel({ orderId }) {
 
   const isAfterFullOrderMode = invoiceMode === 'after_full_order'
   const orderFullyDelivered = order.fulfilmentStatus === 'delivered'
-  const needsDeliveryChoice = invoiceMode === 'per_delivery' && deliveries.length > 1
-  const noBillableDelivery = invoiceMode === 'per_delivery' && deliveries.length === 0 && !wholeOrderInvoice
+  const needsDeliveryChoice = invoiceMode === 'per_delivery' && billableUninvoicedDeliveries.length > 1
+  const noBillableDelivery = invoiceMode === 'per_delivery' && billableUninvoicedDeliveries.length === 0 && !wholeOrderInvoice
 
   // Already-invoiced states short-circuit the whole panel - never let the user attempt a duplicate.
   if (wholeOrderInvoice) {
@@ -274,24 +306,68 @@ function OrderInvoicePanel({ orderId }) {
         </div>
       </div>
 
-      {needsDeliveryChoice && (
+      {invoiceMode === 'per_delivery' && allDeliveries.length > 0 && (
         <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-          <Select
-            label="Delivery to Invoice"
-            options={deliveries.map((delivery) => ({
-              value: delivery.id,
-              label: `${delivery.deliveryNumber} · ${delivery.status.replace(/_/g, ' ')}`,
-            }))}
-            value={selectedDeliveryId}
-            onChange={(event) => setSelectedDeliveryId(event.target.value)}
-            placeholder="Select which delivery this invoice covers"
-          />
-          <p className="mt-2 text-xs text-neutral-400">This organization bills per delivery, and this order has more than one.</p>
+          <p className="text-sm font-semibold text-neutral-900">Deliveries</p>
+          <p className="mt-1 text-xs text-neutral-400">This organization bills per delivery. Select which delivery this invoice covers.</p>
+          <div className="mt-3 space-y-2">
+            {allDeliveries.map((delivery) => {
+              const deliveryInvoice = invoicedByDeliveryId[delivery.id]
+              const deliveredQty = delivery.items.reduce((sum, item) => sum + (item.deliveredQuantity || 0), 0)
+              const isBillable = billableDeliveryStatuses.includes(delivery.status) && !deliveryInvoice
+              const isSelected = selectedDeliveryId === delivery.id
+
+              return (
+                <div
+                  key={delivery.id}
+                  className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
+                    isSelected ? 'border-primary-300 bg-primary-50/40' : 'border-neutral-100'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium text-neutral-900">{delivery.deliveryNumber}</p>
+                      <Badge variant={delivery.status === 'delivered' ? 'success' : 'warning'}>{delivery.status.replace(/_/g, ' ')}</Badge>
+                    </div>
+                    <p className="mt-0.5 text-xs text-neutral-400">Delivered: {deliveredQty}</p>
+                  </div>
+                  <div className="shrink-0">
+                    {deliveryInvoice ? (
+                      <Button type="button" variant="outline" size="sm" onClick={() => navigate(`/admin/invoices/${deliveryInvoice.id}`)}>
+                        View Invoice {deliveryInvoice.invoiceNumber}
+                      </Button>
+                    ) : isBillable ? (
+                      <Button type="button" size="sm" variant={isSelected ? 'primary' : 'outline'} onClick={() => setSelectedDeliveryId(delivery.id)}>
+                        {isSelected ? 'Selected' : 'Create Invoice'}
+                      </Button>
+                    ) : (
+                      <Button type="button" size="sm" variant="secondary" disabled title="This delivery has not been delivered yet">
+                        Not Available
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
       {submitError && (
-        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{submitError}</div>
+        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <p>{submitError}</p>
+          {duplicateInvoice && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => navigate(`/admin/invoices/${duplicateInvoice.id}`)}
+            >
+              View Invoice {duplicateInvoice.invoiceNumber}
+            </Button>
+          )}
+        </div>
       )}
 
       <Button
@@ -310,19 +386,24 @@ function OrderInvoicePanel({ orderId }) {
 
 // Select a customer, then show every order they have (invoiceable or not) so nothing is
 // hidden - each order's action reflects its real state: not yet delivered, ready to invoice,
-// or already invoiced (possibly more than once, for per-delivery billing).
+// or already invoiced (possibly more than once, for per-delivery billing). Invoice state is
+// checked per-order via order_id (the confirmed-supported filter), never a bulk customer_id
+// invoice fetch, so a mismatch there can't silently hide a bad state.
 function FromOrderFlow({ onBack }) {
   const navigate = useNavigate()
   const [customers, setCustomers] = useState([])
   const [customerId, setCustomerId] = useState('')
+  const [invoiceMode, setInvoiceMode] = useState('per_delivery')
   const [orders, setOrders] = useState([])
   const [invoicesByOrder, setInvoicesByOrder] = useState({})
+  const [moreToInvoiceByOrder, setMoreToInvoiceByOrder] = useState({})
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true)
   const [isLoadingOrders, setIsLoadingOrders] = useState(false)
 
   useEffect(() => {
-    listCustomers().then((result) => {
-      if (result.success) setCustomers(result.customers)
+    Promise.all([listCustomers(), getSalesWorkflowSettings()]).then(([customersResult, settingsResult]) => {
+      if (customersResult.success) setCustomers(customersResult.customers)
+      if (settingsResult.success) setInvoiceMode(settingsResult.settings.partialDeliveryInvoiceMode)
       setIsLoadingCustomers(false)
     })
   }, [])
@@ -331,34 +412,67 @@ function FromOrderFlow({ onBack }) {
     if (!customerId) {
       setOrders([])
       setInvoicesByOrder({})
+      setMoreToInvoiceByOrder({})
       return
     }
 
     let isMounted = true
     setIsLoadingOrders(true)
 
-    Promise.all([listOrders({ customer_id: customerId }), listInvoices({ customer_id: customerId })]).then(
-      ([ordersResult, invoicesResult]) => {
-        if (!isMounted) return
+    async function load() {
+      const ordersResult = await listOrders({ customer_id: customerId })
+      if (!isMounted) return
+      const customerOrders = ordersResult.success ? ordersResult.orders : []
+      setOrders(customerOrders)
 
-        setOrders(ordersResult.success ? ordersResult.orders : [])
+      const invoiceResults = await Promise.all(customerOrders.map((order) => listInvoices({ order_id: order.id })))
+      if (!isMounted) return
 
-        const map = {}
-        if (invoicesResult.success) {
-          invoicesResult.invoices.forEach((invoice) => {
-            if (!invoice.orderId) return
-            map[invoice.orderId] = [...(map[invoice.orderId] || []), invoice]
+      const invoiceMap = {}
+      customerOrders.forEach((order, index) => {
+        const result = invoiceResults[index]
+        invoiceMap[order.id] = result.success ? result.invoices : []
+      })
+      setInvoicesByOrder(invoiceMap)
+
+      // Per-delivery orgs can have more to invoice even after one invoice exists - only
+      // check deliveries for orders that already have an invoice but no whole-order one.
+      if (invoiceMode === 'per_delivery') {
+        const ordersNeedingCheck = customerOrders.filter((order) => {
+          const orderInvoices = invoiceMap[order.id] || []
+          return orderInvoices.length > 0 && !orderInvoices.some((invoice) => !invoice.deliveryId)
+        })
+
+        if (ordersNeedingCheck.length > 0) {
+          const deliveryResults = await Promise.all(ordersNeedingCheck.map((order) => listDeliveries({ order_id: order.id })))
+          if (!isMounted) return
+
+          const moreMap = {}
+          ordersNeedingCheck.forEach((order, index) => {
+            const result = deliveryResults[index]
+            const deliveries = result.success ? result.deliveries : []
+            const invoicedDeliveryIds = new Set((invoiceMap[order.id] || []).map((invoice) => invoice.deliveryId).filter(Boolean))
+            moreMap[order.id] = deliveries.some(
+              (delivery) => billableDeliveryStatuses.includes(delivery.status) && !invoicedDeliveryIds.has(delivery.id),
+            )
           })
+          setMoreToInvoiceByOrder(moreMap)
+        } else {
+          setMoreToInvoiceByOrder({})
         }
-        setInvoicesByOrder(map)
-        setIsLoadingOrders(false)
-      },
-    )
+      } else {
+        setMoreToInvoiceByOrder({})
+      }
+
+      setIsLoadingOrders(false)
+    }
+
+    load()
 
     return () => {
       isMounted = false
     }
-  }, [customerId])
+  }, [customerId, invoiceMode])
 
   const customerOptions = useMemo(() => customers.map((customer) => ({ value: customer.id, label: customer.name })), [customers])
   const selectedCustomer = customers.find((customer) => customer.id === customerId)
@@ -373,10 +487,11 @@ function FromOrderFlow({ onBack }) {
       <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
         <Select
           label="Select Customer"
+          searchable
           options={customerOptions}
           value={customerId}
           onChange={(event) => setCustomerId(event.target.value)}
-          placeholder={isLoadingCustomers ? 'Loading...' : 'Search and select a customer'}
+          placeholder={isLoadingCustomers ? 'Loading...' : 'Search customer...'}
           disabled={isLoadingCustomers}
         />
       </div>
@@ -392,7 +507,10 @@ function FromOrderFlow({ onBack }) {
           <div className="space-y-3">
             {orders.map((order) => {
               const orderInvoices = invoicesByOrder[order.id] || []
-              const hasDelivered = order.items.some((item) => (item.deliveredQuantity || 0) > 0)
+              const wholeOrderInvoice = orderInvoices.find((invoice) => !invoice.deliveryId)
+              const deliveredQty = order.items.reduce((sum, item) => sum + (item.deliveredQuantity || 0), 0)
+              const hasDelivered = deliveredQty > 0
+              const canCreateNext = !wholeOrderInvoice && invoiceMode === 'per_delivery' && moreToInvoiceByOrder[order.id]
 
               return (
                 <div
@@ -408,12 +526,12 @@ function FromOrderFlow({ onBack }) {
                       </Badge>
                     </div>
                     <p className="mt-1 text-xs text-neutral-400">
-                      {formatOrderDate(order.orderDate)} · Total {formatCurrency(order.total)}
+                      {formatOrderDate(order.orderDate)} · Total {formatCurrency(order.total)} · Delivered {deliveredQty}
                       {!hasDelivered && orderInvoices.length === 0 && ' · No delivered quantity'}
                     </p>
                   </div>
-                  <div className="mt-3 shrink-0 sm:mt-0">
-                    {orderInvoices.length > 0 ? (
+                  <div className="mt-3 flex shrink-0 flex-wrap items-center gap-2 sm:mt-0">
+                    {orderInvoices.length > 0 && (
                       <Button
                         type="button"
                         variant="outline"
@@ -422,11 +540,18 @@ function FromOrderFlow({ onBack }) {
                       >
                         {orderInvoices.length > 1 ? `View Invoices (${orderInvoices.length})` : `View Invoice ${orderInvoices[0].invoiceNumber}`}
                       </Button>
-                    ) : hasDelivered ? (
+                    )}
+                    {orderInvoices.length === 0 && hasDelivered && (
                       <Button type="button" size="sm" onClick={() => navigate(`/admin/invoices/new?orderId=${order.id}`)}>
                         Create Invoice
                       </Button>
-                    ) : (
+                    )}
+                    {canCreateNext && (
+                      <Button type="button" size="sm" onClick={() => navigate(`/admin/invoices/new?orderId=${order.id}`)}>
+                        Create Next Invoice
+                      </Button>
+                    )}
+                    {orderInvoices.length === 0 && !hasDelivered && (
                       <Button
                         type="button"
                         size="sm"

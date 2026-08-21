@@ -29,6 +29,17 @@ function formatDateLabel(value) {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+function Field({ label, value }) {
+  return (
+    <div>
+      <p className="text-xs text-neutral-400">{label}</p>
+      <p className="mt-1 text-sm font-medium text-neutral-900">{value || '—'}</p>
+    </div>
+  )
+}
+
+const statusLabel = { active: 'Active', inactive: 'Inactive', discontinued: 'Discontinued' }
+
 export default function ProductDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -284,6 +295,69 @@ export default function ProductDetail() {
           <p className="text-sm leading-6 text-neutral-600">{product.description}</p>
         </Card>
       )}
+
+      <Card title="Specifications">
+        <div className="space-y-5">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Classification</p>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Field label="Lifecycle Status" value={statusLabel[product.statusValue] || statusLabel[product.status]} />
+              <Field label="Sub Category" value={product.subCategory} />
+              <Field label="Manufacturer" value={product.manufacturer} />
+              <Field label="Model Number" value={product.modelNumber} />
+              <Field label="Short Name" value={product.shortName} />
+              <Field label="Barcode" value={product.barcode} />
+            </div>
+          </div>
+
+          <div className="border-t border-neutral-100 pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Tax &amp; Purchase</p>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Field label="HSN/SAC Code" value={product.hsnSacCode} />
+              <Field label="Tax Category" value={product.taxCategory} />
+              <Field label="GST/VAT Rate" value={product.gstVatRate !== '' ? `${product.gstVatRate}%` : ''} />
+              <Field label="Purchase Unit" value={product.purchaseUnit} />
+              <Field label="Supplier Code" value={product.supplierProductCode} />
+              <Field label="Lead Time" value={product.leadTime !== '' ? `${product.leadTime} days` : ''} />
+              <Field label="Min. Order Qty" value={product.minimumOrderQuantity} />
+              <Field label="Sales Unit" value={product.salesUnit} />
+            </div>
+          </div>
+
+          <div className="border-t border-neutral-100 pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Physical Specifications</p>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Field label="Weight" value={product.weight !== '' ? `${product.weight} ${product.weightUnit || ''}`.trim() : ''} />
+              <Field
+                label="Dimensions (L×W×H)"
+                value={product.length || product.width || product.height ? `${product.length || 0} × ${product.width || 0} × ${product.height || 0}` : ''}
+              />
+              <Field label="Volume" value={product.volume} />
+              <Field label="Color" value={product.color} />
+              <Field label="Material" value={product.material} />
+              <Field label="Size" value={product.size} />
+            </div>
+          </div>
+
+          <div className="border-t border-neutral-100 pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Additional Information</p>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Field label="Warranty" value={product.warrantyPeriod ? `${product.warrantyPeriod} ${product.warrantyPeriodUnit || ''}`.trim() : ''} />
+              <Field label="Shelf Life" value={product.shelfLife ? `${product.shelfLife} ${product.shelfLifeUnit || ''}`.trim() : ''} />
+              <Field label="Country of Origin" value={product.countryOfOrigin} />
+              <Field label="Launch Date" value={formatDateLabel(product.launchDate)} />
+              <Field label="End of Life Date" value={formatDateLabel(product.endOfLifeDate)} />
+              <Field label="Tags" value={product.productTags} />
+            </div>
+            {product.notes && (
+              <div className="mt-4">
+                <p className="text-xs text-neutral-400">Internal Notes</p>
+                <p className="mt-1 whitespace-pre-line text-sm text-neutral-700">{product.notes}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
 
       {(product.coverImage || product.images?.length > 0) && (
         <Card title="Images">
