@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --strictPort",
+    "dev": "vite --host localhost --strictPort",
     "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/stop-dev.ps1",
     "build": "vite build",
     "lint": "oxlint",
