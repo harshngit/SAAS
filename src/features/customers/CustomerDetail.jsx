@@ -8,6 +8,7 @@ import {
   CalendarCheck2,
   CreditCard,
   FileText,
+  Globe2,
   Landmark,
   Mail,
   MapPin,
@@ -31,10 +32,8 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import DatePicker from '../../components/ui/DatePicker'
 import EmptyState from '../../components/ui/EmptyState'
-import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
-import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
 import {
   deleteCustomer,
@@ -42,7 +41,7 @@ import {
   getCustomerAccountStatement,
   getCustomerPaymentReceipt,
   getCustomerPayments,
-  recordCustomerPayment,
+  listCustomerDocuments,
   updateCustomer,
   voidCustomerPayment,
 } from '../../api/customers'
@@ -77,18 +76,6 @@ const paymentModeOptions = [
   { value: 'card', label: 'Card' },
   { value: 'cheque', label: 'Cheque' },
 ]
-
-const today = () => new Date().toISOString().slice(0, 10)
-
-const emptyPaymentForm = {
-  amount: '',
-  paymentMode: 'cash',
-  reference: '',
-  note: '',
-  orderId: '',
-  invoiceId: '',
-  receivedOn: today(),
-}
 
 function openReceiptDocument(receipt) {
   const receiptValue = String(receipt || '').trim()
@@ -266,10 +253,6 @@ export default function CustomerDetail() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-  const [paymentForm, setPaymentForm] = useState(emptyPaymentForm)
-  const [isSavingPayment, setIsSavingPayment] = useState(false)
-  const [paymentFormError, setPaymentFormError] = useState('')
   const [payments, setPayments] = useState([])
   const [isLoadingPayments, setIsLoadingPayments] = useState(true)
   const [paymentsError, setPaymentsError] = useState('')
@@ -289,6 +272,9 @@ export default function CustomerDetail() {
   const [ledgerError, setLedgerError] = useState('')
   const [statementDateFrom, setStatementDateFrom] = useState('')
   const [statementDateTo, setStatementDateTo] = useState('')
+  const [documents, setDocuments] = useState([])
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(true)
+  const [documentsError, setDocumentsError] = useState('')
 
   const loadLedger = async (params = {}) => {
     setIsLoadingLedger(true)
@@ -328,14 +314,17 @@ export default function CustomerDetail() {
       setIsLoadingOrders(true)
       setIsLoadingLedger(true)
       setLedgerError('')
+      setIsLoadingDocuments(true)
+      setDocumentsError('')
 
       const usersPromise = currentUser?.role === ROLES.SALES_OFFICER ? Promise.resolve({ success: true, users: [] }) : listUsers()
-      const [result, paymentsResult, usersResult, ordersResult, ledgerResult] = await Promise.all([
+      const [result, paymentsResult, usersResult, ordersResult, ledgerResult, documentsResult] = await Promise.all([
         getCustomer(id),
         getCustomerPayments(id),
         usersPromise,
         listOrders({ customer_id: id }),
         getCustomerAccountStatement(id),
+        listCustomerDocuments(id),
       ])
 
       if (!isMounted) return
@@ -344,6 +333,13 @@ export default function CustomerDetail() {
       setIsLoadingPayments(false)
       setIsLoadingOrders(false)
       setIsLoadingLedger(false)
+      setIsLoadingDocuments(false)
+
+      if (documentsResult.success) {
+        setDocuments(documentsResult.documents)
+      } else {
+        setDocumentsError(documentsResult.error)
+      }
 
       if (currentUser?.role === ROLES.SALES_OFFICER) {
         setStaffUsers(
@@ -497,55 +493,6 @@ export default function CustomerDetail() {
     navigate(basePath)
   }
 
-  const handleOpenPaymentModal = () => {
-    setPaymentForm(emptyPaymentForm)
-    setPaymentFormError('')
-    setIsPaymentModalOpen(true)
-  }
-
-  const handleClosePaymentModal = () => {
-    if (isSavingPayment) return
-    setIsPaymentModalOpen(false)
-    setPaymentFormError('')
-  }
-
-  const handleRecordPayment = async (event) => {
-    event.preventDefault()
-    setPaymentFormError('')
-
-    const amount = Number(paymentForm.amount)
-    if (!amount || amount <= 0) {
-      setPaymentFormError('Enter a valid payment amount.')
-      return
-    }
-
-    setIsSavingPayment(true)
-
-    const result = await recordCustomerPayment(customer.id, {
-      amount,
-      paymentMode: paymentForm.paymentMode,
-      reference: paymentForm.reference.trim(),
-      note: paymentForm.note.trim(),
-      orderId: paymentForm.orderId.trim(),
-      invoiceId: paymentForm.invoiceId.trim(),
-      receivedOn: paymentForm.receivedOn ? `${paymentForm.receivedOn}T00:00:00.000Z` : undefined,
-    })
-
-    setIsSavingPayment(false)
-
-    if (!result.success) {
-      setPaymentFormError(result.error)
-      return
-    }
-
-    setCustomer((current) => normalizeCustomer({
-      ...current,
-      ...result.customer,
-    }))
-    setIsPaymentModalOpen(false)
-    await loadPayments()
-  }
-
   const handleOpenReceipt = async (payment) => {
     setPaymentsError('')
     setDownloadingReceiptId(payment.id)
@@ -668,7 +615,7 @@ export default function CustomerDetail() {
             Edit Customer
           </Button>
           {isAdmin && (
-            <Button variant="outline" size="sm" onClick={handleOpenPaymentModal}>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/admin/customers/${customer.id}/record-payment`)}>
               <Plus className="size-4" aria-hidden="true" />
               Record Payment
             </Button>
@@ -692,6 +639,9 @@ export default function CustomerDetail() {
             </div>
             <div className="min-w-0">
               <p className="text-lg font-semibold text-neutral-900">{customer.name}</p>
+              {customer.displayName && customer.displayName !== customer.name && (
+                <p className="text-sm text-neutral-500">Display Name: {customer.displayName}</p>
+              )}
               <p className="text-sm text-neutral-500">Customer ID: {customer.customerId || '-'}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Badge variant={customer.status === 'active' ? 'success' : 'danger'}>{customer.status === 'active' ? 'Active' : 'Inactive'}</Badge>
@@ -711,6 +661,7 @@ export default function CustomerDetail() {
             <TopInfoItem icon={CreditCard} label="Payment Type" value={formatLabel(customer.preferredPaymentMethod)} />
             <TopInfoItem icon={Calendar} label="Customer Since" value={formatDate(customer.customerSince)} />
             <TopInfoItem icon={Calendar} label="Created On" value={formatDateTime(customer.createdAt)} />
+            <TopInfoItem icon={Calendar} label="Last Updated" value={formatDateTime(customer.updatedAt)} />
           </div>
         </div>
       </div>
@@ -761,11 +712,37 @@ export default function CustomerDetail() {
             <Field label="Designation" value={customer.designation} />
             <Field label="Communication Preference" value={customer.preferredCommunication} />
           </div>
+          {(customer.facebook || customer.instagram || customer.linkedin || customer.twitter || customer.youtube) && (
+            <div className="mt-4 border-t border-neutral-100 pt-4">
+              <p className="text-xs text-neutral-400">Social Media</p>
+              <div className="mt-2 flex flex-wrap gap-3 text-sm">
+                {[
+                  { label: 'Facebook', value: customer.facebook },
+                  { label: 'Instagram', value: customer.instagram },
+                  { label: 'LinkedIn', value: customer.linkedin },
+                  { label: 'X (Twitter)', value: customer.twitter },
+                  { label: 'YouTube', value: customer.youtube },
+                ].filter((link) => link.value).map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.value}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1 text-primary-700 hover:bg-primary-50/60"
+                  >
+                    <Globe2 className="size-3.5" aria-hidden="true" />
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </Section>
 
         <Section number={2} title="Business & Tax Information" icon={Building2}>
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
             <Field label="Business Type" value={formatLabel(customer.customerType)} />
+            <Field label="Legal Business Name" value={customer.legalBusinessName} />
             <Field label="Industry" value={formatLabel(customer.industry)} />
             <Field label="GST Number" value={customer.gstNumber} />
             <Field label="PAN / Registration No." value={customer.panBusinessRegistrationNo} />
@@ -780,6 +757,22 @@ export default function CustomerDetail() {
             <Field label="Billing Address" value={billingAddressLine} />
             <Field label="Shipping Address" value={shippingAddressLine} />
             <Field label="Country" value={customer.country} />
+            <div className="min-w-0">
+              <p className="text-xs text-neutral-400">Google Maps Location</p>
+              {customer.googleMapsLocation ? (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customer.googleMapsLocation)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-primary-700 hover:underline"
+                >
+                  <MapPin className="size-3.5" aria-hidden="true" />
+                  {customer.googleMapsLocation}
+                </a>
+              ) : (
+                <p className="mt-1 text-sm font-medium text-neutral-900">-</p>
+              )}
+            </div>
           </div>
         </Section>
       </div>
@@ -793,6 +786,8 @@ export default function CustomerDetail() {
             <Field label="Total Received" value={formatCurrency(customer.totalReceived || 0)} />
             <Field label="Total Billed" value={formatCurrency(customer.totalBilled || 0)} />
             <Field label="Opening Balance" value={formatCurrency(customer.openingBalance || 0)} />
+            <Field label="Total Purchases" value={formatCurrency(customer.totalPurchases || 0)} />
+            <Field label="Customer Lifetime Value" value={formatCurrency(customer.customerLifetimeValue || 0)} />
           </div>
         </Section>
 
@@ -813,7 +808,7 @@ export default function CustomerDetail() {
           icon={CreditCard}
           className="xl:col-span-1"
           actions={isAdmin && (
-            <Button type="button" variant="ghost" size="sm" onClick={handleOpenPaymentModal}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => navigate(`/admin/customers/${customer.id}/record-payment`)}>
               <Plus className="size-4" aria-hidden="true" />
               Record
             </Button>
@@ -919,8 +914,27 @@ export default function CustomerDetail() {
                 <li>Communication: {customer.preferredCommunication || '-'}</li>
                 <li>Payment Method: {formatLabel(customer.preferredPaymentMethod) || '-'}</li>
                 <li>Tags: {customer.customerTags || '-'}</li>
+                {customer.preferredPaymentMethod === 'UPI' && customer.upiId && <li>UPI ID: {customer.upiId}</li>}
+                {customer.preferredPaymentMethod === 'Bank Transfer' && (customer.bankName || customer.accountNumber || customer.ifscSwiftCode) && (
+                  <>
+                    {customer.bankName && <li>Bank Name: {customer.bankName}</li>}
+                    {customer.accountNumber && <li>Account Number: {customer.accountNumber}</li>}
+                    {customer.ifscSwiftCode && <li>IFSC/SWIFT Code: {customer.ifscSwiftCode}</li>}
+                  </>
+                )}
               </ul>
             </div>
+            {(customer.dateOfBirth || customer.anniversaryDate || customer.loyaltyNumber || customer.referralCustomer) && (
+              <div className="border-t border-neutral-100 pt-4">
+                <p className="text-xs text-neutral-400">Additional Details</p>
+                <ul className="mt-2 space-y-1.5 text-sm text-neutral-700">
+                  {customer.dateOfBirth && <li>Date of Birth: {formatDate(customer.dateOfBirth)}</li>}
+                  {customer.anniversaryDate && <li>Anniversary: {formatDate(customer.anniversaryDate)}</li>}
+                  {customer.loyaltyNumber && <li>Loyalty Number: {customer.loyaltyNumber}</li>}
+                  {customer.referralCustomer && <li>Referred By: {customer.referralCustomer}</li>}
+                </ul>
+              </div>
+            )}
           </div>
         </Section>
       </div>
@@ -1037,96 +1051,45 @@ export default function CustomerDetail() {
         )}
       </Section>
 
-      <Modal isOpen={isPaymentModalOpen} onClose={handleClosePaymentModal} title="Record Customer Payment" className="max-w-lg">
-        <form onSubmit={handleRecordPayment} className="space-y-5">
-          {paymentFormError && (
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {paymentFormError}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
-            <div className="min-w-0">
-              <p className="text-xs text-neutral-400">Customer</p>
-              <p className="truncate text-sm font-medium text-neutral-900">{customer.businessName || customer.name}</p>
-            </div>
-            <div className="shrink-0 text-right">
-              <p className="text-xs text-neutral-400">Outstanding</p>
-              <p className={`text-sm font-semibold ${customer.outstandingBalance > 0 ? 'text-amber-600' : 'text-neutral-900'}`}>
-                {formatCurrency(customer.outstandingBalance)}
-              </p>
-            </div>
+      <Section
+        number={10}
+        title="Documents"
+        icon={FileText}
+        actions={
+          <Button type="button" variant="ghost" size="sm" onClick={goToEdit}>
+            <Plus className="size-4" aria-hidden="true" />
+            Manage
+          </Button>
+        }
+      >
+        {documentsError ? (
+          <div className="py-6 text-center">
+            <p className="text-sm text-red-600">{documentsError}</p>
           </div>
-
-          <Input
-            label="Amount"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="0.00"
-            value={paymentForm.amount}
-            onChange={(event) => setPaymentForm((current) => ({ ...current, amount: event.target.value }))}
-            inputClassName="text-lg font-semibold"
-            required
-          />
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Select
-              label="Payment Mode"
-              options={paymentModeOptions}
-              value={paymentForm.paymentMode}
-              onChange={(event) => setPaymentForm((current) => ({ ...current, paymentMode: event.target.value }))}
-              required
-            />
-            <DatePicker
-              label="Received On"
-              value={paymentForm.receivedOn}
-              onChange={(value) => setPaymentForm((current) => ({ ...current, receivedOn: value }))}
-            />
+        ) : isLoadingDocuments ? (
+          <LoadingSpinner label="Loading documents..." />
+        ) : documents.length === 0 ? (
+          <p className="py-6 text-center text-sm text-neutral-400">No documents uploaded for this customer yet.</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {documents.map((document) => (
+              <a
+                key={document.id}
+                href={document.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3.5 py-2.5 hover:border-primary-200 hover:bg-primary-50/40"
+              >
+                <FileText className="size-4 shrink-0 text-primary-600" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-neutral-900">{document.name}</p>
+                  <p className="text-xs text-neutral-400">{formatLabel(document.document_type)}</p>
+                </div>
+              </a>
+            ))}
           </div>
-
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-neutral-400">Settle Against (Optional)</p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input
-                label="Invoice ID"
-                placeholder="Leave blank for advance"
-                value={paymentForm.invoiceId}
-                onChange={(event) => setPaymentForm((current) => ({ ...current, invoiceId: event.target.value }))}
-              />
-              <Input
-                label="Order ID"
-                placeholder="Optional order ID"
-                value={paymentForm.orderId}
-                onChange={(event) => setPaymentForm((current) => ({ ...current, orderId: event.target.value }))}
-              />
-            </div>
-          </div>
-
-          <Input
-            label="Reference"
-            placeholder="Transaction ID, cheque no., etc."
-            value={paymentForm.reference}
-            onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
-          />
-          <Input
-            label="Note"
-            as="textarea"
-            placeholder="Optional note about this payment"
-            value={paymentForm.note}
-            onChange={(event) => setPaymentForm((current) => ({ ...current, note: event.target.value }))}
-          />
-
-          <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={handleClosePaymentModal} disabled={isSavingPayment}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={isSavingPayment}>
-              Record Payment
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        )}
+      </Section>
 
       <Modal
         isOpen={Boolean(voidTarget)}

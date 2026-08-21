@@ -1028,7 +1028,14 @@ export default function UserEdit() {
                   label="Identity Proof Document"
                   description="Aadhaar, PAN, Passport, or similar."
                   accept="application/pdf,image/*"
-                  existingItems={user?.identityProofFile ? [{ name: 'Identity proof', url: user.identityProofFile }] : []}
+                  existingItems={
+                    user?.identityProofFile
+                      ? [{
+                          name: `${effectiveIdentityProofOptions.find((option) => option.value === formData.identityProofType)?.label || 'Identity proof'} Document`,
+                          url: user.identityProofFile,
+                        }]
+                      : []
+                  }
                   stagedFiles={singleDocFiles.identityDocuments ? [singleDocFiles.identityDocuments] : []}
                   removed={singleDocRemoved.identityDocuments}
                   onFilesSelected={(files) => updateSingleDoc('identityDocuments', files)}

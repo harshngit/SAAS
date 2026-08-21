@@ -129,6 +129,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
               label="Amount Received"
               type="number"
               min="0"
+              step="0.01"
               required
               value={amountReceived}
               onChange={(event) => setAmountReceived(event.target.value)}

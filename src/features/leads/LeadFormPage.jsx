@@ -23,6 +23,11 @@ import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 
 const emptyForm = {
+  name: '',
+  contactPerson: '',
+  email: '',
+  interestedProduct: '',
+  notes: '',
   leadSource: '',
   customerId: '',
   mobileNumber: '',
@@ -145,6 +150,7 @@ export default function LeadFormPage() {
 
   const validate = () => {
     const nextErrors = {}
+    if (!formData.name.trim()) nextErrors.name = 'Prospect / business name is required.'
     if (!formData.leadSource) nextErrors.leadSource = 'Lead source is required.'
     if (!formData.mobileNumber.trim()) nextErrors.mobileNumber = 'Mobile number is required.'
     if (formData.mobileNumber.trim() && !/^[0-9+\-\s()]{7,16}$/.test(formData.mobileNumber.trim())) {
@@ -243,6 +249,20 @@ export default function LeadFormPage() {
             )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                label="Prospect / Business Name"
+                required
+                value={formData.name}
+                onChange={(event) => updateField('name', event.target.value)}
+                placeholder="e.g. Sunrise Distributors"
+                error={errors.name}
+              />
+              <Input
+                label="Contact Person"
+                value={formData.contactPerson}
+                onChange={(event) => updateField('contactPerson', event.target.value)}
+                placeholder="Who to speak with"
+              />
               <Select
                 label="Lead Source"
                 required
@@ -268,6 +288,13 @@ export default function LeadFormPage() {
                 placeholder="Contact mobile number"
                 error={errors.mobileNumber}
               />
+              <Input
+                label="Email"
+                type="email"
+                value={formData.email}
+                onChange={(event) => updateField('email', event.target.value)}
+                placeholder="Contact email address"
+              />
               <Select
                 label="Assigned Salesperson"
                 required
@@ -284,6 +311,22 @@ export default function LeadFormPage() {
                 options={LEAD_STATUS_OPTIONS}
                 value={formData.leadStatus}
                 onChange={(event) => updateField('leadStatus', event.target.value)}
+              />
+              <Input
+                label="Interested Product"
+                value={formData.interestedProduct}
+                onChange={(event) => updateField('interestedProduct', event.target.value)}
+                placeholder="What are they interested in?"
+                className="sm:col-span-2"
+              />
+              <Input
+                as="textarea"
+                label="Notes"
+                value={formData.notes}
+                onChange={(event) => updateField('notes', event.target.value)}
+                placeholder="Any additional context for the sales team"
+                inputClassName="min-h-24"
+                className="sm:col-span-2"
               />
             </div>
           </div>
@@ -369,9 +412,12 @@ export default function LeadFormPage() {
               </div>
               <div>
                 <p className="text-base font-semibold text-neutral-900">Notes</p>
-                <p className="mt-1 text-sm text-neutral-500">Notes will appear here after the lead is created.</p>
+                <p className="mt-1 text-sm text-neutral-500">Preview of what the sales team will see.</p>
               </div>
             </div>
+            <p className="mt-4 whitespace-pre-line text-sm text-neutral-700">
+              {formData.notes.trim() || 'No notes added yet.'}
+            </p>
           </section>
         </aside>
       </div>

@@ -37,9 +37,6 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
-// Backend LeadCreate/LeadUpdate only model: source, an optional link to an existing customer,
-// a contact mobile number, assignment, and status - there is no room for free-text prospect
-// name/email/budget/products/notes, so the form only collects what actually persists.
 export const LEAD_STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
   { value: 'contacted', label: 'Contacted' },
@@ -71,6 +68,16 @@ function buildLeadBody(payload) {
   const assignedSalespersonId = payload.assignedSalespersonId || payload.assigned_salesperson_id
   if (assignedSalespersonId) body.assigned_salesperson_id = assignedSalespersonId
 
+  if (payload.name !== undefined) body.name = payload.name?.trim() || ''
+  if (payload.contactPerson !== undefined || payload.contact_person !== undefined) {
+    body.contact_person = (payload.contactPerson ?? payload.contact_person)?.trim() || ''
+  }
+  if (payload.email !== undefined) body.email = payload.email?.trim() || ''
+  if (payload.interestedProduct !== undefined || payload.interested_product !== undefined) {
+    body.interested_product = (payload.interestedProduct ?? payload.interested_product)?.trim() || ''
+  }
+  if (payload.notes !== undefined) body.notes = payload.notes?.trim() || ''
+
   return body
 }
 
@@ -84,11 +91,18 @@ function normalizeLead(lead) {
     id: lead.id,
     leadId: lead.lead_id || lead.id,
     organizationId: lead.organization_id,
+    name: lead.name || '',
+    contactPerson: lead.contact_person || '',
+    email: lead.email || '',
+    interestedProduct: lead.interested_product || '',
+    notes: lead.notes || '',
     leadSource: lead.lead_source || '',
     leadStatus: lead.lead_status || 'new',
     mobileNumber: lead.mobile_number || '',
     customerId: lead.customer_id || customer?.id || '',
     customerName: customer?.name || customer?.customer_name || '',
+    convertedCustomerId: lead.converted_customer_id || '',
+    convertedAt: lead.converted_at || null,
     assignedSalespersonId: lead.assigned_salesperson_id || salesperson?.id || '',
     assignedSalespersonName: salesperson?.name || '',
     createdAt: lead.created_at,
@@ -167,6 +181,47 @@ export async function updateLead(leadId, payload) {
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to update lead. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function convertLeadToCustomer(leadId, payload = {}) {
+  try {
+    const body = {}
+
+    if (payload.name) body.name = payload.name.trim()
+    if (payload.businessName) body.business_name = payload.businessName.trim()
+    if (payload.phone) body.phone = payload.phone.trim()
+    if (payload.email) body.email = payload.email.trim()
+    if (payload.gstNumber) body.gst_number = payload.gstNumber.trim()
+    if (payload.billingAddress) body.billing_address = payload.billingAddress.trim()
+    if (payload.deliveryAddress) body.delivery_address = payload.deliveryAddress.trim()
+    if (payload.assignedSalesOfficerId) body.assigned_sales_officer_id = payload.assignedSalesOfficerId
+    if (payload.creditLimit !== undefined && payload.creditLimit !== '') body.credit_limit = Number(payload.creditLimit) || 0
+    if (payload.openingBalance !== undefined && payload.openingBalance !== '') body.opening_balance = Number(payload.openingBalance) || 0
+    if (payload.category) body.category = payload.category
+    if (payload.notes) body.notes = payload.notes.trim()
+    if (payload.primaryContactPerson) body.primary_contact_person = payload.primaryContactPerson.trim()
+
+    const { data } = await apiClient.post(`/leads/${leadId}/convert-to-customer`, body, {
+      headers: authHeader(),
+    })
+
+    return {
+      success: true,
+      leadId: data?.lead_id || leadId,
+      customerId: data?.customer_id || data?.customer?.id || '',
+      leadStatus: data?.lead_status || 'won',
+      converted: data?.converted !== false,
+      customer: data?.customer || null,
+    }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to convert this lead to a customer. Please try again.',
     )
 
     return { success: false, error: message }

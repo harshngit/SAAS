@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   FileText,
   IndianRupee,
+  PackageCheck,
+  Store,
   Truck,
   User,
   Wallet,
@@ -18,6 +20,7 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
+import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
@@ -27,6 +30,9 @@ import {
   cancelOrder,
   confirmOrder,
   getOrder,
+  pickupConfirm,
+  pickupPick,
+  pickupReady,
   rejectOrder,
 } from '../../api/orders'
 import { listDeliveries, planDelivery } from '../../api/deliveries'
@@ -104,6 +110,12 @@ export default function OrderDetail() {
   const [isPlanning, setIsPlanning] = useState(false)
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  const [isPickupConfirmModalOpen, setIsPickupConfirmModalOpen] = useState(false)
+  const [pickupItemQuantities, setPickupItemQuantities] = useState({})
+  const [collectedBy, setCollectedBy] = useState('')
+  const [pickupNotesInput, setPickupNotesInput] = useState('')
+  const [pickupError, setPickupError] = useState('')
+  const [isConfirmingPickup, setIsConfirmingPickup] = useState(false)
   const [orderInvoices, setOrderInvoices] = useState([])
   const [hasMoreToInvoice, setHasMoreToInvoice] = useState(false)
   const [invoiceMode, setInvoiceMode] = useState('per_delivery')
@@ -207,9 +219,10 @@ export default function OrderDetail() {
     )
   }
 
+  const isPickupOrder = order.fulfilmentMethod === 'pickup'
   const canConfirmDraft = order.status === 'draft'
   const canApprove = order.status === 'awaiting_approval'
-  const canPlanDelivery = ['placed', 'processing'].includes(order.status) && !order.assignedDeliveryPartnerId
+  const canPlanDelivery = !isPickupOrder && ['placed', 'processing'].includes(order.status) && !order.assignedDeliveryPartnerId
   const canCancel = cancellableStatuses.includes(order.status)
   const isReserved = ['reserved', 'planned', 'loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)
   const isLoaded = ['loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)
@@ -217,14 +230,33 @@ export default function OrderDetail() {
   const isDelivered = order.fulfilmentStatus === 'delivered'
   const hasDeliveredQuantity = order.items.some((item) => (item.deliveredQuantity || 0) > 0)
 
-  const fulfillmentSteps = [
-    { label: 'Order Placed', status: 'done' },
-    { label: 'Stock Reserved', status: isReserved ? 'done' : 'current' },
-    { label: 'Delivery Assigned', status: order.assignedDeliveryPartnerId ? 'done' : canPlanDelivery ? 'current' : 'pending' },
-    { label: 'Loaded', status: isLoaded ? 'done' : order.assignedDeliveryPartnerId ? 'current' : 'pending' },
-    { label: 'In Transit', status: isInTransit ? 'done' : isLoaded ? 'current' : 'pending' },
-    { label: 'Delivered', status: isDelivered ? 'done' : isInTransit ? 'current' : 'pending' },
-  ]
+  const canPickupPick = isPickupOrder && ['placed', 'processing'].includes(order.status) && order.pickupStatus === 'not_started'
+  const canPickupReady = isPickupOrder && order.pickupStatus === 'picking'
+  const canConfirmPickup = isPickupOrder && order.pickupStatus === 'ready'
+  const isPickupCollected = isPickupOrder && order.pickupStatus === 'collected'
+
+  const fulfillmentSteps = isPickupOrder
+    ? [
+        { label: 'Order Placed', status: 'done' },
+        { label: 'Stock Reserved', status: isReserved ? 'done' : 'current' },
+        {
+          label: 'Picking',
+          status: ['picking', 'ready', 'collected'].includes(order.pickupStatus) ? 'done' : canPickupPick ? 'current' : 'pending',
+        },
+        {
+          label: 'Ready for Pickup',
+          status: ['ready', 'collected'].includes(order.pickupStatus) ? 'done' : canPickupReady ? 'current' : 'pending',
+        },
+        { label: 'Collected', status: isPickupCollected ? 'done' : canConfirmPickup ? 'current' : 'pending' },
+      ]
+    : [
+        { label: 'Order Placed', status: 'done' },
+        { label: 'Stock Reserved', status: isReserved ? 'done' : 'current' },
+        { label: 'Delivery Assigned', status: order.assignedDeliveryPartnerId ? 'done' : canPlanDelivery ? 'current' : 'pending' },
+        { label: 'Loaded', status: isLoaded ? 'done' : order.assignedDeliveryPartnerId ? 'current' : 'pending' },
+        { label: 'In Transit', status: isInTransit ? 'done' : isLoaded ? 'current' : 'pending' },
+        { label: 'Delivered', status: isDelivered ? 'done' : isInTransit ? 'current' : 'pending' },
+      ]
 
   const runAction = async (action) => {
     setIsActing(true)
@@ -302,6 +334,38 @@ export default function OrderDetail() {
     }
   }
 
+  const handlePickupPick = () => runAction(() => pickupPick(order.id))
+  const handlePickupReady = () => runAction(() => pickupReady(order.id))
+
+  const openPickupConfirmModal = () => {
+    setPickupItemQuantities(Object.fromEntries(order.items.map((item) => [item.id, item.quantity])))
+    setCollectedBy('')
+    setPickupNotesInput('')
+    setPickupError('')
+    setIsPickupConfirmModalOpen(true)
+  }
+
+  const handleConfirmPickup = async () => {
+    setIsConfirmingPickup(true)
+    setPickupError('')
+
+    const result = await pickupConfirm(order.id, {
+      items: order.items.map((item) => ({ orderItemId: item.id, collectedQuantity: pickupItemQuantities[item.id] ?? item.quantity })),
+      collectedBy: collectedBy.trim() || undefined,
+      notes: pickupNotesInput.trim() || undefined,
+    })
+
+    setIsConfirmingPickup(false)
+
+    if (!result.success) {
+      setPickupError(result.error)
+      return
+    }
+
+    setOrder(result.order)
+    setIsPickupConfirmModalOpen(false)
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -342,6 +406,24 @@ export default function OrderDetail() {
             <Button variant="outline" size="sm" onClick={openPlanModal}>
               <Truck className="size-4" aria-hidden="true" />
               Plan Delivery
+            </Button>
+          )}
+          {canPickupPick && (
+            <Button variant="outline" size="sm" loading={isActing} onClick={handlePickupPick}>
+              <Store className="size-4" aria-hidden="true" />
+              Pick Items
+            </Button>
+          )}
+          {canPickupReady && (
+            <Button variant="outline" size="sm" loading={isActing} onClick={handlePickupReady}>
+              <PackageCheck className="size-4" aria-hidden="true" />
+              Mark Ready for Pickup
+            </Button>
+          )}
+          {canConfirmPickup && (
+            <Button variant="primary" size="sm" onClick={openPickupConfirmModal}>
+              <Check className="size-4" aria-hidden="true" />
+              Confirm Pickup
             </Button>
           )}
           {['placed', 'processing', 'completed'].includes(order.status) && (() => {
@@ -503,8 +585,28 @@ export default function OrderDetail() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <Card title="Delivery Information">
-          {order.assignedDeliveryPartnerId ? (
+        <Card title={isPickupOrder ? 'Pickup Information' : 'Delivery Information'}>
+          {isPickupOrder ? (
+            <div className="space-y-3.5 text-sm">
+              <div className="flex items-center justify-between"><span className="text-neutral-500">Fulfilment Method</span><span className="font-medium text-neutral-900">Takeaway / Self Pickup</span></div>
+              <div className="flex items-center justify-between">
+                <span className="text-neutral-500">Pickup Status</span>
+                <Badge variant={isPickupCollected ? 'success' : 'warning'}>{order.pickupStatus.replace(/_/g, ' ')}</Badge>
+              </div>
+              {order.collectedBy && (
+                <div className="flex items-center justify-between"><span className="text-neutral-500">Collected By</span><span className="font-medium text-neutral-900">{order.collectedBy}</span></div>
+              )}
+              {order.collectedAt && (
+                <div className="flex items-center justify-between"><span className="text-neutral-500">Collected At</span><span className="font-medium text-neutral-900">{formatDate(order.collectedAt)}</span></div>
+              )}
+              {order.pickupNotes && (
+                <div className="border-t border-neutral-100 pt-3">
+                  <span className="text-neutral-500">Pickup Notes</span>
+                  <p className="mt-1 whitespace-pre-line text-neutral-700">{order.pickupNotes}</p>
+                </div>
+              )}
+            </div>
+          ) : order.assignedDeliveryPartnerId ? (
             <div className="space-y-3.5 text-sm">
               <div className="flex items-center justify-between"><span className="text-neutral-500">Delivery Partner</span><span className="font-medium text-neutral-900">{order.assignedDeliveryPartnerName}</span></div>
               <div className="flex items-center justify-between"><span className="text-neutral-500">Fulfilment Method</span><span className="font-medium capitalize text-neutral-900">{order.fulfilmentMethod}</span></div>
@@ -627,6 +729,67 @@ export default function OrderDetail() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isPickupConfirmModalOpen}
+        onClose={() => {
+          if (isConfirmingPickup) return
+          setIsPickupConfirmModalOpen(false)
+        }}
+        title="Confirm Pickup"
+        className="max-w-lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsPickupConfirmModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" loading={isConfirmingPickup} onClick={handleConfirmPickup}>Confirm Pickup</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {pickupError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{pickupError}</div>
+          )}
+          <Input
+            label="Collected By (optional)"
+            placeholder="Name of the person collecting"
+            value={collectedBy}
+            onChange={(event) => setCollectedBy(event.target.value)}
+          />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-neutral-700">Collected Quantity</label>
+            <div className="space-y-2">
+              {order.items.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-neutral-800">{item.productName}</p>
+                    <p className="text-xs text-neutral-400">Ordered: {item.quantity}</p>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max={item.quantity}
+                    value={pickupItemQuantities[item.id] ?? item.quantity}
+                    onChange={(event) =>
+                      setPickupItemQuantities((current) => ({ ...current, [item.id]: Number(event.target.value) }))
+                    }
+                    className="h-9 w-24 shrink-0 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-neutral-700">Notes (optional)</label>
+            <textarea
+              value={pickupNotesInput}
+              onChange={(event) => setPickupNotesInput(event.target.value)}
+              placeholder="Any additional notes about this pickup"
+              maxLength={500}
+              className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            />
           </div>
         </div>
       </Modal>

@@ -791,6 +791,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <input
                       type="number"
                       min="0"
+                      step="0.01"
                       value={discountValue}
                       onChange={(event) => setDiscountValue(event.target.value)}
                       className="h-11 w-full min-w-0 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"

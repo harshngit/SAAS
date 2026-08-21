@@ -170,6 +170,10 @@ function normalizeOrder(order) {
     orderDate: order.order_date || order.created_at,
     deliveryDate: order.delivery_date,
     fulfilmentMethod: order.fulfilment_method || 'delivery',
+    pickupStatus: order.pickup_status || 'not_started',
+    collectedBy: order.collected_by || '',
+    collectedAt: order.collected_at || null,
+    pickupNotes: order.pickup_notes || '',
     paymentType: order.payment_type || '',
     paymentTermsDays: order.payment_terms_days ?? 0,
     source: order.source || 'office',
@@ -325,6 +329,70 @@ export async function assignDeliveryPartner(orderId, deliveryPartnerId) {
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to assign delivery partner. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function pickupPick(orderId) {
+  try {
+    const { data } = await apiClient.post(`/orders/${orderId}/pickup/pick`, {}, {
+      headers: authHeader(),
+    })
+
+    return { success: true, order: normalizeOrder(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to start picking this order. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function pickupReady(orderId) {
+  try {
+    const { data } = await apiClient.post(`/orders/${orderId}/pickup/ready`, {}, {
+      headers: authHeader(),
+    })
+
+    return { success: true, order: normalizeOrder(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to mark this order ready for pickup. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function pickupConfirm(orderId, payload = {}) {
+  try {
+    const requestBody = {
+      items: (payload.items || []).map((item) => ({
+        order_item_id: item.orderItemId || item.order_item_id,
+        collected_quantity: Number(item.collectedQuantity ?? item.collected_quantity) || 0,
+      })),
+    }
+
+    if (payload.collectedBy || payload.collected_by) requestBody.collected_by = payload.collectedBy || payload.collected_by
+    if (payload.notes) requestBody.notes = payload.notes
+
+    const { data } = await apiClient.post(`/orders/${orderId}/pickup/confirm`, requestBody, {
+      headers: authHeader(),
+    })
+
+    return { success: true, order: normalizeOrder(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to confirm this pickup. Please try again.',
     )
 
     return { success: false, error: message }

@@ -287,6 +287,7 @@ export default function PurchaseInvoiceForm({ isOpen, onClose, invoice, onSaved 
                         type="number"
                         min="0"
                         max="100"
+                        step="0.01"
                         value={item.discount}
                         onChange={(event) => updateItem(index, 'discount', event.target.value)}
                         className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
@@ -297,6 +298,7 @@ export default function PurchaseInvoiceForm({ isOpen, onClose, invoice, onSaved 
                         type="number"
                         min="0"
                         max="100"
+                        step="0.01"
                         value={item.tax}
                         onChange={(event) => updateItem(index, 'tax', event.target.value)}
                         className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
@@ -320,6 +322,7 @@ export default function PurchaseInvoiceForm({ isOpen, onClose, invoice, onSaved 
             label="Extra Discount (₹)"
             type="number"
             min="0"
+            step="0.01"
             value={formState.discount}
             onChange={(event) => updateField('discount', event.target.value)}
           />

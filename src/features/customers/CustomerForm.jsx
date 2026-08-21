@@ -18,8 +18,13 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import { listCustomers, listCustomerDocuments, updateCustomer } from '../../api/customers'
-import { deleteFile, uploadFile, uploadFiles as uploadGenericFiles } from '../../api/files'
+import {
+  deleteCustomerDocument,
+  listCustomerDocuments,
+  uploadCustomerDocument,
+  uploadOtherCustomerDocuments,
+} from '../../api/customers'
+import { deleteFile, uploadFiles as uploadGenericFiles } from '../../api/files'
 import { formatCurrency } from '../../utils/format'
 
 const documentTypeByField = {
@@ -111,13 +116,6 @@ function toDateInputValue(value) {
   return date.toISOString().slice(0, 10)
 }
 
-function formatOptionLabel(value = '') {
-  return String(value)
-    .trim()
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase())
-}
-
 const optionValues = {
   // The API enforces this exact lowercase enum — do not add/relabel values here.
   industry: ['Food & Beverage', 'Retail', 'Wholesale', 'Corporate', 'Healthcare', 'Education', 'Hospitality', 'Manufacturing', 'Services'],
@@ -140,6 +138,26 @@ const optionValues = {
 }
 
 const toOptions = (values) => values.map((value) => (typeof value === 'string' ? { value, label: value } : value))
+
+// The backend only stores UPI/bank fields - there is no card-detail storage (raw card numbers
+// are never collected here for PCI reasons), so each payment method only shows what it can
+// actually persist.
+function isPaymentDetailFieldVisible(fieldName, preferredPaymentMethod) {
+  if (fieldName === 'upiId') return preferredPaymentMethod === 'UPI'
+  if (['bankName', 'accountNumber', 'ifscSwiftCode'].includes(fieldName)) return preferredPaymentMethod === 'Bank Transfer'
+  return true
+}
+
+// Fixed backend enum (see CustomerProfileIn.basic_information.customer_type) - not something
+// to infer from existing customer records.
+const customerTypeOptions = [
+  { value: 'individual', label: 'Individual' },
+  { value: 'business', label: 'Business' },
+  { value: 'government', label: 'Government' },
+  { value: 'dealer', label: 'Dealer' },
+  { value: 'distributor', label: 'Distributor' },
+  { value: 'vendor', label: 'Vendor' },
+]
 
 const sectionMeta = {
   'Basic Information': { description: 'Customer identity and profile details.', icon: BadgeInfo },
@@ -168,7 +186,7 @@ function section(title, fields) {
 const formSections = [
   section('Basic Information', [
     { name: 'customerId', label: 'Customer ID', description: 'Unique customer identifier. Auto-generated.', type: 'Text (Auto Number)', required: true, input: 'readonly' },
-    { name: 'customerType', label: 'Customer Type', description: 'Individual, Business, Government, Dealer, Distributor, Vendor.', type: 'Text', required: true },
+    { name: 'customerType', label: 'Customer Type', description: 'Individual, Business, Government, Dealer, Distributor, Vendor.', type: 'Dropdown', input: 'select', required: true },
     { name: 'customerName', label: 'Customer Name', description: 'Name of the customer or business.', type: 'Text (Max 100 chars)', required: true, maxLength: 100 },
     { name: 'legalBusinessName', label: 'Legal Business Name', description: 'Registered business name for companies.', type: 'Text' },
     { name: 'displayName', label: 'Display Name', description: 'Name displayed in invoices and reports.', type: 'Text' },
@@ -482,7 +500,6 @@ export default function CustomerForm({
   const [activeSection, setActiveSection] = useState(formSections[0].id)
   const [uploadPreviews, setUploadPreviews] = useState({})
   const [uploadedFileUrls, setUploadedFileUrls] = useState({})
-  const [customerTypeOptions, setCustomerTypeOptions] = useState([])
   const uploadPreviewsRef = useRef({})
   // Tracks file_ids from POST /files/upload that aren't attached to a saved customer yet
   // (create mode, before the record exists) - so a discarded/replaced upload can be cleaned
@@ -558,7 +575,7 @@ export default function CustomerForm({
       setUploadPreviews((current) => {
         const next = { ...current }
         Object.entries(grouped).forEach(([field, docs]) => {
-          next[field] = docs.map((doc) => ({ name: doc.name, type: doc.content_type, url: doc.url }))
+          next[field] = docs.map((doc) => ({ id: doc.id, name: doc.name, type: doc.content_type, url: doc.url }))
         })
         uploadPreviewsRef.current = next
         return next
@@ -581,51 +598,6 @@ export default function CustomerForm({
   }, [isOpen, customer?.id])
 
   useEffect(() => {
-    if (!isOpen) return
-
-    let isMounted = true
-
-    async function loadCustomerTypes() {
-      const result = await listCustomers()
-      if (!isMounted) return
-
-      const optionMap = new Map()
-
-      if (result.success) {
-        result.customers.forEach((customerItem) => {
-          const value = String(customerItem.customerType || customerItem.type || customerItem.category || '').trim()
-          if (!value || optionMap.has(value)) return
-          optionMap.set(value, { value, label: formatOptionLabel(value) })
-        })
-      }
-
-      const currentValue = String(
-        customer?.customerType || customer?.type || customer?.category || initialCustomer?.customerType || initialCustomer?.type || initialCustomer?.category || '',
-      ).trim()
-
-      if (currentValue && !optionMap.has(currentValue)) {
-        optionMap.set(currentValue, { value: currentValue, label: formatOptionLabel(currentValue) })
-      }
-
-      setCustomerTypeOptions(Array.from(optionMap.values()))
-    }
-
-    loadCustomerTypes()
-
-    return () => {
-      isMounted = false
-    }
-  }, [
-    customer?.category,
-    customer?.customerType,
-    customer?.type,
-    initialCustomer?.category,
-    initialCustomer?.customerType,
-    initialCustomer?.type,
-    isOpen,
-  ])
-
-  useEffect(() => {
     return () => {
       Object.values(uploadPreviewsRef.current).forEach(revokeUploadPreviewUrls)
     }
@@ -636,7 +608,7 @@ export default function CustomerForm({
       revokeUploadPreviewUrls(current[name])
       const nextPreviews = {
         ...current,
-        [name]: documents.map((doc) => ({ name: doc.name, type: doc.content_type, url: doc.url })),
+        [name]: documents.map((doc) => ({ id: doc.id, name: doc.name, type: doc.content_type, url: doc.url })),
       }
       uploadPreviewsRef.current = nextPreviews
       return nextPreviews
@@ -692,11 +664,9 @@ export default function CustomerForm({
       }
 
       discardStagedFiles(name)
-      stagedFileIdsRef.current[name] = name === 'otherDocuments'
-        ? result.files.map((file) => file.file_id).filter(Boolean)
-        : result.files[0]?.file_id
+      const fileIds = result.files.map((file) => file.file_id).filter(Boolean)
+      stagedFileIdsRef.current[name] = name === 'otherDocuments' ? fileIds : fileIds[0]
 
-      const urls = result.files.map((file) => file.url).filter(Boolean)
       setUploadPreviews((current) => {
         revokeUploadPreviewUrls(current[name])
         const nextPreviews = {
@@ -710,61 +680,80 @@ export default function CustomerForm({
         uploadPreviewsRef.current = nextPreviews
         return nextPreviews
       })
+      // The customer doesn't exist yet - stage the file_id (not the url) so the eventual
+      // POST /customers create call can attach it via the profile's documents section.
       setUploadedFileUrls((current) => ({
         ...current,
-        [name]: name === 'otherDocuments' ? urls : urls[0] || '',
+        [name]: name === 'otherDocuments' ? fileIds : fileIds[0] || '',
       }))
       return
     }
 
-    // Editing an existing customer: upload via the generic endpoint, then persist the URL
-    // with a normal customer update (same pattern the Users module uses).
+    // Editing an existing customer: upload and attach in one call via the dedicated document
+    // endpoints - not the generic file upload + profile PATCH, which never actually persisted
+    // (the profile's documents section only accepts a file_id, and only for attaching at
+    // creation time; PATCHing it afterwards with a URL was silently ignored by the backend).
     setDocumentsError('')
     setUploadingField(name)
 
     const uploadResult = name === 'otherDocuments'
-      ? await uploadGenericFiles(selectedFiles)
-      : await uploadFile(selectedFiles[0])
+      ? await uploadOtherCustomerDocuments(customerId, selectedFiles)
+      : await uploadCustomerDocument(customerId, documentTypeByField[name], selectedFiles[0])
+
+    setUploadingField('')
 
     if (!uploadResult.success) {
-      setUploadingField('')
       setDocumentsError(uploadResult.error)
       return
     }
 
-    const newUrls = name === 'otherDocuments'
-      ? uploadResult.files.map((file) => file.url).filter(Boolean)
-      : [uploadResult.file.url]
-
-    const existingUrls = name === 'otherDocuments'
-      ? (uploadPreviews[name] || []).map((preview) => preview.url).filter(Boolean)
-      : []
-
-    const patchValue = name === 'otherDocuments' ? [...existingUrls, ...newUrls] : newUrls[0]
-    const patchResult = await updateCustomer(customerId, { ...formData, [name]: patchValue })
-    setUploadingField('')
-
-    if (!patchResult.success) {
-      setDocumentsError(patchResult.error)
-      return
-    }
-
-    const existingPreviews = name === 'otherDocuments' ? (uploadPreviews[name] || []) : []
-    const newDocs = name === 'otherDocuments'
-      ? uploadResult.files.map((file, index) => ({ name: file.name || selectedFiles[index]?.name, content_type: file.content_type, url: file.url }))
-      : [{ name: uploadResult.file.name || selectedFiles[0]?.name, content_type: uploadResult.file.content_type, url: uploadResult.file.url }]
-    const allDocs = [
-      ...existingPreviews.map((preview) => ({ name: preview.name, content_type: preview.type, url: preview.url })),
-      ...newDocs,
-    ]
+    const newDocs = name === 'otherDocuments' ? uploadResult.documents : [uploadResult.document]
+    const existingDocs = name === 'otherDocuments' ? (uploadPreviews[name] || []) : []
+    const allDocs = [...existingDocs, ...newDocs]
 
     applyServerDocumentPreviews(name, allDocs)
     updateField(name, name === 'otherDocuments' ? `${allDocs.length} file(s)` : newDocs[0].name || 'Uploaded')
   }
 
-  const handleUploadRemove = (name) => {
-    if (!customer?.id) {
+  const handleUploadRemove = async (name) => {
+    const customerId = customer?.id
+
+    if (!customerId) {
       discardStagedFiles(name)
+      setUploadPreviews((current) => {
+        revokeUploadPreviewUrls(current[name])
+        const { [name]: removed, ...remaining } = current
+        void removed
+        uploadPreviewsRef.current = remaining
+        return remaining
+      })
+      setUploadedFileUrls((current) => {
+        const { [name]: removed, ...remaining } = current
+        void removed
+        return remaining
+      })
+      updateField(name, '')
+      return
+    }
+
+    // Existing customer: these documents are already attached server-side, so removing the
+    // field must actually delete them there too, not just clear the local preview.
+    const docsToDelete = (uploadPreviews[name] || []).filter((doc) => doc.id)
+    if (docsToDelete.length === 0) {
+      updateField(name, '')
+      return
+    }
+
+    setDocumentsError('')
+    setUploadingField(name)
+
+    const results = await Promise.all(docsToDelete.map((doc) => deleteCustomerDocument(customerId, doc.id)))
+    setUploadingField('')
+
+    const failure = results.find((result) => !result.success)
+    if (failure) {
+      setDocumentsError(failure.error)
+      return
     }
 
     setUploadPreviews((current) => {
@@ -772,11 +761,6 @@ export default function CustomerForm({
       const { [name]: removed, ...remaining } = current
       void removed
       uploadPreviewsRef.current = remaining
-      return remaining
-    })
-    setUploadedFileUrls((current) => {
-      const { [name]: removed, ...remaining } = current
-      void removed
       return remaining
     })
     updateField(name, '')
@@ -811,6 +795,12 @@ export default function CustomerForm({
 
       if (field === 'sameAsBilling' && value) {
         next.shippingAddress = current.billingAddress
+      }
+
+      // Editing the shipping field directly means it's no longer "same as billing" -
+      // the checkbox must reflect that instead of silently staying checked and wrong.
+      if (field === 'shippingAddress' && current.sameAsBilling && value !== current.billingAddress) {
+        next.sameAsBilling = false
       }
 
       return next
@@ -1073,7 +1063,15 @@ export default function CustomerForm({
 
             <section className="flex-1 border-b border-neutral-100 py-5">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {activeFormSection.fields.map((field) => (
+                {activeFormSection.fields.map((field) => {
+                  if (
+                    activeFormSection.id === 'payment-information'
+                    && !isPaymentDetailFieldVisible(field.name, formData.preferredPaymentMethod)
+                  ) {
+                    return null
+                  }
+
+                  return (
                   <Fragment key={field.name}>
                     <CustomerField className={field.wide ? 'lg:col-span-2' : ''}>
                       {renderField(field)}
@@ -1089,8 +1087,14 @@ export default function CustomerForm({
                         Shipping address same as billing address
                       </label>
                     )}
+                    {activeFormSection.id === 'payment-information' && field.name === 'preferredPaymentMethod' && formData.preferredPaymentMethod === 'Card' && (
+                      <p className="rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-xs text-neutral-500 lg:col-span-2">
+                        Card payment details aren't collected or stored here - this only records that the customer prefers to pay by card.
+                      </p>
+                    )}
                   </Fragment>
-                ))}
+                  )
+                })}
               </div>
             </section>
 

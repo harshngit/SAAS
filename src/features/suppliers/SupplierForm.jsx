@@ -127,6 +127,7 @@ export default function SupplierForm({
               label="Opening Balance"
               type="number"
               min="0"
+              step="0.01"
               placeholder="0"
               value={formData.openingBalance}
               onChange={(event) => updateField('openingBalance', event.target.value)}

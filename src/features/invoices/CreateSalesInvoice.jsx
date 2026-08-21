@@ -194,12 +194,14 @@ function OrderInvoicePanel({ orderId }) {
     (delivery) => billableDeliveryStatuses.includes(delivery.status) && !invoicedByDeliveryId[delivery.id],
   )
 
+  const isPickupOrder = order?.fulfilmentMethod === 'pickup'
+
   const handleIssue = async () => {
     setIsSubmitting(true)
     setSubmitError('')
     setDuplicateInvoice(null)
 
-    const result = await invoiceOrder(orderId, invoiceMode === 'per_delivery' ? selectedDeliveryId : undefined)
+    const result = await invoiceOrder(orderId, !isPickupOrder && invoiceMode === 'per_delivery' ? selectedDeliveryId : undefined)
 
     if (!result.success) {
       if (result.duplicateRef) {
@@ -235,10 +237,16 @@ function OrderInvoicePanel({ orderId }) {
     return <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError || 'Order not found.'}</div>
   }
 
-  const isAfterFullOrderMode = invoiceMode === 'after_full_order'
+  // Pickup orders never go through the delivery pipeline at all - no delivery records ever
+  // exist for them, so the per_delivery/after_full_order delivery-selection logic below must
+  // not apply. They always bill the whole order directly, gated only on whether the pickup has
+  // actually been collected (which is when delivered_quantity gets set on the order items).
+  const hasDeliveredQuantity = order.items.some((item) => (item.deliveredQuantity || 0) > 0)
+  const isAfterFullOrderMode = !isPickupOrder && invoiceMode === 'after_full_order'
   const orderFullyDelivered = order.fulfilmentStatus === 'delivered'
-  const needsDeliveryChoice = invoiceMode === 'per_delivery' && billableUninvoicedDeliveries.length > 1
-  const noBillableDelivery = invoiceMode === 'per_delivery' && billableUninvoicedDeliveries.length === 0 && !wholeOrderInvoice
+  const needsDeliveryChoice = !isPickupOrder && invoiceMode === 'per_delivery' && billableUninvoicedDeliveries.length > 1
+  const noBillableDelivery = !isPickupOrder && invoiceMode === 'per_delivery' && billableUninvoicedDeliveries.length === 0 && !wholeOrderInvoice
+  const pickupNotCollected = isPickupOrder && !hasDeliveredQuantity && !wholeOrderInvoice
 
   // Already-invoiced states short-circuit the whole panel - never let the user attempt a duplicate.
   if (wholeOrderInvoice) {
@@ -251,6 +259,14 @@ function OrderInvoicePanel({ orderId }) {
           <FileCheck2 className="size-4" aria-hidden="true" />
           View Invoice {wholeOrderInvoice.invoiceNumber}
         </Button>
+      </div>
+    )
+  }
+
+  if (pickupNotCollected) {
+    return (
+      <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+        This order has not been collected yet. Complete the pickup before creating an invoice.
       </div>
     )
   }
@@ -281,7 +297,7 @@ function OrderInvoicePanel({ orderId }) {
             <thead>
               <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
                 <th className="px-3.5 py-2.5">Product</th>
-                <th className="px-3.5 py-2.5 text-right">Delivered Qty</th>
+                <th className="px-3.5 py-2.5 text-right">{isPickupOrder ? 'Collected Qty' : 'Delivered Qty'}</th>
                 <th className="px-3.5 py-2.5 text-right">Rate</th>
                 <th className="px-3.5 py-2.5 text-right">Subtotal</th>
                 <th className="px-3.5 py-2.5 text-right">GST</th>
@@ -946,6 +962,7 @@ export default function CreateSalesInvoice() {
                             type="number"
                             min="0"
                             max="100"
+                            step="0.01"
                             value={item.discount}
                             onChange={(event) => updateItem(index, 'discount', event.target.value)}
                             className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
@@ -956,6 +973,7 @@ export default function CreateSalesInvoice() {
                             type="number"
                             min="0"
                             max="100"
+                            step="0.01"
                             value={item.taxRate}
                             onChange={(event) => updateItem(index, 'taxRate', event.target.value)}
                             className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
@@ -1030,8 +1048,8 @@ export default function CreateSalesInvoice() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input label="Additional Charges (₹)" type="number" min="0" value={additionalCharges} onChange={(event) => setAdditionalCharges(event.target.value)} />
-              <Input label="Extra Discount (₹)" type="number" min="0" value={discount} onChange={(event) => setDiscount(event.target.value)} />
+              <Input label="Additional Charges (₹)" type="number" min="0" step="0.01" value={additionalCharges} onChange={(event) => setAdditionalCharges(event.target.value)} />
+              <Input label="Extra Discount (₹)" type="number" min="0" step="0.01" value={discount} onChange={(event) => setDiscount(event.target.value)} />
             </div>
 
             <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
@@ -1079,7 +1097,7 @@ export default function CreateSalesInvoice() {
               </div>
 
               <div className="mt-5 space-y-3">
-                <Input label="Amount Paid Now (Optional)" type="number" min="0" value={amountPaid} onChange={(event) => setAmountPaid(event.target.value)} />
+                <Input label="Amount Paid Now (Optional)" type="number" min="0" step="0.01" value={amountPaid} onChange={(event) => setAmountPaid(event.target.value)} />
                 <div className="rounded-xl bg-amber-50 px-3.5 py-2.5">
                   <p className="text-xs text-amber-700">Due Amount</p>
                   <p className="text-lg font-semibold text-amber-700">{formatCurrency(dueAmount)}</p>

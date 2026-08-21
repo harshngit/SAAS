@@ -407,14 +407,17 @@ function IdentityProofUploadField({
   return (
     <div className="flex min-h-28 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
       <div className="grid w-full grid-cols-1 gap-3 xl:grid-cols-[minmax(10rem,1fr)_auto_auto] xl:items-center">
-        <Select
-          label="Identity Proofs"
-          name="identityProofType"
-          options={options}
-          value={proofValue}
-          onChange={onProofChange}
-          required
-        />
+        <div className="min-w-0">
+          <Select
+            label="Identity Proofs"
+            name="identityProofType"
+            options={options}
+            value={proofValue}
+            onChange={onProofChange}
+            required
+          />
+          {fileValue && <p className="mt-1 truncate text-xs font-medium text-primary-700">{fileValue}</p>}
+        </div>
         <div className="flex shrink-0 items-center justify-center">
           <UploadPreview previews={previews} />
         </div>
@@ -447,7 +450,6 @@ function IdentityProofUploadField({
             <Trash2 className="size-3.5" aria-hidden="true" />
             Remove
           </Button>
-          {fileValue && <p className="max-w-80 truncate text-xs font-medium text-primary-700">{fileValue}</p>}
         </div>
       </div>
     </div>

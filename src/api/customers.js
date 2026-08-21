@@ -105,6 +105,19 @@ function toFileUrlArray(value) {
   return values.map(toFileUrl).filter(Boolean)
 }
 
+// Writing documents in the sectioned profile body only accepts a raw file_id (per
+// CustomerProfileIn.documents) - never a URL. isFileId() naturally rejects a plain filename
+// string (what an already-attached edit-mode document looks like in formData), so only a
+// genuinely staged create-mode upload ever makes it through here.
+function toFileId(value) {
+  return isFileId(value) ? String(value).trim() : ''
+}
+
+function toFileIdArray(value) {
+  const values = Array.isArray(value) ? value : toStringArray(value)
+  return values.map(toFileId).filter(Boolean)
+}
+
 function normalizeUploadedDocument(document) {
   if (!document) return document
 
@@ -119,13 +132,16 @@ function normalizeUploadedDocument(document) {
 function buildCustomerRequestBody(payload) {
   const customerName = (payload.customerName || payload.name || '').trim()
   const coordinates = parseMapsCoordinates(payload.googleMapsLocation || payload.google_maps_location)
+  // Only relevant while creating a brand-new customer (staged uploads waiting for a real
+  // customer_id to attach to). Once a customer exists, documents are uploaded and attached
+  // directly via POST /customers/{id}/documents, independent of this profile PATCH.
   const documents = cleanObject({
-    gst_certificate_url: toFileUrl(payload.gstCertificate),
-    pan_card_url: toFileUrl(payload.panCard),
-    business_registration_certificate_url: toFileUrl(payload.businessRegistrationCertificate),
-    address_proof_url: toFileUrl(payload.addressProof),
-    purchase_agreement_url: toFileUrl(payload.purchaseAgreement),
-    other_document_urls: toFileUrlArray(payload.otherDocuments),
+    gst_certificate_id: toFileId(payload.gstCertificate),
+    pan_card_id: toFileId(payload.panCard),
+    business_registration_certificate_id: toFileId(payload.businessRegistrationCertificate),
+    address_proof_id: toFileId(payload.addressProof),
+    purchase_agreement_id: toFileId(payload.purchaseAgreement),
+    other_document_ids: toFileIdArray(payload.otherDocuments),
   })
 
   const requestBody = {
@@ -290,12 +306,12 @@ function normalizeSectionedCustomer(data) {
     twitter: social.x_twitter_url || '',
     youtube: social.youtube_url || '',
 
-    gstCertificate: getFileUrl(documents.gst_certificate_url || documents.gst_certificate_id),
-    panCard: getFileUrl(documents.pan_card_url || documents.pan_card_id),
-    businessRegistrationCertificate: getFileUrl(documents.business_registration_certificate_url || documents.business_registration_certificate_id),
-    addressProof: getFileUrl(documents.address_proof_url || documents.address_proof_id),
-    purchaseAgreement: getFileUrl(documents.purchase_agreement_url || documents.purchase_agreement_id),
-    otherDocuments: toFileUrlArray(documents.other_document_urls || documents.other_document_ids),
+    gstCertificate: getFileUrl(documents.gst_certificate_id || documents.gst_certificate_url),
+    panCard: getFileUrl(documents.pan_card_id || documents.pan_card_url),
+    businessRegistrationCertificate: getFileUrl(documents.business_registration_certificate_id || documents.business_registration_certificate_url),
+    addressProof: getFileUrl(documents.address_proof_id || documents.address_proof_url),
+    purchaseAgreement: getFileUrl(documents.purchase_agreement_id || documents.purchase_agreement_url),
+    otherDocuments: toFileUrlArray(documents.other_document_ids || documents.other_document_urls),
     documentIds: documents,
 
     dateOfBirth: toDateOnly(additional.date_of_birth),
@@ -485,6 +501,24 @@ export async function listCustomerDocuments(customerId, documentType) {
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to load customer documents. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function deleteCustomerDocument(customerId, documentId) {
+  try {
+    await apiClient.delete(`/customers/${customerId}/documents/${documentId}`, {
+      headers: authHeader(),
+    })
+
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to delete this document. Please try again.',
     )
 
     return { success: false, error: message }

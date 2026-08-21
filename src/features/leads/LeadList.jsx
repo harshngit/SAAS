@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Edit, Plus, RefreshCw, RotateCw, Search, Trash2 } from 'lucide-react'
+import { ArrowRightCircle, Download, Edit, Plus, RefreshCw, RotateCw, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
@@ -10,11 +10,16 @@ import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, deleteLead, listLeads, updateLead } from '../../api/leads'
+import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, convertLeadToCustomer, deleteLead, listLeads, updateLead } from '../../api/leads'
 import { listCustomers } from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
+
+const customerCategoryOptions = ['Retail', 'Wholesale', 'Corporate', 'VIP', 'Dealer', 'Distributor'].map((value) => ({
+  value,
+  label: value,
+}))
 
 const statusVariant = {
   new: 'info',
@@ -85,6 +90,16 @@ function LeadEditForm({ lead, customerOptions, salespersonOptions, saving, formE
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
+        <Input
+          label="Prospect / Business Name"
+          value={formData.name}
+          onChange={(event) => updateField('name', event.target.value)}
+        />
+        <Input
+          label="Contact Person"
+          value={formData.contactPerson}
+          onChange={(event) => updateField('contactPerson', event.target.value)}
+        />
         <Select
           label="Lead Source"
           required
@@ -106,6 +121,12 @@ function LeadEditForm({ lead, customerOptions, salespersonOptions, saving, formE
           onChange={(event) => updateField('mobileNumber', event.target.value)}
           error={errors.mobileNumber}
         />
+        <Input
+          label="Email"
+          type="email"
+          value={formData.email}
+          onChange={(event) => updateField('email', event.target.value)}
+        />
         <Select
           label="Assigned Salesperson"
           required
@@ -121,10 +142,158 @@ function LeadEditForm({ lead, customerOptions, salespersonOptions, saving, formE
           value={formData.leadStatus}
           onChange={(event) => updateField('leadStatus', event.target.value)}
         />
+        <Input
+          label="Interested Product"
+          value={formData.interestedProduct}
+          onChange={(event) => updateField('interestedProduct', event.target.value)}
+          className="sm:col-span-2"
+        />
+        <Input
+          as="textarea"
+          label="Notes"
+          value={formData.notes}
+          onChange={(event) => updateField('notes', event.target.value)}
+          inputClassName="min-h-20"
+          className="sm:col-span-2"
+        />
       </div>
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>Cancel</Button>
         <Button type="submit" loading={saving}>Save Lead</Button>
+      </div>
+    </form>
+  )
+}
+
+function ConvertLeadForm({ lead, salespersonOptions, saving, formError, onClose, onSave }) {
+  const [formData, setFormData] = useState(() => ({
+    name: lead?.name || lead?.customerName || '',
+    primaryContactPerson: lead?.contactPerson || '',
+    phone: lead?.mobileNumber || '',
+    email: lead?.email || '',
+    gstNumber: '',
+    billingAddress: '',
+    deliveryAddress: '',
+    assignedSalesOfficerId: lead?.assignedSalespersonId || '',
+    creditLimit: '',
+    openingBalance: '',
+    category: '',
+    notes: lead?.notes || '',
+  }))
+  const [errors, setErrors] = useState({})
+
+  const updateField = (field, value) => {
+    setFormData((current) => ({ ...current, [field]: value }))
+    setErrors((current) => ({ ...current, [field]: '' }))
+  }
+
+  const validate = () => {
+    const nextErrors = {}
+    if (!formData.name.trim()) nextErrors.name = 'Business / customer name is required.'
+    if (!formData.phone.trim()) nextErrors.phone = 'Phone number is required.'
+
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    if (!validate()) return
+    onSave(formData)
+  }
+
+  if (!lead) return null
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <p className="text-sm text-neutral-500">
+        Review and confirm the details below - this creates a real customer record linked back to this lead.
+      </p>
+      {formError && (
+        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
+      )}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Input
+          label="Business / Customer Name"
+          required
+          value={formData.name}
+          onChange={(event) => updateField('name', event.target.value)}
+          error={errors.name}
+        />
+        <Input
+          label="Primary Contact Person"
+          value={formData.primaryContactPerson}
+          onChange={(event) => updateField('primaryContactPerson', event.target.value)}
+        />
+        <Input
+          label="Phone"
+          required
+          value={formData.phone}
+          onChange={(event) => updateField('phone', event.target.value)}
+          error={errors.phone}
+        />
+        <Input
+          label="Email"
+          type="email"
+          value={formData.email}
+          onChange={(event) => updateField('email', event.target.value)}
+        />
+        <Input
+          label="GST Number"
+          value={formData.gstNumber}
+          onChange={(event) => updateField('gstNumber', event.target.value)}
+        />
+        <Select
+          label="Category"
+          options={[{ value: '', label: 'No category' }, ...customerCategoryOptions]}
+          value={formData.category}
+          onChange={(event) => updateField('category', event.target.value)}
+        />
+        <Select
+          label="Assigned Sales Officer"
+          options={[{ value: '', label: 'Unassigned' }, ...salespersonOptions]}
+          value={formData.assignedSalesOfficerId}
+          onChange={(event) => updateField('assignedSalesOfficerId', event.target.value)}
+        />
+        <Input
+          label="Credit Limit"
+          type="number"
+          min="0"
+          step="0.01"
+          value={formData.creditLimit}
+          onChange={(event) => updateField('creditLimit', event.target.value)}
+        />
+        <Input
+          label="Opening Balance"
+          type="number"
+          step="0.01"
+          value={formData.openingBalance}
+          onChange={(event) => updateField('openingBalance', event.target.value)}
+        />
+        <Input
+          label="Billing Address"
+          value={formData.billingAddress}
+          onChange={(event) => updateField('billingAddress', event.target.value)}
+          className="sm:col-span-2"
+        />
+        <Input
+          label="Delivery Address"
+          value={formData.deliveryAddress}
+          onChange={(event) => updateField('deliveryAddress', event.target.value)}
+          className="sm:col-span-2"
+        />
+        <Input
+          as="textarea"
+          label="Notes"
+          value={formData.notes}
+          onChange={(event) => updateField('notes', event.target.value)}
+          inputClassName="min-h-20"
+          className="sm:col-span-2"
+        />
+      </div>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>Cancel</Button>
+        <Button type="submit" loading={saving}>Convert to Customer</Button>
       </div>
     </form>
   )
@@ -153,6 +322,10 @@ export default function LeadList() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+
+  const [convertTarget, setConvertTarget] = useState(null)
+  const [isConverting, setIsConverting] = useState(false)
+  const [convertError, setConvertError] = useState('')
 
   const loadLeads = useCallback(async () => {
     setIsLoading(true)
@@ -324,6 +497,26 @@ export default function LeadList() {
     setIsDeleting(false)
   }
 
+  const handleConvertLead = async (formData) => {
+    if (!convertTarget) return
+
+    setIsConverting(true)
+    setConvertError('')
+
+    const result = await convertLeadToCustomer(convertTarget.id, formData)
+
+    if (!result.success) {
+      setConvertError(result.error)
+      setIsConverting(false)
+      return
+    }
+
+    setIsConverting(false)
+    setConvertTarget(null)
+    await loadLeads()
+    navigate(`/admin/customers/${result.customerId}`)
+  }
+
   return (
     <div className="space-y-4">
       <Card className="p-0">
@@ -436,10 +629,10 @@ export default function LeadList() {
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
                           <div className={`flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${avatarClasses[index % avatarClasses.length]}`}>
-                            {getInitials(lead.customerName || lead.mobileNumber)}
+                            {getInitials(lead.name || lead.customerName || lead.mobileNumber)}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-neutral-900">{lead.customerName || 'New prospect'}</p>
+                            <p className="font-semibold text-neutral-900">{lead.name || lead.customerName || 'New prospect'}</p>
                             <p className="mt-0.5 text-xs text-neutral-400">{lead.leadId}</p>
                           </div>
                         </div>
@@ -456,10 +649,12 @@ export default function LeadList() {
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
-                          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-600 text-[0.65rem] font-semibold text-white">
-                            {getInitials(lead.assignedSalespersonName)}
-                          </span>
-                          <span className="max-w-28 text-neutral-600">{lead.assignedSalespersonName || '-'}</span>
+                          {lead.assignedSalespersonName && (
+                            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-600 text-[0.65rem] font-semibold text-white">
+                              {getInitials(lead.assignedSalespersonName)}
+                            </span>
+                          )}
+                          <span className="max-w-28 text-neutral-600">{lead.assignedSalespersonName || 'Unassigned'}</span>
                         </div>
                       </td>
                       <td className="px-4 py-4">
@@ -470,6 +665,9 @@ export default function LeadList() {
                         <ActionMenu
                           items={[
                             { label: 'Edit', icon: Edit, onClick: () => setEditingLead(lead) },
+                            lead.convertedCustomerId
+                              ? { label: 'View Customer', icon: ArrowRightCircle, onClick: () => navigate(`/admin/customers/${lead.convertedCustomerId}`) }
+                              : { label: 'Convert to Customer', icon: ArrowRightCircle, onClick: () => { setConvertError(''); setConvertTarget(lead) } },
                             { label: 'Delete', icon: Trash2, danger: true, onClick: () => setDeleteTarget(lead) },
                           ]}
                         />
@@ -516,6 +714,29 @@ export default function LeadList() {
             <Button type="button" variant="danger" loading={isDeleting} onClick={handleDeleteLead}>Delete</Button>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(convertTarget)}
+        onClose={() => {
+          if (isConverting) return
+          setConvertError('')
+          setConvertTarget(null)
+        }}
+        title="Convert to Customer"
+        className="max-w-2xl"
+      >
+        <ConvertLeadForm
+          lead={convertTarget}
+          salespersonOptions={salespersonOptions}
+          saving={isConverting}
+          formError={convertError}
+          onClose={() => {
+            setConvertError('')
+            setConvertTarget(null)
+          }}
+          onSave={handleConvertLead}
+        />
       </Modal>
     </div>
   )
