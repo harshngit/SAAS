@@ -149,10 +149,10 @@ export default function Sidebar({
   if (!currentUser) return null
 
   const labelVisibilityClass = isExpanded
-    ? 'visible max-w-36 opacity-100 delay-150'
+    ? 'visible max-w-48 opacity-100 delay-150'
     : 'invisible max-w-0 opacity-0 delay-0'
   const desktopLabelVisibilityClass = isExpanded
-    ? 'md:visible md:max-w-36 md:opacity-100 md:delay-150'
+    ? 'md:visible md:max-w-48 md:opacity-100 md:delay-150'
     : 'md:invisible md:max-w-0 md:opacity-0 md:delay-0'
   const sectionLabelVisibilityClass = isExpanded
     ? 'visible max-w-48 whitespace-nowrap opacity-100 delay-150'
@@ -377,10 +377,10 @@ export default function Sidebar({
                                 />
                               )}
                             </span>
-                            <span className={`visible flex max-w-44 items-center gap-2 overflow-hidden whitespace-nowrap opacity-100 transition-all duration-150 ${desktopLabelVisibilityClass}`}>
-                              {item.label}
+                            <span className={`visible flex max-w-48 items-center gap-2 overflow-hidden opacity-100 transition-all duration-150 ${desktopLabelVisibilityClass}`}>
+                              <span className="truncate whitespace-nowrap">{item.label}</span>
                               {badgeCount > 0 && (
-                                <span className="inline-flex min-w-4.5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1 py-0.5 text-[0.6rem] font-semibold leading-none text-white">
+                                <span className="inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1 text-[0.6rem] font-semibold leading-none text-white">
                                   {badgeCount}
                                 </span>
                               )}

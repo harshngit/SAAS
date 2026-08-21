@@ -66,6 +66,7 @@ import OrganizationDetail from '../features/superadmin/OrganizationDetail'
 import UpgradeRequests from '../features/superadmin/UpgradeRequests'
 import SubscriptionPlans from '../features/superadmin/SubscriptionPlans'
 import PlatformAnalytics from '../features/superadmin/PlatformAnalytics'
+import SuperAdminsList from '../features/superadmin/SuperAdminsList'
 import AdminPlans from '../features/plans/AdminPlans'
 import AdminDeliveries from '../features/deliveries/AdminDeliveries'
 import AdminExpenses from '../features/expenses/AdminExpenses'
@@ -121,6 +122,7 @@ export default function AppRoutes() {
           <Route path="/superadmin/upgrade-requests" element={<UpgradeRequests />} />
           <Route path="/superadmin/plans" element={<SubscriptionPlans />} />
           <Route path="/superadmin/analytics" element={<PlatformAnalytics />} />
+          <Route path="/superadmin/admins" element={<SuperAdminsList />} />
         </Route>
 
         <Route

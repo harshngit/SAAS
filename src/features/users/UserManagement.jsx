@@ -613,38 +613,53 @@ export default function UserManagement() {
     }
 
     setUploadingField(name)
-    const result = await uploadGenericFiles(selectedFiles)
-    setUploadingField('')
 
-    if (!result.success) {
-      setFormError(`${fileNames || 'File'} could not be uploaded: ${result.error}`)
+    try {
+      const result = await uploadGenericFiles(selectedFiles)
+
+      if (!result.success) {
+        setFormError(`${fileNames || 'File'} could not be uploaded: ${result.error}`)
+        setUploadedFileUrls((current) => {
+          const { [name]: removed, ...remaining } = current
+          void removed
+          return remaining
+        })
+        setFormData((current) => ({ ...current, [name]: '' }))
+        return
+      }
+
+      const urls = result.files.map((file) => file.url).filter(Boolean)
+      setUploadPreviews((current) => {
+        revokeUploadPreviewUrls(current[name])
+        const nextPreviews = {
+          ...current,
+          [name]: result.files.map((file, index) => ({
+            name: file.name || selectedFiles[index]?.name || 'Uploaded file',
+            type: file.content_type || selectedFiles[index]?.type || '',
+            url: file.url,
+          })),
+        }
+        uploadPreviewsRef.current = nextPreviews
+        return nextPreviews
+      })
+      setUploadedFileUrls((current) => ({
+        ...current,
+        [name]: selectedFiles.length > 1 ? urls : urls[0] || '',
+      }))
+    } catch {
+      // Guards against the "stuck on Uploading..." state forever if anything in this chain
+      // throws unexpectedly instead of resolving to {success:false} - the button must always
+      // recover, even on an error path we didn't anticipate.
+      setFormError(`${fileNames || 'File'} could not be uploaded. Please try again.`)
       setUploadedFileUrls((current) => {
         const { [name]: removed, ...remaining } = current
         void removed
         return remaining
       })
       setFormData((current) => ({ ...current, [name]: '' }))
-      return
+    } finally {
+      setUploadingField('')
     }
-
-    const urls = result.files.map((file) => file.url).filter(Boolean)
-    setUploadPreviews((current) => {
-      revokeUploadPreviewUrls(current[name])
-      const nextPreviews = {
-        ...current,
-        [name]: result.files.map((file, index) => ({
-          name: file.name || selectedFiles[index]?.name || 'Uploaded file',
-          type: file.content_type || selectedFiles[index]?.type || '',
-          url: file.url,
-        })),
-      }
-      uploadPreviewsRef.current = nextPreviews
-      return nextPreviews
-    })
-    setUploadedFileUrls((current) => ({
-      ...current,
-      [name]: selectedFiles.length > 1 ? urls : urls[0] || '',
-    }))
   }
 
   const handleUploadRemove = (name) => {

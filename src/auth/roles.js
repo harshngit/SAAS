@@ -114,6 +114,7 @@ export const roleMenus = {
         { label: 'Upgrade Requests', path: '/superadmin/upgrade-requests', icon: TrendingUp },
         { label: 'Plans', path: '/superadmin/plans', icon: CreditCard },
         { label: 'Platform Analytics', path: '/superadmin/analytics', icon: Activity },
+        { label: 'Superadmins', path: '/superadmin/admins', icon: ShieldCheck },
       ],
     },
   ],

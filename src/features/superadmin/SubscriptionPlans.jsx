@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Pencil, Plus, Power } from 'lucide-react'
+import { Check, Pencil, Plus, Power, Trash2 } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Modal from '../../components/ui/Modal'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/Tabs'
-import { listPlans, createPlan, updatePlan, updatePlanStatus } from '../../api/superadmin'
+import { listPlans, createPlan, updatePlan, updatePlanStatus, deletePlan } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
 import PlanForm from './PlanForm'
 
@@ -23,6 +24,10 @@ export default function SubscriptionPlans() {
 
   const [updatingStatusId, setUpdatingStatusId] = useState(null)
   const [actionError, setActionError] = useState('')
+
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const loadPlans = useCallback(async () => {
     setIsLoading(true)
@@ -91,6 +96,25 @@ export default function SubscriptionPlans() {
       return
     }
 
+    await loadPlans()
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+
+    setIsDeleting(true)
+    setDeleteError('')
+
+    const result = await deletePlan(deleteTarget.id)
+
+    if (!result.success) {
+      setDeleteError(result.error)
+      setIsDeleting(false)
+      return
+    }
+
+    setIsDeleting(false)
+    setDeleteTarget(null)
     await loadPlans()
   }
 
@@ -188,6 +212,19 @@ export default function SubscriptionPlans() {
                     >
                       <Pencil className="size-4" />
                     </button>
+                    {!plan.is_default && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteError('')
+                          setDeleteTarget(plan)
+                        }}
+                        aria-label={`Delete ${plan.name}`}
+                        className="rounded-lg p-2 text-neutral-500 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -214,6 +251,43 @@ export default function SubscriptionPlans() {
         isSubmitting={isSubmitting}
         submitError={formError}
       />
+
+      <Modal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => {
+          if (isDeleting) return
+          setDeleteError('')
+          setDeleteTarget(null)
+        }}
+        title="Delete Plan"
+      >
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-neutral-600">
+            Permanently delete {deleteTarget?.name || 'this plan'}? This cannot be undone. If any organization is
+            currently subscribed to it, or it has upgrade requests referencing it, the deletion will be refused —
+            deactivate the plan instead so existing subscribers keep functioning.
+          </p>
+          {deleteError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</div>
+          )}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isDeleting}
+              onClick={() => {
+                setDeleteError('')
+                setDeleteTarget(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" loading={isDeleting} onClick={handleDelete}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

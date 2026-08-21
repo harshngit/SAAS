@@ -125,6 +125,80 @@ export async function updateOrganizationStatus(orgId, status) {
   }
 }
 
+function buildSuperAdminBody(payload) {
+  const body = {}
+
+  if (payload.name !== undefined) body.name = payload.name?.trim() || ''
+  if (payload.email !== undefined) body.email = payload.email?.trim() || ''
+  if (payload.phone !== undefined) body.phone = payload.phone?.trim() || ''
+  if (payload.password) body.password = payload.password
+  if (payload.isActive !== undefined || payload.is_active !== undefined) {
+    body.is_active = payload.isActive ?? payload.is_active
+  }
+
+  return body
+}
+
+export async function listSuperAdmins() {
+  try {
+    const { data } = await apiClient.get('/superadmin/admins')
+    return { success: true, admins: Array.isArray(data) ? data : data?.admins || [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load superadmins. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function createSuperAdmin(payload) {
+  try {
+    const { data } = await apiClient.post('/superadmin/admins', buildSuperAdminBody(payload))
+    return { success: true, admin: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to create superadmin. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function updateSuperAdmin(adminId, payload) {
+  try {
+    const { data } = await apiClient.patch(`/superadmin/admins/${adminId}`, buildSuperAdminBody(payload))
+    return { success: true, admin: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to update superadmin. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function deleteSuperAdmin(adminId) {
+  try {
+    await apiClient.delete(`/superadmin/admins/${adminId}`)
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to delete superadmin. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function listPlans() {
   try {
     const { data } = await apiClient.get('/superadmin/plans')
@@ -179,6 +253,21 @@ export async function updatePlanStatus(id, isActive) {
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to update plan status. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function deletePlan(id) {
+  try {
+    await apiClient.delete(`/superadmin/plans/${id}`)
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to delete plan. Please try again.',
     )
 
     return { success: false, error: message }

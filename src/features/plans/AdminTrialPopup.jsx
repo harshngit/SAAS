@@ -19,20 +19,28 @@ export default function AdminTrialPopup() {
   const trialTotalDays = currentOrganization?.trial_total_days ?? currentOrganization?.trialTotalDays ?? defaultTrialTotalDays
   const trialProgress =
     typeof trialDaysLeft === 'number' ? ((trialTotalDays - trialDaysLeft) / trialTotalDays) * 100 : 0
+  // trial_days_left can stay populated on the org record even after it's upgraded to a paid
+  // plan - only trust it while status is actually still "trial", not just because it's a number.
+  const isOnTrial = (currentOrganization?.status || '').toLowerCase() === 'trial'
 
   useEffect(() => {
     if (currentUser?.role === ROLES.ADMIN) {
-      setIsOpen(true)
       getCurrentProfile()
     }
   }, [currentUser?.id, currentUser?.role])
+
+  useEffect(() => {
+    if (currentUser?.role === ROLES.ADMIN && isOnTrial) {
+      setIsOpen(true)
+    }
+  }, [currentUser?.role, isOnTrial])
 
   const explorePlans = () => {
     setIsOpen(false)
     navigate('/admin/plans')
   }
 
-  if (currentUser?.role !== ROLES.ADMIN || typeof trialDaysLeft !== 'number') return null
+  if (currentUser?.role !== ROLES.ADMIN || !isOnTrial || typeof trialDaysLeft !== 'number') return null
 
   return (
     <Modal
