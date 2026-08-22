@@ -318,7 +318,7 @@ export default function ProductDetail() {
               <Field label="GST/VAT Rate" value={product.gstVatRate !== '' ? `${product.gstVatRate}%` : ''} />
               <Field label="Purchase Unit" value={product.purchaseUnit} />
               <Field label="Supplier Code" value={product.supplierProductCode} />
-              <Field label="Lead Time" value={product.leadTime !== '' ? `${product.leadTime} days` : ''} />
+              <Field label="Lead Time" value={product.leadTime} />
               <Field label="Min. Order Qty" value={product.minimumOrderQuantity} />
               <Field label="Sales Unit" value={product.salesUnit} />
             </div>

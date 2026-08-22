@@ -18,12 +18,7 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import {
-  deleteCustomerDocument,
-  listCustomerDocuments,
-  uploadCustomerDocument,
-  uploadOtherCustomerDocuments,
-} from '../../api/customers'
+import { deleteCustomerDocument, listCustomerDocuments, updateCustomer } from '../../api/customers'
 import { deleteFile, uploadFiles as uploadGenericFiles } from '../../api/files'
 import { formatCurrency } from '../../utils/format'
 
@@ -603,18 +598,6 @@ export default function CustomerForm({
     }
   }, [])
 
-  const applyServerDocumentPreviews = (name, documents) => {
-    setUploadPreviews((current) => {
-      revokeUploadPreviewUrls(current[name])
-      const nextPreviews = {
-        ...current,
-        [name]: documents.map((doc) => ({ id: doc.id, name: doc.name, type: doc.content_type, url: doc.url })),
-      }
-      uploadPreviewsRef.current = nextPreviews
-      return nextPreviews
-    })
-  }
-
   // Best-effort: discard a previously staged (uploaded but never attached) file. Failures are
   // swallowed - a leftover unattached upload isn't worth surfacing an error for.
   const discardStagedFiles = (name) => {
@@ -689,29 +672,50 @@ export default function CustomerForm({
       return
     }
 
-    // Editing an existing customer: upload and attach in one call via the dedicated document
-    // endpoints - not the generic file upload + profile PATCH, which never actually persisted
-    // (the profile's documents section only accepts a file_id, and only for attaching at
-    // creation time; PATCHing it afterwards with a URL was silently ignored by the backend).
+    // Editing an existing customer: upload via the generic file endpoint (same one create-mode
+    // already uses), then attach the returned file_id with a customer PATCH - the documented
+    // DocumentsSection workflow (upload once with POST /files/upload, attach the file_id
+    // anywhere) rather than a document-type-specific upload endpoint.
     setDocumentsError('')
     setUploadingField(name)
 
-    const uploadResult = name === 'otherDocuments'
-      ? await uploadOtherCustomerDocuments(customerId, selectedFiles)
-      : await uploadCustomerDocument(customerId, documentTypeByField[name], selectedFiles[0])
-
-    setUploadingField('')
+    const uploadResult = await uploadGenericFiles(selectedFiles)
 
     if (!uploadResult.success) {
+      setUploadingField('')
       setDocumentsError(uploadResult.error)
       return
     }
 
-    const newDocs = name === 'otherDocuments' ? uploadResult.documents : [uploadResult.document]
+    const newFileIds = uploadResult.files.map((file) => file.file_id).filter(Boolean)
+    const existingOtherIds = name === 'otherDocuments'
+      ? (uploadPreviews[name] || []).map((doc) => doc.id).filter(Boolean)
+      : []
+    const patchValue = name === 'otherDocuments' ? [...existingOtherIds, ...newFileIds] : newFileIds[0] || ''
+
+    const attachResult = await updateCustomer(customerId, { ...formData, [name]: patchValue })
+    setUploadingField('')
+
+    if (!attachResult.success) {
+      setDocumentsError(attachResult.error)
+      return
+    }
+
+    const newDocs = uploadResult.files.map((file, index) => ({
+      id: name === 'otherDocuments' ? newFileIds[index] : newFileIds[0],
+      name: file.name || selectedFiles[index]?.name || 'Uploaded file',
+      type: file.content_type || selectedFiles[index]?.type || '',
+      url: file.url,
+    }))
     const existingDocs = name === 'otherDocuments' ? (uploadPreviews[name] || []) : []
     const allDocs = [...existingDocs, ...newDocs]
 
-    applyServerDocumentPreviews(name, allDocs)
+    setUploadPreviews((current) => {
+      revokeUploadPreviewUrls(current[name])
+      const nextPreviews = { ...current, [name]: allDocs }
+      uploadPreviewsRef.current = nextPreviews
+      return nextPreviews
+    })
     updateField(name, name === 'otherDocuments' ? `${allDocs.length} file(s)` : newDocs[0].name || 'Uploaded')
   }
 
@@ -737,7 +741,9 @@ export default function CustomerForm({
     }
 
     // Existing customer: these documents are already attached server-side, so removing the
-    // field must actually delete them there too, not just clear the local preview.
+    // field must actually delete them there too, not just clear the local preview. A customer
+    // PATCH can't do this - the backend silently ignores `null`/`[]` in the documents section
+    // (live-verified) - so detaching still goes through the dedicated per-document delete.
     const docsToDelete = (uploadPreviews[name] || []).filter((doc) => doc.id)
     if (docsToDelete.length === 0) {
       updateField(name, '')

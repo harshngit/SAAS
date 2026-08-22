@@ -223,6 +223,38 @@ function Field({ label, value }) {
   )
 }
 
+function DocumentPreviewCard({ document }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const isImage = typeof document.content_type === 'string' && document.content_type.startsWith('image/')
+  const showImage = isImage && document.url && !imageFailed
+
+  return (
+    <a
+      href={document.url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-3 rounded-xl border border-neutral-100 bg-neutral-50 p-2.5 hover:border-primary-200 hover:bg-primary-50/40"
+    >
+      {showImage ? (
+        <img
+          src={document.url}
+          alt={document.name}
+          onError={() => setImageFailed(true)}
+          className="size-14 shrink-0 rounded-lg border border-neutral-100 object-cover"
+        />
+      ) : (
+        <div className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-neutral-100 bg-white">
+          <FileText className="size-6 text-primary-600" aria-hidden="true" />
+        </div>
+      )}
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-neutral-900" title={document.name}>{document.name}</p>
+        <p className="text-xs text-neutral-400">{formatLabel(document.document_type)}</p>
+      </div>
+    </a>
+  )
+}
+
 function Section({ number, title, icon: Icon, actions, children, className = '' }) {
   return (
     <div className={`rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) ${className}`}>
@@ -556,6 +588,15 @@ export default function CustomerDetail() {
     .filter(Boolean)
     .join(', ')
 
+  // Prefer real coordinates when the customer has them (pinned via the map picker) - falls
+  // back to whatever text was pasted (an address string, or a Maps link) otherwise.
+  const mapQuery =
+    typeof customer.mapsLatitude === 'number' && typeof customer.mapsLongitude === 'number'
+      ? `${customer.mapsLatitude},${customer.mapsLongitude}`
+      : customer.googleMapsLocation
+  const mapEmbedUrl = mapQuery ? `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed` : ''
+  const mapSearchUrl = mapQuery ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}` : ''
+
   const goToEdit = () => {
     if (isAdmin) {
       navigate(`/admin/customers/edit/${customer.id}`)
@@ -753,22 +794,31 @@ export default function CustomerDetail() {
         </Section>
 
         <Section number={3} title="Address Information" icon={MapPin}>
-          <div className="grid grid-cols-1 gap-x-4 gap-y-4">
+          <div className="grid grid-cols-1 gap-y-4">
             <Field label="Billing Address" value={billingAddressLine} />
             <Field label="Shipping Address" value={shippingAddressLine} />
             <Field label="Country" value={customer.country} />
             <div className="min-w-0">
               <p className="text-xs text-neutral-400">Google Maps Location</p>
-              {customer.googleMapsLocation ? (
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customer.googleMapsLocation)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-primary-700 hover:underline"
-                >
-                  <MapPin className="size-3.5" aria-hidden="true" />
-                  {customer.googleMapsLocation}
-                </a>
+              {mapEmbedUrl ? (
+                <div className="mt-1 overflow-hidden rounded-xl border border-neutral-100">
+                  <iframe
+                    title="Customer location"
+                    src={mapEmbedUrl}
+                    className="h-24 w-full border-0"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                  <a
+                    href={mapSearchUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-1.5 border-t border-neutral-100 bg-white py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50/60"
+                  >
+                    <MapPin className="size-3.5" aria-hidden="true" />
+                    View on Map
+                  </a>
+                </div>
               ) : (
                 <p className="mt-1 text-sm font-medium text-neutral-900">-</p>
               )}
@@ -1071,21 +1121,9 @@ export default function CustomerDetail() {
         ) : documents.length === 0 ? (
           <p className="py-6 text-center text-sm text-neutral-400">No documents uploaded for this customer yet.</p>
         ) : (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {documents.map((document) => (
-              <a
-                key={document.id}
-                href={document.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3.5 py-2.5 hover:border-primary-200 hover:bg-primary-50/40"
-              >
-                <FileText className="size-4 shrink-0 text-primary-600" aria-hidden="true" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-neutral-900">{document.name}</p>
-                  <p className="text-xs text-neutral-400">{formatLabel(document.document_type)}</p>
-                </div>
-              </a>
+              <DocumentPreviewCard key={document.id} document={document} />
             ))}
           </div>
         )}

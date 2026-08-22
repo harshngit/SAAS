@@ -80,14 +80,6 @@ function toStringArray(value) {
     .filter(Boolean)
 }
 
-function cleanObject(payload) {
-  return Object.fromEntries(
-    Object.entries(payload).filter(([, value]) => (
-      value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0)
-    )),
-  )
-}
-
 function isFileUrl(value) {
   return /^https?:\/\//i.test(String(value || '').trim())
 }
@@ -107,15 +99,19 @@ function toFileUrlArray(value) {
 
 // Writing documents in the sectioned profile body only accepts a raw file_id (per
 // CustomerProfileIn.documents) - never a URL. isFileId() naturally rejects a plain filename
-// string (what an already-attached edit-mode document looks like in formData), so only a
-// genuinely staged create-mode upload ever makes it through here.
-function toFileId(value) {
-  return isFileId(value) ? String(value).trim() : ''
+// string (what an already-attached, untouched document looks like in formData), so only a
+// genuinely staged new upload ever makes it through here. Live-verified the backend silently
+// ignores `null`/`[]` in this section (ie. it cannot detach a slot) - clearing an attached
+// document has to go through DELETE /customers/{id}/documents/{document_id} instead.
+function toFileIdField(value) {
+  return isFileId(value) ? String(value).trim() : undefined
 }
 
-function toFileIdArray(value) {
-  const values = Array.isArray(value) ? value : toStringArray(value)
-  return values.map(toFileId).filter(Boolean)
+// An untouched "other documents" field is a display string ("2 file(s)"); only a real array -
+// staged new ids, or `[]` to explicitly clear everything - should be sent.
+function toFileIdArrayField(value) {
+  if (!Array.isArray(value)) return undefined
+  return value.map((item) => (isFileId(item) ? String(item).trim() : null)).filter((item) => item !== null)
 }
 
 function normalizeUploadedDocument(document) {
@@ -132,17 +128,22 @@ function normalizeUploadedDocument(document) {
 function buildCustomerRequestBody(payload) {
   const customerName = (payload.customerName || payload.name || '').trim()
   const coordinates = parseMapsCoordinates(payload.googleMapsLocation || payload.google_maps_location)
-  // Only relevant while creating a brand-new customer (staged uploads waiting for a real
-  // customer_id to attach to). Once a customer exists, documents are uploaded and attached
-  // directly via POST /customers/{id}/documents, independent of this profile PATCH.
-  const documents = cleanObject({
-    gst_certificate_id: toFileId(payload.gstCertificate),
-    pan_card_id: toFileId(payload.panCard),
-    business_registration_certificate_id: toFileId(payload.businessRegistrationCertificate),
-    address_proof_id: toFileId(payload.addressProof),
-    purchase_agreement_id: toFileId(payload.purchaseAgreement),
-    other_document_ids: toFileIdArray(payload.otherDocuments),
-  })
+  // Documents are attached the same way whether the customer is brand-new or already exists:
+  // upload with POST /files/upload, then send the returned file_id here (per the backend's
+  // DocumentsSection contract). A field is included only when there's something to write - a
+  // new id, an explicit `null` to clear a slot, or `[]` to clear other_document_ids - so an
+  // untouched field (still holding its display filename/string) never overwrites what's on file.
+  const documentsRaw = {
+    gst_certificate_id: toFileIdField(payload.gstCertificate),
+    pan_card_id: toFileIdField(payload.panCard),
+    business_registration_certificate_id: toFileIdField(payload.businessRegistrationCertificate),
+    address_proof_id: toFileIdField(payload.addressProof),
+    purchase_agreement_id: toFileIdField(payload.purchaseAgreement),
+    other_document_ids: toFileIdArrayField(payload.otherDocuments),
+  }
+  const documents = Object.fromEntries(
+    Object.entries(documentsRaw).filter(([, value]) => value !== undefined),
+  )
 
   const requestBody = {
     basic_information: {
@@ -439,55 +440,10 @@ export async function deleteCustomer(customerId) {
   }
 }
 
-export async function uploadCustomerDocument(customerId, documentType, file) {
-  try {
-    const formData = new FormData()
-    formData.append('document_type', documentType)
-    formData.append('file', file)
-
-    const { data } = await apiClient.post(`/customers/${customerId}/documents`, formData, {
-      headers: {
-        ...authHeader(),
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-
-    return { success: true, document: normalizeUploadedDocument(data) }
-  } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to upload document. Please try again.',
-    )
-
-    return { success: false, error: message }
-  }
-}
-
-export async function uploadOtherCustomerDocuments(customerId, files) {
-  try {
-    const formData = new FormData()
-    files.forEach((file) => formData.append('files', file))
-
-    const { data } = await apiClient.post(`/customers/${customerId}/documents/other`, formData, {
-      headers: {
-        ...authHeader(),
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-
-    return { success: true, documents: Array.isArray(data) ? data.map(normalizeUploadedDocument) : [] }
-  } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to upload documents. Please try again.',
-    )
-
-    return { success: false, error: message }
-  }
-}
-
+// Read-only: resolves the customer's document id fields (gst_certificate_id, etc.) into full
+// {id, document_type, name, content_type, size, url, uploaded_at} records. Writing documents no
+// longer goes through a dedicated endpoint - upload with POST /files/upload (api/files.js
+// uploadFile/uploadFiles) and attach the returned file_id via updateCustomer's `documents` section.
 export async function listCustomerDocuments(customerId, documentType) {
   try {
     const { data } = await apiClient.get(`/customers/${customerId}/documents`, {
@@ -507,6 +463,11 @@ export async function listCustomerDocuments(customerId, documentType) {
   }
 }
 
+// Attaching a document via PATCH /customers/{id} (documents.{field}_id = a new file_id or full
+// /files/upload URL) works fine and is what CustomerForm uses. Detaching one is the one case that
+// doesn't: PATCHing that same field to `null`/`[]` to clear it is silently ignored by the backend
+// (re-verified live) - the value stays whatever it was. So removal still goes through this
+// dedicated endpoint, purely because there's no working PATCH-based way to clear the slot.
 export async function deleteCustomerDocument(customerId, documentId) {
   try {
     await apiClient.delete(`/customers/${customerId}/documents/${documentId}`, {

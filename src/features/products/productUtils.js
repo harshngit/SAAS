@@ -12,9 +12,15 @@ function normalizeVariantInventory(variant = {}) {
   }
 }
 
+function toCommaString(value, fallbackValue = '') {
+  if (Array.isArray(value)) return value.join(', ')
+  return value || fallbackValue
+}
+
 export function normalizeApiProduct(product, fallback = {}) {
   const sourceVariants = product.variations?.length ? product.variations : fallback.variants || []
   const categoryLabel =
+    product.category?.name ||
     product.category_name ||
     product.categoryName ||
     product.product_type ||
@@ -72,7 +78,8 @@ export function normalizeApiProduct(product, fallback = {}) {
     shelfLifeUnit: product.shelf_life_unit || fallback.shelfLifeUnit || '',
     launchDate: product.launch_date || fallback.launchDate || '',
     endOfLifeDate: product.end_of_life_date || fallback.endOfLifeDate || '',
-    productTags: product.product_tags || fallback.productTags || '',
+    productTags: toCommaString(product.product_tags, fallback.productTags || ''),
+    variantAttributes: toCommaString(product.variant_attributes, fallback.variantAttributes || ''),
     notes: product.notes || fallback.notes || '',
     currency: product.currency || fallback.currency || '',
     countryOfOrigin: product.country_of_origin || fallback.countryOfOrigin || '',
@@ -114,6 +121,7 @@ export function normalizeApiProduct(product, fallback = {}) {
         gstRate: variant.gstRate || 0,
         purchasePrice: variant.purchasePrice || 0,
         sellingPrice: Number(variant.price ?? variant.sellingPrice) || 0,
+        imageUrl: variant.image_url || variant.imageUrl || fallbackVariant.imageUrl || '',
         inventory,
       }
     }),

@@ -3,7 +3,6 @@ import {
   BadgeInfo,
   Barcode,
   Boxes,
-  ChevronDown,
   ClipboardList,
   DollarSign,
   FileText,
@@ -15,6 +14,7 @@ import {
   ShoppingBag,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -22,7 +22,7 @@ import Select from '../../components/ui/Select'
 import { listCategories } from '../../api/categories'
 import { listBrands } from '../../api/brands'
 import { listSuppliers } from '../../api/suppliers'
-import { formatCurrency } from '../../utils/format'
+import { mapProductBackendField } from '../../api/products'
 import { readImageAsDataUrl } from '../../utils/imageFile'
 import { uploadFile } from '../../api/files'
 
@@ -53,6 +53,7 @@ function makeEmptyVariant(overrides = {}) {
     purchasePrice: '',
     sellingPrice: '',
     mrp: '',
+    imageUrl: '',
     inventory: { ...emptyVariantInventory },
     ...overrides,
     id: overrides.id || makeVariantId(),
@@ -228,6 +229,12 @@ const productSections = [
     { name: 'productManual', label: 'Product Manual', input: 'file', accept: '.pdf' },
   ]),
   section('Variants & Attributes', [
+    {
+      name: 'variantAttributes',
+      label: 'Attribute Types',
+      placeholder: 'e.g. Color, Size',
+      wide: true,
+    },
     { name: 'variants', label: 'Variants', input: 'variants', wide: true },
   ]),
   section('Inventory Information', [
@@ -253,7 +260,7 @@ const productSections = [
   section('Purchase Information', [
     { name: 'preferredSupplier', label: 'Preferred Supplier', input: 'select' },
     { name: 'supplierProductCode', label: 'Supplier Product Code' },
-    { name: 'leadTime', label: 'Lead Time', input: 'number' },
+    { name: 'leadTime', label: 'Lead Time', placeholder: 'e.g. 7 days' },
     { name: 'minimumOrderQuantity', label: 'Minimum Order Quantity', input: 'number' },
     { name: 'purchaseUnit', label: 'Purchase Unit', input: 'select' },
   ]),
@@ -282,7 +289,7 @@ const productSections = [
     { name: 'countryOfOrigin', label: 'Country of Origin', input: 'select' },
     { name: 'launchDate', label: 'Launch Date', input: 'date' },
     { name: 'endOfLifeDate', label: 'End of Life Date', input: 'date' },
-    { name: 'productTags', label: 'Product Tags' },
+    { name: 'productTags', label: 'Product Tags', placeholder: 'e.g. bestseller, new' },
     { name: 'notes', label: 'Notes' },
   ]),
   section('Documents', [
@@ -413,6 +420,7 @@ export default function ProductForm({
   onSave,
   saving = false,
   formError = '',
+  formErrorFields = [],
   catalogProducts = [],
 }) {
   const [formData, setFormData] = useState(emptyForm)
@@ -424,7 +432,6 @@ export default function ProductForm({
   const [activeSection, setActiveSection] = useState(productSections[0].id)
   const [errors, setErrors] = useState({})
   const [imageError, setImageError] = useState('')
-  const [openVariantIndex, setOpenVariantIndex] = useState(-1)
   const [uploadingFields, setUploadingFields] = useState({})
   const [documentUploadError, setDocumentUploadError] = useState('')
   const [validationBanner, setValidationBanner] = useState('')
@@ -474,7 +481,6 @@ export default function ProductForm({
     setActiveSection(productSections[0].id)
     setErrors({})
     setImageError('')
-    setOpenVariantIndex(-1)
   }, [product, isOpen])
 
   useEffect(() => {
@@ -534,6 +540,19 @@ export default function ProductForm({
     }))
   }, [categoryOptions, formData.category])
 
+  // Server-side validation errors (e.g. a 422 on save) carry the same weight as the client-side
+  // ones handleSubmit already jumps to a tab for - just sourced from the backend's field names
+  // instead of the local validate() function.
+  useEffect(() => {
+    if (!formErrorFields || formErrorFields.length === 0) return
+
+    const mappedFieldName = formErrorFields.map(mapProductBackendField).find(Boolean)
+    if (!mappedFieldName) return
+
+    const sectionWithError = findSectionForErrorField(productSections, mappedFieldName)
+    if (sectionWithError) setActiveSection(sectionWithError.id)
+  }, [formErrorFields])
+
   if (!isOpen) return null
 
   const updateField = (field, value) => {
@@ -560,6 +579,28 @@ export default function ProductForm({
     }
 
     updateField(field, result.file.url)
+  }
+
+  // Same immediate upload-then-store pattern as handleDocumentUpload, just writing into a
+  // variant's own imageUrl instead of a top-level field - works identically whether the product
+  // is new or already saved, since the image only rides along inside `variations` on Save.
+  const handleVariantImageUpload = async (index, file) => {
+    if (!file) return
+
+    const fieldKey = `variantImage-${index}`
+    setDocumentUploadError('')
+    setUploadingFields((current) => ({ ...current, [fieldKey]: true }))
+
+    const result = await uploadFile(file)
+
+    setUploadingFields((current) => ({ ...current, [fieldKey]: false }))
+
+    if (!result.success) {
+      setDocumentUploadError(result.error)
+      return
+    }
+
+    updateVariant(index, 'imageUrl', result.file.url)
   }
 
   const validate = () => {
@@ -790,7 +831,6 @@ export default function ProductForm({
         },
       ],
     }))
-    setOpenVariantIndex(formData.variants.length)
   }
 
   const removeVariant = (index) => {
@@ -800,15 +840,6 @@ export default function ProductForm({
       hasVariants: nextVariantCount > 0,
       variants: current.variants.filter((_, variantIndex) => variantIndex !== index),
     }))
-    if (nextVariantCount <= 0) {
-      setOpenVariantIndex(-1)
-      return
-    }
-    setOpenVariantIndex((current) => {
-      if (current === index) return -1
-      if (current > index) return current - 1
-      return current
-    })
   }
 
   const renderField = (field) => {
@@ -819,6 +850,7 @@ export default function ProductForm({
       error: errors[field.name],
       required: field.required,
       maxLength: field.maxLength,
+      placeholder: field.placeholder,
     }
 
     if (field.input === 'select') {
@@ -1091,124 +1123,137 @@ export default function ProductForm({
             </Button>
           </div>
 
-          <div className="space-y-3 p-3 sm:p-4">
-            {formData.variants.length === 0 ? (
+          {formData.variants.length === 0 ? (
+            <div className="p-3 sm:p-4">
               <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-8 text-center">
                 <p className="text-sm font-medium text-neutral-700">No variants added yet.</p>
               </div>
-            ) : formData.variants.map((variant, index) => {
-              const isOpen = openVariantIndex === index
-              const variantTitle = getVariantName(variant, index)
-              const variantInventory = normalizeVariantInventory(variant, index === 0 ? formData.openingStock : '')
-              return (
-                <div
-                  key={variant.id}
-                  className={`overflow-hidden rounded-xl border transition-all ${
-                    isOpen
-                      ? 'border-primary-200 bg-white shadow-[0_18px_40px_-34px_rgb(6_59_0/0.65)]'
-                      : 'border-neutral-100 bg-neutral-50/70 hover:border-neutral-200'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setOpenVariantIndex(isOpen ? -1 : index)}
-                    className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors ${
-                      isOpen ? 'bg-primary-50/60 text-primary-800' : 'text-neutral-800 hover:bg-white'
-                    }`}
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <span
-                        className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-                          isOpen ? 'bg-primary-600 text-white' : 'bg-white text-primary-700 ring-1 ring-neutral-200'
-                        }`}
-                      >
-                        {index + 1}
-                      </span>
-                      <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{variantTitle}</p>
-                      <p className="sr-only">
-                        {variantInventory.openingStock ? `${variantInventory.openingStock} inventory` : 'No inventory'} · {variant.sellingPrice ? formatCurrency(Number(variant.sellingPrice)) : 'No selling price'}
-                      </p>
-                        {/* <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-neutral-600 ring-1 ring-neutral-200">
-                            {inventoryText}
-                          </span>
-                          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-neutral-600 ring-1 ring-neutral-200">
-                            {sellingPriceText}
-                          </span>
-                          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-neutral-600 ring-1 ring-neutral-200">
-                            {mrpText}
-                          </span>
-                        </div> */}
-                    </div>
-                    </div>
-                    <div className="ml-auto flex shrink-0 items-center justify-end pl-4">
-                      <ChevronDown className={`size-5 text-neutral-400 transition-transform ${isOpen ? 'rotate-180 text-primary-700' : ''}`} aria-hidden="true" />
-                    </div>
-                  </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-3xl text-left text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                    <th className="px-5 py-3">Variant</th>
+                    <th className="px-3 py-3">SKU</th>
+                    <th className="px-3 py-3 text-center">Stock</th>
+                    <th className="px-3 py-3">Selling Price (₹)</th>
+                    <th className="px-3 py-3">MRP (₹)</th>
+                    <th className="w-10 px-3 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-50">
+                  {formData.variants.map((variant, index) => {
+                    const variantInventory = normalizeVariantInventory(variant, index === 0 ? formData.openingStock : '')
+                    const isUploadingImage = Boolean(uploadingFields[`variantImage-${index}`])
 
-                  {isOpen && (
-                    <div className="border-t border-primary-100 bg-white p-3 sm:p-4">
-                      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm font-semibold text-neutral-900">Variant details</p>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeVariant(index)}
-                        >
-                          <Trash2 className="size-4" aria-hidden="true" />
-                          Remove
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                        <Input
-                          label="Variant Attributes"
-                          compact
-                          placeholder="e.g. 1L Bottle, Red / Large"
-                          value={variant.size}
-                          onChange={(event) => updateVariant(index, 'size', event.target.value)}
-                        />
-                        <Input
-                          label="Variant SKU"
-                          compact
-                          value={variant.sku}
-                          onChange={(event) => updateVariant(index, 'sku', event.target.value)}
-                        />
-                        <Input
-                          label="Variant Inventory"
-                          compact
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={variantInventory.openingStock}
-                          onChange={(event) => updateVariant(index, 'inventory', event.target.value)}
-                        />
-                        <Input
-                          label="Variant Price - Selling"
-                          compact
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={variant.sellingPrice}
-                          onChange={(event) => updateVariant(index, 'sellingPrice', event.target.value)}
-                        />
-                        <Input
-                          label="Variant MRP"
-                          compact
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={variant.mrp}
-                          onChange={(event) => updateVariant(index, 'mrp', event.target.value)}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+                    return (
+                      <tr key={variant.id}>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <label className="group relative flex size-10 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
+                              {variant.imageUrl ? (
+                                <img src={variant.imageUrl} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <ImagePlus className="size-4 text-neutral-300" aria-hidden="true" />
+                              )}
+                              <span className="absolute inset-0 hidden items-center justify-center bg-black/45 group-hover:flex">
+                                <Upload className="size-3.5 text-white" aria-hidden="true" />
+                              </span>
+                              {isUploadingImage && (
+                                <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[0.6rem] font-medium text-white">
+                                  ...
+                                </span>
+                              )}
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp"
+                                className="sr-only"
+                                disabled={isUploadingImage}
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0]
+                                  event.target.value = ''
+                                  if (file) handleVariantImageUpload(index, file)
+                                }}
+                              />
+                              {variant.imageUrl && !isUploadingImage && (
+                                <button
+                                  type="button"
+                                  title="Remove variant image"
+                                  onClick={(event) => {
+                                    event.preventDefault()
+                                    updateVariant(index, 'imageUrl', '')
+                                  }}
+                                  className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-white text-red-600 shadow-sm ring-1 ring-neutral-200"
+                                >
+                                  <X className="size-2.5" aria-hidden="true" />
+                                </button>
+                              )}
+                            </label>
+                            <input
+                              type="text"
+                              value={variant.size}
+                              placeholder="e.g. Red / Large"
+                              onChange={(event) => updateVariant(index, 'size', event.target.value)}
+                              className="h-9 w-full min-w-0 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                            />
+                          </div>
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <input
+                            type="text"
+                            value={variant.sku}
+                            onChange={(event) => updateVariant(index, 'sku', event.target.value)}
+                            className="h-9 w-28 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                          />
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={variantInventory.openingStock}
+                            onChange={(event) => updateVariant(index, 'inventory', event.target.value)}
+                            className="h-9 w-20 rounded-lg border border-neutral-200 bg-white px-2.5 text-center text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                          />
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={variant.sellingPrice}
+                            onChange={(event) => updateVariant(index, 'sellingPrice', event.target.value)}
+                            className="h-9 w-24 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                          />
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={variant.mrp}
+                            onChange={(event) => updateVariant(index, 'mrp', event.target.value)}
+                            className="h-9 w-24 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                          />
+                        </td>
+                        <td className="px-3 py-3.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => removeVariant(index)}
+                            className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
+                            aria-label={`Remove ${getVariantName(variant, index)}`}
+                          >
+                            <Trash2 className="size-4" aria-hidden="true" />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )
     }

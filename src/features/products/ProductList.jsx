@@ -35,6 +35,7 @@ export default function ProductList() {
   const [statusProduct, setStatusProduct] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [formErrorFields, setFormErrorFields] = useState([])
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [statusError, setStatusError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -128,12 +129,14 @@ export default function ProductList() {
   const handleAddProduct = () => {
     setEditingProduct(null)
     setFormError('')
+    setFormErrorFields([])
     setIsFormOpen(true)
   }
 
   const handleEditProduct = (product) => {
     setEditingProduct(product)
     setFormError('')
+    setFormErrorFields([])
     setIsFormOpen(true)
   }
 
@@ -159,6 +162,7 @@ export default function ProductList() {
   const handleSaveProduct = async (productData) => {
     setIsSaving(true)
     setFormError('')
+    setFormErrorFields([])
 
     const result = editingProduct
       ? await updateProduct(editingProduct.id, productData)
@@ -168,6 +172,7 @@ export default function ProductList() {
 
     if (!result.success) {
       setFormError(result.error)
+      setFormErrorFields(result.errorFields || [])
       return
     }
 
@@ -239,12 +244,14 @@ export default function ProductList() {
         onClose={() => {
           if (isSaving) return
           setFormError('')
+          setFormErrorFields([])
           setIsFormOpen(false)
         }}
         product={editingProduct}
         onSave={handleSaveProduct}
         saving={isSaving}
         formError={formError}
+        formErrorFields={formErrorFields}
         catalogProducts={products}
       />
     )

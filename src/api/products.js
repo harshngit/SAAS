@@ -80,7 +80,7 @@ const PRODUCT_FIELD_MAP = [
   ['taxInclusive', 'tax_inclusive', 'boolean'],
   ['preferredSupplierId', 'preferred_supplier_id', 'string'],
   ['supplierProductCode', 'supplier_product_code', 'string'],
-  ['leadTime', 'lead_time', 'number'],
+  ['leadTime', 'lead_time', 'string'],
   ['minimumOrderQuantity', 'minimum_order_quantity', 'number'],
   ['purchaseUnit', 'purchase_unit', 'string'],
   ['salesUnit', 'sales_unit', 'string'],
@@ -97,7 +97,7 @@ const PRODUCT_FIELD_MAP = [
   ['material', 'material', 'string'],
   ['size', 'physical_size', 'string'],
   ['hasVariants', 'has_variants', 'boolean'],
-  ['variantAttributes', 'variant_attributes', 'string'],
+  ['variantAttributes', 'variant_attributes', 'list'],
   ['downloadableProduct', 'downloadable_product', 'boolean'],
   ['licenseKeyRequired', 'license_key_required', 'boolean'],
   ['downloadLimit', 'download_limit', 'number'],
@@ -106,18 +106,75 @@ const PRODUCT_FIELD_MAP = [
   ['shelfLife', 'shelf_life', 'string'],
   ['shelfLifeUnit', 'shelf_life_unit', 'string'],
   ['countryOfOrigin', 'country_of_origin', 'string'],
-  ['launchDate', 'launch_date', 'string'],
-  ['endOfLifeDate', 'end_of_life_date', 'string'],
-  ['productTags', 'product_tags', 'string'],
+  ['launchDate', 'launch_date', 'date'],
+  ['endOfLifeDate', 'end_of_life_date', 'date'],
+  ['productTags', 'product_tags', 'list'],
   ['notes', 'notes', 'string'],
   ['uom', 'uom', 'string'],
   ['subCategoryId', 'sub_category_id', 'string'],
   ['brandId', 'brand_id', 'string'],
 ]
 
+// Fields set directly in createProduct/updateProduct's request body rather than through
+// PRODUCT_FIELD_MAP - kept separate so a backend validation error on one of these (e.g.
+// "name", "category_id") can still be traced back to the form field that produced it.
+const PRODUCT_TOP_LEVEL_FIELD_MAP = [
+  ['name', 'name'],
+  ['description', 'description'],
+  ['sellingPrice', 'price'],
+  ['coverImage', 'cover_image'],
+  ['images', 'images'],
+  ['videoUrl', 'product_video'],
+  ['catalogBrochure', 'product_catalog_brochure'],
+  ['productManual', 'product_manual'],
+  ['productDatasheet', 'product_datasheet'],
+  ['complianceCertificate', 'compliance_certificate'],
+  ['warrantyDocument', 'warranty_document'],
+  ['downloadFile', 'download_file'],
+  ['productType', 'product_type'],
+  ['brand', 'brand'],
+  ['productCode', 'sku'],
+  ['category', 'category_id'],
+  ['status', 'is_active'],
+]
+
+const BACKEND_TO_FRONTEND_FIELD = Object.fromEntries([
+  ...PRODUCT_FIELD_MAP.map(([formField, backendField]) => [backendField, formField]),
+  ...PRODUCT_TOP_LEVEL_FIELD_MAP.map(([formField, backendField]) => [backendField, formField]),
+])
+
+// Maps a raw backend field name (from a 422 error's `loc`, e.g. "launch_date") back to the
+// camelCase form field name (e.g. "launchDate") so a validation error can jump to the right tab.
+export function mapProductBackendField(backendField) {
+  return BACKEND_TO_FRONTEND_FIELD[backendField]
+}
+
+// FastAPI 422s shape errors as { detail: [{ loc: ["body", "field_name", ...], msg, type }, ...] }.
+// Pulls out just the field name (first loc segment after "body") from each entry.
+function extractErrorFields(detail) {
+  if (!Array.isArray(detail)) return []
+
+  return detail
+    .map((entry) => {
+      const loc = Array.isArray(entry?.loc) ? entry.loc.filter((part) => part !== 'body') : []
+      return typeof loc[0] === 'string' ? loc[0] : null
+    })
+    .filter(Boolean)
+}
+
 function coerceFieldValue(kind, value) {
   if (kind === 'number') return Number(value) || 0
   if (kind === 'boolean') return Boolean(value)
+  if (kind === 'list') {
+    if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean)
+    return String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean)
+  }
+  // The backend's date fields are `datetime | None` - an empty string fails validation
+  // ("input is too short"), so an untouched/cleared date has to be omitted, not sent as ''.
+  if (kind === 'date') {
+    const trimmed = String(value ?? '').trim()
+    return trimmed || undefined
+  }
   return value ?? ''
 }
 
@@ -127,7 +184,11 @@ function coerceFieldValue(kind, value) {
 function applyProductFieldMap(requestBody, payload) {
   PRODUCT_FIELD_MAP.forEach(([formField, backendField, kind]) => {
     const value = formField === 'uom' ? (payload.uom ?? payload.unitOfMeasure) : payload[formField]
-    if (value !== undefined) requestBody[backendField] = coerceFieldValue(kind, value)
+    if (value === undefined) return
+
+    const coerced = coerceFieldValue(kind, value)
+    if (coerced === undefined || coerced === null) return
+    requestBody[backendField] = coerced
   })
 }
 
@@ -141,6 +202,7 @@ function toVariationPayload(variant, includeId = false) {
     weight: Number(variant.weight) || 0,
     price: Number(variant.sellingPrice ?? variant.price) || 0,
     mrp: Number(variant.mrp) || 0,
+    image_url: variant.imageUrl || variant.image_url || null,
     inventory: inventory.openingStock,
     minimum_stock_level: inventory.minimumStockLevel,
     maximum_stock_level: inventory.maximumStockLevel,
@@ -195,7 +257,7 @@ export async function createProduct(payload) {
       'Unable to create product. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, error: message, errorFields: extractErrorFields(errorData?.detail) }
   }
 }
 
@@ -286,7 +348,7 @@ export async function updateProduct(productId, payload) {
       'Unable to update product. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, error: message, errorFields: extractErrorFields(errorData?.detail) }
   }
 }
 

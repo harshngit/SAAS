@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Search } from 'lucide-react'
+import { Check, ChevronDown, Search } from 'lucide-react'
 
 const Select = forwardRef(function Select(
   {
@@ -66,7 +66,7 @@ const Select = forwardRef(function Select(
     if (!isOpen) return undefined
 
     const updateMenuPosition = () => {
-      const trigger = wrapperRef.current?.querySelector('[data-select-trigger="true"], input[type="text"]')
+      const trigger = wrapperRef.current?.querySelector('[data-select-trigger="true"]')
       if (!trigger) return
 
       const rect = trigger.getBoundingClientRect()
@@ -160,6 +160,7 @@ const Select = forwardRef(function Select(
         {searchable ? (
           <div
             role="combobox"
+            data-select-trigger="true"
             aria-haspopup="listbox"
             aria-expanded={isOpen}
             aria-controls={`${selectId}-listbox`}
@@ -255,13 +256,14 @@ const Select = forwardRef(function Select(
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => handleSelect(option.value)}
                   title={option.label}
-                  className={`cursor-pointer truncate rounded-lg px-3 py-2 transition-colors ${
+                  className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 transition-colors ${
                     isSelected
-                      ? 'bg-primary-600 text-white'
+                      ? 'bg-primary-50 font-medium text-primary-700'
                       : 'text-neutral-700 hover:bg-primary-50 hover:text-primary-700'
                   }`}
                 >
-                  {option.label}
+                  <span className="truncate">{option.label}</span>
+                  {isSelected && <Check className="size-4 shrink-0 text-primary-600" aria-hidden="true" />}
                 </div>
               )
             })}
