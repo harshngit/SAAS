@@ -11,10 +11,8 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
 import { RequirePermission } from '../../auth/RequirePermission'
-import { ROLES } from '../../auth/roles'
 import { ORDER_STATUS_OPTIONS, listOrders } from '../../api/orders'
-import { listUsers } from '../../api/users'
-import { normalizeApiUser } from '../users/userRoleUtils'
+import { listDeliveryPartners } from '../../api/deliveries'
 import { formatCurrency } from '../../utils/format'
 
 const statusTabs = [{ value: 'all', label: 'All' }, ...ORDER_STATUS_OPTIONS]
@@ -82,9 +80,9 @@ export default function OrderList() {
   useEffect(() => {
     let isMounted = true
 
-    listUsers().then((result) => {
+    listDeliveryPartners().then((result) => {
       if (!isMounted || !result.success) return
-      setDeliveryPartners(result.users.map(normalizeApiUser).filter((user) => user.role === ROLES.DELIVERY_PARTNER))
+      setDeliveryPartners(result.partners)
     })
 
     return () => {

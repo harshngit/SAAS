@@ -20,6 +20,27 @@ const productStatusTabs = [
   { value: 'inactive', label: 'Inactive' },
 ]
 
+function ProductThumbnail({ src, alt }) {
+  const [hasError, setHasError] = useState(false)
+
+  if (src && !hasError) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        onError={() => setHasError(true)}
+        className="size-9 shrink-0 rounded-full border border-neutral-100 object-cover"
+      />
+    )
+  }
+
+  return (
+    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+      <Package className="size-4" aria-hidden="true" />
+    </div>
+  )
+}
+
 export default function ProductList() {
   const navigate = useNavigate()
   const [products, setProducts] = useState([])
@@ -387,9 +408,7 @@ export default function ProductList() {
                   >
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex size-9 items-center justify-center rounded-full bg-primary-50 text-primary-700 ring-1 ring-primary-100">
-                          <Package className="size-4" aria-hidden="true" />
-                        </div>
+                        <ProductThumbnail src={product.coverImage} alt={product.name} />
                         <span className="font-medium text-neutral-900">{product.name}</span>
                       </div>
                     </td>

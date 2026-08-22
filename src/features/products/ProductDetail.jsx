@@ -1,6 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Boxes, Edit, IndianRupee, Package, Paperclip, Percent, Power, Trash2, Upload } from 'lucide-react'
+import {
+  ArrowLeft,
+  Boxes,
+  Calendar,
+  Download,
+  Edit,
+  IndianRupee,
+  Package,
+  Paperclip,
+  Percent,
+  Power,
+  Trash2,
+  Upload,
+  Video,
+} from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -34,6 +48,48 @@ function Field({ label, value }) {
     <div>
       <p className="text-xs text-neutral-400">{label}</p>
       <p className="mt-1 text-sm font-medium text-neutral-900">{value || '—'}</p>
+    </div>
+  )
+}
+
+function DocumentLink({ label, url }) {
+  return (
+    <div>
+      <p className="text-xs text-neutral-400">{label}</p>
+      {url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-primary-700 hover:underline"
+        >
+          <Download className="size-3.5" aria-hidden="true" />
+          View file
+        </a>
+      ) : (
+        <p className="mt-1 text-sm font-medium text-neutral-900">—</p>
+      )}
+    </div>
+  )
+}
+
+function HeroThumbnail({ src, alt }) {
+  const [hasError, setHasError] = useState(false)
+
+  if (src && !hasError) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        onError={() => setHasError(true)}
+        className="size-16 shrink-0 rounded-xl border border-neutral-100 object-cover sm:size-20"
+      />
+    )
+  }
+
+  return (
+    <div className="flex size-16 shrink-0 items-center justify-center rounded-xl border border-neutral-100 bg-neutral-50 text-neutral-300 sm:size-20">
+      <Package className="size-6" aria-hidden="true" />
     </div>
   )
 }
@@ -253,16 +309,33 @@ export default function ProductDetail() {
             <ArrowLeft className="size-4" aria-hidden="true" />
             Back
           </Button>
-          <div>
+          <HeroThumbnail src={product.coverImage} alt={product.name} />
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold text-neutral-900">{product.name}</h1>
               <Badge variant={product.status === 'active' ? 'success' : 'danger'}>
                 {product.status === 'active' ? 'Active' : 'Inactive'}
               </Badge>
             </div>
+            {product.sku && <p className="mt-0.5 text-xs text-neutral-400">SKU: {product.sku}</p>}
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {product.brand && <Badge variant="neutral">{product.brand}</Badge>}
               {(product.categoryLabel || product.category) && <Badge variant="primary">{product.categoryLabel || product.category}</Badge>}
+              {product.subCategory && <Badge variant="neutral">{product.subCategory}</Badge>}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-400">
+              {product.createdAt && (
+                <span className="inline-flex items-center gap-1">
+                  <Calendar className="size-3" aria-hidden="true" />
+                  Created {formatDateLabel(product.createdAt)}
+                </span>
+              )}
+              {product.updatedAt && (
+                <span className="inline-flex items-center gap-1">
+                  <Calendar className="size-3" aria-hidden="true" />
+                  Updated {formatDateLabel(product.updatedAt)}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -283,12 +356,46 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard icon={Boxes} iconVariant="primary" label="Variants" value={product.variants.length} />
         <StatCard icon={IndianRupee} iconVariant="success" label="Selling Price" value={priceRange} />
         <StatCard icon={Percent} iconVariant="info" label="Avg. GST Rate" value={`${avgGst}%`} />
         <StatCard icon={Percent} iconVariant="warning" label="Avg. Margin" value={`${avgMargin}%`} />
+        <StatCard icon={Package} iconVariant="neutral" label="Total Stock" value={product.totalStock} />
       </div>
+
+      {(product.coverImage || product.images?.length > 0 || product.videoUrl) && (
+        <Card title="Images & Media">
+          <div className="flex flex-wrap gap-3">
+            {product.coverImage && (
+              <img
+                src={product.coverImage}
+                alt={product.name}
+                className="size-32 rounded-xl border-2 border-primary-100 object-cover"
+              />
+            )}
+            {product.images?.map((image, index) => (
+              <img
+                key={index}
+                src={image}
+                alt={`${product.name} ${index + 1}`}
+                className="size-24 rounded-xl border border-neutral-100 object-cover"
+              />
+            ))}
+            {product.videoUrl && (
+              <a
+                href={product.videoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex size-24 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-neutral-200 bg-neutral-50 text-neutral-500 hover:border-primary-200 hover:bg-primary-50/40 hover:text-primary-700"
+              >
+                <Video className="size-5" aria-hidden="true" />
+                <span className="text-xs font-medium">Video</span>
+              </a>
+            )}
+          </div>
+        </Card>
+      )}
 
       {product.description && (
         <Card title="Overview">
@@ -302,11 +409,24 @@ export default function ProductDetail() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Classification</p>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <Field label="Lifecycle Status" value={statusLabel[product.statusValue] || statusLabel[product.status]} />
+              <Field label="Product Type" value={product.productType} />
               <Field label="Sub Category" value={product.subCategory} />
               <Field label="Manufacturer" value={product.manufacturer} />
               <Field label="Model Number" value={product.modelNumber} />
               <Field label="Short Name" value={product.shortName} />
               <Field label="Barcode" value={product.barcode} />
+              <Field label="Unit of Measure" value={product.unitOfMeasure} />
+              <Field label="Currency" value={product.currency} />
+            </div>
+          </div>
+
+          <div className="border-t border-neutral-100 pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Pricing</p>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Field label="MRP" value={product.mrp !== '' ? formatCurrency(product.mrp) : ''} />
+              <Field label="Wholesale Price" value={product.wholesalePrice !== '' ? formatCurrency(product.wholesalePrice) : ''} />
+              <Field label="Dealer Price" value={product.dealerPrice !== '' ? formatCurrency(product.dealerPrice) : ''} />
+              <Field label="Discount %" value={product.discountPercent !== '' ? `${product.discountPercent}%` : ''} />
             </div>
           </div>
 
@@ -316,11 +436,16 @@ export default function ProductDetail() {
               <Field label="HSN/SAC Code" value={product.hsnSacCode} />
               <Field label="Tax Category" value={product.taxCategory} />
               <Field label="GST/VAT Rate" value={product.gstVatRate !== '' ? `${product.gstVatRate}%` : ''} />
-              <Field label="Purchase Unit" value={product.purchaseUnit} />
+              <Field label="Tax Inclusive" value={product.taxInclusive ? 'Yes' : 'No'} />
+              <Field label="Preferred Supplier" value={product.supplierName} />
               <Field label="Supplier Code" value={product.supplierProductCode} />
               <Field label="Lead Time" value={product.leadTime} />
               <Field label="Min. Order Qty" value={product.minimumOrderQuantity} />
+              <Field label="Purchase Unit" value={product.purchaseUnit} />
               <Field label="Sales Unit" value={product.salesUnit} />
+              <Field label="Commission Eligible" value={product.commissionEligible ? 'Yes' : 'No'} />
+              <Field label="Commission %" value={product.commissionPercent !== '' ? `${product.commissionPercent}%` : ''} />
+              <Field label="Default Discount" value={product.defaultDiscount !== '' ? `${product.defaultDiscount}%` : ''} />
             </div>
           </div>
 
@@ -347,6 +472,7 @@ export default function ProductDetail() {
               <Field label="Country of Origin" value={product.countryOfOrigin} />
               <Field label="Launch Date" value={formatDateLabel(product.launchDate)} />
               <Field label="End of Life Date" value={formatDateLabel(product.endOfLifeDate)} />
+              <Field label="Attribute Types" value={product.variantAttributes} />
               <Field label="Tags" value={product.productTags} />
             </div>
             {product.notes && (
@@ -359,24 +485,25 @@ export default function ProductDetail() {
         </div>
       </Card>
 
-      {(product.coverImage || product.images?.length > 0) && (
-        <Card title="Images">
-          <div className="flex flex-wrap gap-3">
-            {product.coverImage && (
-              <img
-                src={product.coverImage}
-                alt={product.name}
-                className="size-24 rounded-xl border border-neutral-100 object-cover"
-              />
-            )}
-            {product.images?.map((image, index) => (
-              <img
-                key={index}
-                src={image}
-                alt={`${product.name} ${index + 1}`}
-                className="size-24 rounded-xl border border-neutral-100 object-cover"
-              />
-            ))}
+      {(product.downloadableProduct || product.downloadFile) && (
+        <Card title="Digital Product Information">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Field label="Downloadable Product" value={product.downloadableProduct ? 'Yes' : 'No'} />
+            <Field label="License Key Required" value={product.licenseKeyRequired ? 'Yes' : 'No'} />
+            <Field label="Download Limit" value={product.downloadLimit} />
+            <DocumentLink label="Download File" url={product.downloadFile} />
+          </div>
+        </Card>
+      )}
+
+      {(product.catalogBrochure || product.productManual || product.productDatasheet || product.complianceCertificate || product.warrantyDocument) && (
+        <Card title="Documents">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <DocumentLink label="Catalog / Brochure" url={product.catalogBrochure} />
+            <DocumentLink label="Product Manual" url={product.productManual} />
+            <DocumentLink label="Datasheet" url={product.productDatasheet} />
+            <DocumentLink label="Compliance Certificate" url={product.complianceCertificate} />
+            <DocumentLink label="Warranty Document" url={product.warrantyDocument} />
           </div>
         </Card>
       )}
@@ -386,6 +513,7 @@ export default function ProductDetail() {
           <table className="w-full min-w-3xl text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <th className="whitespace-nowrap px-5 py-3" />
                 <th className="whitespace-nowrap px-5 py-3">Size</th>
                 <th className="whitespace-nowrap px-5 py-3">SKU</th>
                 <th className="whitespace-nowrap px-5 py-3">HSN/SAC</th>
@@ -405,6 +533,15 @@ export default function ProductDetail() {
 
                 return (
                   <tr key={`${product.id}-${index}`} className="transition-colors hover:bg-primary-50/35">
+                    <td className="px-5 py-2">
+                      {variant.imageUrl ? (
+                        <img src={variant.imageUrl} alt={variant.size} className="size-9 rounded-lg border border-neutral-100 object-cover" />
+                      ) : (
+                        <div className="flex size-9 items-center justify-center rounded-lg border border-neutral-100 bg-neutral-50 text-neutral-300">
+                          <Package className="size-4" aria-hidden="true" />
+                        </div>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-5 py-3.5 font-medium text-neutral-800">{variant.size}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-neutral-500">{variant.sku}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-neutral-500">{variant.hsn}</td>

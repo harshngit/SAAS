@@ -147,6 +147,14 @@ export default function SalesReturnDetail() {
   }
 
   const handleReceive = async () => {
+    const hasFractionalQuantity = Object.values(receiveItems).some(
+      (values) => !Number.isInteger(Number(values.receivedQuantity)),
+    )
+    if (hasFractionalQuantity) {
+      setReceiveError('Received quantity must be a whole number.')
+      return
+    }
+
     setIsReceiving(true)
     setReceiveError('')
 
@@ -433,7 +441,7 @@ export default function SalesReturnDetail() {
                       type="number"
                       min="0"
                       max={item.quantityReturned}
-                      step="0.01"
+                      step="1"
                       value={values.receivedQuantity}
                       onChange={(event) => updateReceiveItem(item.id, 'receivedQuantity', event.target.value)}
                     />

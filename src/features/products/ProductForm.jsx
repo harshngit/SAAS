@@ -242,18 +242,18 @@ const productSections = [
     { name: 'variantInventory', label: 'Variant Inventory', input: 'variantInventory', wide: true },
   ]),
   section('Pricing Information', [
-    { name: 'purchasePrice', label: 'Purchase Price', input: 'number', required: true },
-    { name: 'sellingPrice', label: 'Selling Price', input: 'number', required: true },
-    { name: 'mrp', label: 'MSRP/MRP', input: 'number' },
-    { name: 'wholesalePrice', label: 'Wholesale Price', input: 'number' },
-    { name: 'dealerPrice', label: 'Dealer Price', input: 'number' },
-    { name: 'discountPercent', label: 'Discount (%)', input: 'number' },
+    { name: 'purchasePrice', label: 'Purchase Price', input: 'number', step: '0.01', required: true },
+    { name: 'sellingPrice', label: 'Selling Price', input: 'number', step: '0.01', required: true },
+    { name: 'mrp', label: 'MSRP/MRP', input: 'number', step: '0.01' },
+    { name: 'wholesalePrice', label: 'Wholesale Price', input: 'number', step: '0.01' },
+    { name: 'dealerPrice', label: 'Dealer Price', input: 'number', step: '0.01' },
+    { name: 'discountPercent', label: 'Discount (%)', input: 'number', step: '1' },
     { name: 'taxInclusivePrice', label: 'Tax Inclusive Price', input: 'checkbox' },
     { name: 'currency', label: 'Currency', input: 'select' },
   ]),
   section('Tax Information', [
     { name: 'taxCategory', label: 'Tax Category', input: 'select' },
-    { name: 'gstVatRate', label: 'GST/VAT Rate', input: 'number' },
+    { name: 'gstVatRate', label: 'GST/VAT Rate', input: 'number', step: '1' },
     { name: 'hsnSacCode', label: 'HSN/SAC Code' },
     { name: 'taxInclusive', label: 'Tax Inclusive', input: 'checkbox' },
   ]),
@@ -261,16 +261,16 @@ const productSections = [
     { name: 'preferredSupplier', label: 'Preferred Supplier', input: 'select' },
     { name: 'supplierProductCode', label: 'Supplier Product Code' },
     { name: 'leadTime', label: 'Lead Time', placeholder: 'e.g. 7 days' },
-    { name: 'minimumOrderQuantity', label: 'Minimum Order Quantity', input: 'number' },
+    { name: 'minimumOrderQuantity', label: 'Minimum Order Quantity', input: 'number', step: '1' },
     { name: 'purchaseUnit', label: 'Purchase Unit', input: 'select' },
   ]),
   section('Physical Specifications', [
-    { name: 'weight', label: 'Weight', input: 'number' },
+    { name: 'weight', label: 'Weight', input: 'number', step: '0.01' },
     { name: 'weightUnit', label: 'Weight Unit', input: 'select' },
-    { name: 'length', label: 'Length', input: 'number' },
-    { name: 'width', label: 'Width', input: 'number' },
-    { name: 'height', label: 'Height', input: 'number' },
-    { name: 'volume', label: 'Volume', input: 'number' },
+    { name: 'length', label: 'Length', input: 'number', step: '0.01' },
+    { name: 'width', label: 'Width', input: 'number', step: '0.01' },
+    { name: 'height', label: 'Height', input: 'number', step: '0.01' },
+    { name: 'volume', label: 'Volume', input: 'number', step: '0.01' },
     { name: 'color', label: 'Color' },
     { name: 'size', label: 'Size' },
     { name: 'material', label: 'Material' },
@@ -278,7 +278,7 @@ const productSections = [
   section('Digital Product Information', [
     { name: 'downloadableProduct', label: 'Downloadable Product', input: 'checkbox' },
     { name: 'licenseKeyRequired', label: 'License Key Required', input: 'checkbox' },
-    { name: 'downloadLimit', label: 'Download Limit', input: 'number' },
+    { name: 'downloadLimit', label: 'Download Limit', input: 'number', step: '1' },
     { name: 'downloadFile', label: 'Download File', input: 'compactFile', accept: '.zip,.pdf,image/*' },
   ]),
   section('Additional Information', [
@@ -1467,7 +1467,7 @@ export default function ProductForm({
         {...commonProps}
         type={field.input === 'number' ? 'number' : field.input === 'date' ? 'date' : field.input === 'url' ? 'url' : 'text'}
         min={field.input === 'number' ? '0' : undefined}
-        step={field.input === 'number' ? '0.01' : undefined}
+        step={field.input === 'number' ? field.step : undefined}
       />
     )
   }

@@ -6,9 +6,7 @@ import {
   listVehicles,
   updateVehicle,
 } from '../../api/vehicles'
-import { listUsers } from '../../api/users'
-import { normalizeApiUser } from '../users/userRoleUtils'
-import { ROLES } from '../../auth/roles'
+import { listDeliveryPartners } from '../../api/deliveries'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -137,7 +135,7 @@ export default function VehicleList() {
     setIsLoading(true)
     setListError('')
 
-    const [vehiclesResult, usersResult] = await Promise.all([listVehicles(), listUsers()])
+    const [vehiclesResult, partnersResult] = await Promise.all([listVehicles(), listDeliveryPartners()])
 
     if (!vehiclesResult.success) {
       setVehicles([])
@@ -148,8 +146,8 @@ export default function VehicleList() {
 
     setVehicles(vehiclesResult.vehicles)
 
-    if (usersResult.success) {
-      setDrivers(usersResult.users.map(normalizeApiUser).filter((user) => user.role === ROLES.DELIVERY_PARTNER))
+    if (partnersResult.success) {
+      setDrivers(partnersResult.partners)
     }
 
     setIsLoading(false)

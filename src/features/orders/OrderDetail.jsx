@@ -24,7 +24,6 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import { ROLES } from '../../auth/roles'
 import {
   approveOrder,
   cancelOrder,
@@ -35,13 +34,11 @@ import {
   pickupReady,
   rejectOrder,
 } from '../../api/orders'
-import { listDeliveries, planDelivery } from '../../api/deliveries'
+import { listDeliveries, listDeliveryPartners, planDelivery } from '../../api/deliveries'
 import { listInvoices } from '../../api/invoices'
 import { getSalesWorkflowSettings } from '../../api/settings'
-import { listUsers } from '../../api/users'
 import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
-import { normalizeApiUser } from '../users/userRoleUtils'
 import { formatCurrency } from '../../utils/format'
 
 const statusBadgeVariant = {
@@ -181,12 +178,10 @@ export default function OrderDetail() {
   useEffect(() => {
     let isMounted = true
 
-    Promise.all([listUsers(), listVehicles(), listWarehouses(), getSalesWorkflowSettings()]).then(
-      ([usersResult, vehiclesResult, warehousesResult, settingsResult]) => {
+    Promise.all([listDeliveryPartners(), listVehicles(), listWarehouses(), getSalesWorkflowSettings()]).then(
+      ([partnersResult, vehiclesResult, warehousesResult, settingsResult]) => {
         if (!isMounted) return
-        if (usersResult.success) {
-          setDeliveryPartners(usersResult.users.map(normalizeApiUser).filter((user) => user.role === ROLES.DELIVERY_PARTNER))
-        }
+        if (partnersResult.success) setDeliveryPartners(partnersResult.partners)
         if (vehiclesResult.success) setVehicles(vehiclesResult.vehicles)
         if (warehousesResult.success) setWarehouses(warehousesResult.warehouses)
         if (settingsResult.success) setInvoiceMode(settingsResult.settings.partialDeliveryInvoiceMode)

@@ -126,6 +126,27 @@ function normalizeDelivery(delivery) {
   }
 }
 
+// Lightweight, non-admin-safe partner list for "assign delivery partner" dropdowns -
+// GET /users is admin-only and 403s for other staff roles, which is why this exists
+// instead of reusing listUsers() + a client-side role filter.
+export async function listDeliveryPartners() {
+  try {
+    const { data } = await apiClient.get('/deliveries/partners', {
+      headers: authHeader(),
+    })
+
+    return { success: true, partners: Array.isArray(data) ? data : [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load delivery partners. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function listDeliveries(params = {}) {
   try {
     const queryParams = {}

@@ -22,10 +22,9 @@ import Select from '../../components/ui/Select'
 import { ROLES, roleHomePath } from '../../auth/roles'
 import { listProducts } from '../../api/products'
 import { listCustomers } from '../../api/customers'
-import { listUsers } from '../../api/users'
+import { listDeliveryPartners } from '../../api/deliveries'
 import { listWarehouses } from '../../api/warehouses'
 import { createOrder, assignDeliveryPartner } from '../../api/orders'
-import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
@@ -118,10 +117,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     let isMounted = true
 
     async function loadOptions() {
-      const [productsResult, customersResult, usersResult, warehousesResult] = await Promise.all([
+      const [productsResult, customersResult, partnersResult, warehousesResult] = await Promise.all([
         listProducts(),
         listCustomers(),
-        listUsers(),
+        listDeliveryPartners(),
         listWarehouses(),
       ])
 
@@ -129,9 +128,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
       if (productsResult.success) setAvailableProducts(productsResult.products)
       if (customersResult.success) setCustomerRecords(customersResult.customers)
-      if (usersResult.success) {
-        setDeliveryBoys(usersResult.users.map(normalizeApiUser).filter((user) => user.role === ROLES.DELIVERY_PARTNER && user.isActive))
-      }
+      if (partnersResult.success) setDeliveryBoys(partnersResult.partners)
       if (warehousesResult.success) {
         setWarehouses(warehousesResult.warehouses)
         const defaultWarehouse = warehousesResult.warehouses.find((warehouse) => warehouse.isDefault)
@@ -259,6 +256,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     if (orderItems.length === 0) nextErrors.items = 'Add at least one product to the order.'
     if (orderItems.some((item) => !Number(item.quantity) || Number(item.quantity) < 1)) {
       nextErrors.items = 'Keep every product quantity at least 1.'
+    } else if (orderItems.some((item) => !Number.isInteger(Number(item.quantity)))) {
+      nextErrors.items = 'Quantity must be a whole number.'
     }
     if (!paymentMethod) nextErrors.paymentMethod = 'Select a payment type.'
     if (!restrictToVehicleStock && !deliveryType) nextErrors.deliveryType = 'Select a delivery method.'
@@ -590,6 +589,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               <input
                                 type="number"
                                 min="1"
+                                step="1"
                                 value={item.quantity}
                                 onChange={(event) => updateOrderItem(item.productId, 'quantity', event.target.value)}
                                 className="h-9 w-14 rounded-lg border border-neutral-200 bg-white text-center text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"

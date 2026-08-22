@@ -42,6 +42,10 @@ export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
 
     const result = await createCustomer({
       customerName: form.customerName,
+      // This quick-add form skips the full customer-type picker CustomerForm has, but the
+      // backend requires a non-empty customer_type - default to the most common case rather
+      // than sending '' (which the backend normalizes to null and then rejects outright).
+      customerType: 'individual',
       phone: form.mobileNumber,
       primaryContactPerson: form.primaryContactPerson,
       email: form.email,

@@ -172,6 +172,9 @@ export default function SalesReturnFormPage() {
     })
     if (hasInvalidQuantity) return 'Each selected item needs a valid return quantity within what was invoiced.'
 
+    const hasFractionalQuantity = selectedRows.some((item) => !Number.isInteger(Number(returnQuantities[item.invoiceItemId])))
+    if (hasFractionalQuantity) return 'Return quantity must be a whole number.'
+
     return ''
   }
 
@@ -288,7 +291,7 @@ export default function SalesReturnFormPage() {
                             type="number"
                             min="0"
                             max={item.quantity}
-                            step="0.01"
+                            step="1"
                             disabled={!isSelected}
                             value={returnQuantities[item.invoiceItemId] ?? ''}
                             onChange={(event) => updateQuantity(item.invoiceItemId, event.target.value, item.quantity)}

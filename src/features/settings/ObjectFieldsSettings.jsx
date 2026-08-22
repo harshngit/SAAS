@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Boxes,
-  Check,
   Info,
   Lock,
   Package,
@@ -32,6 +31,30 @@ function humanizeFieldKey(key) {
     .split('_')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
+}
+
+function FieldToggle({ label, checked, onChange }) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-neutral-100 bg-neutral-50/60 px-3.5 py-2.5 transition-colors hover:border-neutral-200 hover:bg-neutral-50">
+      <span className="truncate text-sm font-medium text-neutral-800" title={label}>{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+          checked ? 'bg-primary-600' : 'bg-neutral-200'
+        }`}
+      >
+        <span
+          className={`inline-block size-3.5 transform rounded-full bg-white shadow transition-transform ${
+            checked ? 'translate-x-4.5' : 'translate-x-1'
+          }`}
+        />
+      </button>
+    </label>
+  )
 }
 
 export default function ObjectFieldsSettings() {
@@ -159,62 +182,43 @@ export default function ObjectFieldsSettings() {
       </div>
 
       {currentModuleFields && (
-        <div className="overflow-hidden rounded-xl border border-neutral-100 bg-white shadow-(--shadow-card)">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-neutral-50 text-xs font-semibold text-neutral-500">
-              <tr>
-                <th className="px-4 py-3">Field Name</th>
-                <th className="w-28 px-4 py-3 text-center">Visible</th>
-                <th className="w-32 px-4 py-3 text-center">Required</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {(currentModuleFields.mandatory || []).map((fieldKey) => (
-                <tr key={fieldKey} className="bg-neutral-50/40">
-                  <td className="px-4 py-3 text-xs font-semibold text-neutral-800">{humanizeFieldKey(fieldKey)}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="grid size-4 place-items-center rounded border border-primary-700 bg-primary-700 text-white mx-auto">
-                      <Check className="size-3" />
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-1 text-[0.65rem] font-semibold text-neutral-600">
-                      <Lock className="size-3" />
-                      Required
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {(currentModuleFields.optional || []).map((fieldKey) => {
-                const checked = currentModuleSettings[fieldKey] !== false
+        <div className="space-y-4">
+          {(currentModuleFields.mandatory || []).length > 0 && (
+            <div className="rounded-xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-400">Always visible</p>
+              <div className="flex flex-wrap gap-2">
+                {currentModuleFields.mandatory.map((fieldKey) => (
+                  <span
+                    key={fieldKey}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-600"
+                  >
+                    <Lock className="size-3" />
+                    {humanizeFieldKey(fieldKey)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
-                return (
-                  <tr key={fieldKey} className="hover:bg-neutral-50/70">
-                    <td className="px-4 py-3 text-xs font-semibold text-neutral-800">{humanizeFieldKey(fieldKey)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <label className="inline-flex cursor-pointer items-center justify-center">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(event) => toggleField(fieldKey, event.target.checked)}
-                          className="peer sr-only"
-                        />
-                        <span className="grid size-4 place-items-center rounded border border-neutral-300 bg-white text-white peer-checked:border-primary-700 peer-checked:bg-primary-700">
-                          <Check className="size-3" />
-                        </span>
-                      </label>
-                    </td>
-                    <td className="px-4 py-3 text-center text-neutral-400">-</td>
-                  </tr>
-                )
-              })}
-              {(currentModuleFields.mandatory || []).length === 0 && (currentModuleFields.optional || []).length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-sm text-neutral-400">No configurable fields for this module.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <div className="rounded-xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-400">Optional fields</p>
+            {(currentModuleFields.optional || []).length > 0 ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {currentModuleFields.optional.map((fieldKey) => (
+                  <FieldToggle
+                    key={fieldKey}
+                    label={humanizeFieldKey(fieldKey)}
+                    checked={currentModuleSettings[fieldKey] !== false}
+                    onChange={(checked) => toggleField(fieldKey, checked)}
+                  />
+                ))}
+              </div>
+            ) : (currentModuleFields.mandatory || []).length === 0 ? (
+              <p className="py-8 text-center text-sm text-neutral-400">No configurable fields for this module.</p>
+            ) : (
+              <p className="py-4 text-center text-sm text-neutral-400">No optional fields for this module.</p>
+            )}
+          </div>
         </div>
       )}
     </div>

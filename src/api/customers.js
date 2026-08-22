@@ -193,7 +193,10 @@ function buildCustomerRequestBody(payload) {
       ifsc_swift_code: payload.ifscSwiftCode || '',
     },
     sales_crm_information: {
-      sales_representative_id: payload.assignedSalesOfficerId || payload.assigned_sales_officer_id || '',
+      // Live-verified: the backend looks this up as a real user id even when the value is an
+      // empty string, and rejects it ("not a user in your firm") - unlike other optional fields,
+      // it has to be omitted entirely (undefined drops out of JSON.stringify) rather than sent as ''.
+      sales_representative_id: payload.assignedSalesOfficerId || payload.assigned_sales_officer_id || undefined,
       lead_source: payload.leadSource || '',
       territory: payload.territory || '',
       customer_priority: payload.customerPriority || '',

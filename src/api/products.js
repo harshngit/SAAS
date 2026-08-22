@@ -58,12 +58,6 @@ const PRODUCT_FIELD_MAP = [
   ['manufacturer', 'manufacturer', 'string'],
   ['modelNumber', 'model_number', 'string'],
   ['status', 'status', 'string'],
-  ['mrp', 'msrp_mrp', 'number'],
-  ['wholesalePrice', 'wholesale_price', 'number'],
-  ['dealerPrice', 'dealer_price', 'number'],
-  ['discountPercent', 'discount', 'number'],
-  ['taxInclusivePrice', 'tax_inclusive_price', 'boolean'],
-  ['currency', 'currency', 'string'],
   ['inventoryTracking', 'inventory_tracking', 'boolean'],
   ['openingStock', 'opening_stock', 'number'],
   ['minimumStockLevel', 'minimum_stock_level', 'number'],
@@ -192,6 +186,22 @@ function applyProductFieldMap(requestBody, payload) {
   })
 }
 
+// mrp/wholesalePrice/dealerPrice/discountPercent/taxInclusivePrice/currency all live under the
+// backend's nested `pricing` object (ProductPricingIn/Update), never as top-level fields - sending
+// them flat (as this used to) is silently accepted by nothing and the values never persist.
+function buildPricingPayload(payload) {
+  return {
+    purchase_price: Number(payload.purchasePrice) || 0,
+    selling_price: Number(payload.sellingPrice ?? payload.price) || 0,
+    mrp: Number(payload.mrp) || 0,
+    wholesale_price: Number(payload.wholesalePrice) || 0,
+    dealer_price: Number(payload.dealerPrice) || 0,
+    discount_percent: Number(payload.discountPercent) || 0,
+    tax_inclusive: Boolean(payload.taxInclusivePrice),
+    currency: payload.currency || 'INR',
+  }
+}
+
 function toVariationPayload(variant, includeId = false) {
   const inventory = normalizeVariantInventory(variant)
   const variation = {
@@ -240,6 +250,7 @@ export async function createProduct(payload) {
       sku: payload.sku || payload.variants?.[0]?.sku || '',
       category_id: payload.categoryId || payload.category_id || payload.category || '',
       total_inventory: Number(payload.totalInventory ?? payload.total_inventory) || variations.reduce((sum, variant) => sum + variant.inventory, 0),
+      pricing: buildPricingPayload(payload),
       variations,
     }
 
@@ -332,6 +343,17 @@ export async function updateProduct(productId, payload) {
       if (requestBody.total_inventory === undefined) {
         requestBody.total_inventory = requestBody.variations.reduce((sum, variant) => sum + variant.inventory, 0)
       }
+    }
+    // Only touch pricing when the caller actually sent pricing fields (e.g. a bare
+    // `{ isActive }` status-toggle call shouldn't zero out mrp/wholesale/dealer/etc.) - `pricing`
+    // is a single nested object server-side, so a partial call must build the full sub-object
+    // from ProductForm's always-complete payload, not send a half-filled one.
+    if (
+      payload.mrp !== undefined || payload.wholesalePrice !== undefined || payload.dealerPrice !== undefined ||
+      payload.discountPercent !== undefined || payload.taxInclusivePrice !== undefined || payload.currency !== undefined ||
+      payload.purchasePrice !== undefined || payload.sellingPrice !== undefined
+    ) {
+      requestBody.pricing = buildPricingPayload(payload)
     }
 
     applyProductFieldMap(requestBody, payload)

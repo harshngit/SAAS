@@ -34,6 +34,7 @@ import DatePicker from '../../components/ui/DatePicker'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
+import { useToast } from '../../components/ui/toastContext'
 import { ROLES } from '../../auth/roles'
 import {
   deleteCustomer,
@@ -51,6 +52,7 @@ import { useAuthStore } from '../../store/authStore'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 import { formatCurrency } from '../../utils/format'
 import CustomerForm from './CustomerForm'
+import RecordPaymentDrawer from './RecordPaymentDrawer'
 import { customerBasePathByRole } from './customerConstants'
 
 const orderStatusVariant = {
@@ -275,6 +277,7 @@ function Section({ number, title, icon: Icon, actions, children, className = '' 
 export default function CustomerDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
   const isAdmin = currentUser?.role === ROLES.ADMIN
   const basePath = customerBasePathByRole[currentUser?.role] || '/sales/customers'
@@ -286,6 +289,7 @@ export default function CustomerDetail() {
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [payments, setPayments] = useState([])
+  const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false)
   const [isLoadingPayments, setIsLoadingPayments] = useState(true)
   const [paymentsError, setPaymentsError] = useState('')
   const [downloadingReceiptId, setDownloadingReceiptId] = useState('')
@@ -446,6 +450,21 @@ export default function CustomerDetail() {
     }
 
     setPayments(result.payments.map(normalizeCustomerPayment))
+  }
+
+  const handlePaymentRecorded = async (amount) => {
+    setIsRecordPaymentOpen(false)
+    loadPayments()
+
+    const result = await getCustomer(id)
+    if (result.success) {
+      setCustomer(normalizeCustomer(result.customer))
+    }
+
+    showToast({
+      title: 'Payment recorded',
+      message: `${formatCurrency(amount)} recorded for ${customer?.businessName || customer?.name || 'this customer'}.`,
+    })
   }
 
   if (isLoading) {
@@ -656,7 +675,7 @@ export default function CustomerDetail() {
             Edit Customer
           </Button>
           {isAdmin && (
-            <Button variant="outline" size="sm" onClick={() => navigate(`/admin/customers/${customer.id}/record-payment`)}>
+            <Button variant="outline" size="sm" onClick={() => setIsRecordPaymentOpen(true)}>
               <Plus className="size-4" aria-hidden="true" />
               Record Payment
             </Button>
@@ -858,7 +877,7 @@ export default function CustomerDetail() {
           icon={CreditCard}
           className="xl:col-span-1"
           actions={isAdmin && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => navigate(`/admin/customers/${customer.id}/record-payment`)}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setIsRecordPaymentOpen(true)}>
               <Plus className="size-4" aria-hidden="true" />
               Record
             </Button>
@@ -1167,6 +1186,13 @@ export default function CustomerDetail() {
           </div>
         </div>
       </Modal>
+
+      <RecordPaymentDrawer
+        isOpen={isRecordPaymentOpen}
+        onClose={() => setIsRecordPaymentOpen(false)}
+        customer={customer}
+        onSaved={handlePaymentRecorded}
+      />
     </div>
   )
 }

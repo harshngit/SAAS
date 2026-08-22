@@ -30,7 +30,6 @@ import NotificationsList from '../features/notifications/NotificationsList'
 import AuditLogList from '../features/auditLogs/AuditLogList'
 import CustomerList from '../features/customers/CustomerList'
 import CustomerDetail from '../features/customers/CustomerDetail'
-import RecordCustomerPayment from '../features/customers/RecordCustomerPayment'
 import CustomerEdit from '../features/customers/CustomerEdit'
 import LeadList from '../features/leads/LeadList'
 import LeadFormPage from '../features/leads/LeadFormPage'
@@ -192,7 +191,6 @@ export default function AppRoutes() {
           <Route path="/admin/customers" element={<CustomerList />} />
           <Route path="/admin/customers/edit/:customer_id" element={<CustomerEdit />} />
           <Route path="/admin/customers/:id" element={<CustomerDetail />} />
-          <Route path="/admin/customers/:id/record-payment" element={<RecordCustomerPayment />} />
           <Route path="/admin/leads" element={<LeadList />} />
           <Route path="/admin/leads/new" element={<LeadFormPage />} />
           <Route path="/admin/quotations" element={<QuotationList />} />

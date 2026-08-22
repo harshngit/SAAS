@@ -29,6 +29,7 @@ import {
   dispatchDelivery,
   downloadDeliveryChallan,
   getDelivery,
+  listDeliveryPartners,
   loadDeliveryOntoVehicle,
   markDeliveryReady,
   pickDeliveryItems,
@@ -37,9 +38,6 @@ import {
   updateDeliveryPlan,
 } from '../../api/deliveries'
 import { getFileUrl, uploadFiles } from '../../api/files'
-import { listUsers } from '../../api/users'
-import { normalizeApiUser } from '../users/userRoleUtils'
-import { ROLES } from '../../auth/roles'
 import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
 import { formatCurrency } from '../../utils/format'
@@ -286,10 +284,10 @@ export default function DeliveryDetail() {
     if (!isAdminView) return
     let isMounted = true
 
-    Promise.all([listUsers(), listVehicles(), listWarehouses()]).then(([usersResult, vehiclesResult, warehousesResult]) => {
+    Promise.all([listDeliveryPartners(), listVehicles(), listWarehouses()]).then(([partnersResult, vehiclesResult, warehousesResult]) => {
       if (!isMounted) return
-      if (usersResult.success) {
-        setDeliveryPartners(usersResult.users.map(normalizeApiUser).filter((user) => user.role === ROLES.DELIVERY_PARTNER))
+      if (partnersResult.success) {
+        setDeliveryPartners(partnersResult.partners)
       }
       if (vehiclesResult.success) {
         setVehicles(vehiclesResult.vehicles)

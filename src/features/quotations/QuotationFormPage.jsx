@@ -246,7 +246,10 @@ export default function QuotationFormPage() {
       item.unitPrice === '' ||
       Number(item.unitPrice) < 0
     ))
+    const hasFractionalQuantity = formData.items.some((item) => item.quantity !== '' && !Number.isInteger(Number(item.quantity)))
+
     if (hasInvalidItem) nextErrors.items = 'Each item needs a product, quantity, and unit price.'
+    else if (hasFractionalQuantity) nextErrors.items = 'Quantity must be a whole number.'
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -318,7 +321,7 @@ export default function QuotationFormPage() {
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Select label="Product" required options={productOptions} value={item.productId} onChange={(event) => updateItem(index, 'productId', event.target.value)} placeholder={isLoadingOptions ? 'Loading...' : 'Select product'} disabled={isLoadingOptions} />
                 <Input label="SKU" value={item.sku} disabled placeholder="Auto-filled product code" />
-                <Input label="Quantity" required type="number" min="0" step="0.01" value={item.quantity} onChange={(event) => updateItem(index, 'quantity', event.target.value)} />
+                <Input label="Quantity" required type="number" min="0" step="1" value={item.quantity} onChange={(event) => updateItem(index, 'quantity', event.target.value)} />
                 <Select label="UOM" options={uomOptions} value={item.uom} onChange={(event) => updateItem(index, 'uom', event.target.value)} placeholder="Select UOM" />
                 <Input label="Unit Price" required type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => updateItem(index, 'unitPrice', event.target.value)} />
                 <Input label="Discount (%)" type="number" min="0" step="0.01" value={item.discount} onChange={(event) => updateItem(index, 'discount', event.target.value)} />
