@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   startOfMonth,
@@ -23,12 +24,17 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
   const selectedDate = value ? parseISO(value) : null
   const [viewMonth, setViewMonth] = useState(selectedDate && isValid(selectedDate) ? selectedDate : new Date())
   const containerRef = useRef(null)
+  const menuRef = useRef(null)
+  const [menuStyle, setMenuStyle] = useState(null)
 
   useEffect(() => {
     if (!open) return
 
     const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) setOpen(false)
+      if (
+        containerRef.current && !containerRef.current.contains(event.target) &&
+        menuRef.current && !menuRef.current.contains(event.target)
+      ) setOpen(false)
     }
     const handleEscape = (event) => {
       if (event.key === 'Escape') setOpen(false)
@@ -39,6 +45,39 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
+
+  // Positioned via a portal + measured coordinates (not plain CSS `absolute`) so the panel can
+  // flip to stay on-screen - a "To" field near the right edge would otherwise always grow
+  // rightward off the viewport, and one near the bottom would grow off the bottom too.
+  useEffect(() => {
+    if (!open) return undefined
+
+    const PANEL_WIDTH = 288
+    const PANEL_HEIGHT = 360
+
+    const updatePosition = () => {
+      const trigger = containerRef.current?.querySelector('button[data-datepicker-trigger="true"]')
+      if (!trigger) return
+
+      const rect = trigger.getBoundingClientRect()
+      const shouldOpenUp = window.innerHeight - rect.bottom < PANEL_HEIGHT + 12 && rect.top > PANEL_HEIGHT
+      const left = Math.min(rect.left, window.innerWidth - PANEL_WIDTH - 16)
+
+      setMenuStyle({
+        left: Math.max(16, left),
+        top: shouldOpenUp ? rect.top - PANEL_HEIGHT - 8 : rect.bottom + 8,
+        width: PANEL_WIDTH,
+      })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
     }
   }, [open])
 
@@ -59,6 +98,7 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
       <div className="relative">
         <button
           type="button"
+          data-datepicker-trigger="true"
           onClick={() => setOpen((prev) => !prev)}
           className={`flex w-full items-center justify-between rounded-xl border bg-neutral-50 px-3.5 py-2.5 text-left text-sm transition-all focus:bg-white focus:outline-none focus:ring-4 ${
             error
@@ -72,8 +112,12 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
           <Calendar className="size-4 text-neutral-400" aria-hidden="true" />
         </button>
 
-        {open && (
-          <div className="absolute z-20 mt-2 w-72 rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-popover)">
+        {open && menuStyle && createPortal(
+          <div
+            ref={menuRef}
+            style={menuStyle}
+            className="fixed z-50 rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-popover)"
+          >
             <div className="flex items-center justify-between">
               <button
                 type="button"
@@ -131,7 +175,8 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
             >
               Today
             </button>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
       {error && <span className="text-xs text-red-600">{error}</span>}

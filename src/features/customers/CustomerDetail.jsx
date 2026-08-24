@@ -8,7 +8,6 @@ import {
   CalendarCheck2,
   CreditCard,
   FileText,
-  Globe2,
   Landmark,
   Mail,
   MapPin,
@@ -34,6 +33,7 @@ import DatePicker from '../../components/ui/DatePicker'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
+import SocialLinks from '../../components/ui/SocialLinks'
 import { useToast } from '../../components/ui/toastContext'
 import { ROLES } from '../../auth/roles'
 import {
@@ -767,36 +767,10 @@ export default function CustomerDetail() {
             <Field label="Primary Phone" value={customer.phone} />
             <Field label="Alternate Mobile" value={customer.alternateMobileNumber} />
             <Field label="Email Address" value={customer.email} />
-            <Field label="Website" value={customer.website} />
             <Field label="Primary Contact Person" value={customer.primaryContactPerson} />
             <Field label="Designation" value={customer.designation} />
             <Field label="Communication Preference" value={customer.preferredCommunication} />
           </div>
-          {(customer.facebook || customer.instagram || customer.linkedin || customer.twitter || customer.youtube) && (
-            <div className="mt-4 border-t border-neutral-100 pt-4">
-              <p className="text-xs text-neutral-400">Social Media</p>
-              <div className="mt-2 flex flex-wrap gap-3 text-sm">
-                {[
-                  { label: 'Facebook', value: customer.facebook },
-                  { label: 'Instagram', value: customer.instagram },
-                  { label: 'LinkedIn', value: customer.linkedin },
-                  { label: 'X (Twitter)', value: customer.twitter },
-                  { label: 'YouTube', value: customer.youtube },
-                ].filter((link) => link.value).map((link) => (
-                  <a
-                    key={link.label}
-                    href={link.value}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1 text-primary-700 hover:bg-primary-50/60"
-                  >
-                    <Globe2 className="size-3.5" aria-hidden="true" />
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
         </Section>
 
         <Section number={2} title="Business & Tax Information" icon={Building2}>
@@ -813,10 +787,12 @@ export default function CustomerDetail() {
         </Section>
 
         <Section number={3} title="Address Information" icon={MapPin}>
-          <div className="grid grid-cols-1 gap-y-4">
-            <Field label="Billing Address" value={billingAddressLine} />
-            <Field label="Shipping Address" value={shippingAddressLine} />
-            <Field label="Country" value={customer.country} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-y-4">
+              <Field label="Billing Address" value={billingAddressLine} />
+              <Field label="Shipping Address" value={shippingAddressLine} />
+              <Field label="Country" value={customer.country} />
+            </div>
             <div className="min-w-0">
               <p className="text-xs text-neutral-400">Google Maps Location</p>
               {mapEmbedUrl ? (
@@ -844,6 +820,22 @@ export default function CustomerDetail() {
             </div>
           </div>
         </Section>
+      </div>
+
+      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+        <p className="text-sm text-neutral-400">Social Media</p>
+        <div className="mt-3 border-t border-neutral-100 pt-3">
+          <SocialLinks
+            links={{
+              website: customer.website,
+              facebook: customer.facebook,
+              instagram: customer.instagram,
+              linkedin: customer.linkedin,
+              twitter: customer.twitter,
+              youtube: customer.youtube,
+            }}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
@@ -1066,18 +1058,6 @@ export default function CustomerDetail() {
               <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
                 <p className="text-xs text-neutral-400">Credit Limit</p>
                 <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ledger.summary.creditLimit)}</p>
-              </div>
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Ageing Analysis</p>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {['0-30', '31-60', '61-90', '90+'].map((bucket) => (
-                  <div key={bucket} className="rounded-xl border border-neutral-100 px-4 py-3">
-                    <p className="text-xs text-neutral-400">{bucket} days</p>
-                    <p className="mt-1 text-base font-semibold text-neutral-900">{formatCurrency(ledger.ageing[bucket])}</p>
-                  </div>
-                ))}
               </div>
             </div>
 

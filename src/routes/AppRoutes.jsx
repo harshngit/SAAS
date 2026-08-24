@@ -33,6 +33,7 @@ import CustomerDetail from '../features/customers/CustomerDetail'
 import CustomerEdit from '../features/customers/CustomerEdit'
 import LeadList from '../features/leads/LeadList'
 import LeadFormPage from '../features/leads/LeadFormPage'
+import LeadDetail from '../features/leads/LeadDetail'
 import QuotationList from '../features/quotations/QuotationList'
 import QuotationFormPage from '../features/quotations/QuotationFormPage'
 import QuotationDetail from '../features/quotations/QuotationDetail'
@@ -193,6 +194,7 @@ export default function AppRoutes() {
           <Route path="/admin/customers/:id" element={<CustomerDetail />} />
           <Route path="/admin/leads" element={<LeadList />} />
           <Route path="/admin/leads/new" element={<LeadFormPage />} />
+          <Route path="/admin/leads/:id" element={<LeadDetail />} />
           <Route path="/admin/quotations" element={<QuotationList />} />
           <Route path="/admin/quotations/new" element={<QuotationFormPage />} />
           <Route path="/admin/quotations/:id" element={<QuotationDetail />} />
@@ -238,6 +240,7 @@ export default function AppRoutes() {
           <Route path="/sales/customers/:id" element={<CustomerDetail />} />
           <Route path="/sales/leads" element={<LeadList />} />
           <Route path="/sales/leads/new" element={<LeadFormPage />} />
+          <Route path="/sales/leads/:id" element={<LeadDetail />} />
           <Route path="/sales/quotations" element={<QuotationList />} />
           <Route path="/sales/quotations/new" element={<QuotationFormPage />} />
           <Route path="/sales/quotations/:id" element={<QuotationDetail />} />

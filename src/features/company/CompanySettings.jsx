@@ -112,16 +112,18 @@ function getFileNameFromUrl(url) {
 }
 
 function getPreviewFileKind({ name = "", type = "", url = "" }) {
-  const fileHint = `${name} ${url}`.toLowerCase();
+  // Match the extension against `name` and `url` separately (each own end-anchored) rather than
+  // a single concatenated "name url" string - a joined string only ever end-anchors on whichever
+  // value comes last, silently missing the extension on the other one.
+  const nameHint = name.toLowerCase();
+  const urlHint = url.toLowerCase();
+  const matchesExt = (pattern) => pattern.test(nameHint) || pattern.test(urlHint);
 
-  if (
-    type.startsWith("image/") ||
-    /\.(png|jpe?g|gif|webp|bmp|svg)(?:$|[?#])/i.test(fileHint)
-  ) {
+  if (type.startsWith("image/") || matchesExt(/\.(png|jpe?g|gif|webp|bmp|svg)(?:$|[?#])/i)) {
     return "image";
   }
 
-  if (type === "application/pdf" || /\.pdf(?:$|[?#])/i.test(fileHint)) {
+  if (type === "application/pdf" || matchesExt(/\.pdf(?:$|[?#])/i)) {
     return "pdf";
   }
 
@@ -129,12 +131,19 @@ function getPreviewFileKind({ name = "", type = "", url = "" }) {
     type === "application/msword" ||
     type ===
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    /\.(doc|docx)(?:$|[?#])/i.test(fileHint)
+    matchesExt(/\.(doc|docx)(?:$|[?#])/i)
   ) {
     return "word";
   }
 
   return "file";
+}
+
+// Chrome's built-in PDF viewer honors these Adobe "open parameters" as a URL hash - hides its
+// own toolbar/side-panel/scrollbar chrome so an embedded PDF reads as a plain content thumbnail
+// instead of a miniature scrollable viewer.
+function pdfPreviewSrc(url) {
+  return `${url}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&view=FitH`;
 }
 
 function buildPreviewFiles({ value, displayName, fileType }) {
@@ -622,6 +631,54 @@ function CheckboxField({ label, name, checked, onChange, disabled }) {
   );
 }
 
+// Small thumbnail strip for a multi-file field's extra files (beyond the primary one shown in
+// the big box) - mirrors the "Other Documents" strip used on the Customer form so multi-file
+// uploads look consistent across the app instead of just listing raw filenames.
+function MiniFilePreviewStrip({ files = [] }) {
+  if (!files.length) return null;
+
+  const visibleFiles = files.slice(0, 2);
+  const remainingCount = files.length - visibleFiles.length;
+
+  return (
+    <div className="mt-2 flex min-w-0 items-center gap-2">
+      {visibleFiles.map((file) => (
+        <a
+          key={`${file.name}-${file.url}`}
+          href={file.url}
+          target="_blank"
+          rel="noreferrer"
+          title={file.name}
+          className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
+        >
+          {file.kind === "image" ? (
+            <img src={file.url} alt={file.name} className="size-full object-cover" />
+          ) : file.kind === "pdf" ? (
+            <iframe
+              src={pdfPreviewSrc(file.url)}
+              title={file.name}
+              scrolling="no"
+              className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-white"
+            />
+          ) : (
+            <span className="flex size-full items-center justify-center text-neutral-500">
+              <FileText className="size-5" aria-hidden="true" />
+            </span>
+          )}
+          <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1 py-0.5 text-[9px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+            {file.name}
+          </span>
+        </a>
+      ))}
+      {remainingCount > 0 && (
+        <span className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-xs font-semibold text-neutral-500">
+          +{remainingCount}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function FileUploadField({
   label,
   name,
@@ -648,7 +705,10 @@ function FileUploadField({
       ((value.startsWith("http://") || value.startsWith("https://")) &&
         (previewAsImage || (!displayName && accept === "image/*"))));
   const displayValue =
-    displayName || previewFiles.map((file) => file.name).join(", ");
+    multiple && previewFiles.length > 0
+      ? `${previewFiles.length} file(s)`
+      : displayName || previewFiles.map((file) => file.name).join(", ");
+  const extraPreviewFiles = multiple ? previewFiles.slice(1) : [];
   const handlePreview = () => {
     if (!canPreview) return;
 
@@ -659,11 +719,19 @@ function FileUploadField({
 
     openFileInNewTab(previewFiles[0]?.url);
   };
+  const isPdfPreview = !isImagePreview && previewFiles[0]?.kind === "pdf";
   const previewContent = isImagePreview ? (
     <img
       src={value}
       alt={`${label} preview`}
       className="max-h-16 max-w-32 object-contain"
+    />
+  ) : isPdfPreview ? (
+    <iframe
+      src={pdfPreviewSrc(previewFiles[0].url)}
+      title={`${label} preview`}
+      scrolling="no"
+      className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-white"
     />
   ) : canPreview ? (
     <FileText className="size-6 text-neutral-500" aria-hidden="true" />
@@ -678,7 +746,7 @@ function FileUploadField({
           <button
             type="button"
             onClick={handlePreview}
-            className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white text-xs font-medium text-neutral-400 transition-colors hover:border-primary-300 hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+            className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-white text-xs font-medium text-neutral-400 transition-colors hover:border-primary-300 hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
             aria-label={`Open ${label}`}
             title={`Open ${label}`}
           >
@@ -699,6 +767,7 @@ function FileUploadField({
               {uploading ? "Uploading..." : displayValue}
             </p>
           )}
+          {!uploading && <MiniFilePreviewStrip files={extraPreviewFiles} />}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {canPreview && (
               <Button
@@ -2358,12 +2427,18 @@ export default function CompanySettings() {
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => handleTabChange(item.id)}
-                    className={`flex shrink-0 items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-sm font-medium transition-colors lg:w-full ${
+                    className={`relative flex shrink-0 items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-sm font-medium transition-colors lg:w-full ${
                       isActive
-                        ? "bg-primary-50 text-primary-700 ring-1 ring-primary-100"
+                        ? "bg-[#c4eba9] text-neutral-900 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]"
                         : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-800"
                     }`}
                   >
+                    <span
+                      className={`absolute left-1 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-primary-900 transition-opacity ${
+                        isActive ? "opacity-100" : "opacity-0"
+                      }`}
+                      aria-hidden="true"
+                    />
                     <Icon className="size-4 shrink-0" />
                     <span className="whitespace-nowrap">{item.label}</span>
                   </button>

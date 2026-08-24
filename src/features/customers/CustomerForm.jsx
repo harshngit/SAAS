@@ -3,6 +3,7 @@ import {
   BadgeInfo,
   Building2,
   CreditCard,
+  Eye,
   FileText,
   Globe2,
   Handshake,
@@ -240,12 +241,12 @@ const formSections = [
     { name: 'youtube', label: 'YouTube', description: 'YouTube channel.', type: 'URL', input: 'url' },
   ]),
   section('Documents (Uploads)', [
-    { name: 'gstCertificate', label: 'GST Certificate', description: 'Tax registration certificate.', type: 'PDF/Image Upload', input: 'file', wide: true, icon: ReceiptText },
-    { name: 'panCard', label: 'PAN Card', description: 'PAN document.', type: 'PDF/Image Upload', input: 'file', wide: true, icon: CreditCard },
-    { name: 'businessRegistrationCertificate', label: 'Business Registration Certificate', description: 'Registration proof.', type: 'PDF Upload', input: 'file', wide: true, icon: Building2 },
-    { name: 'addressProof', label: 'Address Proof', description: 'Utility bill, lease agreement, etc.', type: 'PDF/Image Upload', input: 'file', wide: true, icon: MapPin },
-    { name: 'purchaseAgreement', label: 'Purchase Agreement', description: 'Signed contract.', type: 'PDF Upload', input: 'file', wide: true, icon: Handshake },
-    { name: 'otherDocuments', label: 'Other Documents', description: 'Additional files.', type: 'Multiple File Upload', input: 'file', multiple: true, wide: true, icon: FileText },
+    { name: 'gstCertificate', label: 'GST Certificate', description: 'Tax registration certificate.', type: 'PDF/Image Upload', input: 'file', icon: ReceiptText },
+    { name: 'panCard', label: 'PAN Card', description: 'PAN document.', type: 'PDF/Image Upload', input: 'file', icon: CreditCard },
+    { name: 'businessRegistrationCertificate', label: 'Business Registration Certificate', description: 'Registration proof.', type: 'PDF Upload', input: 'file', icon: Building2 },
+    { name: 'addressProof', label: 'Address Proof', description: 'Utility bill, lease agreement, etc.', type: 'PDF/Image Upload', input: 'file', icon: MapPin },
+    { name: 'purchaseAgreement', label: 'Purchase Agreement', description: 'Signed contract.', type: 'PDF Upload', input: 'file', icon: Handshake },
+    { name: 'otherDocuments', label: 'Other Documents', description: 'Additional files.', type: 'Multiple File Upload', input: 'file', multiple: true, icon: FileText },
   ]),
   section('Additional Information', [
     { name: 'dateOfBirth', label: 'Date of Birth', description: 'For individual customers.', type: 'Date Picker', input: 'date' },
@@ -354,6 +355,14 @@ const revokeUploadPreviewUrls = (previews = []) => {
   previews.forEach((preview) => URL.revokeObjectURL(preview.url))
 }
 
+// Chrome's built-in PDF viewer honors these Adobe "open parameters" as a URL hash - hides its
+// own toolbar/side-panel/scrollbar chrome so an embedded PDF reads as a plain content thumbnail
+// instead of a miniature scrollable viewer (still `pointer-events-none`d on top, as a fallback
+// for viewers that don't honor the hash).
+function pdfPreviewSrc(url) {
+  return `${url}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&view=FitH`
+}
+
 function UploadPreview({ previews = [] }) {
   if (!previews.length) {
     return null
@@ -380,7 +389,12 @@ function UploadPreview({ previews = [] }) {
             {isImage ? (
               <img src={preview.url} alt={preview.name} className="size-full object-cover" />
             ) : isPdf ? (
-              <iframe src={preview.url} title={preview.name} className="size-full pointer-events-none border-0 bg-white" />
+              <iframe
+                src={pdfPreviewSrc(preview.url)}
+                title={preview.name}
+                scrolling="no"
+                className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-white"
+              />
             ) : (
               <span className="flex size-full items-center justify-center text-neutral-500">
                 <FileText className="size-5" aria-hidden="true" />
@@ -401,50 +415,91 @@ function UploadPreview({ previews = [] }) {
   )
 }
 
-function CustomerUploadField({ field, value, previews, onChange, onRemove, error, uploading = false }) {
-  const Icon = field.icon || FileText
-  const hasValue = Boolean(value)
+function DocumentThumbnail({ preview }) {
+  if (!preview) {
+    return (
+      <div className="flex h-20 w-36 shrink-0 items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white text-neutral-300">
+        <FileText className="size-6" aria-hidden="true" />
+      </div>
+    )
+  }
+
+  const isImage = (preview.type || '').startsWith('image/')
+  const isPdf = preview.type === 'application/pdf'
 
   return (
-    <div>
-      <div
-        className={`flex flex-col gap-4 rounded-2xl border p-4 transition-all sm:flex-row sm:items-center sm:justify-between ${
-          hasValue ? 'border-primary-100 bg-primary-50/40' : 'border-neutral-100 bg-neutral-50 hover:border-neutral-200'
-        }`}
-      >
-        <div className="flex min-w-0 items-start gap-3">
-          <span
-            className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${
-              hasValue ? 'bg-primary-100 text-primary-700' : 'bg-white text-neutral-400 ring-1 ring-neutral-200'
-            }`}
-          >
-            <Icon className="size-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold leading-5 text-neutral-900">
-                {field.label}
-                {field.required && <span className="text-red-500"> *</span>}
-              </p>
-              <Badge variant={uploading ? 'info' : hasValue ? 'success' : 'neutral'}>
-                {uploading ? 'Uploading…' : hasValue ? 'Uploaded' : 'Not uploaded'}
-              </Badge>
-            </div>
-            {field.description && <p className="mt-0.5 text-xs text-neutral-500">{field.description}</p>}
-            {hasValue && !uploading && <p className="mt-1 truncate text-xs font-medium text-primary-700">{value}</p>}
-          </div>
-        </div>
+    <a
+      href={preview.url}
+      target="_blank"
+      rel="noreferrer"
+      title={`Preview ${preview.name}`}
+      className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-white transition-colors hover:border-primary-300 hover:bg-primary-50/50"
+    >
+      {isImage ? (
+        <img src={preview.url} alt={preview.name} className="size-full object-cover" />
+      ) : isPdf ? (
+        <iframe
+          src={pdfPreviewSrc(preview.url)}
+          title={preview.name}
+          scrolling="no"
+          className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-white"
+        />
+      ) : (
+        <FileText className="size-6 text-neutral-400" aria-hidden="true" />
+      )}
+    </a>
+  )
+}
 
-        <div className="flex shrink-0 items-center gap-3 sm:pl-4">
-          <UploadPreview previews={previews} />
-          <div className="flex shrink-0 items-center gap-2">
+// Same card layout as Company Settings' Documents tab (thumbnail box + Preview/Upload/Remove),
+// kept visually consistent across the app - just fed from this form's own richer preview data
+// (real image/PDF thumbnails, and a horizontal strip for the "other documents" multi-file slot).
+function CustomerUploadField({ field, value, previews, onChange, onRemove, error, uploading = false }) {
+  const hasValue = Boolean(value)
+  const primaryPreview = previews?.[0]
+  const extraPreviews = previews?.slice(1) || []
+
+  return (
+    <div className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
+      <div className="grid grid-cols-[9rem_1fr] gap-4">
+        <DocumentThumbnail preview={primaryPreview} />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold leading-5 text-neutral-900">
+              {field.label}
+              {field.required && <span className="text-red-500"> *</span>}
+            </p>
+            <Badge variant={uploading ? 'info' : hasValue ? 'success' : 'neutral'}>
+              {uploading ? 'Uploading…' : hasValue ? 'Uploaded' : 'Not uploaded'}
+            </Badge>
+          </div>
+          {field.description && <p className="mt-0.5 text-xs text-neutral-500">{field.description}</p>}
+          {hasValue && !uploading && <p className="mt-1 truncate text-xs font-medium text-primary-700">{value}</p>}
+
+          {extraPreviews.length > 0 && (
+            <div className="mt-2">
+              <UploadPreview previews={extraPreviews} />
+            </div>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {primaryPreview && (
+              <button
+                type="button"
+                onClick={() => window.open(primaryPreview.url, '_blank', 'noreferrer')}
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-white px-3.5 text-xs font-medium tracking-tight text-neutral-700 transition-all hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700"
+              >
+                <Eye className="size-3.5" aria-hidden="true" />
+                Preview
+              </button>
+            )}
             <label
               className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3.5 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700 ${
                 uploading ? 'pointer-events-none opacity-60' : 'cursor-pointer'
               }`}
             >
               <Upload className="size-3.5" aria-hidden="true" />
-              {uploading ? 'Uploading…' : 'Upload'}
+              {uploading ? 'Uploading…' : field.multiple ? 'Upload Files' : 'Upload'}
               <input
                 type="file"
                 multiple={field.multiple}
@@ -457,21 +512,19 @@ function CustomerUploadField({ field, value, previews, onChange, onRemove, error
                 }}
               />
             </label>
-            <Button
+            <button
               type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 shrink-0 whitespace-nowrap rounded-full px-3 text-xs"
               disabled={!hasValue || uploading}
               onClick={onRemove}
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-white px-3.5 text-xs font-medium tracking-tight text-neutral-700 transition-all hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Trash2 className="size-3.5" aria-hidden="true" />
               Remove
-            </Button>
+            </button>
           </div>
+          {error && <span className="mt-2 block text-xs text-red-600">{error}</span>}
         </div>
       </div>
-      {error && <span className="mt-1.5 block text-xs text-red-600">{error}</span>}
     </div>
   )
 }
@@ -827,7 +880,9 @@ export default function CustomerForm({
     if (!formData.primaryContactPerson.trim()) nextErrors.primaryContactPerson = 'Primary contact person is required.'
     if (!formData.mobileNumber.trim()) nextErrors.mobileNumber = 'Mobile number is required.'
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) nextErrors.email = 'Enter a valid email address.'
-    if (formData.website && !/^https:\/\//i.test(formData.website.trim())) nextErrors.website = 'Website must begin with https://.'
+    if (formData.website && !/^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+([/?#].*)?$/i.test(formData.website.trim())) {
+      nextErrors.website = 'Enter a valid website (e.g. www.example.com).'
+    }
     if (formData.gstNumber && !gstNumberPattern.test(formData.gstNumber.trim().toUpperCase())) nextErrors.gstNumber = 'Enter a valid GST number.'
     if (!formData.billingAddress.trim()) nextErrors.billingAddress = 'Billing address is required.'
     if (!formData.googleMapsLocation.trim()) nextErrors.googleMapsLocation = 'Google Maps location is required.'
