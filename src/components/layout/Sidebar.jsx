@@ -195,24 +195,21 @@ export default function Sidebar({
           isExpanded ? 'md:w-[16rem]' : 'md:w-[4.75rem]'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'}`}
       >
-        <span
-          aria-hidden="true"
-          className="absolute right-[-0.6rem] top-1/2 z-10 hidden size-8 -translate-y-1/2 rounded-full bg-white md:block"
-        />
+        
         <button
-          type="button"
-          onClick={onToggleExpanded}
-          aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-          aria-expanded={isExpanded}
-          aria-controls={id}
-          className="group absolute right-[-0.65rem] top-1/2 z-20 hidden size-7 -translate-y-1/2 items-center justify-center rounded-full bg-white text-primary-700 shadow-(--shadow-card) ring-2 ring-neutral-200 transition-colors hover:text-primary-900 focus:outline-none focus:ring-2 focus:ring-neutral-200 md:flex"
-        >
-          {isExpanded ? (
-            <ChevronLeft className="size-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
-          ) : (
-            <ChevronRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-          )}
-        </button>
+  type="button"
+  onClick={onToggleExpanded}
+  aria-label={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
+  aria-expanded={isExpanded}
+  aria-controls={id}
+  className="group absolute right-[-0.65rem] top-1/2 z-20 hidden size-8 -translate-y-1/2 items-center justify-center rounded-full bg-white text-primary-700 shadow-(--shadow-card) ring-2 ring-neutral-200 transition-colors hover:text-primary-900 focus:outline-none focus:ring-2 focus:ring-neutral-200 md:flex"
+>
+  {isExpanded ? (
+    <ChevronLeft className="size-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
+  ) : (
+    <ChevronRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+  )}
+</button>
 
         <div className={`relative flex items-center px-4 pb-4 pt-5 ${isExpanded ? 'justify-between' : 'md:justify-center'}`}>
           <div className="flex min-w-0 items-center gap-3">

@@ -155,7 +155,7 @@ export default function Topbar() {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3">
       {pageTitle == 'Dashboard' && (
-        <div className="relative hidden w-full max-w-[31rem] sm:block lg:mx-auto">
+        <div className="relative hidden w-full max-w-[650px] sm:block lg:mx-auto">
           <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
           <input
             type="text"
@@ -165,7 +165,7 @@ export default function Topbar() {
         </div>
       )}
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-5 flex items-center gap-5">
         {logoutError && <p className="hidden text-sm text-red-600 md:block">{logoutError}</p>}
         <button
           type="button"
@@ -247,7 +247,7 @@ export default function Topbar() {
             <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary-500 to-primary-700 text-xs font-semibold text-white ring-2 ring-white">
               {initials}
             </div>
-            <div className="hidden text-left sm:block">
+            <div className="hidden pr-3 text-left sm:block">
               <p className="text-sm font-medium leading-tight text-neutral-900">{currentUser.name}</p>
               <span className="text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
             </div>

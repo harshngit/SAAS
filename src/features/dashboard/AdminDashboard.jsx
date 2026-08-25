@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { formatCompactCurrency, formatCurrency } from '../../utils/format'
 import { getAdminDashboard } from '../../api/dashboard'
 import {
@@ -142,25 +143,92 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
 
   return (
     <div
-      className={`relative flex min-h-[132px] flex-col overflow-hidden rounded-[1rem] p-3 shadow-[0_1px_2px_rgb(15_23_42/0.03)] ${toneClasses[tone]}`}
+      className={`group relative flex min-h-[12.5rem] flex-col overflow-hidden rounded-[1rem] p-3.5 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-3.5 ${toneClasses[tone]}`}
     >
-      <div className="pointer-events-none absolute right-3 top-3 flex size-7 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
-        <Icon className="size-3.5" aria-hidden="true" />
-      </div>
-      <div className="min-w-0 pr-8">
-        <p className="max-w-full break-words text-[0.58rem] font-semibold uppercase leading-3.5 tracking-[0.1em] text-current/72">
+      <div className="min-w-0">
+        <p className="mx-auto min-h-[2.35rem] max-w-[8rem] whitespace-normal break-normal text-center text-[0.68rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-current/72 sm:text-[0.72rem]">
           {title}
         </p>
-        <p className="mt-1.5 break-words font-(--font-display) text-[1.08rem] font-semibold leading-tight tracking-tight">
-          {value}
-        </p>
-        {delta && <p className="mt-1 break-words text-[0.65rem] leading-3.5 text-current/78">{delta}</p>}
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate font-(--font-display) text-[1.05rem] font-semibold leading-none tracking-tight">
+            {value}
+          </p>
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 transition-transform duration-300 group-hover:scale-105">
+            <Icon className="size-3.5" aria-hidden="true" />
+          </div>
+        </div>
+        {delta && <p className="mt-1 break-words text-[0.65rem] leading-4 text-current/78">{delta}</p>}
       </div>
-      {footer && <p className="mt-auto pt-2.5 break-words text-[0.65rem] font-medium leading-3.5 text-current/82">{footer}</p>}
+      {footer && (
+        <div className="mt-auto flex items-center gap-1 pt-2.5 text-[0.66rem] font-medium leading-4 text-current/82 transition-transform duration-300 group-hover:translate-x-0.5">
+          <span>{footer}</span>
+          <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
+        </div>
+      )}
     </div>
   )
 }
 
+function FeaturedSalesCard({ totalSales, totalOrders, pendingOrders, toDeliverOrders }) {
+  const navigate = useNavigate()
+
+  return (
+    <button
+      type="button"
+      onClick={() => navigate('/admin/orders')}
+      aria-label="View sales orders"
+      className="group relative flex min-h-[15rem] flex-col overflow-hidden rounded-[1rem] bg-[linear-gradient(180deg,#0f5a12_0%,#063b00_100%)] p-4 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-4"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.06),transparent_30%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
+      <div className="pointer-events-none absolute right-3 top-3 flex size-14 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-105 sm:size-16">
+        <IndianRupee className="size-7 sm:size-8" aria-hidden="true" />
+      </div>
+
+      <div className="min-w-0 pr-14">
+        <p className="max-w-full whitespace-nowrap text-[0.7rem] font-semibold uppercase tracking-[0.11em] text-white/82 sm:text-[0.8rem]">
+          Today&apos;s Sales
+        </p>
+        <p className="mt-1.5 font-(--font-display) text-[2.8rem] font-semibold leading-none tracking-tight text-white sm:text-[3.2rem]">
+          {formatCurrency(totalSales)}
+        </p>
+      </div>
+
+      <div className="relative mt-6 grid grid-cols-3 items-stretch divide-x divide-white/10 sm:mt-8">
+        <div className="flex flex-col items-center justify-center px-4 py-2 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-6">
+          <p className="text-[0.72rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.82rem]">
+            Orders
+          </p>
+          <p className="mt-1.5 text-[1.8rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[2rem]">
+            {totalOrders}
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center px-4 py-2 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-6">
+          <p className="text-[0.72rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.82rem]">
+            Pending
+          </p>
+          <p className="mt-1.5 text-[1.8rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[2rem]">
+            {pendingOrders}
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center px-4 py-2 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-6">
+          <p className="whitespace-nowrap text-[0.72rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.82rem]">
+            To Deliver
+          </p>
+          <p className="mt-1.5 text-[1.8rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[2rem]">
+            {toDeliverOrders}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-auto pt-4 text-[0.9rem] font-medium leading-4 text-white/88">
+        <span className="inline-flex items-center gap-1.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-white">
+          View Sales
+          <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
+        </span>
+      </div>
+    </button>
+  )
+}
 function StatMini({ label, sublabel, value, pct, tone = 'green' }) {
   const colors = {
     green: 'bg-emerald-500',
@@ -320,8 +388,8 @@ export default function AdminDashboard() {
   }))
 
   return (
-    <div className="space-y-3 rounded-[2rem] bg-[#f5f7fb] p-3 sm:p-4 lg:p-5">
-      <div className="overflow-hidden rounded-[1.15rem] border border-white/70 bg-white p-1.5 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+    <div className="space-y-3 rounded-[2rem] bg-transparent">
+      <div className="overflow-hidden rounded-[1.15rem] border border-white/70 bg-white p-2.5 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
         <div className="grid w-full grid-cols-[1fr_repeat(5,minmax(0,1fr))_88px] gap-1.5">
           <Select
             options={dateRangePresets}
@@ -348,19 +416,19 @@ export default function AdminDashboard() {
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-9">
+        <div className="md:col-span-2 xl:col-span-2">
+          <FeaturedSalesCard
+            totalSales={summary.today_sales}
+            totalOrders={ordersSummary.total ?? 0}
+            pendingOrders={ordersSummary.pending ?? 0}
+            toDeliverOrders={ordersSummary.to_deliver ?? 0}
+          />
+        </div>
         <KpiCard
-          title="Today's Sales"
-          value={formatCurrency(summary.today_sales)}
-          delta={`Orders ${ordersSummary.total ?? 0} • Pending ${ordersSummary.pending ?? 0} • To Deliver ${ordersSummary.to_deliver ?? 0}`}
-          footer="View Sales"
-          icon={IndianRupee}
-          tone="green"
-        />
-        <KpiCard
-          title="Period Sales"
+          title="This Month Sales"
           value={formatCurrency(summary.period_sales ?? summary.month_sales)}
-          delta={`${salesGrowth >= 0 ? '+' : ''}${salesGrowth}% vs previous period`}
+          delta={`${salesGrowth >= 0 ? '+' : ''}${salesGrowth}% vs last month`}
           footer="View Sales Report"
           icon={Wallet}
           tone="mint"
@@ -403,7 +471,7 @@ export default function AdminDashboard() {
         <KpiCard
           title="Sales Growth"
           value={`${salesGrowth >= 0 ? '+' : ''}${salesGrowth}%`}
-          delta="vs previous period"
+          delta="vs last month"
           footer="View Growth Report"
           icon={Sparkles}
           tone="pink"
