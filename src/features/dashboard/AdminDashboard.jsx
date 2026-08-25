@@ -141,6 +141,10 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
     sky: 'bg-[linear-gradient(135deg,#dbeafe,#bfdbfe)] text-blue-950 border border-blue-100',
   }
 
+  const footerParts = footer ? footer.split(' ') : []
+  const footerFirstLine = footerParts.length === 3 ? footerParts.slice(0, 2).join(' ') : footerParts.slice(0, 1).join(' ')
+  const footerSecondLine = footerParts.length === 3 ? footerParts.slice(2).join(' ') : footerParts.slice(1).join(' ')
+
   return (
     <div
       className={`group relative flex min-h-[12.5rem] flex-col overflow-hidden rounded-[1rem] p-3.5 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-3.5 ${toneClasses[tone]}`}
@@ -160,8 +164,11 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
         {delta && <p className="mt-1 break-words text-[0.65rem] leading-4 text-current/78">{delta}</p>}
       </div>
       {footer && (
-        <div className="mt-auto flex items-center gap-1 pt-2.5 text-[0.66rem] font-medium leading-4 text-current/82 transition-transform duration-300 group-hover:translate-x-0.5">
-          <span>{footer}</span>
+        <div className="mt-auto flex w-full items-end justify-between gap-4 pt-2.5 text-[0.66rem] font-medium leading-4 text-current/82 transition-transform duration-300 group-hover:translate-x-0.5">
+          <span className="min-w-0 flex-1 leading-[1.05]">
+            <span className="block whitespace-nowrap">{footerFirstLine}</span>
+            {footerSecondLine && <span className="block whitespace-nowrap">{footerSecondLine}</span>}
+          </span>
           <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
         </div>
       )}
@@ -177,50 +184,50 @@ function FeaturedSalesCard({ totalSales, totalOrders, pendingOrders, toDeliverOr
       type="button"
       onClick={() => navigate('/admin/orders')}
       aria-label="View sales orders"
-      className="group relative flex min-h-[15rem] flex-col overflow-hidden rounded-[1rem] bg-[linear-gradient(180deg,#0f5a12_0%,#063b00_100%)] p-4 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-4"
+      className="group relative flex h-[14rem] min-w-[320px] flex-col overflow-hidden rounded-[1rem] bg-[linear-gradient(180deg,#0f5a12_0%,#063b00_100%)] p-3.5 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-3.5"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.06),transparent_30%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
-      <div className="pointer-events-none absolute right-3 top-3 flex size-14 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-105 sm:size-16">
-        <IndianRupee className="size-7 sm:size-8" aria-hidden="true" />
+      <div className="pointer-events-none absolute right-3 top-3 flex size-13 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-105 sm:size-14">
+        <IndianRupee className="size-6.5 sm:size-7" aria-hidden="true" />
       </div>
 
-      <div className="min-w-0 pr-14">
-        <p className="max-w-full whitespace-nowrap text-[0.7rem] font-semibold uppercase tracking-[0.11em] text-white/82 sm:text-[0.8rem]">
+      <div className="min-w-0 pr-13">
+        <p className="max-w-full whitespace-nowrap text-[0.68rem] font-semibold uppercase tracking-[0.11em] text-white/82 sm:text-[0.76rem]">
           Today&apos;s Sales
         </p>
-        <p className="mt-1.5 font-(--font-display) text-[2.8rem] font-semibold leading-none tracking-tight text-white sm:text-[3.2rem]">
+        <p className="mt-1 font-(--font-display) text-[2.55rem] font-semibold leading-none tracking-tight text-white sm:text-[2.10rem]">
           {formatCurrency(totalSales)}
         </p>
       </div>
 
-      <div className="relative mt-6 grid grid-cols-3 items-stretch divide-x divide-white/10 sm:mt-8">
-        <div className="flex flex-col items-center justify-center px-4 py-2 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-6">
-          <p className="text-[0.72rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.82rem]">
+      <div className="relative mt-5 grid grid-cols-3 items-stretch divide-x divide-white/10 sm:mt-6">
+        <div className="flex flex-col items-center justify-center px-3.5 py-1.5 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-5">
+          <p className="text-[0.68rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.75rem]">
             Orders
           </p>
-          <p className="mt-1.5 text-[1.8rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[2rem]">
+          <p className="mt-1 text-[1.65rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[1.85rem]">
             {totalOrders}
           </p>
         </div>
-        <div className="flex flex-col items-center justify-center px-4 py-2 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-6">
-          <p className="text-[0.72rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.82rem]">
+        <div className="flex flex-col items-center justify-center px-3.5 py-1.5 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-5">
+          <p className="text-[0.68rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.75rem]">
             Pending
           </p>
-          <p className="mt-1.5 text-[1.8rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[2rem]">
+          <p className="mt-1 text-[1.65rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[1.85rem]">
             {pendingOrders}
           </p>
         </div>
-        <div className="flex flex-col items-center justify-center px-4 py-2 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-6">
-          <p className="whitespace-nowrap text-[0.72rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.82rem]">
+        <div className="flex flex-col items-center justify-center px-3.5 py-1.5 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-5">
+          <p className="whitespace-nowrap text-[0.68rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.75rem]">
             To Deliver
           </p>
-          <p className="mt-1.5 text-[1.8rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[2rem]">
+          <p className="mt-1 text-[1.65rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[1.85rem]">
             {toDeliverOrders}
           </p>
         </div>
       </div>
 
-      <div className="mt-auto pt-4 text-[0.9rem] font-medium leading-4 text-white/88">
+      <div className="mt-auto pt-3 text-[0.88rem] font-medium leading-4 text-white/88">
         <span className="inline-flex items-center gap-1.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-white">
           View Sales
           <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
@@ -301,6 +308,7 @@ const stockToneByStatus = { out_of_stock: 'red', low_stock: 'amber' }
 
 export default function AdminDashboard() {
   const [datePreset, setDatePreset] = useState('this_month')
+  const [recentOrdersSearch, setRecentOrdersSearch] = useState('')
   const [dashboard, setDashboard] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -386,6 +394,14 @@ export default function AdminDashboard() {
     total: row.total,
     orderDate: formatOrderDate(row.date),
   }))
+  const recentOrdersSearchTerm = recentOrdersSearch.trim().toLowerCase()
+  const filteredRecentOrders = !recentOrdersSearchTerm
+    ? recentOrders
+    : recentOrders.filter((order) =>
+        [order.orderNumber, order.customerName, order.status, order.paymentStatus, order.total, order.orderDate].some((value) =>
+          String(value ?? '').toLowerCase().includes(recentOrdersSearchTerm),
+        ),
+      )
 
   return (
     <div className="space-y-3 rounded-[2rem] bg-transparent">
@@ -416,8 +432,8 @@ export default function AdminDashboard() {
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-9">
-        <div className="md:col-span-2 xl:col-span-2">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,5.55fr)]">
+        <div>
           <FeaturedSalesCard
             totalSales={summary.today_sales}
             totalOrders={ordersSummary.total ?? 0}
@@ -425,92 +441,94 @@ export default function AdminDashboard() {
             toDeliverOrders={ordersSummary.to_deliver ?? 0}
           />
         </div>
-        <KpiCard
-          title="This Month Sales"
-          value={formatCurrency(summary.period_sales ?? summary.month_sales)}
-          delta={`${salesGrowth >= 0 ? '+' : ''}${salesGrowth}% vs last month`}
-          footer="View Sales Report"
-          icon={Wallet}
-          tone="mint"
-        />
-        <KpiCard
-          title="Purchases"
-          value={formatCurrency(summary.purchases)}
-          footer="View Purchase Report"
-          icon={ShoppingCart}
-          tone="amber"
-        />
-        <KpiCard
-          title="Expenses"
-          value={formatCurrency(summary.expenses)}
-          footer="View Expense Report"
-          icon={CreditCard}
-          tone="violet"
-        />
-        <KpiCard
-          title="Gross Profit"
-          value={formatCurrency(grossProfit)}
-          footer="View Profit & Loss"
-          icon={TrendingUp}
-          tone="cyan"
-        />
-        <KpiCard
-          title="Net Profit"
-          value={formatCurrency(netProfit)}
-          footer="View Profit & Loss"
-          icon={CircleDollarSign}
-          tone="blue"
-        />
-        <KpiCard
-          title="New Customers"
-          value={summary.new_customers ?? 0}
-          footer="View Customers"
-          icon={Users}
-          tone="sky"
-        />
-        <KpiCard
-          title="Sales Growth"
-          value={`${salesGrowth >= 0 ? '+' : ''}${salesGrowth}%`}
-          delta="vs last month"
-          footer="View Growth Report"
-          icon={Sparkles}
-          tone="pink"
-        />
+        <div className="pl-18 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7 w-[966px] h-[70px]">
+          <KpiCard
+            title="This Month Sales"
+            value={formatCurrency(summary.period_sales ?? summary.month_sales)}
+            delta={`${salesGrowth >= 0 ? '+' : ''}${salesGrowth}% vs last month`}
+            footer="View Sales Report"
+            icon={Wallet}
+            tone="mint"
+          />
+          <KpiCard
+            title="Purchases"
+            value={formatCurrency(summary.purchases)}
+            footer="View Purchase Report"
+            icon={ShoppingCart}
+            tone="amber"
+          />
+          <KpiCard
+            title="Expenses"
+            value={formatCurrency(summary.expenses)}
+            footer="View Expense Report"
+            icon={CreditCard}
+            tone="violet"
+          />
+          <KpiCard
+            title="Gross Profit"
+            value={formatCurrency(grossProfit)}
+            footer="View Profit & Loss"
+            icon={TrendingUp}
+            tone="cyan"
+          />
+          <KpiCard
+            title="Net Profit"
+            value={formatCurrency(netProfit)}
+            footer="View Profit & Loss"
+            icon={CircleDollarSign}
+            tone="blue"
+          />
+          <KpiCard
+            title="New Customers"
+            value={summary.new_customers ?? 0}
+            footer="View Customers"
+            icon={Users}
+            tone="sky"
+          />
+          <KpiCard
+            title="Sales Growth"
+            value={`${salesGrowth >= 0 ? '+' : ''}${salesGrowth}%`}
+            delta="vs last month"
+            footer="View Growth Report"
+            icon={Sparkles}
+            tone="pink"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="space-y-3">
-          <DashboardCard className="border-neutral-100 p-2.5">
+        <div className="space-y-3 ">
+          <div className="border-0 bg-transparent p-0 shadow-none hover:shadow-none">
             <div className="grid grid-cols-5 gap-1.5">
-              <button className="flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.8rem] bg-white px-1 py-1 text-center text-primary-700 ring-1 ring-neutral-100">
-                <ShoppingCart className="size-3.5 shrink-0" />
+              <button className="flex min-h-[76px] min-w-0 bg-white flex-col items-center justify-center gap-0.5 rounded-[0.8rem] border border-neutral-100 px-1 py-3 text-center text-primary-700 shadow-none">
+                <ShoppingCart className="size-3.5 shrink-0  " />
                 <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
-                  <span className="block whitespace-nowrap">New</span>
+                  <span className="block whitespace-nowrap ">New</span>
                   <span className="block whitespace-nowrap">Sale</span>
                 </span>
               </button>
-              <button className="flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.8rem] bg-white px-1 py-1 text-center text-primary-700 ring-1 ring-neutral-100">
+              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.8rem] border border-neutral-100 bg-white px-1 py-3 text-center text-primary-700 shadow-none">
                 <PackagePlus className="size-3.5 shrink-0" />
                 <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
                   <span className="block whitespace-nowrap">New</span>
                   <span className="block whitespace-nowrap">Purchase</span>
                 </span>
               </button>
-              <button className="flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.8rem] bg-white px-1 py-1 text-center text-primary-700 ring-1 ring-neutral-100">
+              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.8rem] border border-neutral-100 bg-white px-1 py-3 text-center text-primary-700 shadow-none">
                 <Wallet className="size-3.5 shrink-0" />
                 <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
                   <span className="block whitespace-nowrap">Collect</span>
                   <span className="block whitespace-nowrap">Payment</span>
                 </span>
               </button>
-              <button className="flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.8rem] bg-white px-1 py-1 text-center text-primary-700 ring-1 ring-neutral-100">
+              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.8rem] border border-neutral-100 bg-white px-1 py-3 text-center text-primary-700 shadow-none">
                 <Clock className="size-3.5 shrink-0" />
                 <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
                   <span className="block whitespace-nowrap">Pending</span>
                   <span className="block whitespace-nowrap">Orders</span>
                 </span>
               </button>
-              <button className="flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.8rem] bg-white px-1 py-1 text-center text-primary-700 ring-1 ring-neutral-100">
+              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.8rem] border border-neutral-100 bg-white px-1 py-3 text-center text-primary-700 shadow-none">
                 <MoreHorizontal className="size-3.5 shrink-0" />
                 <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
                   <span className="block whitespace-nowrap">More</span>
@@ -518,7 +536,7 @@ export default function AdminDashboard() {
                 </span>
               </button>
             </div>
-          </DashboardCard>
+          </div>
 
           <DashboardCard
             title="Business Signals"
@@ -553,7 +571,7 @@ export default function AdminDashboard() {
           <DashboardCard
             title="Stock Watch"
             actions={<span className="text-[0.7rem] font-semibold text-primary-600">View all</span>}
-            className="[&>div:first-child]:mb-3"
+            className="min-h-[350px] [&>div:first-child]:mb-3"
           >
             {stockWatchRows.length === 0 ? (
               <p className="text-[0.72rem] text-neutral-400">Nothing running low right now.</p>
@@ -576,7 +594,7 @@ export default function AdminDashboard() {
           <DashboardCard
             title="Recent Activity"
             actions={<span className="text-[0.7rem] font-semibold text-primary-600">View all</span>}
-            className=" mt-5 min-h-[310px]"
+            className=" mt-5 min-h-[350px]"
           >
             <div className="flex min-h-[220px] flex-col justify-between">
               {recentOrders.slice(0, 5).map((order) => (
@@ -598,19 +616,61 @@ export default function AdminDashboard() {
               )}
             </div>
           </DashboardCard>
+
+          <DashboardCard
+            title={
+              <>
+                <span className="whitespace-nowrap">Top 5 Customers</span>
+                <br />
+                <span className="whitespace-nowrap">by Sales</span>
+              </>
+            }
+            subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
+            actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
+            className="min-h-[350px] [&>div:first-child_h3]:text-[0.78rem]"
+          >
+            {topCustomers.length === 0 ? (
+              <p className="text-[0.72rem] text-neutral-400">No sales in this period yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {topCustomers.map((customer, index) => {
+                  const width = Math.max(8, Math.round((customer.value / topCustomerPeak) * 100))
+                  return (
+                    <div key={customer.name} className="space-y-1">
+                      <div className="flex items-center justify-between gap-3 text-[0.78rem]">
+                        <span className="truncate font-medium text-neutral-700">{customer.name}</span>
+                        <span className="shrink-0 font-semibold text-neutral-900">{formatCurrency(customer.value)}</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
+                        <div className={`h-full rounded-full ${index === 0 ? 'bg-blue-500' : 'bg-blue-400'}`} style={{ width: `${width}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <div className="mx-auto flex items-center justify-center text-[0.7rem]">
+              <button className="mt-50 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                View Customer Report
+                <ChevronRight className="size-4 text-primary-600" />
+              </button>
+            </div>
+          </DashboardCard>
         </div>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,0.9fr)]">
+        <div className="-mt-5 space-y-4">
+          <div className="w-full">
+            <div className="grid items-stretch grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <DashboardCard
               title="Cashflow"
               subtitle={`Net for period ${formatCurrency(summary.period_sales ?? summary.month_sales)}`}
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
+              className="h-full min-h-[420px]"
             >
-              <ResponsiveContainer width="100%" height={230}>
+              <ResponsiveContainer width="100%" height={320}>
                 <BarChart data={cashflowData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid vertical={false} stroke="#edf1f5" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval={1} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval={4} />
                   <YAxis tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} tickFormatter={formatCompactCurrency} width={44} />
                   <Tooltip content={<CashflowTooltip />} cursor={{ fill: '#f8f9fa' }} />
                   <Bar name="Inflow" dataKey="value" fill="#14532d" radius={[6, 6, 0, 0]} barSize={18} />
@@ -623,99 +683,68 @@ export default function AdminDashboard() {
               title="Receivables vs Payables"
               subtitle="As of now"
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">Live</span>}
+              className="h-full min-h-[420px] [&>div:first-child]:mb-2"
             >
-              <div className="relative">
-                <ResponsiveContainer width="100%" height={170}>
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'Receivables', value: totalReceivables },
-                        { name: 'Payables', value: totalPayables },
-                      ]}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius="62%"
-                      outerRadius="88%"
-                      paddingAngle={4}
-                      stroke="none"
-                    >
-                      <Cell fill="#22c55e" />
-                      <Cell fill="#3b82f6" />
-                    </Pie>
-                    <Tooltip content={<DonutTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <p className="text-[0.7rem] text-neutral-400">Net Outstanding</p>
-                  <p className="font-(--font-display) text-xl font-semibold text-neutral-900">{formatCurrency(totalOutstanding)}</p>
+              <div className="flex h-full flex-col">
+                <div className="relative">
+                  <ResponsiveContainer width="100%" height={210}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Receivables', value: totalReceivables },
+                          { name: 'Payables', value: totalPayables },
+                        ]}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius="62%"
+                        outerRadius="88%"
+                        paddingAngle={4}
+                        stroke="none"
+                      >
+                        <Cell fill="#22c55e" />
+                        <Cell fill="#3b82f6" />
+                      </Pie>
+                      <Tooltip content={<DonutTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <p className="text-[0.7rem] text-neutral-400">Net Outstanding</p>
+                    <p className="font-(--font-display) text-xl font-semibold text-neutral-900">{formatCurrency(totalOutstanding)}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-2 space-y-1.5 text-[0.78rem]">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-neutral-600">
-                    <span className="size-2.5 rounded-full bg-emerald-500" />
-                    Receivables
-                  </span>
-                  <span className="font-semibold text-neutral-900">{formatCurrency(totalReceivables)}</span>
+                <div className="mt-1.5 space-y-1.5 text-[0.78rem]">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-neutral-600">
+                      <span className="size-2.5 rounded-full bg-emerald-500" />
+                      Receivables
+                    </span>
+                    <span className="font-semibold text-neutral-900">{formatCurrency(totalReceivables)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-neutral-600">
+                      <span className="size-2.5 rounded-full bg-blue-500" />
+                      Payables
+                    </span>
+                    <span className="font-semibold text-neutral-900">{formatCurrency(totalPayables)}</span>
+                  </div>
+                  {(receivablesPayables.overdue_receivables > 0 || receivablesPayables.overdue_payables > 0) && (
+                    <p className="pt-1 text-[0.68rem] text-amber-600">
+                      {formatCurrency(receivablesPayables.overdue_receivables || 0)} receivables and{' '}
+                      {formatCurrency(receivablesPayables.overdue_payables || 0)} payables overdue past{' '}
+                      {receivablesPayables.overdue_after_days ?? 0} days.
+                    </p>
+                  )}
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-neutral-600">
-                    <span className="size-2.5 rounded-full bg-blue-500" />
-                    Payables
-                  </span>
-                  <span className="font-semibold text-neutral-900">{formatCurrency(totalPayables)}</span>
+                <div className="mt-auto flex items-center justify-center text-[0.7rem]">
+                  <button className="mt-13 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                    View A/R Report
+                    <ChevronRight className="size-4 text-primary-600" />
+                  </button>
                 </div>
-                {(receivablesPayables.overdue_receivables > 0 || receivablesPayables.overdue_payables > 0) && (
-                  <p className="pt-1 text-[0.68rem] text-amber-600">
-                    {formatCurrency(receivablesPayables.overdue_receivables || 0)} receivables and{' '}
-                    {formatCurrency(receivablesPayables.overdue_payables || 0)} payables overdue past{' '}
-                    {receivablesPayables.overdue_after_days ?? 0} days.
-                  </p>
-                )}
-              </div>
-              <div className="mt-3 flex items-center justify-end text-[0.7rem]">
-                <button className="font-semibold text-primary-600">View A/R Report</button>
-                <ChevronRight className="size-4 text-primary-600" />
               </div>
             </DashboardCard>
 
-            <DashboardCard
-              title={
-                <>
-                  <span className="whitespace-nowrap">Top 5 Customers</span>
-                  <br />
-                  <span className="whitespace-nowrap">by Sales</span>
-                </>
-              }
-              subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
-              actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
-              className="[&>div:first-child_h3]:text-[0.78rem]"
-            >
-              {topCustomers.length === 0 ? (
-                <p className="text-[0.72rem] text-neutral-400">No sales in this period yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {topCustomers.map((customer, index) => {
-                    const width = Math.max(8, Math.round((customer.value / topCustomerPeak) * 100))
-                    return (
-                      <div key={customer.name} className="space-y-1">
-                        <div className="flex items-center justify-between gap-3 text-[0.78rem]">
-                          <span className="truncate font-medium text-neutral-700">{customer.name}</span>
-                          <span className="shrink-0 font-semibold text-neutral-900">{formatCurrency(customer.value)}</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
-                          <div className={`h-full rounded-full ${index === 0 ? 'bg-blue-500' : 'bg-blue-400'}`} style={{ width: `${width}%` }} />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-              <div className="mt-3 flex items-center justify-end text-[0.7rem]">
-                <button className="font-semibold text-primary-600">View Customer Report</button>
-                <ChevronRight className="size-4 text-primary-600" />
-              </div>
-            </DashboardCard>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
@@ -771,9 +800,11 @@ export default function AdminDashboard() {
                   <p className="text-[0.72rem] text-neutral-400">No expenses recorded in this period.</p>
                 )}
               </div>
-              <div className="mt-3 flex items-center justify-end text-[0.7rem]">
-                <button className="font-semibold text-primary-600">View Expense Report</button>
-                <ChevronRight className="size-4 text-primary-600" />
+              <div className="mt-auto flex items-center justify-center text-[0.7rem]">
+                <button className=" mt-26 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                  View Expense Report
+                  <ChevronRight className="size-4 text-primary-600" />
+                </button>
               </div>
             </DashboardCard>
           </div>
@@ -794,82 +825,97 @@ export default function AdminDashboard() {
                   <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
-              <div className="mt-3 flex items-center justify-end text-[0.7rem]">
-                <button className="font-semibold text-primary-600">View Sales Report</button>
-                <ChevronRight className="size-4 text-primary-600" />
+              <div className="mt-3 flex items-center justify-center text-[0.7rem]">
+                <button className="inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                  View Sales Report
+                  <ChevronRight className="size-4 text-primary-600" />
+                </button>
+              </div>
+            </DashboardCard>
+
+            <DashboardCard
+              title="Recent Orders"
+              subtitle="Latest sales orders across the organization"
+              actions={
+                <div className="relative w-full max-w-xs">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={recentOrdersSearch}
+                    onChange={(event) => setRecentOrdersSearch(event.target.value)}
+                    placeholder="Search orders..."
+                    className="w-full rounded-full border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  />
+                </div>
+              }
+            >
+              <DataTable
+                columns={[
+                  { key: 'orderNumber', header: 'Order #', sortable: true },
+                  { key: 'customerName', header: 'Customer', sortable: true },
+                  {
+                    key: 'status',
+                    header: 'Status',
+                    sortable: true,
+                    render: (row) => <Badge variant={statusVariant[row.status] || 'neutral'}>{formatStatusLabel(row.status)}</Badge>,
+                  },
+                  {
+                    key: 'paymentStatus',
+                    header: 'Payment',
+                    sortable: true,
+                    render: (row) => <Badge variant={paymentVariant[row.paymentStatus] || 'neutral'} dot>{formatStatusLabel(row.paymentStatus)}</Badge>,
+                  },
+                  { key: 'total', header: 'Total', sortable: true, align: 'right', render: (row) => formatCurrency(row.total) },
+                  { key: 'orderDate', header: 'Date', sortable: true },
+                ]}
+                data={filteredRecentOrders}
+                searchable={false}
+                pageSize={5}
+                actions={(row) => [
+                  { label: 'View order', icon: MoreHorizontal, onClick: () => {} },
+                  ...(row.status !== 'cancelled' && row.status !== 'delivered'
+                    ? [{ label: 'Cancel order', icon: Ban, danger: true, onClick: () => {} }]
+                    : []),
+                ]}
+              />
+            </DashboardCard>
+
+            <DashboardCard
+              title="Important Reports"
+              subtitle="Quick links"
+              actions={
+                <button className="inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-primary-600">
+                  All Reports
+                  <ChevronRight className="size-4" />
+                </button>
+              }
+            >
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {[
+                  'Sales Report',
+                  'Purchase Report',
+                  'Profit & Loss',
+                  'Cash Flow Report',
+                  'Inventory Report',
+                  'Tax Report',
+                  'AR Aging Report',
+                  'AP Aging Report',
+                  'Stock Valuation',
+                ].map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    className="flex items-center gap-2.5 rounded-[0.75rem] border border-neutral-100 bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-colors hover:border-primary-200 hover:bg-primary-50/40"
+                  >
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-neutral-100 text-neutral-600">
+                      <BarChart3 className="size-3.5" />
+                    </div>
+                    <span className="min-w-0 truncate text-[0.78rem] font-medium text-neutral-700">{label}</span>
+                  </button>
+                ))}
               </div>
             </DashboardCard>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 lg:col-span-2 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <DashboardCard title="Important Reports" subtitle="Quick links">
-            <div className="grid grid-cols-1 gap-1.5">
-              {[
-                'Sales Report',
-                'Purchase Report',
-                'Profit & Loss',
-                'Cash Flow Report',
-                'Inventory Report',
-                'Tax Report',
-                'AR Aging Report',
-                'AP Aging Report',
-                'Stock Valuation',
-              ].map((label) => (
-                <button
-                  key={label}
-                  type="button"
-                  className="flex items-center gap-2.5 rounded-[0.85rem] border border-neutral-100 bg-white px-3 py-2 text-left shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-colors hover:border-primary-200 hover:bg-primary-50/40"
-                >
-                  <div className="flex size-7 items-center justify-center rounded-lg bg-neutral-50 text-neutral-700 ring-1 ring-neutral-100">
-                    <BarChart3 className="size-3.5" />
-                  </div>
-                  <span className="text-[0.76rem] font-medium text-neutral-700">{label}</span>
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 flex items-center justify-end text-[0.7rem]">
-              <button className="font-semibold text-primary-600">All Reports</button>
-              <ChevronRight className="size-4 text-primary-600" />
-            </div>
-          </DashboardCard>
-
-          <DashboardCard
-            title="Recent Orders"
-            subtitle="Latest sales orders across the organization"
-            actions={<div className="flex items-center gap-2 text-[0.7rem] text-neutral-400"><Search className="size-3.5" />Search orders...</div>}
-          >
-            <DataTable
-              columns={[
-                { key: 'orderNumber', header: 'Order #', sortable: true },
-                { key: 'customerName', header: 'Customer', sortable: true },
-                {
-                  key: 'status',
-                  header: 'Status',
-                  sortable: true,
-                  render: (row) => <Badge variant={statusVariant[row.status] || 'neutral'}>{formatStatusLabel(row.status)}</Badge>,
-                },
-                {
-                  key: 'paymentStatus',
-                  header: 'Payment',
-                  sortable: true,
-                  render: (row) => <Badge variant={paymentVariant[row.paymentStatus] || 'neutral'} dot>{formatStatusLabel(row.paymentStatus)}</Badge>,
-                },
-                { key: 'total', header: 'Total', sortable: true, align: 'right', render: (row) => formatCurrency(row.total) },
-                { key: 'orderDate', header: 'Date', sortable: true },
-              ]}
-              data={recentOrders}
-              searchKeys={['orderNumber', 'customerName', 'status']}
-              searchPlaceholder="Search orders..."
-              pageSize={5}
-              actions={(row) => [
-                { label: 'View order', icon: MoreHorizontal, onClick: () => {} },
-                ...(row.status !== 'cancelled' && row.status !== 'delivered'
-                  ? [{ label: 'Cancel order', icon: Ban, danger: true, onClick: () => {} }]
-                  : []),
-              ]}
-            />
-          </DashboardCard>
         </div>
       </div>
     </div>

@@ -97,7 +97,7 @@ export default function DataTable({
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400 ${alignClass(column.align)}`}
+                  className={`whitespace-nowrap px-4 py-2.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400 ${alignClass(column.align)}`}
                 >
                   {column.sortable ? (
                     <button
@@ -121,7 +121,7 @@ export default function DataTable({
                   )}
                 </th>
               ))}
-              {actions && <th className="w-12 px-4 py-3" />}
+              {actions && <th className="w-12 px-4 py-2.5" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-50">
@@ -141,12 +141,12 @@ export default function DataTable({
               paginated.map((row) => (
                 <tr key={row[rowKey]} className="transition-colors hover:bg-primary-50/35">
                   {columns.map((column) => (
-                    <td key={column.key} className={`px-4 py-3.5 text-neutral-700 ${alignClass(column.align)}`}>
+                    <td key={column.key} className={`px-4 py-2.5 text-neutral-700 ${alignClass(column.align)}`}>
                       {column.render ? column.render(row) : row[column.key]}
                     </td>
                   ))}
                   {actions && (
-                    <td className="px-4 py-3.5 text-right">
+                    <td className="px-4 py-2.5 text-right">
                       <ActionMenu items={actions(row)} />
                     </td>
                   )}
