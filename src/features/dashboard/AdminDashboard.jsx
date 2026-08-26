@@ -652,8 +652,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="mt-3 space-y-4">
-          <div className="w-full">
-            <div className="grid items-stretch grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)]">
             <DashboardCard
               title="Cashflow"
               subtitle={`Net for period ${formatCurrency(summary.period_sales ?? summary.month_sales)}`}
@@ -737,7 +736,57 @@ export default function AdminDashboard() {
               </div>
             </DashboardCard>
 
-            </div>
+            <DashboardCard
+              title="Expense Breakdown"
+              subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
+              actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
+              className="h-full min-h-[420px] [&>div:first-child]:mb-4"
+            >
+              <div className="relative">
+                <ResponsiveContainer width="100%" height={175}>
+                  <PieChart>
+                    <Pie
+                      data={expenseBreakdown}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius="58%"
+                      outerRadius="86%"
+                      paddingAngle={3}
+                      stroke="none"
+                    >
+                      {expenseBreakdown.map((entry, index) => (
+                        <Cell key={entry.name} fill={['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8'][index % 5]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<DonutTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <p className="text-[0.7rem] text-neutral-400">Total Expenses</p>
+                  <p className="font-(--font-display) text-lg font-semibold text-neutral-900">{formatCurrency(summary.expenses)}</p>
+                </div>
+              </div>
+              <div className="space-y-1.5 text-[0.78rem]">
+                {expenseBreakdown.slice(0, 5).map((entry, index) => (
+                  <div key={entry.name} className="flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2 text-neutral-600">
+                      <span className="size-2.5 rounded-full" style={{ backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8'][index % 5] }} />
+                      {entry.name}
+                    </span>
+                    <span className="font-semibold text-neutral-900">{formatCurrency(entry.value)}</span>
+                  </div>
+                ))}
+                {expenseBreakdown.length === 0 && (
+                  <p className="text-[0.72rem] text-neutral-400">No expenses recorded in this period.</p>
+                )}
+              </div>
+              <div className="mt-auto flex items-center justify-center text-[0.7rem]">
+                <button className=" mt-26 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                  View Expense Report
+                  <ChevronRight className="size-4 text-primary-600" />
+                </button>
+              </div>
+            </DashboardCard>
           </div>
 
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
@@ -813,57 +862,6 @@ export default function AdminDashboard() {
             </DashboardCard>
           </div>
 
-          <DashboardCard
-            title="Expense Breakdown"
-            subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
-            actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
-            className="h-full [&>div:first-child]:mb-4"
-          >
-            <div className="relative">
-              <ResponsiveContainer width="100%" height={175}>
-                <PieChart>
-                  <Pie
-                    data={expenseBreakdown}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius="58%"
-                    outerRadius="86%"
-                    paddingAngle={3}
-                    stroke="none"
-                  >
-                    {expenseBreakdown.map((entry, index) => (
-                      <Cell key={entry.name} fill={['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8'][index % 5]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<DonutTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <p className="text-[0.7rem] text-neutral-400">Total Expenses</p>
-                <p className="font-(--font-display) text-lg font-semibold text-neutral-900">{formatCurrency(summary.expenses)}</p>
-              </div>
-            </div>
-            <div className="space-y-1.5 text-[0.78rem]">
-              {expenseBreakdown.slice(0, 5).map((entry, index) => (
-                <div key={entry.name} className="flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2 text-neutral-600">
-                    <span className="size-2.5 rounded-full" style={{ backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8'][index % 5] }} />
-                    {entry.name}
-                  </span>
-                  <span className="font-semibold text-neutral-900">{formatCurrency(entry.value)}</span>
-                </div>
-              ))}
-              {expenseBreakdown.length === 0 && (
-                <p className="text-[0.72rem] text-neutral-400">No expenses recorded in this period.</p>
-              )}
-            </div>
-            <div className="mt-auto flex items-center justify-center text-[0.7rem]">
-              <button className=" mt-26 inline-flex items-center gap-1.5 font-semibold text-primary-600">
-                View Expense Report
-                <ChevronRight className="size-4 text-primary-600" />
-              </button>
-            </div>
-          </DashboardCard>
           <div className="grid grid-cols-1 gap-3">
             <DashboardCard
               title="Recent Orders"
