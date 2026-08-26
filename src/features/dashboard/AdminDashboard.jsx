@@ -7,7 +7,6 @@ import {
   BarChart3,
   ChevronDown,
   ChevronRight,
-  CircleDollarSign,
   Clock,
   CreditCard,
   IndianRupee,
@@ -164,7 +163,10 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
         {delta && <p className="mt-1 break-words text-[0.65rem] leading-4 text-current/78">{delta}</p>}
       </div>
       {footer && (
-        <div className="mt-auto flex w-full items-end justify-between gap-4 pt-2.5 text-[0.66rem] font-medium leading-4 text-current/82 transition-transform duration-300 group-hover:translate-x-0.5">
+        <div
+          className="mt-auto flex w-full items-end justify-between gap-4 pt-2.5 text-[0.72rem] font-semibold leading-4 text-current/86 transition-transform duration-300 group-hover:translate-x-0.5"
+          style={{ borderTop: '1px solid #374151' }}
+        >
           <span className="min-w-0 flex-1 leading-[1.05]">
             <span className="block whitespace-nowrap">{footerFirstLine}</span>
             {footerSecondLine && <span className="block whitespace-nowrap">{footerSecondLine}</span>}
@@ -176,8 +178,50 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
   )
 }
 
-function FeaturedSalesCard({ totalSales, totalOrders, pendingOrders, toDeliverOrders }) {
+function ProfitSummaryCard({ grossProfit, netProfit }) {
+  const footer = 'View Profit & Loss'
+  const footerParts = footer.split(' ')
+  const footerFirstLine = footerParts.length === 3 ? footerParts.slice(0, 2).join(' ') : footerParts.slice(0, 1).join(' ')
+  const footerSecondLine = footerParts.length === 3 ? footerParts.slice(2).join(' ') : footerParts.slice(1).join(' ')
+
+  return (
+    <div className="group relative flex min-h-[12.5rem] flex-col overflow-hidden rounded-[1rem] bg-[linear-gradient(135deg,#0f766e,#2563eb)] p-3.5 text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-3.5">
+      <div className="min-w-0">
+        <p className="mx-auto max-w-[8rem] whitespace-normal break-normal text-center text-[0.68rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-white/72 sm:text-[0.72rem]">
+          Profit Summary
+        </p>
+        <div className="mt-2 grid grid-cols-2 divide-x divide-white/12">
+          <div className="flex flex-col items-center justify-center px-2 py-2 text-center">
+            <p className="text-[0.64rem] font-medium leading-none text-white/65">Gross Profit</p>
+            <p className="mt-1 font-(--font-display) text-[1.05rem] font-semibold leading-none tracking-tight text-white">
+              {formatCurrency(grossProfit)}
+            </p>
+          </div>
+          <div className="flex flex-col items-center justify-center px-2 py-2 text-center">
+            <p className="text-[0.64rem] font-medium leading-none text-white/65">Net Profit</p>
+            <p className="mt-1 font-(--font-display) text-[1.05rem] font-semibold leading-none tracking-tight text-white">
+              {formatCurrency(netProfit)}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div
+        className="mt-auto flex w-full items-end justify-between gap-4 pt-2.5 text-[0.72rem] font-semibold leading-4 text-white/86 transition-transform duration-300 group-hover:translate-x-0.5"
+        style={{ borderTop: '1px solid #374151' }}
+      >
+        <span className="min-w-0 flex-1 leading-[1.05]">
+          <span className="block whitespace-nowrap">{footerFirstLine}</span>
+          {footerSecondLine && <span className="block whitespace-nowrap">{footerSecondLine}</span>}
+        </span>
+        <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
+      </div>
+    </div>
+  )
+}
+
+function FeaturedSalesCard({ totalSales, monthlyTarget = 80000, monthlyAchieved = 0 }) {
   const navigate = useNavigate()
+  const remainingTarget = Math.max((monthlyTarget || 0) - (monthlyAchieved || 0), 0)
 
   return (
     <button
@@ -200,30 +244,32 @@ function FeaturedSalesCard({ totalSales, totalOrders, pendingOrders, toDeliverOr
         </p>
       </div>
 
-      <div className="relative mt-5 grid grid-cols-3 items-stretch divide-x divide-white/10 sm:mt-6">
-        <div className="flex flex-col items-center justify-center px-3.5 py-1.5 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-5">
-          <p className="text-[0.68rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.75rem]">
-            Orders
-          </p>
-          <p className="mt-1 text-[1.65rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[1.85rem]">
-            {totalOrders}
-          </p>
-        </div>
-        <div className="flex flex-col items-center justify-center px-3.5 py-1.5 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-5">
-          <p className="text-[0.68rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.75rem]">
-            Pending
-          </p>
-          <p className="mt-1 text-[1.65rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[1.85rem]">
-            {pendingOrders}
-          </p>
-        </div>
-        <div className="flex flex-col items-center justify-center px-3.5 py-1.5 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:px-5">
-          <p className="whitespace-nowrap text-[0.68rem] font-medium leading-none text-white/60 transition-colors duration-300 group-hover:text-white/72 sm:text-[0.75rem]">
-            To Deliver
-          </p>
-          <p className="mt-1 text-[1.65rem] font-medium leading-none text-white transition-all duration-300 group-hover:scale-[1.02] sm:text-[1.85rem]">
-            {toDeliverOrders}
-          </p>
+      <div className="relative mt-4 sm:mt-5">
+        <div className="grid grid-cols-3 divide-x divide-white/20">
+          <div className="min-w-0 px-2.5 py-1.5 text-center transition-transform duration-300 group-hover:-translate-y-0.5 sm:px-3">
+            <p className="mx-auto max-w-[5rem] whitespace-normal break-words text-[0.58rem] font-semibold uppercase leading-[1.05] tracking-[0.12em] text-white/66 sm:text-[0.62rem]">
+              Monthly Target
+            </p>
+            <p className="mt-5 text-[0.95rem] font-semibold leading-none text-white sm:text-[1.05rem]">
+              {formatCurrency(monthlyTarget)}
+            </p>
+          </div>
+          <div className="min-w-0 px-2.5 py-1.5 text-center transition-transform duration-300 group-hover:-translate-y-0.5 sm:px-3">
+            <p className="mx-auto max-w-[5rem] whitespace-normal break-words text-[0.58rem] font-semibold uppercase leading-[1.05] tracking-[0.12em] text-white/66 sm:text-[0.62rem]">
+              Achieved
+            </p>
+            <p className="mt-8 text-[0.95rem] font-semibold leading-none text-white sm:text-[1.05rem]">
+              {formatCurrency(monthlyAchieved)}
+            </p>
+          </div>
+          <div className="min-w-0 px-2.5 py-1.5 text-center transition-transform duration-300 group-hover:-translate-y-0.5 sm:px-3">
+            <p className="mx-auto max-w-[5.5rem] whitespace-normal break-words text-[0.58rem] font-semibold uppercase leading-[1.05] tracking-[0.12em] text-white/66 sm:text-[0.62rem]">
+              Remaining Target
+            </p>
+            <p className="mt-5 text-[0.95rem] font-semibold leading-none text-white sm:text-[1.05rem]">
+              {formatCurrency(remainingTarget)}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -436,12 +482,11 @@ export default function AdminDashboard() {
         <div>
           <FeaturedSalesCard
             totalSales={summary.today_sales}
-            totalOrders={ordersSummary.total ?? 0}
-            pendingOrders={ordersSummary.pending ?? 0}
-            toDeliverOrders={ordersSummary.to_deliver ?? 0}
+            monthlyTarget={summary.monthly_target ?? 80000}
+            monthlyAchieved={summary.month_sales ?? summary.period_sales ?? 0}
           />
         </div>
-        <div className="pl-18 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7 w-[966px] h-[70px]">
+        <div className="pl-18 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
           <KpiCard
             title="This Month Sales"
             value={formatCurrency(summary.period_sales ?? summary.month_sales)}
@@ -464,20 +509,7 @@ export default function AdminDashboard() {
             icon={CreditCard}
             tone="violet"
           />
-          <KpiCard
-            title="Gross Profit"
-            value={formatCurrency(grossProfit)}
-            footer="View Profit & Loss"
-            icon={TrendingUp}
-            tone="cyan"
-          />
-          <KpiCard
-            title="Net Profit"
-            value={formatCurrency(netProfit)}
-            footer="View Profit & Loss"
-            icon={CircleDollarSign}
-            tone="blue"
-          />
+          <ProfitSummaryCard grossProfit={grossProfit} netProfit={netProfit} />
           <KpiCard
             title="New Customers"
             value={summary.new_customers ?? 0}
@@ -617,48 +649,9 @@ export default function AdminDashboard() {
             </div>
           </DashboardCard>
 
-          <DashboardCard
-            title={
-              <>
-                <span className="whitespace-nowrap">Top 5 Customers</span>
-                <br />
-                <span className="whitespace-nowrap">by Sales</span>
-              </>
-            }
-            subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
-            actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
-            className="min-h-[350px] [&>div:first-child_h3]:text-[0.78rem]"
-          >
-            {topCustomers.length === 0 ? (
-              <p className="text-[0.72rem] text-neutral-400">No sales in this period yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {topCustomers.map((customer, index) => {
-                  const width = Math.max(8, Math.round((customer.value / topCustomerPeak) * 100))
-                  return (
-                    <div key={customer.name} className="space-y-1">
-                      <div className="flex items-center justify-between gap-3 text-[0.78rem]">
-                        <span className="truncate font-medium text-neutral-700">{customer.name}</span>
-                        <span className="shrink-0 font-semibold text-neutral-900">{formatCurrency(customer.value)}</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
-                        <div className={`h-full rounded-full ${index === 0 ? 'bg-blue-500' : 'bg-blue-400'}`} style={{ width: `${width}%` }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            <div className="mx-auto flex items-center justify-center text-[0.7rem]">
-              <button className="mt-50 inline-flex items-center gap-1.5 font-semibold text-primary-600">
-                View Customer Report
-                <ChevronRight className="size-4 text-primary-600" />
-              </button>
-            </div>
-          </DashboardCard>
         </div>
 
-        <div className="-mt-5 space-y-4">
+        <div className="mt-3 space-y-4">
           <div className="w-full">
             <div className="grid items-stretch grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <DashboardCard
@@ -747,74 +740,12 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-            <DashboardCard title="Top Selling Products" subtitle="Amount" className="h-full [&>div:first-child]:mb-4">
-              {topProducts.length === 0 ? (
-                <p className="text-[0.72rem] text-neutral-400">No product sales in this period yet.</p>
-              ) : (
-                <TopProductsBarChart data={topProducts} height={320} />
-              )}
-            </DashboardCard>
-
-            <DashboardCard
-              title="Expense Breakdown"
-              subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
-              actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
-              className="h-full [&>div:first-child]:mb-4"
-            >
-              <div className="relative">
-                <ResponsiveContainer width="100%" height={175}>
-                  <PieChart>
-                    <Pie
-                      data={expenseBreakdown}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius="58%"
-                      outerRadius="86%"
-                      paddingAngle={3}
-                      stroke="none"
-                    >
-                      {expenseBreakdown.map((entry, index) => (
-                        <Cell key={entry.name} fill={['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8'][index % 5]} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<DonutTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <p className="text-[0.7rem] text-neutral-400">Total Expenses</p>
-                  <p className="font-(--font-display) text-lg font-semibold text-neutral-900">{formatCurrency(summary.expenses)}</p>
-                </div>
-              </div>
-              <div className="space-y-1.5 text-[0.78rem]">
-                {expenseBreakdown.slice(0, 5).map((entry, index) => (
-                  <div key={entry.name} className="flex items-center justify-between gap-3">
-                    <span className="flex items-center gap-2 text-neutral-600">
-                      <span className="size-2.5 rounded-full" style={{ backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8'][index % 5] }} />
-                      {entry.name}
-                    </span>
-                    <span className="font-semibold text-neutral-900">{formatCurrency(entry.value)}</span>
-                  </div>
-                ))}
-                {expenseBreakdown.length === 0 && (
-                  <p className="text-[0.72rem] text-neutral-400">No expenses recorded in this period.</p>
-                )}
-              </div>
-              <div className="mt-auto flex items-center justify-center text-[0.7rem]">
-                <button className=" mt-26 inline-flex items-center gap-1.5 font-semibold text-primary-600">
-                  View Expense Report
-                  <ChevronRight className="size-4 text-primary-600" />
-                </button>
-              </div>
-            </DashboardCard>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
             <DashboardCard
               title="Sales Trend"
               subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
-              className="self-start"
+              className="h-full min-h-[350px] self-start"
             >
               <ResponsiveContainer width="100%" height={185}>
                 <LineChart data={salesTrendData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -833,6 +764,107 @@ export default function AdminDashboard() {
               </div>
             </DashboardCard>
 
+            <DashboardCard title="Top Selling Products" subtitle="Amount" className="h-full min-h-[350px] [&>div:first-child]:mb-4">
+              {topProducts.length === 0 ? (
+                <p className="text-[0.72rem] text-neutral-400">No product sales in this period yet.</p>
+              ) : (
+                <TopProductsBarChart data={topProducts} height={320} />
+              )}
+            </DashboardCard>
+
+            <DashboardCard
+              title={
+                <>
+                  <span className="whitespace-nowrap">Top 5 Customers</span>
+                  <br />
+                  <span className="whitespace-nowrap">by Sales</span>
+                </>
+              }
+              subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
+              actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
+              className="min-h-[350px] [&>div:first-child_h3]:text-[0.78rem]"
+            >
+              {topCustomers.length === 0 ? (
+                <p className="text-[0.72rem] text-neutral-400">No sales in this period yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {topCustomers.map((customer, index) => {
+                    const width = Math.max(8, Math.round((customer.value / topCustomerPeak) * 100))
+                    return (
+                      <div key={customer.name} className="space-y-1">
+                        <div className="flex items-center justify-between gap-3 text-[0.78rem]">
+                          <span className="truncate font-medium text-neutral-700">{customer.name}</span>
+                          <span className="shrink-0 font-semibold text-neutral-900">{formatCurrency(customer.value)}</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
+                          <div className={`h-full rounded-full ${index === 0 ? 'bg-blue-500' : 'bg-blue-400'}`} style={{ width: `${width}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              <div className="mx-auto flex items-center justify-center text-[0.7rem]">
+                <button className="mt-50 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                  View Customer Report
+                  <ChevronRight className="size-4 text-primary-600" />
+                </button>
+              </div>
+            </DashboardCard>
+          </div>
+
+          <DashboardCard
+            title="Expense Breakdown"
+            subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
+            actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
+            className="h-full [&>div:first-child]:mb-4"
+          >
+            <div className="relative">
+              <ResponsiveContainer width="100%" height={175}>
+                <PieChart>
+                  <Pie
+                    data={expenseBreakdown}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius="58%"
+                    outerRadius="86%"
+                    paddingAngle={3}
+                    stroke="none"
+                  >
+                    {expenseBreakdown.map((entry, index) => (
+                      <Cell key={entry.name} fill={['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8'][index % 5]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<DonutTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                <p className="text-[0.7rem] text-neutral-400">Total Expenses</p>
+                <p className="font-(--font-display) text-lg font-semibold text-neutral-900">{formatCurrency(summary.expenses)}</p>
+              </div>
+            </div>
+            <div className="space-y-1.5 text-[0.78rem]">
+              {expenseBreakdown.slice(0, 5).map((entry, index) => (
+                <div key={entry.name} className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2 text-neutral-600">
+                    <span className="size-2.5 rounded-full" style={{ backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8'][index % 5] }} />
+                    {entry.name}
+                  </span>
+                  <span className="font-semibold text-neutral-900">{formatCurrency(entry.value)}</span>
+                </div>
+              ))}
+              {expenseBreakdown.length === 0 && (
+                <p className="text-[0.72rem] text-neutral-400">No expenses recorded in this period.</p>
+              )}
+            </div>
+            <div className="mt-auto flex items-center justify-center text-[0.7rem]">
+              <button className=" mt-26 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                View Expense Report
+                <ChevronRight className="size-4 text-primary-600" />
+              </button>
+            </div>
+          </DashboardCard>
+          <div className="grid grid-cols-1 gap-3">
             <DashboardCard
               title="Recent Orders"
               subtitle="Latest sales orders across the organization"
