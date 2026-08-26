@@ -39,7 +39,6 @@ import Card from '../../components/ui/Card'
 import DataTable from '../../components/ui/DataTable'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
-import TopProductsBarChart from '../../components/charts/TopProductsBarChart'
 
 const paymentVariant = {
   paid: 'success',
@@ -228,7 +227,7 @@ function FeaturedSalesCard({ totalSales, monthlyTarget = 80000, monthlyAchieved 
       type="button"
       onClick={() => navigate('/admin/orders')}
       aria-label="View sales orders"
-      className="group relative flex h-[14rem] min-w-[320px] flex-col overflow-hidden rounded-[1rem] bg-[linear-gradient(180deg,#0f5a12_0%,#063b00_100%)] p-3.5 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-3.5"
+      className="group relative flex h-[14rem] w-full min-w-0 flex-col overflow-hidden rounded-[1rem] bg-[linear-gradient(180deg,#0f5a12_0%,#063b00_100%)] p-3.5 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-3.5"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.06),transparent_30%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
       <div className="pointer-events-none absolute right-3 top-3 flex size-13 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-105 sm:size-14">
@@ -355,9 +354,14 @@ const stockToneByStatus = { out_of_stock: 'red', low_stock: 'amber' }
 export default function AdminDashboard() {
   const [datePreset, setDatePreset] = useState('this_month')
   const [recentOrdersSearch, setRecentOrdersSearch] = useState('')
+  const [topProductsMetric, setTopProductsMetric] = useState('amount')
   const [dashboard, setDashboard] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return window.localStorage.getItem('saas-sidebar-expanded') !== 'false'
+  })
 
   const loadDashboard = useCallback(async (preset) => {
     setIsLoading(true)
@@ -379,6 +383,27 @@ export default function AdminDashboard() {
     loadDashboard(datePreset)
     // Only refetch when the user explicitly applies a new preset (Apply button) - not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const handleSidebarStateChange = (event) => {
+      if (typeof event?.detail === 'boolean') {
+        setIsSidebarExpanded(event.detail)
+        return
+      }
+
+      if (typeof window !== 'undefined') {
+        setIsSidebarExpanded(window.localStorage.getItem('saas-sidebar-expanded') !== 'false')
+      }
+    }
+
+    window.addEventListener('saas-sidebar-expanded-change', handleSidebarStateChange)
+    window.addEventListener('storage', handleSidebarStateChange)
+
+    return () => {
+      window.removeEventListener('saas-sidebar-expanded-change', handleSidebarStateChange)
+      window.removeEventListener('storage', handleSidebarStateChange)
+    }
   }, [])
 
   if (isLoading && !dashboard) {
@@ -429,7 +454,14 @@ export default function AdminDashboard() {
   }))
   const topCustomers = topCustomersRows.map((row) => ({ name: row.customer_name, value: row.sales || 0 }))
   const topCustomerPeak = topCustomers[0]?.value || 1
-  const topProducts = topProductsRows.map((row) => ({ name: row.product_name, value: row.sales_amount || 0 }))
+  const topProducts = topProductsRows.map((row) => ({
+    name: row.product_name,
+    amount: row.sales_amount || 0,
+    quantity: row.quantity || 0,
+  }))
+  const topProductsValueKey = topProductsMetric === 'quantity' ? 'quantity' : 'amount'
+  const topProductsSorted = [...topProducts].sort((a, b) => (b[topProductsValueKey] || 0) - (a[topProductsValueKey] || 0))
+  const topProductsPeak = topProductsSorted[0]?.[topProductsValueKey] || 1
   const expenseBreakdown = expenseBreakdownRows.map((row) => ({ name: row.category, value: row.amount || 0 }))
   const recentOrders = recentOrdersRows.map((row) => ({
     id: row.id,
@@ -478,15 +510,19 @@ export default function AdminDashboard() {
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,5.55fr)]">
-        <div>
+      <div className="grid grid-cols-1 gap-2 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="min-w-0">
           <FeaturedSalesCard
             totalSales={summary.today_sales}
             monthlyTarget={summary.monthly_target ?? 80000}
             monthlyAchieved={summary.month_sales ?? summary.period_sales ?? 0}
           />
         </div>
-        <div className="pl-18 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+        <div
+          className={`grid min-w-0 w-full grid-cols-1 gap-2.5 transition-[padding] duration-300 md:grid-cols-2 xl:grid-cols-6 ${
+            isSidebarExpanded ? 'pl-0' : 'pl-2'
+          }`}
+        >
           <KpiCard
             title="This Month Sales"
             value={formatCurrency(summary.period_sales ?? summary.month_sales)}
@@ -651,24 +687,26 @@ export default function AdminDashboard() {
 
         </div>
 
-        <div className="mt-3 space-y-4">
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="mt-1 space-y-3.5">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
             <DashboardCard
               title="Cashflow"
               subtitle={`Net for period ${formatCurrency(summary.period_sales ?? summary.month_sales)}`}
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
               className="h-full min-h-[420px]"
             >
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={cashflowData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="#edf1f5" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval={4} />
-                  <YAxis tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} tickFormatter={formatCompactCurrency} width={44} />
-                  <Tooltip content={<CashflowTooltip />} cursor={{ fill: '#f8f9fa' }} />
-                  <Bar name="Inflow" dataKey="value" fill="#14532d" radius={[6, 6, 0, 0]} barSize={18} />
-                  <Bar name="Outflow" dataKey="outflow" fill="#d1d5db" radius={[6, 6, 0, 0]} barSize={18} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="-mr-2">
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={cashflowData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid vertical={false} stroke="#edf1f5" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval={4} />
+                    <YAxis tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} tickFormatter={formatCompactCurrency} width={22} />
+                    <Tooltip content={<CashflowTooltip />} cursor={{ fill: '#f8f9fa' }} />
+                    <Bar name="Inflow" dataKey="value" fill="#14532d" radius={[6, 6, 0, 0]} barSize={18} />
+                    <Bar name="Outflow" dataKey="outflow" fill="#d1d5db" radius={[6, 6, 0, 0]} barSize={18} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </DashboardCard>
 
             <DashboardCard
@@ -728,7 +766,7 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 <div className="mt-auto flex items-center justify-center text-[0.7rem]">
-                  <button className="mt-13 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                  <button className="mt-16 inline-flex items-center gap-1.5 font-semibold text-primary-600">
                     View A/R Report
                     <ChevronRight className="size-4 text-primary-600" />
                   </button>
@@ -781,7 +819,7 @@ export default function AdminDashboard() {
                 )}
               </div>
               <div className="mt-auto flex items-center justify-center text-[0.7rem]">
-                <button className=" mt-26 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                <button className=" mt-31 inline-flex items-center gap-1.5 font-semibold text-primary-600">
                   View Expense Report
                   <ChevronRight className="size-4 text-primary-600" />
                 </button>
@@ -796,11 +834,11 @@ export default function AdminDashboard() {
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
               className="h-full min-h-[350px] self-start"
             >
-              <ResponsiveContainer width="100%" height={185}>
+              <ResponsiveContainer width="100%" height={350}>
                 <LineChart data={salesTrendData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid vertical={false} stroke="#edf1f5" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval={2} />
-                  <YAxis tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} tickFormatter={formatCompactCurrency} width={40} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval={5} />
+                  <YAxis tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} tickFormatter={formatCompactCurrency} width={28} />
                   <Tooltip content={<CashflowTooltip />} />
                   <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
                 </LineChart>
@@ -813,12 +851,69 @@ export default function AdminDashboard() {
               </div>
             </DashboardCard>
 
-            <DashboardCard title="Top Selling Products" subtitle="Amount" className="h-full min-h-[350px] [&>div:first-child]:mb-4">
-              {topProducts.length === 0 ? (
-                <p className="text-[0.72rem] text-neutral-400">No product sales in this period yet.</p>
-              ) : (
-                <TopProductsBarChart data={topProducts} height={320} />
-              )}
+            <DashboardCard
+              title="Top Selling Products"
+              subtitle={topProductsMetric === 'amount' ? 'Amount' : 'Quantity'}
+              actions={
+                <div className="inline-flex rounded-full bg-neutral-50 p-0.5 text-[0.68rem] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setTopProductsMetric('amount')}
+                    className={`rounded-full px-3 py-1 transition-colors ${
+                      topProductsMetric === 'amount' ? 'bg-blue-50 text-primary-700 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'
+                    }`}
+                    aria-pressed={topProductsMetric === 'amount'}
+                  >
+                    Amount
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTopProductsMetric('quantity')}
+                    className={`rounded-full px-3 py-1 transition-colors ${
+                      topProductsMetric === 'quantity' ? 'bg-blue-50 text-primary-700 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'
+                    }`}
+                    aria-pressed={topProductsMetric === 'quantity'}
+                  >
+                    Quantity
+                  </button>
+                </div>
+              }
+              className="h-full min-h-[420px] [&>div:first-child]:mb-4"
+            >
+              <div className="flex h-full flex-col">
+                {topProductsSorted.length === 0 ? (
+                  <p className="text-[0.72rem] text-neutral-400">No product sales in this period yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {topProductsSorted.slice(0, 10).map((product, index) => {
+                      const value = product[topProductsValueKey] || 0
+                      const width = Math.max(8, Math.round((value / topProductsPeak) * 100))
+                      return (
+                        <div key={product.name} className="space-y-1">
+                          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                            <span className="w-4 text-center text-[0.72rem] font-semibold text-neutral-400">{index + 1}</span>
+                            <span className="truncate text-[0.74rem] font-medium text-neutral-700">{product.name}</span>
+                            <span className="font-semibold text-neutral-900">
+                              {topProductsValueKey === 'amount' ? formatCurrency(value) : value.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <div className="pl-7">
+                            <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
+                              <div className="h-full rounded-full bg-blue-500" style={{ width: `${width}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                <div className="mt-auto flex items-center justify-center pt-3 text-[0.7rem]">
+                  <button className="mt-73 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                    View Product Report
+                    <ChevronRight className="size-4 text-primary-600" />
+                  </button>
+                </div>
+              </div>
             </DashboardCard>
 
             <DashboardCard
@@ -833,31 +928,33 @@ export default function AdminDashboard() {
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
               className="min-h-[350px] [&>div:first-child_h3]:text-[0.78rem]"
             >
-              {topCustomers.length === 0 ? (
-                <p className="text-[0.72rem] text-neutral-400">No sales in this period yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {topCustomers.map((customer, index) => {
-                    const width = Math.max(8, Math.round((customer.value / topCustomerPeak) * 100))
-                    return (
-                      <div key={customer.name} className="space-y-1">
-                        <div className="flex items-center justify-between gap-3 text-[0.78rem]">
-                          <span className="truncate font-medium text-neutral-700">{customer.name}</span>
-                          <span className="shrink-0 font-semibold text-neutral-900">{formatCurrency(customer.value)}</span>
+              <div className="flex h-full flex-col">
+                {topCustomers.length === 0 ? (
+                  <p className="text-[0.72rem] text-neutral-400">No sales in this period yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {topCustomers.map((customer, index) => {
+                      const width = Math.max(8, Math.round((customer.value / topCustomerPeak) * 100))
+                      return (
+                        <div key={customer.name} className="space-y-1">
+                          <div className="flex items-center justify-between gap-3 text-[0.78rem]">
+                            <span className="truncate font-medium text-neutral-700">{customer.name}</span>
+                            <span className="shrink-0 font-semibold text-neutral-900">{formatCurrency(customer.value)}</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
+                            <div className={`h-full rounded-full ${index === 0 ? 'bg-blue-500' : 'bg-blue-400'}`} style={{ width: `${width}%` }} />
+                          </div>
                         </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
-                          <div className={`h-full rounded-full ${index === 0 ? 'bg-blue-500' : 'bg-blue-400'}`} style={{ width: `${width}%` }} />
-                        </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
+                )}
+                <div className="mt-auto flex items-center justify-center pt-3 text-[0.7rem]">
+                  <button className="mt-78 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                    View Customer Report
+                    <ChevronRight className="size-4 text-primary-600" />
+                  </button>
                 </div>
-              )}
-              <div className="mx-auto flex items-center justify-center text-[0.7rem]">
-                <button className="mt-50 inline-flex items-center gap-1.5 font-semibold text-primary-600">
-                  View Customer Report
-                  <ChevronRight className="size-4 text-primary-600" />
-                </button>
               </div>
             </DashboardCard>
           </div>

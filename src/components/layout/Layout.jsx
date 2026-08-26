@@ -19,6 +19,11 @@ export default function Layout() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     window.localStorage.setItem('saas-sidebar-expanded', String(isSidebarExpanded))
+    window.dispatchEvent(
+      new CustomEvent('saas-sidebar-expanded-change', {
+        detail: isSidebarExpanded,
+      }),
+    )
   }, [isSidebarExpanded])
 
   useEffect(() => {
