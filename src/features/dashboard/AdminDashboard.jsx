@@ -227,7 +227,7 @@ function FeaturedSalesCard({ totalSales, monthlyTarget = 80000, monthlyAchieved 
       type="button"
       onClick={() => navigate('/admin/orders')}
       aria-label="View sales orders"
-      className="group relative flex h-[14rem] w-full min-w-0 flex-col overflow-hidden rounded-[1rem] bg-[linear-gradient(180deg,#0f5a12_0%,#063b00_100%)] p-3.5 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-3.5"
+      className="group relative flex h-[300px] w-full min-w-0 flex-col overflow-hidden rounded-[1rem] bg-[linear-gradient(180deg,#0f5a12_0%,#063b00_100%)] p-3.5 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-3.5"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.06),transparent_30%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
       <div className="pointer-events-none absolute right-3 top-3 flex size-13 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-105 sm:size-14">
@@ -510,8 +510,8 @@ export default function AdminDashboard() {
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-2 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="min-w-0">
+      <div className="grid grid-cols-1 gap-2 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
+        <div className="min-w-0 self-start">
           <FeaturedSalesCard
             totalSales={summary.today_sales}
             monthlyTarget={summary.monthly_target ?? 80000}
@@ -519,7 +519,7 @@ export default function AdminDashboard() {
           />
         </div>
         <div
-          className={`grid min-w-0 w-full grid-cols-1 gap-2.5 transition-[padding] duration-300 md:grid-cols-2 xl:grid-cols-6 ${
+          className={`grid min-w-0 w-full self-start content-start grid-cols-1 gap-2.5 transition-[padding] duration-300 md:grid-cols-2 xl:grid-cols-6 ${
             isSidebarExpanded ? 'pl-0' : 'pl-2'
           }`}
         >
