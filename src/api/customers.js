@@ -501,6 +501,21 @@ export async function recordCustomerPayment(customerId, payload) {
       received_on: payload.receivedOn || payload.received_on || new Date().toISOString(),
     }
 
+    if (payload.upiId || payload.upi_id) requestBody.upi_id = payload.upiId || payload.upi_id
+    if (payload.transactionReference || payload.transaction_reference) {
+      requestBody.transaction_reference = payload.transactionReference || payload.transaction_reference
+    }
+    if (payload.cardType || payload.card_type) requestBody.card_type = payload.cardType || payload.card_type
+    if (payload.cardLastFour || payload.card_last_four) {
+      requestBody.card_last_four = payload.cardLastFour || payload.card_last_four
+    }
+    if (payload.collectionInstructions || payload.collection_instructions) {
+      requestBody.collection_instructions = payload.collectionInstructions || payload.collection_instructions
+    }
+    if (payload.paymentStatus || payload.payment_status) {
+      requestBody.payment_status = payload.paymentStatus || payload.payment_status
+    }
+
     const { data } = await apiClient.post(`/customers/${customerId}/payments`, requestBody, {
       headers: authHeader(),
     })

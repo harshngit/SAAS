@@ -6,13 +6,7 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { createPaymentReceipt } from '../../api/paymentReceipts'
 import { formatCurrency } from '../../utils/format'
-
-const paymentMethodOptions = [
-  { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'upi', label: 'UPI' },
-  { value: 'cheque', label: 'Cheque' },
-]
+import { getPaymentMethodFlags, paymentMethodOptions, sanitizePaymentDetails } from '../payments/paymentMethodUtils'
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -23,6 +17,11 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
   const [amountReceived, setAmountReceived] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('bank_transfer')
   const [reference, setReference] = useState('')
+  const [upiId, setUpiId] = useState('')
+  const [cardType, setCardType] = useState('')
+  const [cardLastFour, setCardLastFour] = useState('')
+  const [collectionInstructions, setCollectionInstructions] = useState('')
+  const [paymentStatus, setPaymentStatus] = useState('pending')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -33,6 +32,11 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
     setAmountReceived(invoice?.outstandingAmount ? String(invoice.outstandingAmount) : '')
     setPaymentMethod('bank_transfer')
     setReference('')
+    setUpiId('')
+    setCardType('')
+    setCardLastFour('')
+    setCollectionInstructions('')
+    setPaymentStatus('pending')
     setNotes('')
     setError('')
   }, [isOpen, invoice])
@@ -47,24 +51,61 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
 
   if (!isOpen || !invoice) return null
 
+  const paymentFlags = getPaymentMethodFlags(paymentMethod)
   const receivedAmount = Number(amountReceived) || 0
   const newOutstanding = Math.max(0, invoice.outstandingAmount - receivedAmount)
 
   const handleSave = async (event) => {
     event.preventDefault()
-    if (receivedAmount <= 0) {
+    if (paymentMethod !== 'cod' && receivedAmount <= 0) {
       setError('Enter an amount greater than zero.')
+      return
+    }
+
+    if (paymentFlags.showUpiFields && !upiId.trim()) {
+      setError('Enter a UPI ID.')
+      return
+    }
+
+    if (paymentFlags.showCardFields) {
+      if (!cardType.trim()) {
+        setError('Enter the card type.')
+        return
+      }
+
+      if (!/^\d{4}$/.test(cardLastFour.trim())) {
+        setError('Enter the last 4 digits of the card.')
+        return
+      }
+    }
+
+    if (paymentFlags.showReferenceField && !reference.trim()) {
+      setError('Enter a transaction/reference ID.')
+      return
+    }
+
+    if (paymentFlags.showCodFields && !collectionInstructions.trim()) {
+      setError('Add collection or delivery instructions.')
       return
     }
 
     setIsSaving(true)
     setError('')
 
+    const paymentDetails = sanitizePaymentDetails(paymentMethod, {
+      upiId: upiId.trim(),
+      transactionReference: reference.trim(),
+      cardType: cardType.trim(),
+      cardLastFour: cardLastFour.trim(),
+      collectionInstructions: collectionInstructions.trim(),
+      paymentStatus,
+    })
+
     const result = await createPaymentReceipt({
       invoiceReferenceId: invoice.id,
       amountReceived: receivedAmount,
       paymentMethod,
-      transactionReference: reference || undefined,
+      ...paymentDetails,
       receiptDate: paymentDate,
       note: notes || undefined,
     })
@@ -130,15 +171,58 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
               type="number"
               min="0"
               step="0.01"
-              required
+              required={paymentMethod !== 'cod'}
               value={amountReceived}
               onChange={(event) => setAmountReceived(event.target.value)}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Select label="Payment Method" options={paymentMethodOptions} value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} required />
-            <Input label="Transaction Reference" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="e.g. TXN123456789" />
+            <Select
+              label="Payment Method"
+              options={paymentMethodOptions}
+              value={paymentMethod}
+              onChange={(event) => {
+                setPaymentMethod(event.target.value)
+                setReference('')
+                setUpiId('')
+                setCardType('')
+                setCardLastFour('')
+                setCollectionInstructions('')
+                setPaymentStatus(event.target.value === 'cod' ? 'pending' : '')
+              }}
+              required
+            />
+            <div className="hidden md:block" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {paymentFlags.showUpiFields && (
+              <>
+                <Input label="UPI ID" value={upiId} onChange={(event) => setUpiId(event.target.value)} required />
+                <Input label="Transaction / Reference ID" value={reference} onChange={(event) => setReference(event.target.value)} required />
+              </>
+            )}
+
+            {paymentFlags.showCardFields && (
+              <>
+                <Input label="Card Type" value={cardType} onChange={(event) => setCardType(event.target.value)} placeholder="Debit / Credit / RuPay" required />
+                <Input label="Last 4 Digits" value={cardLastFour} onChange={(event) => setCardLastFour(event.target.value)} inputClassName="tracking-[0.25em]" maxLength={4} required />
+                <Input label="Transaction / Reference ID" value={reference} onChange={(event) => setReference(event.target.value)} required />
+              </>
+            )}
+
+            {paymentFlags.showCodFields && (
+              <div className="md:col-span-2 flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-neutral-700">Collection / Delivery Instructions</label>
+                <textarea
+                  value={collectionInstructions}
+                  onChange={(event) => setCollectionInstructions(event.target.value)}
+                  className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+                <p className="text-xs text-amber-700">Payment status stays pending until the cash is collected.</p>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">

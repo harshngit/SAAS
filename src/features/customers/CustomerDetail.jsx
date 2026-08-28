@@ -75,6 +75,7 @@ const paymentModeOptions = [
   { value: 'cash', label: 'Cash' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
   { value: 'upi', label: 'UPI' },
+  { value: 'cod', label: 'Cash on Delivery' },
   { value: 'card', label: 'Card' },
   { value: 'cheque', label: 'Cheque' },
 ]

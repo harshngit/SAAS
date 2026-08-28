@@ -52,6 +52,13 @@ function buildReceiptBody(payload) {
   if (payload.transactionReference || payload.transaction_reference) {
     body.transaction_reference = payload.transactionReference || payload.transaction_reference
   }
+  if (payload.upiId || payload.upi_id) body.upi_id = payload.upiId || payload.upi_id
+  if (payload.cardType || payload.card_type) body.card_type = payload.cardType || payload.card_type
+  if (payload.cardLastFour || payload.card_last_four) body.card_last_four = payload.cardLastFour || payload.card_last_four
+  if (payload.collectionInstructions || payload.collection_instructions) {
+    body.collection_instructions = payload.collectionInstructions || payload.collection_instructions
+  }
+  if (payload.paymentStatus || payload.payment_status) body.payment_status = payload.paymentStatus || payload.payment_status
   if (payload.receiptDate || payload.receipt_date) body.receipt_date = payload.receiptDate || payload.receipt_date
   if (payload.note) body.note = payload.note
 

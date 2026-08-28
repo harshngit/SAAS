@@ -115,13 +115,23 @@ function buildInvoiceBody(payload) {
   if (payload.billingAddress || payload.billing_address) body.billing_address = payload.billingAddress || payload.billing_address
 
   const paymentAmount = payload.payment?.amount ?? payload.paymentAmount
-  if (paymentAmount) {
+  const paymentMethod = payload.payment?.paymentMethod || payload.paymentMethod || ''
+  if (paymentAmount || paymentMethod === 'cod') {
+    const payment = payload.payment || {}
     body.payment = {
-      payment_method: payload.payment?.paymentMethod || payload.paymentMethod || 'cash',
+      payment_method: paymentMethod || 'cash',
       amount: Number(paymentAmount),
-      transaction_reference: payload.payment?.transactionReference || payload.paymentReference || undefined,
-      received_on: payload.payment?.receivedOn || undefined,
+      transaction_reference: payment.transactionReference || payload.paymentReference || undefined,
+      received_on: payment.receivedOn || undefined,
     }
+
+    if (payment.upiId || payload.upiId) body.payment.upi_id = payment.upiId || payload.upiId
+    if (payment.cardType || payload.cardType) body.payment.card_type = payment.cardType || payload.cardType
+    if (payment.cardLastFour || payload.cardLastFour) body.payment.card_last_four = payment.cardLastFour || payload.cardLastFour
+    if (payment.collectionInstructions || payload.collectionInstructions) {
+      body.payment.collection_instructions = payment.collectionInstructions || payload.collectionInstructions
+    }
+    if (payment.paymentStatus || payload.paymentStatus) body.payment.payment_status = payment.paymentStatus || payload.paymentStatus
   }
 
   return body

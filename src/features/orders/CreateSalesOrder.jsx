@@ -641,10 +641,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <p className="text-xs text-neutral-400">Total Quantity</p>
                   <p className="text-sm font-semibold text-primary-700">{totals.totalQuantity} Items</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-neutral-400">Subtotal (Before Discount &amp; GST)</p>
-                  <p className="text-sm font-semibold text-neutral-900">{formatCurrency(totals.subtotal)}</p>
-                </div>
               </div>
             </div>
           </div>
@@ -774,11 +770,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
             <h3 className="text-lg font-semibold text-neutral-900">Order Summary</h3>
 
             <div className="mt-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-neutral-600">Subtotal (Before Discount &amp; GST)</span>
-                <span className="text-sm font-medium text-neutral-900">{formatCurrency(totals.subtotal)}</span>
-              </div>
-
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-neutral-700">Discount</label>
                 <div className="grid grid-cols-[9rem_minmax(0,1fr)] gap-2">

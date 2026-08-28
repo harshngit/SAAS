@@ -2151,96 +2151,98 @@ function CompanyOverviewDashboard({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.25fr_1fr_.75fr]">
-        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <MapPin className="size-4 text-neutral-500" />
-            <h3 className="text-sm font-semibold text-neutral-900">
-              Company Addresses
-            </h3>
-          </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_14rem]">
-            <div className="space-y-4 text-sm">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-primary-700">
-                    Registered Office
-                  </p>
-                  <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
-                    Primary
-                  </span>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.85fr)]">
+        <div className="space-y-4">
+          <div className="rounded-xl border border-neutral-100 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <MapPin className="size-4 text-neutral-500" />
+              <h3 className="text-sm font-semibold text-neutral-900">
+                Company Addresses
+              </h3>
+            </div>
+            <div className="mt-3 grid gap-4 md:grid-cols-[1fr_14rem]">
+              <div className="space-y-4 text-sm">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-primary-700">
+                      Registered Office
+                    </p>
+                    <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                      Primary
+                    </span>
+                  </div>
+                  <p className="mt-2 text-neutral-700">{addressLine}</p>
+                  {locationLine && (
+                    <p className="mt-1 text-neutral-500">{locationLine}</p>
+                  )}
                 </div>
-                <p className="mt-2 text-neutral-700">{addressLine}</p>
-                {locationLine && (
-                  <p className="mt-1 text-neutral-500">{locationLine}</p>
-                )}
+                <div>
+                  <p className="font-semibold text-blue-700">
+                    Branch/Warehouse Address
+                  </p>
+                  <p className="mt-2 text-neutral-700">{branchAddress}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-blue-700">
-                  Branch/Warehouse Address
-                </p>
-                <p className="mt-2 text-neutral-700">{branchAddress}</p>
+              <div className="relative min-h-36 overflow-hidden rounded-xl border border-neutral-100 bg-[linear-gradient(135deg,#e8f3ff_25%,transparent_25%),linear-gradient(225deg,#e8f3ff_25%,transparent_25%),linear-gradient(45deg,#edf7ef_25%,transparent_25%),linear-gradient(315deg,#edf7ef_25%,#f8fafc_25%)] bg-[length:36px_36px]">
+                <div className="absolute left-1/2 top-1/2 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-red-500 text-white shadow-lg">
+                  <MapPin className="size-5" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate("general")}
+                  className="absolute bottom-3 right-3 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-primary-700 shadow-sm ring-1 ring-neutral-100"
+                >
+                  View on Map
+                </button>
               </div>
             </div>
-            <div className="relative min-h-44 overflow-hidden rounded-xl border border-neutral-100 bg-[linear-gradient(135deg,#e8f3ff_25%,transparent_25%),linear-gradient(225deg,#e8f3ff_25%,transparent_25%),linear-gradient(45deg,#edf7ef_25%,transparent_25%),linear-gradient(315deg,#edf7ef_25%,#f8fafc_25%)] bg-[length:36px_36px]">
-              <div className="absolute left-1/2 top-1/2 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-red-500 text-white shadow-lg">
-                <MapPin className="size-5" />
-              </div>
+          </div>
+
+          <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-neutral-900">
+                Recent Activity
+              </h3>
               <button
                 type="button"
-                onClick={() => onNavigate("general")}
-                className="absolute bottom-3 right-3 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-primary-700 shadow-sm ring-1 ring-neutral-100"
+                onClick={() => onNavigate("additional-info")}
+                className="text-xs font-semibold text-primary-700"
               >
-                View on Map
+                View All
               </button>
+            </div>
+            <div className="mt-4 space-y-4">
+              {recentActivity.map((activity, index) => {
+                const Icon = activity.icon;
+
+                return (
+                  <div key={`${activity.title}-${index}`} className="flex gap-3">
+                    <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full ${toneClasses[activity.tone]}`}>
+                      <Icon className="size-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-neutral-900">
+                          {activity.title}
+                        </p>
+                        <span className="shrink-0 text-xs text-neutral-400">
+                          {activity.time}
+                        </span>
+                      </div>
+                      <p className="text-xs text-neutral-500">{activity.caption}</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-neutral-900">
-              Recent Activity
-            </h3>
-            <button
-              type="button"
-              onClick={() => onNavigate("additional-info")}
-              className="text-xs font-semibold text-primary-700"
-            >
-              View All
-            </button>
-          </div>
-          <div className="mt-4 space-y-4">
-            {recentActivity.map((activity, index) => {
-              const Icon = activity.icon;
-
-              return (
-                <div key={`${activity.title}-${index}`} className="flex gap-3">
-                  <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full ${toneClasses[activity.tone]}`}>
-                    <Icon className="size-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-semibold text-neutral-900">
-                        {activity.title}
-                      </p>
-                      <span className="shrink-0 text-xs text-neutral-400">
-                        {activity.time}
-                      </span>
-                    </div>
-                    <p className="text-xs text-neutral-500">{activity.caption}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+        <div className="self-start rounded-xl border border-neutral-100 bg-white p-4 shadow-sm h-[208px]">
           <h3 className="text-sm font-semibold text-neutral-900">
             Quick Actions
           </h3>
-          <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
             {quickActions.map((action, index) => {
               const Icon = action.icon;
 
@@ -2249,10 +2251,10 @@ function CompanyOverviewDashboard({
                   key={`${action.label}-${index}`}
                   type="button"
                   onClick={() => onNavigate(action.tab)}
-                  className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border border-neutral-100 bg-white p-3 text-center text-xs font-semibold text-neutral-700 transition-colors hover:border-primary-100 hover:bg-primary-50/40"
+                  className="flex min-h-14 flex-col items-center justify-center gap-1.5 rounded-xl border border-neutral-100 bg-white px-1.5 py-2 text-center text-[10px] font-semibold leading-tight text-neutral-700 transition-colors hover:border-primary-100 hover:bg-primary-50/40"
                 >
-                  <span className={`flex size-9 items-center justify-center rounded-lg ${toneClasses[action.tone]}`}>
-                    <Icon className="size-4" />
+                  <span className={`flex size-7 items-center justify-center rounded-lg ${toneClasses[action.tone]}`}>
+                    <Icon className="size-3.5" />
                   </span>
                   {action.label}
                 </button>
@@ -2672,6 +2674,7 @@ export default function CompanySettings() {
   const activeNavItem =
     settingsNav.find((item) => item.id === activeTab) || settingsNav[0];
   const handledCompletionNavigationRef = useRef("");
+  const handleTabChangeRef = useRef(handleTabChange);
   const isEditableSection = editableSectionIds.includes(activeTab);
   const isActiveSectionEditing = Boolean(editingSections[activeTab]);
   const getUploadFieldState = (name) => {
@@ -2736,7 +2739,9 @@ export default function CompanySettings() {
     }
 
     if (activeTab !== completionNavigationTarget.tabId) {
-      handleTabChange(completionNavigationTarget.tabId, { force: true });
+      handleTabChangeRef.current(completionNavigationTarget.tabId, {
+        force: true,
+      });
       return;
     }
 
@@ -2827,7 +2832,6 @@ export default function CompanySettings() {
     completionNavigationField,
     completionNavigationSection,
     completionNavigationTarget,
-    handleTabChange,
     location.key,
     openGeneralSections,
   ]);
@@ -2980,6 +2984,8 @@ export default function CompanySettings() {
     setActiveTab(tabId);
   }
 
+  handleTabChangeRef.current = handleTabChange;
+
   const handleOpenAuthorizedPersonSection = () => {
     handleTabChange("general", { force: true });
     setOpenGeneralSections((prev) => ({
@@ -3026,7 +3032,7 @@ export default function CompanySettings() {
       pathname: target.route || "/admin/company-settings",
       search: `?section=${encodeURIComponent(target.section)}&field=${encodeURIComponent(target.fieldId || target.fieldKey || "")}`,
     });
-  }, [companyData, handleTabChange, navigate]);
+  }, [companyData, navigate]);
 
   const handleFileUpload = async (name, e) => {
     const file = e.target.files?.[0];

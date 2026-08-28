@@ -7,13 +7,14 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { recordCustomerPayment } from '../../api/customers'
 import { formatCurrency } from '../../utils/format'
+import {
+  getPaymentMethodFlags,
+  paymentMethodOptions,
+  sanitizePaymentDetails,
+} from '../payments/paymentMethodUtils'
 
 const paymentModeOptions = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'upi', label: 'UPI' },
-  { value: 'card', label: 'Card' },
-  { value: 'cheque', label: 'Cheque' },
+  ...paymentMethodOptions,
 ]
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -22,6 +23,11 @@ const emptyPaymentForm = {
   amount: '',
   paymentMode: 'cash',
   reference: '',
+  upiId: '',
+  cardType: '',
+  cardLastFour: '',
+  collectionInstructions: '',
+  paymentStatus: 'pending',
   note: '',
   orderId: '',
   invoiceId: '',
@@ -44,6 +50,8 @@ export default function RecordPaymentDrawer({ isOpen, onClose, customer, onSaved
     setPaymentForm(emptyPaymentForm)
     setFormError('')
   }, [isOpen, customer])
+
+  const paymentFlags = getPaymentMethodFlags(paymentForm.paymentMode)
 
   useEffect(() => {
     if (!isOpen) return undefined
@@ -80,17 +88,54 @@ export default function RecordPaymentDrawer({ isOpen, onClose, customer, onSaved
     setFormError('')
 
     const amount = Number(paymentForm.amount)
-    if (!amount || amount <= 0) {
+    if (paymentForm.paymentMode !== 'cod' && (!amount || amount <= 0)) {
       setFormError('Enter a valid payment amount.')
+      return
+    }
+
+    if (paymentFlags.showUpiFields && !paymentForm.upiId.trim()) {
+      setFormError('Enter a UPI ID.')
+      return
+    }
+
+    if (paymentFlags.showCardFields) {
+      if (!paymentForm.cardType.trim()) {
+        setFormError('Enter the card type.')
+        return
+      }
+
+      if (!/^\d{4}$/.test(paymentForm.cardLastFour.trim())) {
+        setFormError('Enter the last 4 digits of the card.')
+        return
+      }
+    }
+
+    if (paymentFlags.showReferenceField && !paymentForm.reference.trim()) {
+      setFormError('Enter a transaction/reference ID.')
+      return
+    }
+
+    if (paymentFlags.showCodFields && !paymentForm.collectionInstructions.trim()) {
+      setFormError('Add collection or delivery instructions.')
       return
     }
 
     setIsSaving(true)
 
+    const paymentDetails = sanitizePaymentDetails(paymentForm.paymentMode, {
+      upiId: paymentForm.upiId.trim(),
+      transactionReference: paymentForm.reference.trim(),
+      cardType: paymentForm.cardType.trim(),
+      cardLastFour: paymentForm.cardLastFour.trim(),
+      collectionInstructions: paymentForm.collectionInstructions.trim(),
+      paymentStatus: paymentForm.paymentStatus,
+    })
+
     const result = await recordCustomerPayment(customer.id, {
       amount,
       paymentMode: paymentForm.paymentMode,
       reference: paymentForm.reference.trim(),
+      ...paymentDetails,
       note: paymentForm.note.trim(),
       orderId: paymentForm.orderId.trim(),
       invoiceId: paymentForm.invoiceId.trim(),
@@ -158,25 +203,100 @@ export default function RecordPaymentDrawer({ isOpen, onClose, customer, onSaved
             value={paymentForm.amount}
             onChange={(event) => setPaymentForm((current) => ({ ...current, amount: event.target.value }))}
             inputClassName="text-lg font-semibold"
-            required
+            required={paymentForm.paymentMode !== 'cod'}
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <Select
-              label="Payment Mode"
-              options={paymentModeOptions}
-              value={paymentForm.paymentMode}
-              onChange={(event) => setPaymentForm((current) => ({ ...current, paymentMode: event.target.value }))}
+          <Select
+            label="Payment Mode"
+            options={paymentModeOptions}
+            value={paymentForm.paymentMode}
+            onChange={(event) => setPaymentForm((current) => ({
+              ...current,
+              paymentMode: event.target.value,
+              reference: '',
+              upiId: '',
+              cardType: '',
+              cardLastFour: '',
+              collectionInstructions: '',
+              paymentStatus: event.target.value === 'cod' ? 'pending' : '',
+            }))}
+            required
+          />
+          <DatePicker
+            label="Received On"
+            value={paymentForm.receivedOn}
+            onChange={(value) => setPaymentForm((current) => ({ ...current, receivedOn: value }))}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {paymentFlags.showUpiFields && (
+            <>
+              <Input
+                label="UPI ID"
+                value={paymentForm.upiId}
+                onChange={(event) => setPaymentForm((current) => ({ ...current, upiId: event.target.value }))}
+                required
+              />
+              <Input
+                label="Transaction / Reference ID"
+                value={paymentForm.reference}
+                onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
+                required
+              />
+            </>
+          )}
+
+          {paymentFlags.showCardFields && (
+            <>
+              <Input
+                label="Card Type"
+                value={paymentForm.cardType}
+                onChange={(event) => setPaymentForm((current) => ({ ...current, cardType: event.target.value }))}
+                placeholder="Debit / Credit / RuPay"
+                required
+              />
+              <Input
+                label="Last 4 Digits"
+                value={paymentForm.cardLastFour}
+                onChange={(event) => setPaymentForm((current) => ({ ...current, cardLastFour: event.target.value }))}
+                inputClassName="tracking-[0.25em]"
+                maxLength={4}
+                required
+              />
+              <Input
+                label="Transaction / Reference ID"
+                value={paymentForm.reference}
+                onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
+                required
+              />
+            </>
+          )}
+
+          {paymentFlags.showReferenceField && !paymentFlags.showUpiFields && !paymentFlags.showCardFields && (
+            <Input
+              label="Transaction / Reference ID"
+              value={paymentForm.reference}
+              onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
               required
             />
-            <DatePicker
-              label="Received On"
-              value={paymentForm.receivedOn}
-              onChange={(value) => setPaymentForm((current) => ({ ...current, receivedOn: value }))}
-            />
-          </div>
+          )}
+        </div>
 
-          <div className="space-y-3">
+        {paymentFlags.showCodFields && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-neutral-700">Collection / Delivery Instructions</label>
+            <textarea
+              value={paymentForm.collectionInstructions}
+              onChange={(event) => setPaymentForm((current) => ({ ...current, collectionInstructions: event.target.value }))}
+              className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            />
+            <p className="text-xs text-amber-700">Payment status stays pending until the cash is collected.</p>
+          </div>
+        )}
+
+        <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-neutral-400">Settle Against (Optional)</p>
             <div className="grid grid-cols-2 gap-3">
               <Input

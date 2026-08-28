@@ -8,12 +8,16 @@ import { useToast } from '../../components/ui/toastContext'
 import { listCustomers } from '../../api/customers'
 import { listSuppliers, recordSupplierPayment } from '../../api/suppliers'
 import { createPaymentReceipt } from '../../api/paymentReceipts'
+import {
+  getPaymentMethodFlags,
+  paymentMethodOptions,
+  sanitizePaymentDetails,
+} from './paymentMethodUtils'
 
 const paymentTypes = [
   { value: 'customer', label: 'Customer Payment' },
   { value: 'supplier', label: 'Supplier Payment' },
 ]
-const paymentModes = ['Cash', 'UPI', 'Card', 'Bank Transfer', 'Cheque']
 
 export default function RecordPayment() {
   const { showToast } = useToast()
@@ -24,9 +28,14 @@ export default function RecordPayment() {
 
   const [partyId, setPartyId] = useState('')
   const [amount, setAmount] = useState('')
-  const [paymentMode, setPaymentMode] = useState('')
+  const [paymentMode, setPaymentMode] = useState('cash')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [reference, setReference] = useState('')
+  const [upiId, setUpiId] = useState('')
+  const [cardType, setCardType] = useState('')
+  const [cardLastFour, setCardLastFour] = useState('')
+  const [collectionInstructions, setCollectionInstructions] = useState('')
+  const [paymentStatus, setPaymentStatus] = useState('pending')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -39,10 +48,21 @@ export default function RecordPayment() {
     })
   }, [])
 
+  useEffect(() => {
+    setReference('')
+    setUpiId('')
+    setCardType('')
+    setCardLastFour('')
+    setCollectionInstructions('')
+    setPaymentStatus(paymentMode === 'cod' ? 'pending' : '')
+  }, [paymentMode])
+
   const partyOptions = useMemo(() => {
     const list = paymentType === 'customer' ? customers : suppliers
     return list.map((party) => ({ value: party.id, label: party.name }))
   }, [paymentType, customers, suppliers])
+
+  const paymentFlags = getPaymentMethodFlags(paymentMode)
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -51,20 +71,56 @@ export default function RecordPayment() {
       setError(`Select a ${paymentType === 'customer' ? 'customer' : 'supplier'}.`)
       return
     }
-    if (!amount || Number(amount) <= 0) {
+    if (paymentMode !== 'cod' && (!amount || Number(amount) <= 0)) {
       setError('Enter an amount greater than zero.')
+      return
+    }
+
+    if (paymentFlags.showUpiFields && !upiId.trim()) {
+      setError('Enter a UPI ID.')
+      return
+    }
+
+    if (paymentFlags.showCardFields) {
+      if (!cardType.trim()) {
+        setError('Enter the card type.')
+        return
+      }
+
+      if (!/^\d{4}$/.test(cardLastFour.trim())) {
+        setError('Enter the last 4 digits of the card.')
+        return
+      }
+    }
+
+    if (paymentFlags.showReferenceField && !reference.trim()) {
+      setError('Enter a transaction/reference ID.')
+      return
+    }
+
+    if (paymentFlags.showCodFields && !collectionInstructions.trim()) {
+      setError('Add delivery or collection instructions.')
       return
     }
 
     setIsSubmitting(true)
     setError('')
 
+    const paymentDetails = sanitizePaymentDetails(paymentMode, {
+      upiId: upiId.trim(),
+      transactionReference: reference.trim(),
+      cardType: cardType.trim(),
+      cardLastFour: cardLastFour.trim(),
+      collectionInstructions: collectionInstructions.trim(),
+      paymentStatus,
+    })
+
     const result = paymentType === 'customer'
       ? await createPaymentReceipt({
           customerId: partyId,
           amountReceived: amount,
           paymentMethod: paymentMode || 'cash',
-          transactionReference: reference || undefined,
+          ...paymentDetails,
           receiptDate: date,
           note: notes || undefined,
         })
@@ -72,6 +128,7 @@ export default function RecordPayment() {
           amount,
           paymentMode: paymentMode || 'cash',
           reference: reference || undefined,
+          ...paymentDetails,
           note: notes || undefined,
           paidOn: date,
         })
@@ -85,8 +142,13 @@ export default function RecordPayment() {
     showToast({ title: 'Payment recorded', message: 'Payment recorded successfully.' })
     setPartyId('')
     setAmount('')
-    setPaymentMode('')
+    setPaymentMode('cash')
     setReference('')
+    setUpiId('')
+    setCardType('')
+    setCardLastFour('')
+    setCollectionInstructions('')
+    setPaymentStatus('pending')
     setNotes('')
     setIsSubmitting(false)
   }
@@ -130,13 +192,13 @@ export default function RecordPayment() {
               onChange={(e) => setAmount(e.target.value)}
               min="0"
               step="0.01"
-              required
+              required={paymentMode !== 'cod'}
             />
             <Select
               label="Payment Mode"
               value={paymentMode}
               onChange={(e) => setPaymentMode(e.target.value)}
-              options={paymentModes.map((m) => ({ value: m.toLowerCase().replace(' ', '_'), label: m }))}
+              options={paymentMethodOptions}
               required
             />
             <Input
@@ -146,13 +208,72 @@ export default function RecordPayment() {
               onChange={(e) => setDate(e.target.value)}
               required
             />
-            <Input
-              label="Reference Number"
-              type="text"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-            />
           </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {paymentFlags.showUpiFields && (
+              <>
+                <Input
+                  label="UPI ID"
+                  value={upiId}
+                  onChange={(event) => setUpiId(event.target.value)}
+                  required
+                />
+                <Input
+                  label="Transaction / Reference ID"
+                  value={reference}
+                  onChange={(event) => setReference(event.target.value)}
+                  required
+                />
+              </>
+            )}
+
+            {paymentFlags.showCardFields && (
+              <>
+                <Input
+                  label="Card Type"
+                  value={cardType}
+                  onChange={(event) => setCardType(event.target.value)}
+                  placeholder="Debit / Credit / RuPay"
+                  required
+                />
+                <Input
+                  label="Last 4 Digits"
+                  value={cardLastFour}
+                  onChange={(event) => setCardLastFour(event.target.value)}
+                  inputClassName="tracking-[0.25em]"
+                  maxLength={4}
+                  required
+                />
+                <Input
+                  label="Transaction / Reference ID"
+                  value={reference}
+                  onChange={(event) => setReference(event.target.value)}
+                  required
+                />
+              </>
+            )}
+
+            {paymentFlags.showReferenceField && !paymentFlags.showUpiFields && !paymentFlags.showCardFields && (
+              <Input
+                label="Reference Number"
+                type="text"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                required
+              />
+            )}
+          </div>
+          {paymentFlags.showCodFields && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-neutral-700">Collection / Delivery Instructions</label>
+              <textarea
+                value={collectionInstructions}
+                onChange={(event) => setCollectionInstructions(event.target.value)}
+                className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              />
+              <p className="text-xs text-amber-700">Payment status stays pending until the cash is collected.</p>
+            </div>
+          )}
           <div className="mt-4">
             <Input
               label="Notes"

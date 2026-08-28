@@ -16,6 +16,7 @@ import { listProducts } from '../../api/products'
 import { listWarehouses } from '../../api/warehouses'
 import { getSalesWorkflowSettings } from '../../api/settings'
 import { formatCurrency } from '../../utils/format'
+import { getPaymentMethodFlags, sanitizePaymentDetails } from '../payments/paymentMethodUtils'
 
 const orderStatusBadgeVariant = {
   draft: 'neutral',
@@ -39,6 +40,7 @@ const paymentTypeOptions = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
   { value: 'cash', label: 'Cash' },
   { value: 'upi', label: 'UPI' },
+  { value: 'cod', label: 'Cash on Delivery' },
   { value: 'cheque', label: 'Cheque' },
   { value: 'credit', label: 'Credit' },
 ]
@@ -610,6 +612,14 @@ export default function CreateSalesInvoice() {
   const [warehouseId, setWarehouseId] = useState('')
   const [paymentType, setPaymentType] = useState('')
   const [amountPaid, setAmountPaid] = useState('')
+  const [paymentDetails, setPaymentDetails] = useState({
+    reference: '',
+    upiId: '',
+    cardType: '',
+    cardLastFour: '',
+    collectionInstructions: '',
+    paymentStatus: 'pending',
+  })
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState([emptyItem()])
   const [additionalCharges, setAdditionalCharges] = useState('0')
@@ -641,6 +651,17 @@ export default function CreateSalesInvoice() {
     }
   }, [createMode])
 
+  useEffect(() => {
+    setPaymentDetails({
+      reference: '',
+      upiId: '',
+      cardType: '',
+      cardLastFour: '',
+      collectionInstructions: '',
+      paymentStatus: paymentType === 'cod' ? 'pending' : '',
+    })
+  }, [paymentType])
+
   const customerOptions = useMemo(() => customers.map((customer) => ({ value: customer.id, label: customer.name })), [customers])
   const productOptions = useMemo(() => products.map((product) => ({ value: product.id, label: product.name, product })), [products])
 
@@ -669,6 +690,7 @@ export default function CreateSalesInvoice() {
   const grandTotal = subtotal - discountTotal - orderLevelDiscount + taxTotal + chargesTotal
   const paidAmount = Number(amountPaid) || 0
   const dueAmount = Math.max(0, grandTotal - paidAmount)
+  const paymentFlags = getPaymentMethodFlags(paymentType)
 
   const updateItem = (index, field, value) => {
     setItems((current) =>
@@ -738,10 +760,47 @@ export default function CreateSalesInvoice() {
       setSubmitError('Enter a walk-in customer name.')
       return
     }
+    if (paymentFlags.showUpiFields && !paymentDetails.upiId.trim()) {
+      setSubmitError('Enter a UPI ID.')
+      return
+    }
+    if (paymentFlags.showCardFields) {
+      if (!paymentDetails.cardType.trim()) {
+        setSubmitError('Enter the card type.')
+        return
+      }
+      if (!/^\d{4}$/.test(paymentDetails.cardLastFour.trim())) {
+        setSubmitError('Enter the last 4 digits of the card.')
+        return
+      }
+    }
+    if (paymentFlags.showReferenceField && !paymentDetails.reference.trim()) {
+      setSubmitError('Enter a transaction/reference ID.')
+      return
+    }
+    if (paymentFlags.showCodFields && !paymentDetails.collectionInstructions.trim()) {
+      setSubmitError('Add collection or delivery instructions.')
+      return
+    }
 
     setIsSubmitting(true)
     setSubmitError('')
     setStockShortages(null)
+
+    const paymentPayload = paymentType
+      ? {
+          amount: paymentType === 'cod' ? Number(amountPaid) || 0 : paidAmount,
+          paymentMethod: paymentType,
+          ...sanitizePaymentDetails(paymentType, {
+            upiId: paymentDetails.upiId.trim(),
+            transactionReference: paymentDetails.reference.trim(),
+            cardType: paymentDetails.cardType.trim(),
+            cardLastFour: paymentDetails.cardLastFour.trim(),
+            collectionInstructions: paymentDetails.collectionInstructions.trim(),
+            paymentStatus: paymentDetails.paymentStatus,
+          }),
+        }
+      : undefined
 
     const result = await createInvoice({
       customerId: customerType === 'existing' ? customerId : undefined,
@@ -763,7 +822,7 @@ export default function CreateSalesInvoice() {
           ? (item.serialNumbers || []).filter(Boolean)
           : undefined,
       })),
-      payment: paidAmount > 0 ? { amount: paidAmount, paymentMethod: paymentType || 'cash' } : undefined,
+      payment: paymentPayload,
     })
 
     if (!result.success) {
@@ -1067,7 +1126,79 @@ export default function CreateSalesInvoice() {
           <div className="space-y-5">
             <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
               <p className="text-sm font-semibold text-neutral-900">Payment</p>
-              <Select className="mt-3" options={paymentTypeOptions} value={paymentType} onChange={(event) => setPaymentType(event.target.value)} placeholder="Select payment method" />
+              <Select
+                className="mt-3"
+                options={paymentTypeOptions}
+                value={paymentType}
+                onChange={(event) => setPaymentType(event.target.value)}
+                placeholder="Select payment method"
+              />
+
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                {paymentFlags.showUpiFields && (
+                  <>
+                    <Input
+                      label="UPI ID"
+                      value={paymentDetails.upiId}
+                      onChange={(event) => setPaymentDetails((current) => ({ ...current, upiId: event.target.value }))}
+                      required
+                    />
+                    <Input
+                      label="Transaction / Reference ID"
+                      value={paymentDetails.reference}
+                      onChange={(event) => setPaymentDetails((current) => ({ ...current, reference: event.target.value }))}
+                      required
+                    />
+                  </>
+                )}
+
+                {paymentFlags.showCardFields && (
+                  <>
+                    <Input
+                      label="Card Type"
+                      value={paymentDetails.cardType}
+                      onChange={(event) => setPaymentDetails((current) => ({ ...current, cardType: event.target.value }))}
+                      placeholder="Debit / Credit / RuPay"
+                      required
+                    />
+                    <Input
+                      label="Last 4 Digits"
+                      value={paymentDetails.cardLastFour}
+                      onChange={(event) => setPaymentDetails((current) => ({ ...current, cardLastFour: event.target.value }))}
+                      inputClassName="tracking-[0.25em]"
+                      maxLength={4}
+                      required
+                    />
+                    <Input
+                      label="Transaction / Reference ID"
+                      value={paymentDetails.reference}
+                      onChange={(event) => setPaymentDetails((current) => ({ ...current, reference: event.target.value }))}
+                      required
+                    />
+                  </>
+                )}
+
+                {paymentFlags.showReferenceField && !paymentFlags.showUpiFields && !paymentFlags.showCardFields && (
+                  <Input
+                    label="Transaction / Reference ID"
+                    value={paymentDetails.reference}
+                    onChange={(event) => setPaymentDetails((current) => ({ ...current, reference: event.target.value }))}
+                    required
+                  />
+                )}
+
+                {paymentFlags.showCodFields && (
+                  <div className="md:col-span-2 flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-neutral-700">Collection / Delivery Instructions</label>
+                    <textarea
+                      value={paymentDetails.collectionInstructions}
+                      onChange={(event) => setPaymentDetails((current) => ({ ...current, collectionInstructions: event.target.value }))}
+                      className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                    />
+                    <p className="text-xs text-amber-700">Payment status stays pending until the cash is collected.</p>
+                  </div>
+                )}
+              </div>
 
               <div className="mt-5 space-y-2.5 border-t border-neutral-100 pt-4 text-sm">
                 <div className="flex items-center justify-between">
@@ -1097,9 +1228,16 @@ export default function CreateSalesInvoice() {
               </div>
 
               <div className="mt-5 space-y-3">
-                <Input label="Amount Paid Now (Optional)" type="number" min="0" step="0.01" value={amountPaid} onChange={(event) => setAmountPaid(event.target.value)} />
+                <Input
+                  label={paymentType === 'cod' ? 'Amount Collected Now (Optional)' : 'Amount Paid Now (Optional)'}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={amountPaid}
+                  onChange={(event) => setAmountPaid(event.target.value)}
+                />
                 <div className="rounded-xl bg-amber-50 px-3.5 py-2.5">
-                  <p className="text-xs text-amber-700">Due Amount</p>
+                  <p className="text-xs text-amber-700">{paymentType === 'cod' ? 'Pending until collected' : 'Due Amount'}</p>
                   <p className="text-lg font-semibold text-amber-700">{formatCurrency(dueAmount)}</p>
                 </div>
               </div>

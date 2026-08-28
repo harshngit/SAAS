@@ -22,12 +22,14 @@ import {
 } from '../../api/suppliers'
 import { formatCurrency } from '../../utils/format'
 import { normalizeApiPayment, normalizeApiSupplier } from './supplierUtils'
+import { getPaymentMethodFlags, sanitizePaymentDetails } from '../payments/paymentMethodUtils'
 import SupplierForm from './SupplierForm'
 
 const paymentModeOptions = [
   { value: 'cash', label: 'Cash' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
   { value: 'upi', label: 'UPI' },
+  { value: 'cod', label: 'Cash on Delivery' },
   { value: 'cheque', label: 'Cheque' },
 ]
 
@@ -37,6 +39,11 @@ const emptyPaymentForm = {
   amount: '',
   paymentMode: 'cash',
   reference: '',
+  upiId: '',
+  cardType: '',
+  cardLastFour: '',
+  collectionInstructions: '',
+  paymentStatus: 'pending',
   note: '',
   paidOn: today(),
 }
@@ -192,17 +199,56 @@ export default function SupplierDetail() {
     setPaymentFormError('')
 
     const amount = Number(paymentForm.amount)
-    if (!amount || amount <= 0) {
+    const paymentFlags = getPaymentMethodFlags(paymentForm.paymentMode)
+
+    if (paymentForm.paymentMode !== 'cod' && (!amount || amount <= 0)) {
       setPaymentFormError('Enter a valid payment amount.')
+      return
+    }
+
+    if (paymentFlags.showUpiFields && !paymentForm.upiId.trim()) {
+      setPaymentFormError('Enter a UPI ID.')
+      return
+    }
+
+    if (paymentFlags.showCardFields) {
+      if (!paymentForm.cardType.trim()) {
+        setPaymentFormError('Enter the card type.')
+        return
+      }
+
+      if (!/^\d{4}$/.test(paymentForm.cardLastFour.trim())) {
+        setPaymentFormError('Enter the last 4 digits of the card.')
+        return
+      }
+    }
+
+    if (paymentFlags.showReferenceField && !paymentForm.reference.trim()) {
+      setPaymentFormError('Enter a transaction/reference ID.')
+      return
+    }
+
+    if (paymentFlags.showCodFields && !paymentForm.collectionInstructions.trim()) {
+      setPaymentFormError('Add collection or delivery instructions.')
       return
     }
 
     setIsSavingPayment(true)
 
+    const paymentDetails = sanitizePaymentDetails(paymentForm.paymentMode, {
+      upiId: paymentForm.upiId.trim(),
+      transactionReference: paymentForm.reference.trim(),
+      cardType: paymentForm.cardType.trim(),
+      cardLastFour: paymentForm.cardLastFour.trim(),
+      collectionInstructions: paymentForm.collectionInstructions.trim(),
+      paymentStatus: paymentForm.paymentStatus,
+    })
+
     const result = await recordSupplierPayment(supplier.id, {
       amount,
       paymentMode: paymentForm.paymentMode,
       reference: paymentForm.reference.trim() || undefined,
+      ...paymentDetails,
       note: paymentForm.note.trim() || undefined,
       paidOn: paymentForm.paidOn || undefined,
     })
@@ -487,25 +533,99 @@ export default function SupplierDetail() {
             step="0.01"
             value={paymentForm.amount}
             onChange={(event) => setPaymentForm((current) => ({ ...current, amount: event.target.value }))}
-            required
+            required={paymentForm.paymentMode !== 'cod'}
           />
           <Select
             label="Payment Mode"
             options={paymentModeOptions}
             value={paymentForm.paymentMode}
-            onChange={(event) => setPaymentForm((current) => ({ ...current, paymentMode: event.target.value }))}
+            onChange={(event) =>
+              setPaymentForm((current) => ({
+                ...current,
+                paymentMode: event.target.value,
+                reference: '',
+                upiId: '',
+                cardType: '',
+                cardLastFour: '',
+                collectionInstructions: '',
+                paymentStatus: event.target.value === 'cod' ? 'pending' : '',
+              }))
+            }
           />
           <DatePicker
             label="Paid On"
             value={paymentForm.paidOn}
             onChange={(value) => setPaymentForm((current) => ({ ...current, paidOn: value }))}
           />
-          <Input
-            label="Reference"
-            placeholder="e.g. Cheque no. or transaction ID"
-            value={paymentForm.reference}
-            onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
-          />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {getPaymentMethodFlags(paymentForm.paymentMode).showUpiFields && (
+              <>
+                <Input
+                  label="UPI ID"
+                  value={paymentForm.upiId}
+                  onChange={(event) => setPaymentForm((current) => ({ ...current, upiId: event.target.value }))}
+                  required
+                />
+                <Input
+                  label="Transaction / Reference ID"
+                  value={paymentForm.reference}
+                  onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
+                  required
+                />
+              </>
+            )}
+
+            {getPaymentMethodFlags(paymentForm.paymentMode).showCardFields && (
+              <>
+                <Input
+                  label="Card Type"
+                  value={paymentForm.cardType}
+                  onChange={(event) => setPaymentForm((current) => ({ ...current, cardType: event.target.value }))}
+                  placeholder="Debit / Credit / RuPay"
+                  required
+                />
+                <Input
+                  label="Last 4 Digits"
+                  value={paymentForm.cardLastFour}
+                  onChange={(event) => setPaymentForm((current) => ({ ...current, cardLastFour: event.target.value }))}
+                  inputClassName="tracking-[0.25em]"
+                  maxLength={4}
+                  required
+                />
+                <Input
+                  label="Transaction / Reference ID"
+                  value={paymentForm.reference}
+                  onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
+                  required
+                />
+              </>
+            )}
+
+            {getPaymentMethodFlags(paymentForm.paymentMode).showReferenceField &&
+              !getPaymentMethodFlags(paymentForm.paymentMode).showUpiFields &&
+              !getPaymentMethodFlags(paymentForm.paymentMode).showCardFields && (
+                <Input
+                  label="Reference"
+                  placeholder="e.g. Cheque no. or transaction ID"
+                  value={paymentForm.reference}
+                  onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
+                />
+              )}
+
+            {getPaymentMethodFlags(paymentForm.paymentMode).showCodFields && (
+              <div className="md:col-span-2 flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-neutral-700">Collection / Delivery Instructions</label>
+                <textarea
+                  value={paymentForm.collectionInstructions}
+                  onChange={(event) =>
+                    setPaymentForm((current) => ({ ...current, collectionInstructions: event.target.value }))
+                  }
+                  className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+                <p className="text-xs text-amber-700">Payment status stays pending until the cash is collected.</p>
+              </div>
+            )}
+          </div>
           <Input
             label="Note"
             as="textarea"
