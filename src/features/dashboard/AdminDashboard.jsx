@@ -164,7 +164,7 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
       {footer && (
         <div
           className="mt-auto flex w-full items-end justify-between gap-4 pt-2.5 text-[0.72rem] font-semibold leading-4 text-current/86 transition-transform duration-300 group-hover:translate-x-0.5"
-          style={{ borderTop: '1px solid #374151' }}
+          style={{ borderTop: '1px solid rgba(55, 65, 81, 0.55)' }}
         >
           <span className="min-w-0 flex-1 leading-[1.05]">
             <span className="block whitespace-nowrap">{footerFirstLine}</span>
@@ -182,97 +182,108 @@ function ProfitSummaryCard({ grossProfit, netProfit }) {
   const footerParts = footer.split(' ')
   const footerFirstLine = footerParts.length === 3 ? footerParts.slice(0, 2).join(' ') : footerParts.slice(0, 1).join(' ')
   const footerSecondLine = footerParts.length === 3 ? footerParts.slice(2).join(' ') : footerParts.slice(1).join(' ')
-
+ 
   return (
-    <div className="group relative flex min-h-[12.5rem] flex-col overflow-hidden rounded-[1rem] bg-[linear-gradient(135deg,#0f766e,#2563eb)] p-3.5 text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-3.5">
-      <div className="min-w-0">
-        <p className="mx-auto max-w-[8rem] whitespace-normal break-normal text-center text-[0.68rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-white/72 sm:text-[0.72rem]">
+    <div className="group relative flex min-h-[12.5rem] flex-col overflow-hidden rounded-[1rem] bg-[linear-gradient(180deg,#1687a8_0%,#2670db_100%)] p-4 text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-4">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_36%)] opacity-90" />
+      <div className="relative min-w-0">
+        <p className="-ml-1 w-full whitespace-nowrap text-center text-[0.70rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-white/82 sm:text-[0.72rem]">
           Profit Summary
         </p>
-        <div className="mt-2 grid grid-cols-2 divide-x divide-white/12">
-          <div className="flex flex-col items-center justify-center px-2 py-2 text-center">
-            <p className="text-[0.64rem] font-medium leading-none text-white/65">Gross Profit</p>
-            <p className="mt-1 font-(--font-display) text-[1.05rem] font-semibold leading-none tracking-tight text-white">
-              {formatCurrency(grossProfit)}
+        <div className="mt-4 space-y-3.5">
+          <div className="flex items-end justify-between gap-2">
+            <p className="max-w-[5rem] text-[0.64rem] font-medium leading-none text-white/72">Gross Profit</p>
+            <p className="font-(--font-display) text-[1rem] font-semibold leading-none tracking-tight text-white">
+              {formatCompactCurrency(grossProfit)}
             </p>
           </div>
-          <div className="flex flex-col items-center justify-center px-2 py-2 text-center">
-            <p className="text-[0.64rem] font-medium leading-none text-white/65">Net Profit</p>
-            <p className="mt-1 font-(--font-display) text-[1.05rem] font-semibold leading-none tracking-tight text-white">
-              {formatCurrency(netProfit)}
+          <div className="flex items-end justify-between gap-2">
+            <p className="max-w-[5rem] text-[0.64rem] font-medium leading-none text-white/72">Net Profit</p>
+            <p className="font-(--font-display) text-[1rem] font-semibold leading-none tracking-tight text-white">
+              {formatCompactCurrency(netProfit)}
             </p>
           </div>
         </div>
       </div>
-      <div
-        className="mt-auto flex w-full items-end justify-between gap-4 pt-2.5 text-[0.72rem] font-semibold leading-4 text-white/86 transition-transform duration-300 group-hover:translate-x-0.5"
-        style={{ borderTop: '1px solid #374151' }}
-      >
-        <span className="min-w-0 flex-1 leading-[1.05]">
-          <span className="block whitespace-nowrap">{footerFirstLine}</span>
-          {footerSecondLine && <span className="block whitespace-nowrap">{footerSecondLine}</span>}
-        </span>
-        <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
+      <div className="relative mt-auto pt-4">
+        <div className="h-px w-full bg-[rgba(55,65,81,0.55)]" />
+        <div className="mt-3 flex items-end justify-between gap-4 text-[0.72rem] font-semibold leading-4 text-white/92 transition-transform duration-300 group-hover:translate-x-0.5">
+          <span className="min-w-0 leading-[1.02]">
+            <span className="block whitespace-nowrap">{footerFirstLine}</span>
+            {footerSecondLine && <span className="block whitespace-nowrap">{footerSecondLine}</span>}
+          </span>
+          <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
+        </div>
       </div>
     </div>
   )
 }
 
-function FeaturedSalesCard({ totalSales, monthlyTarget = 80000, monthlyAchieved = 0 }) {
+function FeaturedSalesCard({
+  totalSales,
+  monthlyTarget = 80000,
+  monthlyAchieved = 0,
+  ordersCount = 0,
+  deliveredCount = 0,
+  pendingOrdersCount = 0,
+}) {
   const navigate = useNavigate()
   const remainingTarget = Math.max((monthlyTarget || 0) - (monthlyAchieved || 0), 0)
+  const formatCount = (value) => new Intl.NumberFormat('en-IN').format(Number(value) || 0)
 
   return (
     <button
       type="button"
       onClick={() => navigate('/admin/orders')}
       aria-label="View sales orders"
-      className="group relative flex h-[300px] w-full min-w-0 flex-col overflow-hidden rounded-[1rem] bg-[linear-gradient(180deg,#0f5a12_0%,#063b00_100%)] p-3.5 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-3.5"
+      className="group relative flex h-[320px] w-full min-w-0 flex-col overflow-hidden rounded-[1.55rem] bg-[linear-gradient(180deg,#175e17_0%,#0c4608_100%)] p-4 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-4"
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.06),transparent_30%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
-      <div className="pointer-events-none absolute right-3 top-3 flex size-13 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-105 sm:size-14">
-        <IndianRupee className="size-6.5 sm:size-7" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_33%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.06),transparent_28%)] opacity-85 transition-opacity duration-300 group-hover:opacity-100" />
+      <div className="pointer-events-none absolute right-4 top-4 flex size-[4.55rem] items-center justify-center rounded-full bg-white/12 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-105">
+        <IndianRupee className="size-7" aria-hidden="true" />
       </div>
 
-      <div className="min-w-0 pr-13">
-        <p className="max-w-full whitespace-nowrap text-[0.68rem] font-semibold uppercase tracking-[0.11em] text-white/82 sm:text-[0.76rem]">
+      <div className="min-w-0 pr-16">
+        <p className="max-w-full whitespace-nowrap text-[0.85rem] font-semibold uppercase tracking-[0.14em] text-white/78">
           Today&apos;s Sales
         </p>
-        <p className="mt-1 font-(--font-display) text-[2.55rem] font-semibold leading-none tracking-tight text-white sm:text-[2.10rem]">
+        <p className="mt-1 font-(--font-display) text-[2.3rem] font-semibold leading-none tracking-tight text-white">
           {formatCurrency(totalSales)}
         </p>
       </div>
 
-      <div className="relative mt-4 sm:mt-5">
-        <div className="grid grid-cols-3 divide-x divide-white/20">
-          <div className="min-w-0 px-2.5 py-1.5 text-center transition-transform duration-300 group-hover:-translate-y-0.5 sm:px-3">
-            <p className="mx-auto max-w-[5rem] whitespace-normal break-words text-[0.58rem] font-semibold uppercase leading-[1.05] tracking-[0.12em] text-white/66 sm:text-[0.62rem]">
-              Monthly Target
-            </p>
-            <p className="mt-5 text-[0.95rem] font-semibold leading-none text-white sm:text-[1.05rem]">
-              {formatCurrency(monthlyTarget)}
-            </p>
-          </div>
-          <div className="min-w-0 px-2.5 py-1.5 text-center transition-transform duration-300 group-hover:-translate-y-0.5 sm:px-3">
-            <p className="mx-auto max-w-[5rem] whitespace-normal break-words text-[0.58rem] font-semibold uppercase leading-[1.05] tracking-[0.12em] text-white/66 sm:text-[0.62rem]">
-              Achieved
-            </p>
-            <p className="mt-8 text-[0.95rem] font-semibold leading-none text-white sm:text-[1.05rem]">
-              {formatCurrency(monthlyAchieved)}
-            </p>
-          </div>
-          <div className="min-w-0 px-2.5 py-1.5 text-center transition-transform duration-300 group-hover:-translate-y-0.5 sm:px-3">
-            <p className="mx-auto max-w-[5.5rem] whitespace-normal break-words text-[0.58rem] font-semibold uppercase leading-[1.05] tracking-[0.12em] text-white/66 sm:text-[0.62rem]">
-              Remaining Target
-            </p>
-            <p className="mt-5 text-[0.95rem] font-semibold leading-none text-white sm:text-[1.05rem]">
-              {formatCurrency(remainingTarget)}
-            </p>
-          </div>
+      <div className="relative mt-9 grid grid-cols-2 gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <p className="text-[0.90rem] font-medium leading-none text-white/86">Received</p>
+          <p className="mt-1 text-[1.50rem] font-semibold leading-none tracking-tight text-white">
+            {formatCurrency(monthlyAchieved)}
+          </p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[0.90rem] font-medium leading-none text-white/86">Pending</p>
+          <p className="mt-1 text-[1.50rem] font-semibold leading-none tracking-tight text-white">
+            {formatCurrency(remainingTarget)}
+          </p>
+        </div>
+        <div className="col-span-2 h-3" />
+      </div>
+
+      <div className="mt-11 grid grid-cols-3 divide-x divide-white/25 text-left">
+        <div className="pr-3">
+          <p className="text-[0.84rem] font-medium leading-none text-white/88">Orders</p>
+          <p className="mt-1 text-[1.45rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
+        </div>
+        <div className="px-3">
+          <p className="text-[0.84rem] font-medium leading-none text-white/88">Delivered</p>
+          <p className="mt-1 text-[1.45rem] font-semibold leading-none tracking-tight text-white">{formatCount(deliveredCount)}</p>
+        </div>
+        <div className="pl-3">
+          <p className="text-[0.84rem] font-medium leading-none text-white/88">Pending</p>
+          <p className="mt-1 text-[1.45rem] font-semibold leading-none tracking-tight text-white">{formatCount(pendingOrdersCount)}</p>
         </div>
       </div>
 
-      <div className="mt-auto pt-3 text-[0.88rem] font-medium leading-4 text-white/88">
+      <div className="mt-auto flex items-end justify-end pt-3 text-[0.84rem] font-medium leading-4 text-white/90">
         <span className="inline-flex items-center gap-1.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-white">
           View Sales
           <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
@@ -472,6 +483,14 @@ export default function AdminDashboard() {
     total: row.total,
     orderDate: formatOrderDate(row.date),
   }))
+  const deliveredOrderStatuses = new Set(['delivered', 'partially_delivered'])
+  const featuredOrdersCount = Number(ordersSummary.total ?? ordersSummary.total_orders ?? ordersSummary.orders ?? recentOrders.length)
+  const featuredDeliveredCount = Number(
+    ordersSummary.delivered ?? ordersSummary.completed ?? recentOrders.filter((order) => deliveredOrderStatuses.has(order.status)).length,
+  )
+  const featuredPendingCount = Number(
+    ordersSummary.pending ?? ordersSummary.processing ?? Math.max(featuredOrdersCount - featuredDeliveredCount, 0),
+  )
   const recentOrdersSearchTerm = recentOrdersSearch.trim().toLowerCase()
   const filteredRecentOrders = !recentOrdersSearchTerm
     ? recentOrders
@@ -516,6 +535,9 @@ export default function AdminDashboard() {
             totalSales={summary.today_sales}
             monthlyTarget={summary.monthly_target ?? 80000}
             monthlyAchieved={summary.month_sales ?? summary.period_sales ?? 0}
+            ordersCount={featuredOrdersCount}
+            deliveredCount={featuredDeliveredCount}
+            pendingOrdersCount={featuredPendingCount}
           />
         </div>
         <div
@@ -687,7 +709,7 @@ export default function AdminDashboard() {
 
         </div>
 
-        <div className="mt-1 space-y-3.5">
+        <div className="mt-1 space-y-3.5 xl:-mt-30">
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
             <DashboardCard
               title="Cashflow"
@@ -766,7 +788,7 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 <div className="mt-auto flex items-center justify-center text-[0.7rem]">
-                  <button className="mt-16 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                  <button className="mt-19 inline-flex items-center gap-1.5 font-semibold text-primary-600">
                     View A/R Report
                     <ChevronRight className="size-4 text-primary-600" />
                   </button>
