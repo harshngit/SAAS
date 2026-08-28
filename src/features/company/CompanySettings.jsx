@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bell,
   BarChart3,
@@ -8,6 +8,7 @@ import {
   CircleUserRound,
   ClipboardList,
   CreditCard,
+  ArrowRight,
   Eye,
   FileText,
   Globe,
@@ -21,6 +22,7 @@ import {
   Pencil,
   Save,
   ShieldCheck,
+  Sparkles,
   Trash2,
   Upload,
   UploadCloud,
@@ -32,6 +34,7 @@ import {
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Card from "../../components/ui/Card";
+import Modal from "../../components/ui/Modal";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import Select from "../../components/ui/Select";
 import { changePassword, getCurrentProfile } from "../../api/auth";
@@ -500,6 +503,20 @@ function buildCompletionSummary(companyData) {
   };
 }
 
+function getCompletionJumpTarget(companyData) {
+  const nextField = dashboardCompletionFields.find(
+    (field) => !String(companyData[field.key] || "").trim(),
+  );
+
+  if (!nextField) return null;
+
+  const navigation = companyCompletionNavigationMap[nextField.key];
+
+  return navigation
+    ? { ...navigation, fieldKey: nextField.key }
+    : { tabId: "general", sectionId: "basic", fieldKey: nextField.key };
+}
+
 function getBranchCount(companyData) {
   return String(companyData.branchOfficeAddresses || "")
     .split(/\n|,/)
@@ -573,6 +590,27 @@ const companyRequiredFieldsByTab = {
   },
 };
 
+const companyCompletionNavigationMap = {
+  name: { tabId: "general", sectionId: "basic" },
+  legalName: { tabId: "general", sectionId: "basic" },
+  businessType: { tabId: "general", sectionId: "basic" },
+  industry: { tabId: "general", sectionId: "basic" },
+  status: { tabId: "general", sectionId: "basic" },
+  ownerDirectorName: { tabId: "general", sectionId: "authorizedPerson" },
+  designation: { tabId: "general", sectionId: "authorizedPerson" },
+  mobileNumber: { tabId: "general", sectionId: "authorizedPerson" },
+  adminEmail: { tabId: "general", sectionId: "authorizedPerson" },
+  phone: { tabId: "general", sectionId: "contact" },
+  email: { tabId: "general", sectionId: "contact" },
+  registeredAddress: { tabId: "general", sectionId: "address" },
+  city: { tabId: "general", sectionId: "address" },
+  state: { tabId: "general", sectionId: "address" },
+  country: { tabId: "general", sectionId: "address" },
+  pincode: { tabId: "general", sectionId: "address" },
+  gstCertificateFile: { tabId: "documents", sectionId: null },
+  panCardFile: { tabId: "documents", sectionId: null },
+};
+
 const companyTabSectionOrder = {
   general: ["basic", "authorizedPerson", "contact", "address"],
 };
@@ -614,6 +652,560 @@ const bankOptions = [
   { value: "axis", label: "Axis Bank" },
   { value: "other", label: "Other" },
 ];
+
+const companyProfileCompletionSections = [
+  {
+    id: "basic",
+    label: "Basic Information",
+    description: "Company identity and branding.",
+    fields: [
+      {
+        key: "logoUrl",
+        label: "Company Logo",
+        kind: "file",
+        accept: "image/*",
+        uploadLabel: "Upload Logo",
+        required: true,
+      },
+      {
+        key: "name",
+        label: "Company Name",
+        kind: "input",
+        required: true,
+      },
+      {
+        key: "businessType",
+        label: "Business Type",
+        kind: "select",
+        options: businessTypeOptions,
+        placeholder: "Select business type",
+        required: true,
+      },
+    ],
+  },
+  {
+    id: "tax",
+    label: "Business and Tax Information",
+    description: "Registration and tax identifiers.",
+    fields: [
+      {
+        key: "gstin",
+        label: "GST Number",
+        kind: "input",
+        required: true,
+      },
+      {
+        key: "panNumber",
+        label: "PAN Number",
+        kind: "input",
+        required: true,
+      },
+    ],
+  },
+  {
+    id: "contact",
+    label: "Contact and Address",
+    description: "Primary contact details and registered address.",
+    fields: [
+      {
+        key: "phone",
+        label: "Contact Number",
+        kind: "input",
+        required: true,
+      },
+      {
+        key: "email",
+        label: "Email",
+        kind: "input",
+        type: "email",
+        required: true,
+      },
+      {
+        key: "registeredAddress",
+        label: "Address",
+        kind: "textarea",
+        required: true,
+      },
+      {
+        key: "city",
+        label: "City",
+        kind: "input",
+        required: true,
+      },
+      {
+        key: "state",
+        label: "State",
+        kind: "select",
+        options: stateOptions,
+        placeholder: "Select state",
+        required: true,
+      },
+      {
+        key: "pincode",
+        label: "PIN Code",
+        kind: "input",
+        required: true,
+      },
+    ],
+  },
+  {
+    id: "bank",
+    label: "Bank Details",
+    description: "Bank information required for payments.",
+    fields: [
+      {
+        key: "bankAccountDetails",
+        label: "Bank Account Details",
+        kind: "input",
+        required: true,
+      },
+      {
+        key: "accountHolderName",
+        label: "Account Holder Name",
+        kind: "input",
+        required: true,
+      },
+      {
+        key: "ifscCode",
+        label: "IFSC Code",
+        kind: "input",
+        required: true,
+      },
+      {
+        key: "bankName",
+        label: "Bank Name",
+        kind: "select",
+        options: bankOptions,
+        placeholder: "Select bank",
+        required: true,
+      },
+    ],
+  },
+];
+
+function isBlankCompanyValue(value) {
+  return String(value ?? "").trim().length === 0;
+}
+
+function getCompanyProfileCompletionState(companyData) {
+  const sections = companyProfileCompletionSections.map((section) => {
+    const fields = section.fields.map((field) => {
+      const value = companyData?.[field.key];
+      const completed = !isBlankCompanyValue(value);
+
+      return {
+        ...field,
+        value,
+        completed,
+      };
+    });
+
+    const completedFields = fields.filter((field) => field.completed).length;
+    const totalFields = fields.length;
+
+    return {
+      ...section,
+      fields,
+      completedFields,
+      totalFields,
+      incompleteFields: fields.filter((field) => !field.completed),
+      isComplete: completedFields === totalFields,
+    };
+  });
+
+  const completedRequiredFields = sections.reduce(
+    (total, section) => total + section.completedFields,
+    0,
+  );
+  const totalRequiredFields = sections.reduce(
+    (total, section) => total + section.totalFields,
+    0,
+  );
+
+  return {
+    sections,
+    completedRequiredFields,
+    totalRequiredFields,
+    percent:
+      totalRequiredFields === 0
+        ? 0
+        : Math.round((completedRequiredFields / totalRequiredFields) * 100),
+    missingFields: sections.flatMap((section) =>
+      section.incompleteFields.map((field) => ({
+        ...field,
+        sectionId: section.id,
+        sectionLabel: section.label,
+      })),
+    ),
+    firstIncompleteSection:
+      sections.find((section) => !section.isComplete) || sections[0] || null,
+  };
+}
+
+function getCompletionSectionFields(section, companyData) {
+  return section.fields.filter((field) => isBlankCompanyValue(companyData?.[field.key]));
+}
+
+function getCompletionValidationError(field, value) {
+  const trimmedValue = String(value ?? "").trim();
+
+  if (!trimmedValue) {
+    return `${field.label} is required.`;
+  }
+
+  if (field.key === "email") {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailPattern.test(trimmedValue) ? "" : "Enter a valid email address.";
+  }
+
+  if (field.key === "phone") {
+    const phonePattern = /^\+?[0-9][0-9\s()-]{7,}$/;
+    return phonePattern.test(trimmedValue)
+      ? ""
+      : "Enter a valid contact number.";
+  }
+
+  if (field.key === "gstin") {
+    const gstPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+    return gstPattern.test(trimmedValue)
+      ? ""
+      : "Enter a valid GST number.";
+  }
+
+  if (field.key === "panNumber") {
+    const panPattern = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+    return panPattern.test(trimmedValue)
+      ? ""
+      : "Enter a valid PAN number.";
+  }
+
+  if (field.key === "pincode") {
+    const pinPattern = /^[1-9][0-9]{5}$/;
+    return pinPattern.test(trimmedValue) ? "" : "Enter a valid PIN code.";
+  }
+
+  return "";
+}
+
+function getCompletionFieldApiKey(fieldKey) {
+  const apiKeys = {
+    logoUrl: "logo_url",
+    name: "name",
+    businessType: "business_type",
+    gstin: "gst_number",
+    panNumber: "pan_number",
+    phone: "phone",
+    email: "email",
+    registeredAddress: "address",
+    city: "city",
+    state: "state",
+    pincode: "pin_code",
+    bankAccountDetails: "bank_account_details",
+    accountHolderName: "bank_account_holder",
+    ifscCode: "bank_ifsc",
+    bankName: "bank_name",
+  };
+
+  return apiKeys[fieldKey] || fieldKey;
+}
+
+function getCompletionFieldKeyFromApiKey(apiKey) {
+  const fieldKeys = {
+    logo_url: "logoUrl",
+    name: "name",
+    business_type: "businessType",
+    gst_number: "gstin",
+    pan_number: "panNumber",
+    phone: "phone",
+    email: "email",
+    address: "registeredAddress",
+    city: "city",
+    state: "state",
+    pin_code: "pincode",
+    bank_account_details: "bankAccountDetails",
+    bank_account_holder: "accountHolderName",
+    bank_ifsc: "ifscCode",
+    bank_name: "bankName",
+  };
+
+  return fieldKeys[apiKey] || apiKey;
+}
+
+function CompanyProfileCompletionModal({
+  isOpen,
+  companyData,
+  onClose,
+  onCompleteNow,
+  initialSectionId,
+}) {
+  const { showToast } = useToast();
+  const [activeSectionId, setActiveSectionId] = useState(null);
+  const [draftValues, setDraftValues] = useState(companyData);
+  const [draftErrors, setDraftErrors] = useState({});
+  const [draftLogoFile, setDraftLogoFile] = useState(null);
+  const [draftLogoPreview, setDraftLogoPreview] = useState("");
+  const [draftLogoError, setDraftLogoError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const completion = useMemo(
+    () => getCompanyProfileCompletionState(companyData),
+    [companyData],
+  );
+  const activeSection =
+    completion.sections.find((section) => section.id === activeSectionId) ||
+    completion.firstIncompleteSection ||
+    completion.sections[0] ||
+    null;
+  const incompleteFields = activeSection
+    ? activeSection.fields.filter((field) => isBlankCompanyValue(companyData?.[field.key]))
+    : [];
+  const remainingIncompleteSections = completion.sections.filter(
+    (section) => !section.isComplete,
+  );
+  const footerButtonLabel = "Complete Profile";
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const nextCompletion = getCompanyProfileCompletionState(companyData);
+    const nextSection =
+      nextCompletion.sections.find((section) => section.id === initialSectionId) ||
+      nextCompletion.firstIncompleteSection ||
+      nextCompletion.sections[0] ||
+      null;
+
+    setDraftValues(companyData);
+    setDraftErrors({});
+    setDraftLogoFile(null);
+    setDraftLogoPreview("");
+    setDraftLogoError("");
+    setActiveSectionId(nextSection?.id || null);
+  }, [companyData, initialSectionId, isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleClose = () => {
+    if (isSaving) return;
+    onClose();
+  };
+
+  const handleFieldChange = (event) => {
+    const { name, value } = event.target;
+
+    setDraftValues((prev) => ({ ...prev, [name]: value }));
+    setDraftErrors((prev) => ({ ...prev, [name]: "" }));
+    setDraftLogoError("");
+  };
+
+  const handleLogoSelect = (name, event) => {
+    void name;
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setDraftLogoError("Please select an image file for the company logo.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDraftLogoFile(file);
+      setDraftLogoPreview(String(reader.result || ""));
+      setDraftValues((prev) => ({ ...prev, logoUrl: String(reader.result || "") }));
+      setDraftErrors((prev) => ({ ...prev, logoUrl: "" }));
+      setDraftLogoError("");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleLogoRemove = () => {
+    setDraftLogoFile(null);
+    setDraftLogoPreview("");
+    setDraftValues((prev) => ({ ...prev, logoUrl: "" }));
+    setDraftErrors((prev) => ({ ...prev, logoUrl: "" }));
+    setDraftLogoError("");
+  };
+
+  const handleSelectSection = (sectionId) => {
+    if (isSaving) return;
+
+    setActiveSectionId(sectionId);
+    setDraftErrors({});
+    setDraftLogoError("");
+  };
+
+  const handleCompleteProfile = () => {
+    if (isSaving) return;
+
+    if (typeof onCompleteNow === "function") {
+      onCompleteNow();
+    }
+
+    onClose();
+  };
+
+  return (
+    <Modal
+  isOpen={isOpen}
+  onClose={handleClose}
+  title="Company Profile Completion"
+  className="!w-[96vw] !max-w-[84rem]"
+  footer={
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={handleClose}
+        disabled={isSaving}
+      >
+        Cancel
+      </Button>
+
+      <Button
+        type="button"
+        onClick={handleCompleteProfile}
+        disabled={isSaving || !activeSection}
+      >
+        {footerButtonLabel}
+      </Button>
+    </>
+  }
+>
+  <div className="max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
+      <aside className="space-y-3">
+        <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
+            Completion
+          </p>
+
+          <p className="mt-2 text-2xl font-bold text-neutral-900">
+            {completion.percent}% Complete
+          </p>
+
+          <p className="mt-1 text-xs text-neutral-500">
+            {completion.completedRequiredFields} of{" "}
+            {completion.totalRequiredFields} required fields completed
+          </p>
+
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-100">
+            <div
+              className="h-full rounded-full bg-primary-600 transition-all duration-300"
+              style={{ width: `${completion.percent}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {completion.sections.map((section) => {
+            const isActive = section.id === activeSection?.id;
+            const isSectionComplete = section.isComplete;
+
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => handleSelectSection(section.id)}
+                className={`w-full rounded-2xl border p-3 text-left transition-colors ${
+                  isActive
+                    ? "border-primary-200 bg-primary-50/50"
+                    : "border-neutral-100 bg-white hover:border-primary-100 hover:bg-primary-50/30"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-neutral-900">
+                      {section.label}
+                    </p>
+
+                    <p className="mt-1 text-xs text-neutral-500">
+                      {section.description}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`inline-flex shrink-0 items-center rounded-full px-2 py-1 text-[0.68rem] font-semibold ${
+                      isSectionComplete
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {isSectionComplete ? "Completed" : "Incomplete"}
+                  </span>
+                </div>
+
+                {!isSectionComplete && (
+                  <div className="mt-3 flex items-center justify-between text-xs">
+                    <span className="font-semibold text-amber-700">
+                      {section.incompleteFields.length} incomplete
+                    </span>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </aside>
+
+      <section className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-5 shadow-sm">
+        {activeSection ? (
+          <>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold text-neutral-900">
+                  {activeSection.label}
+                </h3>
+
+                <p className="mt-1 text-sm text-neutral-500">
+                  {activeSection.description}
+                </p>
+              </div>
+
+              <span className="shrink-0 rounded-full bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-500">
+                {activeSection.completedFields} completed
+              </span>
+            </div>
+
+            <div className="mt-4">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4">
+                <h4 className="text-sm font-semibold text-neutral-900">
+                  Incomplete Fields
+                </h4>
+                <div className="mt-3 space-y-2">
+                  {incompleteFields.length > 0 ? (
+                    incompleteFields.map((field) => (
+                      <div
+                        key={field.key}
+                        className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"
+                      >
+                        <span className="truncate text-neutral-700">{field.label}</span>
+                        <span className="shrink-0 font-semibold text-amber-700">
+                          Incomplete
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-xl bg-white px-3 py-3 text-sm text-neutral-500">
+                      This section is already complete.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/60 p-5 text-sm text-neutral-500">
+            No profile sections are available.
+          </div>
+        )}
+      </section>
+    </div>
+  </div>
+</Modal>
+  );
+}
 
 function CheckboxField({ label, name, checked, onChange, disabled }) {
   return (
@@ -791,6 +1383,7 @@ function FileUploadField({
               {uploading ? "Uploading..." : uploadLabel}
               <input
                 type="file"
+                name={name}
                 accept={accept}
                 multiple={multiple}
                 disabled={disabled || uploading}
@@ -894,7 +1487,18 @@ function formatActivityTime(value) {
 
 // Sourced from GET /organizations/overview (see api/organizations.js#getOrganizationOverview) -
 // falls back to the locally-derived values only for fields the endpoint's response doesn't cover.
-function CompanyOverviewDashboard({ overview, isLoading, error, onRetry, companyData, organization, onNavigate }) {
+function CompanyOverviewDashboard({
+  overview,
+  isLoading,
+  error,
+  onRetry,
+  companyData,
+  organization,
+  onNavigate,
+  completionState,
+  onViewAllCompletion,
+  onCompleteNow,
+}) {
   if (isLoading) {
     return (
       <section className="pb-5">
@@ -919,7 +1523,6 @@ function CompanyOverviewDashboard({ overview, isLoading, error, onRetry, company
   const company = overview?.company || {};
   const counts = overview?.counts || {};
   const storage = overview?.storage || {};
-  const profileCompletion = overview?.profile_completion || {};
   const authorizedPersonBlock = overview?.authorized_person || {};
   const documentsBlock = overview?.documents || {};
   const addressesBlock = Array.isArray(overview?.addresses) ? overview.addresses : [];
@@ -935,17 +1538,13 @@ function CompanyOverviewDashboard({ overview, isLoading, error, onRetry, company
     documentsBlock.uploaded ?? documentRows.filter((document) => document.status === "uploaded").length;
 
   const localCompletion = buildCompletionSummary(companyData);
-  const apiMissingInformation = profileCompletion.missing_information || profileCompletion.missingInformation;
-  // missing_information is an array of display labels (strings); pair each with its column
-  // name from missing_fields (same order) when available, otherwise use the label as the key.
-  const completion = {
-    percent: profileCompletion.percent ?? localCompletion.percent,
-    missingFields: Array.isArray(apiMissingInformation)
-      ? apiMissingInformation.map((label, index) => ({
-          key: profileCompletion.missing_fields?.[index] || label,
-          label,
-        }))
-      : localCompletion.missingFields,
+  const completion = completionState || {
+    percent: localCompletion.percent,
+    completedRequiredFields: dashboardCompletionFields.length - localCompletion.missingFields.length,
+    totalRequiredFields: dashboardCompletionFields.length,
+    missingFields: localCompletion.missingFields,
+    firstIncompleteSection: null,
+    sections: [],
   };
 
   const branchCount = counts.branches ?? getBranchCount(companyData);
@@ -1176,50 +1775,59 @@ function CompanyOverviewDashboard({ overview, isLoading, error, onRetry, company
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-neutral-900">
-            Profile Completion
-          </h3>
-          <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-center">
-            <div
-              className="grid size-28 shrink-0 place-items-center rounded-full"
-              style={{
-                background: `conic-gradient(#22a447 ${completion.percent}%, #e5e7eb 0)`,
-              }}
-            >
-              <div className="grid size-20 place-items-center rounded-full bg-white text-2xl font-bold text-neutral-900">
-                {completion.percent}%
-              </div>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-neutral-900">
+                Profile Completion
+              </h3>
+              <p className="mt-1 text-xs text-neutral-500">
+                Keep your company profile complete and ready for use.
+              </p>
             </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-neutral-900">
-                {completion.percent >= 90 ? "Almost Complete!" : "Profile Needs Attention"}
+            <span className="rounded-full bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-500">
+              {completion.percent}% Complete
+            </span>
+          </div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-neutral-100">
+            <div
+              className="h-full rounded-full bg-primary-600 transition-all duration-300"
+              style={{ width: `${completion.percent}%` }}
+            />
+          </div>
+          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-3xl font-bold tracking-tight text-neutral-900">
+                {completion.percent}% Complete
               </p>
               <p className="mt-1 text-sm text-neutral-500">
-                {completion.percent >= 90
-                  ? "Great job. Your company profile is almost complete."
-                  : "Complete the missing items to improve company readiness."}
+                {completion.completedRequiredFields} of {completion.totalRequiredFields} required fields completed
               </p>
-              {completion.missingFields.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-xs font-semibold text-neutral-700">
-                    Missing Information
-                  </p>
-                  <ul className="mt-2 space-y-1 text-xs text-neutral-600">
-                    {completion.missingFields.map((field) => (
-                      <li key={field.key}>- {field.label}</li>
-                    ))}
-                  </ul>
-                </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={onViewAllCompletion}>
+                View All
+              </Button>
+              {completion.percent >= 100 ? (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  Profile Complete
+                </span>
+              ) : (
+                <Button type="button" size="sm" onClick={onCompleteNow}>
+                  Complete Now
+                </Button>
               )}
-              <button
-                type="button"
-                onClick={() => onNavigate("general")}
-                className="mt-4 text-sm font-semibold text-primary-700 hover:text-primary-800"
-              >
-                Complete Now
-              </button>
             </div>
           </div>
+          {completion.missingFields.length > 0 && (
+            <div className="mt-4 rounded-2xl bg-neutral-50/70 p-3">
+              <p className="text-xs font-semibold text-neutral-700">Missing Information</p>
+              <ul className="mt-2 space-y-1 text-xs text-neutral-600">
+                {completion.missingFields.slice(0, 4).map((field) => (
+                  <li key={field.key}>- {field.label}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
@@ -1815,6 +2423,9 @@ export default function CompanySettings() {
   });
   const [passwordError, setPasswordError] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
+  const [completionModalSectionId, setCompletionModalSectionId] = useState("");
+  const [completionJumpTarget, setCompletionJumpTarget] = useState(null);
   const [pendingLogoFile, setPendingLogoFile] = useState(null);
   const [pendingLogoPreview, setPendingLogoPreview] = useState("");
   const [logoUploadError, setLogoUploadError] = useState("");
@@ -1872,6 +2483,38 @@ export default function CompanySettings() {
   useEffect(() => {
     loadOverview();
   }, [loadOverview]);
+
+  useEffect(() => {
+    if (!completionJumpTarget) return;
+
+    if (activeTab !== completionJumpTarget.tabId) {
+      return;
+    }
+
+    if (
+      completionJumpTarget.tabId === "general" &&
+      completionJumpTarget.sectionId &&
+      !openGeneralSections[completionJumpTarget.sectionId]
+    ) {
+      setOpenGeneralSections((prev) => ({
+        ...prev,
+        [completionJumpTarget.sectionId]: true,
+      }));
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const selector = `[name="${completionJumpTarget.fieldKey}"]`;
+      document.querySelector(selector)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      document.querySelector(selector)?.focus?.();
+      setCompletionJumpTarget(null);
+    }, 50);
+
+    return () => window.clearTimeout(timer);
+  }, [activeTab, completionJumpTarget, openGeneralSections]);
 
   useEffect(() => {
     let isMounted = true;
@@ -2013,6 +2656,30 @@ export default function CompanySettings() {
     setSaveError("");
     setActiveTab(tabId);
   };
+
+  const handleCompleteProfileJump = useCallback(() => {
+    const target = getCompletionJumpTarget(companyData);
+
+    setIsCompletionModalOpen(false);
+
+    if (!target) {
+      handleTabChange("general");
+      return;
+    }
+
+    if (target.tabId === "general" && target.sectionId) {
+      setOpenGeneralSections((prev) => ({
+        ...prev,
+        [target.sectionId]: true,
+      }));
+    }
+
+    setCompletionJumpTarget({
+      ...target,
+      fieldKey: target.fieldKey || "",
+    });
+    handleTabChange(target.tabId);
+  }, [companyData, handleTabChange]);
 
   const handleFileUpload = async (name, e) => {
     const file = e.target.files?.[0];
@@ -2387,6 +3054,26 @@ export default function CompanySettings() {
     });
   };
 
+  const companyProfileCompletion = useMemo(
+    () => getCompanyProfileCompletionState(companyData),
+    [companyData],
+  );
+
+  const handleOpenCompletionModal = (sectionId) => {
+    setCompletionModalSectionId(
+      sectionId ||
+        companyProfileCompletion.firstIncompleteSection?.id ||
+        companyProfileCompletion.sections[0]?.id ||
+        "",
+    );
+    setIsCompletionModalOpen(true);
+  };
+
+  const handleCompletionSaved = (nextOrganization) => {
+    setLoadedOrganization(nextOrganization);
+    setCompanyData(buildCompanyDataFromProfile(loadedUser, nextOrganization));
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -2500,6 +3187,9 @@ export default function CompanySettings() {
                 companyData={companyData}
                 organization={loadedOrganization}
                 onNavigate={handleTabChange}
+                completionState={companyProfileCompletion}
+                onViewAllCompletion={() => handleOpenCompletionModal(companyProfileCompletion.firstIncompleteSection?.id || companyProfileCompletion.sections[0]?.id)}
+                onCompleteNow={() => handleOpenCompletionModal(companyProfileCompletion.firstIncompleteSection?.id)}
               />
             ) : activeTab === "general" ? (
               <section className="space-y-1.5 pb-5 pt-3">
@@ -3320,6 +4010,15 @@ export default function CompanySettings() {
           </div>
         </div>
       </Card>
+
+      <CompanyProfileCompletionModal
+        isOpen={isCompletionModalOpen}
+        initialSectionId={completionModalSectionId}
+        companyData={companyData}
+        onClose={() => setIsCompletionModalOpen(false)}
+        onCompleteNow={handleCompleteProfileJump}
+        onSaved={handleCompletionSaved}
+      />
     </div>
   );
 }

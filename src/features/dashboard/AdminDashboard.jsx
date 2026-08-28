@@ -101,6 +101,11 @@ function formatChartDateLabel(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
 }
 
+function formatCashflowDateLabel(value) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN', { day: '2-digit' })
+}
+
 function formatOrderDate(value) {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-GB')
@@ -455,7 +460,7 @@ export default function AdminDashboard() {
   const totalOutstanding = totalReceivables + totalPayables
 
   const cashflowData = cashflowRows.map((row) => ({
-    label: formatChartDateLabel(row.date),
+    label: formatCashflowDateLabel(row.date),
     value: row.inflow || 0,
     outflow: row.outflow || 0,
   }))
