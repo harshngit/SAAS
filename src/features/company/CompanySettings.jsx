@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
   BarChart3,
@@ -14,6 +14,7 @@ import {
   Globe,
   HardDrive,
   Image as ImageIcon,
+  Info,
   KeyRound,
   LifeBuoy,
   Mail,
@@ -50,6 +51,7 @@ import {
   uploadOrganizationSignature,
 } from "../../api/organizations";
 import { updateUser } from "../../api/users";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import { useToast } from "../../components/ui/toastContext";
 
@@ -425,26 +427,7 @@ const dashboardDocumentFields = [
   { key: "otherBusinessDocumentsFile", label: "Other Documents" },
 ];
 
-const dashboardCompletionFields = [
-  { key: "name", label: "Company Name" },
-  { key: "legalName", label: "Legal Name" },
-  { key: "businessType", label: "Business Type" },
-  { key: "industry", label: "Industry" },
-  { key: "status", label: "Status" },
-  { key: "ownerDirectorName", label: "Authorized Person" },
-  { key: "designation", label: "Designation" },
-  { key: "mobileNumber", label: "Authorized Mobile" },
-  { key: "adminEmail", label: "Authorized Email" },
-  { key: "phone", label: "Primary Mobile" },
-  { key: "email", label: "Official Email" },
-  { key: "registeredAddress", label: "Registered Address" },
-  { key: "city", label: "City" },
-  { key: "state", label: "State" },
-  { key: "country", label: "Country" },
-  { key: "pincode", label: "PIN/ZIP Code" },
-  { key: "gstCertificateFile", label: "GST Certificate" },
-  { key: "panCardFile", label: "PAN Card" },
-];
+let dashboardCompletionFields = [];
 
 function getOptionLabel(options, value, fallback = "Not set") {
   if (!value) return fallback;
@@ -503,17 +486,19 @@ function buildCompletionSummary(companyData) {
   };
 }
 
-function getCompletionJumpTarget(companyData) {
-  const nextField = dashboardCompletionFields.find(
-    (field) => !String(companyData[field.key] || "").trim(),
-  );
+function getCompletionJumpTarget(companyData, sectionId) {
+  const sectionFields = sectionId
+    ? companyProfileCompletionSections.find((section) => section.id === sectionId)?.fields || []
+    : companyProfileFieldConfig;
+
+  const nextField = sectionFields.find((field) => !String(companyData[field.key] || "").trim());
 
   if (!nextField) return null;
 
-  const navigation = companyCompletionNavigationMap[nextField.key];
+  const navigation = companyProfileFieldConfigByKey[nextField.key];
 
   return navigation
-    ? { ...navigation, fieldKey: nextField.key }
+    ? { ...navigation, fieldKey: nextField.key, fieldId: navigation.fieldId || nextField.key }
     : { tabId: "general", sectionId: "basic", fieldKey: nextField.key };
 }
 
@@ -549,6 +534,10 @@ const companyRequiredFieldsByTab = {
       { key: "businessType", label: "Business Type" },
       { key: "industry", label: "Industry" },
       { key: "status", label: "Status" },
+      { key: "cinRegistrationNumber", label: "CIN/Registration Number" },
+      { key: "gstin", label: "GSTIN/PAN" },
+      { key: "panNumber", label: "PAN Number" },
+      { key: "companyDescription", label: "Company Description" },
     ],
     authorizedPerson: [
       { key: "ownerDirectorName", label: "Owner/Director Name" },
@@ -588,6 +577,14 @@ const companyRequiredFieldsByTab = {
       { key: "invoiceSettings", label: "Invoice Settings" },
     ],
   },
+  "additional-info": {
+    main: [
+      { key: "numberOfEmployees", label: "Number of Employees" },
+      { key: "businessHours", label: "Business Hours" },
+      { key: "companyMissionVision", label: "Company Mission/Vision" },
+      { key: "notes", label: "Notes" },
+    ],
+  },
 };
 
 const companyCompletionNavigationMap = {
@@ -596,6 +593,14 @@ const companyCompletionNavigationMap = {
   businessType: { tabId: "general", sectionId: "basic" },
   industry: { tabId: "general", sectionId: "basic" },
   status: { tabId: "general", sectionId: "basic" },
+  cinRegistrationNumber: { tabId: "general", sectionId: "basic" },
+  gstin: { tabId: "general", sectionId: "basic" },
+  panNumber: { tabId: "general", sectionId: "basic" },
+  companyDescription: { tabId: "general", sectionId: "basic" },
+  numberOfEmployees: { tabId: "additional-info", sectionId: null },
+  businessHours: { tabId: "additional-info", sectionId: null },
+  companyMissionVision: { tabId: "additional-info", sectionId: null },
+  notes: { tabId: "additional-info", sectionId: null },
   ownerDirectorName: { tabId: "general", sectionId: "authorizedPerson" },
   designation: { tabId: "general", sectionId: "authorizedPerson" },
   mobileNumber: { tabId: "general", sectionId: "authorizedPerson" },
@@ -607,6 +612,12 @@ const companyCompletionNavigationMap = {
   state: { tabId: "general", sectionId: "address" },
   country: { tabId: "general", sectionId: "address" },
   pincode: { tabId: "general", sectionId: "address" },
+  qrCodeUrl: { tabId: "billings", sectionId: "payment" },
+  upiId: { tabId: "billings", sectionId: "upi" },
+  bankAccountDetails: { tabId: "billings", sectionId: "bank-account" },
+  accountHolderName: { tabId: "billings", sectionId: "bank-account" },
+  ifscCode: { tabId: "billings", sectionId: "bank-account" },
+  bankName: { tabId: "billings", sectionId: "bank-account" },
   gstCertificateFile: { tabId: "documents", sectionId: null },
   panCardFile: { tabId: "documents", sectionId: null },
 };
@@ -653,20 +664,25 @@ const bankOptions = [
   { value: "other", label: "Other" },
 ];
 
+const companyProfileSectionRouteMap = {
+  basic: { tabId: "general", route: "/admin/company-settings" },
+  "authorized-person": { tabId: "general", route: "/admin/company-settings" },
+  contact: { tabId: "general", route: "/admin/company-settings" },
+  address: { tabId: "general", route: "/admin/company-settings" },
+  branding: { tabId: "branding", route: "/admin/company-settings" },
+  billings: { tabId: "billings", route: "/admin/company-settings" },
+  "online-presence": { tabId: "online-presence", route: "/admin/company-settings" },
+  "business-settings": { tabId: "business-settings", route: "/admin/company-settings" },
+  documents: { tabId: "documents", route: "/admin/company-settings" },
+  "additional-info": { tabId: "additional-info", route: "/admin/company-settings" },
+};
+
 const companyProfileCompletionSections = [
   {
     id: "basic",
     label: "Basic Information",
-    description: "Company identity and branding.",
+    description: "Company identity and legal registration details.",
     fields: [
-      {
-        key: "logoUrl",
-        label: "Company Logo",
-        kind: "file",
-        accept: "image/*",
-        uploadLabel: "Upload Logo",
-        required: true,
-      },
       {
         key: "name",
         label: "Company Name",
@@ -681,16 +697,37 @@ const companyProfileCompletionSections = [
         placeholder: "Select business type",
         required: true,
       },
-    ],
-  },
-  {
-    id: "tax",
-    label: "Business and Tax Information",
-    description: "Registration and tax identifiers.",
-    fields: [
+      {
+        key: "industry",
+        label: "Industry",
+        kind: "select",
+        options: industryOptions,
+        placeholder: "Select industry",
+        required: true,
+      },
+      {
+        key: "status",
+        label: "Status",
+        kind: "select",
+        options: statusOptions,
+        placeholder: "Select status",
+        required: true,
+      },
+      {
+        key: "dateOfIncorporation",
+        label: "Date of Incorporation",
+        kind: "input",
+        type: "date",
+      },
+      {
+        key: "cinRegistrationNumber",
+        label: "CIN/Registration Number",
+        kind: "input",
+        required: true,
+      },
       {
         key: "gstin",
-        label: "GST Number",
+        label: "GSTIN/PAN",
         kind: "input",
         required: true,
       },
@@ -700,31 +737,117 @@ const companyProfileCompletionSections = [
         kind: "input",
         required: true,
       },
+      {
+        key: "companyDescription",
+        label: "Company Description",
+        kind: "textarea",
+        required: true,
+      },
     ],
   },
   {
-    id: "contact",
-    label: "Contact and Address",
-    description: "Primary contact details and registered address.",
+    id: "authorized-person",
+    label: "Authorized Person",
+    description: "Authorized representative contact and identity.",
     fields: [
       {
-        key: "phone",
-        label: "Contact Number",
+        key: "ownerDirectorName",
+        label: "Owner/Director Name",
         kind: "input",
         required: true,
       },
       {
-        key: "email",
+        key: "designation",
+        label: "Designation",
+        kind: "select",
+        options: designationOptions,
+        placeholder: "Select designation",
+        required: true,
+      },
+      {
+        key: "mobileNumber",
+        label: "Mobile Number",
+        kind: "input",
+        required: true,
+      },
+      {
+        key: "adminEmail",
         label: "Email",
         kind: "input",
         type: "email",
         required: true,
       },
       {
+        key: "profilePhotoUrl",
+        label: "Profile Picture",
+        kind: "file",
+        accept: "image/*",
+        uploadLabel: "Upload Photo",
+      },
+      {
+        key: "digitalSignatureUrl",
+        label: "Digital Signature",
+        kind: "file",
+        accept: "image/*",
+        uploadLabel: "Upload Signature",
+      },
+    ],
+  },
+  {
+    id: "contact",
+    label: "Contact Information",
+    description: "Primary business contact details.",
+    fields: [
+      {
+        key: "phone",
+        label: "Primary Mobile Number",
+        kind: "input",
+        required: true,
+      },
+      {
+        key: "alternateMobileNumber",
+        label: "Alternate Mobile Number",
+        kind: "input",
+      },
+      {
+        key: "landlineNumber",
+        label: "Landline Number",
+        kind: "input",
+      },
+      {
+        key: "email",
+        label: "Official Email Address",
+        kind: "input",
+        type: "email",
+        required: true,
+      },
+      {
+        key: "website",
+        label: "Website",
+        kind: "input",
+      },
+      {
+        key: "customerSupportNumber",
+        label: "Customer Support Number",
+        kind: "input",
+      },
+    ],
+  },
+  {
+    id: "address",
+    label: "Address Information",
+    description: "Registered and operational addresses.",
+    fields: [
+      {
         key: "registeredAddress",
-        label: "Address",
+        label: "Registered Address",
         kind: "textarea",
         required: true,
+      },
+      {
+        key: "branchOfficeAddresses",
+        label: "Branch/Office Address(es)",
+        kind: "textarea",
       },
       {
         key: "city",
@@ -741,35 +864,90 @@ const companyProfileCompletionSections = [
         required: true,
       },
       {
+        key: "country",
+        label: "Country",
+        kind: "select",
+        options: countryOptions,
+        placeholder: "Select country",
+        required: true,
+      },
+      {
         key: "pincode",
-        label: "PIN Code",
+        label: "PIN/ZIP Code",
         kind: "input",
         required: true,
       },
     ],
   },
   {
-    id: "bank",
-    label: "Bank Details",
-    description: "Bank information required for payments.",
+    id: "branding",
+    label: "Branding & Identity",
+    description: "Visual branding and signature assets.",
     fields: [
+      {
+        key: "logoUrl",
+        label: "Company Logo",
+        kind: "file",
+        accept: "image/*",
+        uploadLabel: "Upload Logo",
+        required: true,
+      },
+      {
+        key: "stampSealUrl",
+        label: "Company Stamp/Seal",
+        kind: "file",
+        accept: "image/*",
+      },
+      {
+        key: "signatureUrl",
+        label: "Authorized Signature",
+        kind: "file",
+        accept: "image/*",
+      },
+      {
+        key: "letterheadFile",
+        label: "Company Letterhead",
+        kind: "file",
+        accept: "application/pdf,.doc,.docx,image/*",
+      },
+      {
+        key: "bannerUrl",
+        label: "Company Banner",
+        kind: "file",
+        accept: "image/*",
+      },
+    ],
+  },
+  {
+    id: "billings",
+    label: "Billings",
+    description: "Payment and bank details.",
+    fields: [
+      {
+        key: "qrCodeUrl",
+        label: "Google Pay / PhonePe / Paytm QR Code",
+        kind: "file",
+        accept: "image/png,image/jpeg",
+      },
+      {
+        key: "upiId",
+        label: "UPI ID",
+        kind: "input",
+      },
       {
         key: "bankAccountDetails",
         label: "Bank Account Details",
         kind: "input",
-        required: true,
       },
       {
         key: "accountHolderName",
         label: "Account Holder Name",
         kind: "input",
-        required: true,
       },
       {
         key: "ifscCode",
         label: "IFSC Code",
         kind: "input",
-        required: true,
       },
       {
         key: "bankName",
@@ -777,11 +955,179 @@ const companyProfileCompletionSections = [
         kind: "select",
         options: bankOptions,
         placeholder: "Select bank",
-        required: true,
+      },
+    ],
+  },
+  {
+    id: "online-presence",
+    label: "Online Presence",
+    description: "Social and online business profiles.",
+    fields: [
+      { key: "facebook", label: "Facebook", kind: "input" },
+      { key: "instagram", label: "Instagram", kind: "input" },
+      { key: "linkedin", label: "LinkedIn", kind: "input" },
+      { key: "xTwitter", label: "X (Twitter)", kind: "input" },
+      { key: "youtube", label: "YouTube", kind: "input" },
+      {
+        key: "whatsappBusinessNumber",
+        label: "WhatsApp Business Number",
+        kind: "input",
+      },
+    ],
+  },
+  {
+    id: "business-settings",
+    label: "Business Settings",
+    description: "Accounting, tax, and localization settings.",
+    fields: [
+      {
+        key: "financialYear",
+        label: "Financial Year",
+        kind: "select",
+        options: financialYearOptions,
+        placeholder: "Select financial year",
+      },
+      {
+        key: "currency",
+        label: "Currency",
+        kind: "select",
+        options: currencyOptions,
+        placeholder: "Select currency",
+      },
+      {
+        key: "timeZone",
+        label: "Time Zone",
+        kind: "select",
+        options: timeZoneOptions,
+        placeholder: "Select time zone",
+      },
+      {
+        key: "language",
+        label: "Language",
+        kind: "select",
+        options: languageOptions,
+        placeholder: "Select language",
+      },
+      {
+        key: "taxConfiguration",
+        label: "Tax Configuration",
+        kind: "select",
+        options: taxConfigurationOptions,
+        placeholder: "Select tax configuration",
+      },
+      {
+        key: "invoicePrefix",
+        label: "Invoice Prefix",
+        kind: "input",
+      },
+      {
+        key: "invoiceSettings",
+        label: "Invoice Settings",
+        kind: "textarea",
+      },
+    ],
+  },
+  {
+    id: "documents",
+    label: "Documents",
+    description: "Compliance and registration documents.",
+    fields: [
+      {
+        key: "gstCertificateFile",
+        label: "GST Certificate",
+        kind: "file",
+        accept: "application/pdf,image/*",
+      },
+      {
+        key: "panCardFile",
+        label: "PAN Card",
+        kind: "file",
+        accept: "application/pdf,image/*",
+      },
+      {
+        key: "incorporationCertificateFile",
+        label: "Certificate of Incorporation",
+        kind: "file",
+        accept: "application/pdf",
+      },
+      {
+        key: "tradeLicenseFile",
+        label: "Trade License",
+        kind: "file",
+        accept: "application/pdf,image/*",
+      },
+      {
+        key: "msmeCertificateFile",
+        label: "MSME Certificate",
+        kind: "file",
+        accept: "application/pdf",
+      },
+      {
+        key: "fssaiLicenseFile",
+        label: "FSSAI License",
+        kind: "file",
+        accept: "application/pdf,image/*",
+      },
+      {
+        key: "otherBusinessDocumentsFile",
+        label: "Other Business Documents",
+        kind: "file",
+        accept: "application/pdf,image/png,image/jpeg,.docx",
+      },
+    ],
+  },
+  {
+    id: "additional-info",
+    label: "Additional Information",
+    description: "Operational details and internal notes.",
+    fields: [
+      {
+        key: "numberOfEmployees",
+        label: "Number of Employees",
+        kind: "input",
+      },
+      {
+        key: "businessHours",
+        label: "Business Hours",
+        kind: "input",
+      },
+      {
+        key: "companyMissionVision",
+        label: "Company Mission/Vision",
+        kind: "textarea",
+      },
+      {
+        key: "notes",
+        label: "Notes",
+        kind: "textarea",
       },
     ],
   },
 ];
+
+const companyProfileFieldConfig = companyProfileCompletionSections.flatMap((section) => {
+  const routeInfo = companyProfileSectionRouteMap[section.id] || {
+    tabId: section.id,
+    route: "/admin/company-settings",
+  };
+
+  return section.fields.map((field) => ({
+    key: field.key,
+    label: field.label,
+    required: field.required !== false,
+    section: section.id,
+    sectionLabel: section.label,
+    tabId: routeInfo.tabId,
+    route: routeInfo.route,
+    fieldId: field.fieldId || field.key,
+  }));
+});
+
+const companyProfileFieldConfigByKey = Object.fromEntries(
+  companyProfileFieldConfig.map((field) => [field.key, field]),
+);
+
+dashboardCompletionFields = companyProfileFieldConfig;
 
 function isBlankCompanyValue(value) {
   return String(value ?? "").trim().length === 0;
@@ -790,11 +1136,12 @@ function isBlankCompanyValue(value) {
 function getCompanyProfileCompletionState(companyData) {
   const sections = companyProfileCompletionSections.map((section) => {
     const fields = section.fields.map((field) => {
+      const metadata = companyProfileFieldConfigByKey[field.key] || field;
       const value = companyData?.[field.key];
       const completed = !isBlankCompanyValue(value);
 
       return {
-        ...field,
+        ...metadata,
         value,
         completed,
       };
@@ -938,272 +1285,149 @@ function CompanyProfileCompletionModal({
   onCompleteNow,
   initialSectionId,
 }) {
-  const { showToast } = useToast();
-  const [activeSectionId, setActiveSectionId] = useState(null);
-  const [draftValues, setDraftValues] = useState(companyData);
-  const [draftErrors, setDraftErrors] = useState({});
-  const [draftLogoFile, setDraftLogoFile] = useState(null);
-  const [draftLogoPreview, setDraftLogoPreview] = useState("");
-  const [draftLogoError, setDraftLogoError] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-
   const completion = useMemo(
     () => getCompanyProfileCompletionState(companyData),
     [companyData],
   );
-  const activeSection =
-    completion.sections.find((section) => section.id === activeSectionId) ||
-    completion.firstIncompleteSection ||
-    completion.sections[0] ||
-    null;
-  const incompleteFields = activeSection
-    ? activeSection.fields.filter((field) => isBlankCompanyValue(companyData?.[field.key]))
-    : [];
-  const remainingIncompleteSections = completion.sections.filter(
-    (section) => !section.isComplete,
-  );
-  const footerButtonLabel = "Complete Profile";
+  const incompleteSections = useMemo(() => {
+    const sections = completion.sections.filter((section) => !section.isComplete);
 
-  useEffect(() => {
-    if (!isOpen) return;
+    if (!initialSectionId) {
+      return sections;
+    }
 
-    const nextCompletion = getCompanyProfileCompletionState(companyData);
-    const nextSection =
-      nextCompletion.sections.find((section) => section.id === initialSectionId) ||
-      nextCompletion.firstIncompleteSection ||
-      nextCompletion.sections[0] ||
-      null;
-
-    setDraftValues(companyData);
-    setDraftErrors({});
-    setDraftLogoFile(null);
-    setDraftLogoPreview("");
-    setDraftLogoError("");
-    setActiveSectionId(nextSection?.id || null);
-  }, [companyData, initialSectionId, isOpen]);
+    return [...sections].sort((left, right) => {
+      if (left.id === initialSectionId) return -1;
+      if (right.id === initialSectionId) return 1;
+      return 0;
+    });
+  }, [completion.sections, initialSectionId]);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
-    if (isSaving) return;
     onClose();
   };
 
-  const handleFieldChange = (event) => {
-    const { name, value } = event.target;
-
-    setDraftValues((prev) => ({ ...prev, [name]: value }));
-    setDraftErrors((prev) => ({ ...prev, [name]: "" }));
-    setDraftLogoError("");
-  };
-
-  const handleLogoSelect = (name, event) => {
-    void name;
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setDraftLogoError("Please select an image file for the company logo.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setDraftLogoFile(file);
-      setDraftLogoPreview(String(reader.result || ""));
-      setDraftValues((prev) => ({ ...prev, logoUrl: String(reader.result || "") }));
-      setDraftErrors((prev) => ({ ...prev, logoUrl: "" }));
-      setDraftLogoError("");
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleLogoRemove = () => {
-    setDraftLogoFile(null);
-    setDraftLogoPreview("");
-    setDraftValues((prev) => ({ ...prev, logoUrl: "" }));
-    setDraftErrors((prev) => ({ ...prev, logoUrl: "" }));
-    setDraftLogoError("");
-  };
-
-  const handleSelectSection = (sectionId) => {
-    if (isSaving) return;
-
-    setActiveSectionId(sectionId);
-    setDraftErrors({});
-    setDraftLogoError("");
-  };
-
-  const handleCompleteProfile = () => {
-    if (isSaving) return;
-
+  const handleCompleteSection = (sectionId) => {
     if (typeof onCompleteNow === "function") {
-      onCompleteNow();
+      onCompleteNow(sectionId);
     }
-
-    onClose();
   };
 
   return (
     <Modal
-  isOpen={isOpen}
-  onClose={handleClose}
-  title="Company Profile Completion"
-  className="!w-[96vw] !max-w-[84rem]"
-  footer={
-    <>
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={handleClose}
-        disabled={isSaving}
-      >
-        Cancel
-      </Button>
-
-      <Button
-        type="button"
-        onClick={handleCompleteProfile}
-        disabled={isSaving || !activeSection}
-      >
-        {footerButtonLabel}
-      </Button>
-    </>
-  }
->
-  <div className="max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
-      <aside className="space-y-3">
-        <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
-            Completion
-          </p>
-
-          <p className="mt-2 text-2xl font-bold text-neutral-900">
-            {completion.percent}% Complete
-          </p>
-
-          <p className="mt-1 text-xs text-neutral-500">
-            {completion.completedRequiredFields} of{" "}
-            {completion.totalRequiredFields} required fields completed
-          </p>
-
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-100">
-            <div
-              className="h-full rounded-full bg-primary-600 transition-all duration-300"
-              style={{ width: `${completion.percent}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          {completion.sections.map((section) => {
-            const isActive = section.id === activeSection?.id;
-            const isSectionComplete = section.isComplete;
-
-            return (
-              <button
-                key={section.id}
-                type="button"
-                onClick={() => handleSelectSection(section.id)}
-                className={`w-full rounded-2xl border p-3 text-left transition-colors ${
-                  isActive
-                    ? "border-primary-200 bg-primary-50/50"
-                    : "border-neutral-100 bg-white hover:border-primary-100 hover:bg-primary-50/30"
-                }`}
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Company Profile Completion"
+      className="!w-[96vw] !max-w-[78rem]"
+      footer={
+        <Button type="button" variant="ghost" onClick={handleClose}>
+          Close
+        </Button>
+      }
+    >
+      <div className="max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <div
+                className="grid size-16 shrink-0 place-items-center rounded-full"
+                style={{
+                  background: `conic-gradient(rgb(22 101 52) ${completion.percent}%, rgb(229 231 235) 0)`,
+                }}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-neutral-900">
-                      {section.label}
-                    </p>
-
-                    <p className="mt-1 text-xs text-neutral-500">
-                      {section.description}
-                    </p>
-                  </div>
-
-                  <span
-                    className={`inline-flex shrink-0 items-center rounded-full px-2 py-1 text-[0.68rem] font-semibold ${
-                      isSectionComplete
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-amber-50 text-amber-700"
-                    }`}
-                  >
-                    {isSectionComplete ? "Completed" : "Incomplete"}
-                  </span>
+                <div className="grid size-12 place-items-center rounded-full bg-white text-sm font-bold text-neutral-900">
+                  {completion.percent}%
                 </div>
+              </div>
 
-                {!isSectionComplete && (
-                  <div className="mt-3 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-amber-700">
-                      {section.incompleteFields.length} incomplete
-                    </span>
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </aside>
-
-      <section className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-5 shadow-sm">
-        {activeSection ? (
-          <>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="text-base font-semibold text-neutral-900">
-                  {activeSection.label}
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald-900/80">
+                  Company Profile Completion
                 </h3>
-
-                <p className="mt-1 text-sm text-neutral-500">
-                  {activeSection.description}
+                <p className="mt-1 text-sm text-neutral-600">
+                  Complete your company profile.
                 </p>
               </div>
-
-              <span className="shrink-0 rounded-full bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-500">
-                {activeSection.completedFields} completed
-              </span>
             </div>
 
-            <div className="mt-4">
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4">
-                <h4 className="text-sm font-semibold text-neutral-900">
-                  Incomplete Fields
-                </h4>
-                <div className="mt-3 space-y-2">
-                  {incompleteFields.length > 0 ? (
-                    incompleteFields.map((field) => (
-                      <div
-                        key={field.key}
-                        className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"
-                      >
-                        <span className="truncate text-neutral-700">{field.label}</span>
-                        <span className="shrink-0 font-semibold text-amber-700">
-                          Incomplete
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="rounded-xl bg-white px-3 py-3 text-sm text-neutral-500">
-                      This section is already complete.
-                    </div>
-                  )}
-                </div>
+            <div className="lg:min-w-[19rem]">
+              <p className="text-sm font-semibold text-neutral-900">
+                {completion.completedRequiredFields} of {completion.totalRequiredFields} required fields completed
+              </p>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
+                <div
+                  className="h-full rounded-full bg-primary-600 transition-all duration-300"
+                  style={{ width: `${completion.percent}%` }}
+                />
               </div>
             </div>
-          </>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/60 p-5 text-sm text-neutral-500">
-            No profile sections are available.
           </div>
-        )}
-      </section>
-    </div>
-  </div>
-</Modal>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {incompleteSections.length > 0 ? (
+            incompleteSections.map((section) => {
+              const missingSummary = section.incompleteFields.map((field) => field.label);
+
+              return (
+                <article
+                  key={section.id}
+                  className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="text-base font-semibold text-neutral-900">
+                        {section.label}
+                      </h4>
+                      <p className="mt-1 text-sm text-neutral-500">
+                        {section.incompleteFields.length} required field
+                        {section.incompleteFields.length === 1 ? "" : "s"} is missing
+                      </p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                      Incomplete
+                    </span>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs text-neutral-600">
+                    {missingSummary.map((fieldLabel) => (
+                      <span
+                        key={fieldLabel}
+                        className="inline-flex items-center rounded-full bg-neutral-50 px-2.5 py-1 font-medium text-neutral-700"
+                      >
+                        {fieldLabel}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => handleCompleteSection(section.id)}
+                      className="whitespace-nowrap"
+                    >
+                      Complete Now
+                      <ArrowRight className="size-4" />
+                    </Button>
+                  </div>
+                </article>
+              );
+            })
+          ) : (
+            <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/60 p-5 text-sm text-neutral-500 lg:col-span-2">
+              All profile sections are complete.
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 flex items-center gap-2 rounded-2xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+          <Info className="size-4 shrink-0 text-emerald-700" />
+          <span>You&apos;ll be taken directly to the first missing field in the selected section.</span>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -1332,7 +1556,11 @@ function FileUploadField({
   );
 
   return (
-    <div className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
+    <div
+      id={name}
+      data-profile-field={name}
+      className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4"
+    >
       <div className="grid grid-cols-[9rem_1fr] gap-4">
         {canPreview ? (
           <button
@@ -1409,6 +1637,7 @@ function FileUploadField({
 }
 
 function CompanySection({
+  sectionId,
   number,
   title,
   description,
@@ -1420,6 +1649,8 @@ function CompanySection({
 
   return (
     <section
+      data-section-id={sectionId}
+      data-completion-section={sectionId ? `general-${sectionId}` : undefined}
       className={`${isCollapsible ? "border-b border-neutral-100 py-2.5 last:border-b-0" : "border-b border-neutral-100 py-5 last:border-b-0"}`}
     >
       {isCollapsible ? (
@@ -1495,6 +1726,7 @@ function CompanyOverviewDashboard({
   companyData,
   organization,
   onNavigate,
+  onOpenAuthorizedPersonSection,
   completionState,
   onViewAllCompletion,
   onCompleteNow,
@@ -1720,12 +1952,12 @@ function CompanyOverviewDashboard({
           </div>
 
           <div className="grid min-w-0 flex-1 grid-cols-1 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1.15fr_1.35fr_1fr]">
-            {companyFacts.map((fact) => {
+            {companyFacts.map((fact, index) => {
               const Icon = fact.icon;
 
               return (
                 <div
-                  key={fact.label}
+                  key={`${fact.label}-${index}`}
                   className="min-w-0 border-neutral-100 px-0 sm:px-4 sm:[&:not(:first-child)]:border-l"
                 >
                   <p className="whitespace-nowrap text-xs font-medium text-neutral-500">
@@ -1746,12 +1978,12 @@ function CompanyOverviewDashboard({
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {metricCards.map((metric) => {
+        {metricCards.map((metric, index) => {
           const Icon = metric.icon;
 
           return (
             <div
-              key={metric.label}
+              key={`${metric.label}-${index}`}
               className="rounded-xl border border-neutral-100 bg-white p-4 shadow-sm"
             >
               <div className="flex items-center gap-3">
@@ -1774,60 +2006,57 @@ function CompanyOverviewDashboard({
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-neutral-900">
+        <div className="rounded-[1.15rem] border border-neutral-100 bg-white p-5 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset,0_12px_30px_-20px_rgba(15,23,42,0.35)]">
+          <div className="flex items-start gap-3">
+            <div className="grid size-12 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-900 shadow-[0_0_0_1px_rgba(6,95,70,0.08)]">
+              <Building2 className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-[1.05rem] font-bold tracking-tight text-slate-900">
                 Profile Completion
               </h3>
-              <p className="mt-1 text-xs text-neutral-500">
-                Keep your company profile complete and ready for use.
+              <p className="mt-1 max-w-xl text-[0.78rem] leading-4 text-slate-500">
+                Complete the missing information to finish your company profile.
               </p>
             </div>
-            <span className="rounded-full bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-500">
-              {completion.percent}% Complete
-            </span>
           </div>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-neutral-100">
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200/70">
             <div
-              className="h-full rounded-full bg-primary-600 transition-all duration-300"
+              className="h-full rounded-full bg-gradient-to-r from-primary-950 via-primary-700 to-primary-600 transition-all duration-300"
               style={{ width: `${completion.percent}%` }}
             />
           </div>
-          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-3xl font-bold tracking-tight text-neutral-900">
-                {completion.percent}% Complete
-              </p>
-              <p className="mt-1 text-sm text-neutral-500">
-                {completion.completedRequiredFields} of {completion.totalRequiredFields} required fields completed
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={onViewAllCompletion}>
-                View All
-              </Button>
-              {completion.percent >= 100 ? (
-                <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  Profile Complete
-                </span>
-              ) : (
-                <Button type="button" size="sm" onClick={onCompleteNow}>
-                  Complete Now
-                </Button>
-              )}
-            </div>
+          <div className="mt-3">
+            <p className="text-[1.4rem] font-black tracking-tight text-slate-950 sm:text-[1.8rem] sm:leading-none">
+              {completion.percent}% Complete
+            </p>
+            <p className="mt-1 text-[0.82rem] text-slate-600">
+              {completion.completedRequiredFields} of {completion.totalRequiredFields} required fields completed
+            </p>
           </div>
-          {completion.missingFields.length > 0 && (
-            <div className="mt-4 rounded-2xl bg-neutral-50/70 p-3">
-              <p className="text-xs font-semibold text-neutral-700">Missing Information</p>
-              <ul className="mt-2 space-y-1 text-xs text-neutral-600">
-                {completion.missingFields.slice(0, 4).map((field) => (
-                  <li key={field.key}>- {field.label}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="mt-3">
+            {completion.percent >= 100 ? (
+              <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-[0.72rem] font-semibold text-emerald-800">
+                Profile Complete
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-[0.72rem] font-semibold text-slate-800">
+                <span className="size-2 rounded-full bg-amber-500" />
+                {Math.max(completion.totalRequiredFields - completion.completedRequiredFields, 0)} fields remaining
+              </span>
+            )}
+          </div>
+          <div className="mt-4">
+            <Button
+              type="button"
+              size="sm"
+              onClick={onViewAllCompletion}
+              className="w-full justify-center py-2 text-sm font-semibold shadow-[0_16px_30px_-18px_rgba(6,95,70,0.8)]"
+            >
+              View Missing Fields
+              <ArrowRight className="size-3.5" />
+            </Button>
+          </div>
         </div>
 
         <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
@@ -1869,11 +2098,11 @@ function CompanyOverviewDashboard({
               </p>
             </div>
           </div>
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <Button type="button" variant="outline" onClick={() => onNavigate("general")}>
+          <div className="mt-22 grid grid-cols-2 gap-3">
+            <Button type="button" size="sm" variant="outline" onClick={onOpenAuthorizedPersonSection}>
               View Details
             </Button>
-            <Button type="button" onClick={() => onNavigate("general")}>
+            <Button type="button" size="sm" onClick={onOpenAuthorizedPersonSection}>
               Edit
             </Button>
           </div>
@@ -1982,11 +2211,11 @@ function CompanyOverviewDashboard({
             </button>
           </div>
           <div className="mt-4 space-y-4">
-            {recentActivity.map((activity) => {
+            {recentActivity.map((activity, index) => {
               const Icon = activity.icon;
 
               return (
-                <div key={activity.title} className="flex gap-3">
+                <div key={`${activity.title}-${index}`} className="flex gap-3">
                   <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full ${toneClasses[activity.tone]}`}>
                     <Icon className="size-4" />
                   </span>
@@ -2012,12 +2241,12 @@ function CompanyOverviewDashboard({
             Quick Actions
           </h3>
           <div className="mt-5 grid grid-cols-2 gap-3">
-            {quickActions.map((action) => {
+            {quickActions.map((action, index) => {
               const Icon = action.icon;
 
               return (
                 <button
-                  key={action.label}
+                  key={`${action.label}-${index}`}
                   type="button"
                   onClick={() => onNavigate(action.tab)}
                   className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border border-neutral-100 bg-white p-3 text-center text-xs font-semibold text-neutral-700 transition-colors hover:border-primary-100 hover:bg-primary-50/40"
@@ -2072,7 +2301,7 @@ function buildCompanyDataFromProfile(user, organization) {
       organization?.gstinPan ||
       organization?.gst_number ||
       organization?.gstNumber ||
-      initialCompanyData.gstin,
+      "",
     dateOfIncorporation:
       organization?.date_of_incorporation ||
       organization?.dateOfIncorporation ||
@@ -2390,6 +2619,9 @@ function buildOrganizationSettingsRequest(companyData) {
 
 export default function CompanySettings() {
   const { showToast } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const currentUser = useAuthStore((state) => state.currentUser);
   const currentOrganization = useAuthStore(
     (state) => state.currentOrganization,
@@ -2425,7 +2657,8 @@ export default function CompanySettings() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
   const [completionModalSectionId, setCompletionModalSectionId] = useState("");
-  const [completionJumpTarget, setCompletionJumpTarget] = useState(null);
+  const [pendingGeneralSectionScroll, setPendingGeneralSectionScroll] =
+    useState("");
   const [pendingLogoFile, setPendingLogoFile] = useState(null);
   const [pendingLogoPreview, setPendingLogoPreview] = useState("");
   const [logoUploadError, setLogoUploadError] = useState("");
@@ -2438,6 +2671,7 @@ export default function CompanySettings() {
   const [uploadedFileTypes, setUploadedFileTypes] = useState({});
   const activeNavItem =
     settingsNav.find((item) => item.id === activeTab) || settingsNav[0];
+  const handledCompletionNavigationRef = useRef("");
   const isEditableSection = editableSectionIds.includes(activeTab);
   const isActiveSectionEditing = Boolean(editingSections[activeTab]);
   const getUploadFieldState = (name) => {
@@ -2484,37 +2718,119 @@ export default function CompanySettings() {
     loadOverview();
   }, [loadOverview]);
 
-  useEffect(() => {
-    if (!completionJumpTarget) return;
+  const completionNavigationSection = searchParams.get("section") || "";
+  const completionNavigationField = searchParams.get("field") || "";
+  const completionNavigationTarget = useMemo(() => {
+    if (!completionNavigationField) return null;
 
-    if (activeTab !== completionJumpTarget.tabId) {
+    return companyProfileFieldConfigByKey[completionNavigationField] || null;
+  }, [completionNavigationField]);
+
+  useEffect(() => {
+    if (!completionNavigationTarget || !completionNavigationSection) return;
+
+    const handledNavigationKey = `${location.key}:${completionNavigationSection}:${completionNavigationField}`;
+
+    if (handledCompletionNavigationRef.current === handledNavigationKey) {
+      return;
+    }
+
+    if (activeTab !== completionNavigationTarget.tabId) {
+      handleTabChange(completionNavigationTarget.tabId, { force: true });
       return;
     }
 
     if (
-      completionJumpTarget.tabId === "general" &&
-      completionJumpTarget.sectionId &&
-      !openGeneralSections[completionJumpTarget.sectionId]
+      completionNavigationTarget.tabId === "general" &&
+      completionNavigationTarget.section &&
+      !openGeneralSections[completionNavigationTarget.section]
     ) {
       setOpenGeneralSections((prev) => ({
         ...prev,
-        [completionJumpTarget.sectionId]: true,
+        [completionNavigationTarget.section]: true,
       }));
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      const selector = `[name="${completionJumpTarget.fieldKey}"]`;
-      document.querySelector(selector)?.scrollIntoView({
+    let cancelled = false;
+    let animationFrameId = null;
+    let attempt = 0;
+
+    const focusField = () => {
+      if (cancelled) return;
+
+      const fieldElement = document.querySelector(
+        `[data-profile-field="${completionNavigationTarget.fieldId}"]`,
+      );
+
+      if (!fieldElement) {
+        if (attempt < 20) {
+          attempt += 1;
+          animationFrameId = window.requestAnimationFrame(focusField);
+        } else {
+          const fallbackSelector =
+            completionNavigationTarget.tabId === "general"
+              ? `[data-section-id="${completionNavigationSection}"]`
+              : `[data-completion-section="${completionNavigationTarget.tabId}-main"]`;
+
+          document
+            .querySelector(fallbackSelector)
+            ?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          handledCompletionNavigationRef.current = handledNavigationKey;
+        }
+        return;
+      }
+
+      fieldElement.scrollIntoView({
         behavior: "smooth",
         block: "center",
       });
-      document.querySelector(selector)?.focus?.();
-      setCompletionJumpTarget(null);
-    }, 50);
 
-    return () => window.clearTimeout(timer);
-  }, [activeTab, completionJumpTarget, openGeneralSections]);
+      const focusable =
+        fieldElement.querySelector(
+          'input:not([type="hidden"]), textarea, [role="button"], [role="combobox"], button, select',
+        ) ||
+        fieldElement.querySelector(
+          'input, textarea, [role="button"], [role="combobox"], button, select',
+        );
+
+      focusable?.focus?.();
+      const previousBoxShadow = fieldElement.style.boxShadow;
+      const previousTransition = fieldElement.style.transition;
+      const previousBorderColor = fieldElement.style.borderColor;
+
+      fieldElement.style.transition = "box-shadow 200ms ease, border-color 200ms ease";
+      fieldElement.style.boxShadow = "0 0 0 1px rgba(6, 59, 0, 0.14), 0 0 0 6px rgba(6, 95, 70, 0.08)";
+      fieldElement.style.borderColor = "rgba(6, 95, 70, 0.4)";
+
+      window.setTimeout(() => {
+        fieldElement.style.boxShadow = previousBoxShadow;
+        fieldElement.style.transition = previousTransition;
+        fieldElement.style.borderColor = previousBorderColor;
+      }, 2000);
+      handledCompletionNavigationRef.current = handledNavigationKey;
+    };
+
+    animationFrameId = window.requestAnimationFrame(focusField);
+
+    return () => {
+      cancelled = true;
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [
+    activeTab,
+    completionNavigationField,
+    completionNavigationSection,
+    completionNavigationTarget,
+    handleTabChange,
+    location.key,
+    openGeneralSections,
+  ]);
 
   useEffect(() => {
     let isMounted = true;
@@ -2648,38 +2964,69 @@ export default function CompanySettings() {
     }));
   };
 
-  const handleTabChange = (tabId) => {
-    if (activeTab !== tabId && isActiveSectionEditing && !validateCompanyRequiredFields(activeTab)) {
+  function handleTabChange(tabId, options = {}) {
+    const { force = false } = options;
+
+    if (
+      !force &&
+      activeTab !== tabId &&
+      isActiveSectionEditing &&
+      !validateCompanyRequiredFields(activeTab)
+    ) {
       return;
     }
 
     setSaveError("");
     setActiveTab(tabId);
+  }
+
+  const handleOpenAuthorizedPersonSection = () => {
+    handleTabChange("general", { force: true });
+    setOpenGeneralSections((prev) => ({
+      ...prev,
+      authorizedPerson: true,
+    }));
+    setPendingGeneralSectionScroll("authorized-person");
   };
 
-  const handleCompleteProfileJump = useCallback(() => {
-    const target = getCompletionJumpTarget(companyData);
+  useEffect(() => {
+    if (!pendingGeneralSectionScroll || activeTab !== "general") {
+      return;
+    }
+
+    const sectionElement = document.querySelector(
+      `[data-section-id="${pendingGeneralSectionScroll}"]`,
+    );
+
+    if (!sectionElement) {
+      return;
+    }
+
+    const animationFrameId = window.requestAnimationFrame(() => {
+      sectionElement.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      setPendingGeneralSectionScroll("");
+    });
+
+    return () => window.cancelAnimationFrame(animationFrameId);
+  }, [activeTab, openGeneralSections.authorizedPerson, pendingGeneralSectionScroll]);
+
+  const handleCompleteProfileJump = useCallback((sectionId) => {
+    const target = getCompletionJumpTarget(companyData, sectionId);
 
     setIsCompletionModalOpen(false);
 
     if (!target) {
-      handleTabChange("general");
       return;
     }
 
-    if (target.tabId === "general" && target.sectionId) {
-      setOpenGeneralSections((prev) => ({
-        ...prev,
-        [target.sectionId]: true,
-      }));
-    }
-
-    setCompletionJumpTarget({
-      ...target,
-      fieldKey: target.fieldKey || "",
+    navigate({
+      pathname: target.route || "/admin/company-settings",
+      search: `?section=${encodeURIComponent(target.section)}&field=${encodeURIComponent(target.fieldId || target.fieldKey || "")}`,
     });
-    handleTabChange(target.tabId);
-  }, [companyData, handleTabChange]);
+  }, [companyData, handleTabChange, navigate]);
 
   const handleFileUpload = async (name, e) => {
     const file = e.target.files?.[0];
@@ -3103,13 +3450,13 @@ export default function CompanySettings() {
         <div className="grid min-h-[34rem] grid-cols-1 lg:grid-cols-[17rem_1fr]">
           <aside className="border-b border-neutral-100 p-4 lg:border-b-0 lg:border-r lg:p-5">
             <nav className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
-              {settingsNav.map((item) => {
+              {settingsNav.map((item, index) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
 
                 return (
                   <button
-                    key={item.label}
+                    key={`${item.id}-${index}`}
                     type="button"
                     role="tab"
                     aria-selected={isActive}
@@ -3185,15 +3532,17 @@ export default function CompanySettings() {
                 error={overviewError}
                 onRetry={loadOverview}
                 companyData={companyData}
-                organization={loadedOrganization}
-                onNavigate={handleTabChange}
-                completionState={companyProfileCompletion}
-                onViewAllCompletion={() => handleOpenCompletionModal(companyProfileCompletion.firstIncompleteSection?.id || companyProfileCompletion.sections[0]?.id)}
-                onCompleteNow={() => handleOpenCompletionModal(companyProfileCompletion.firstIncompleteSection?.id)}
-              />
+              organization={loadedOrganization}
+              onNavigate={handleTabChange}
+              onOpenAuthorizedPersonSection={handleOpenAuthorizedPersonSection}
+              completionState={companyProfileCompletion}
+              onViewAllCompletion={() => handleOpenCompletionModal(companyProfileCompletion.firstIncompleteSection?.id || companyProfileCompletion.sections[0]?.id)}
+              onCompleteNow={() => handleOpenCompletionModal(companyProfileCompletion.firstIncompleteSection?.id)}
+            />
             ) : activeTab === "general" ? (
               <section className="space-y-1.5 pb-5 pt-3">
                 <CompanySection
+                  sectionId="basic"
                   number="1"
                   title="Basic Information"
                   description="Company identity and legal registration details."
@@ -3289,6 +3638,7 @@ export default function CompanySettings() {
                 </CompanySection>
 
                 <CompanySection
+                  sectionId="authorized-person"
                   number="2"
                   title="Authorized Person"
                   description="Authorized representative contact and identity."
@@ -3355,6 +3705,7 @@ export default function CompanySettings() {
                 </CompanySection>
 
                 <CompanySection
+                  sectionId="contact"
                   number="3"
                   title="Contact Information"
                   description="Primary business contact details."
@@ -3411,6 +3762,7 @@ export default function CompanySettings() {
                 </CompanySection>
 
                 <CompanySection
+                  sectionId="address"
                   number="4"
                   title="Address Information"
                   description="Registered, billing, and shipping addresses."
@@ -3525,7 +3877,7 @@ export default function CompanySettings() {
                 </CompanySection>
               </section>
             ) : activeTab === "branding" ? (
-              <section className="pb-5 pt-5">
+              <section className="pb-5 pt-5" data-completion-section="branding-main">
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   <div className="space-y-3">
                     <FileUploadField
@@ -3622,8 +3974,8 @@ export default function CompanySettings() {
                 </div>
               </section>
             ) : activeTab === "billings" ? (
-              <section className="space-y-6 pb-5 pt-5">
-                <div className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
+              <section className="space-y-6 pb-5 pt-5" data-completion-section="billings-main">
+                <div className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4" data-completion-section="billings-payment">
                   <div className="mb-3">
                     <h3 className="text-sm font-semibold text-neutral-900">
                       Payment QR
@@ -3647,7 +3999,7 @@ export default function CompanySettings() {
                   </div>
                 </div>
 
-                <div>
+                <div data-completion-section="billings-upi">
                   <div className="mb-4">
                     <h3 className="text-sm font-semibold text-neutral-900">
                       UPI Details
@@ -3667,7 +4019,7 @@ export default function CompanySettings() {
                   </div>
                 </div>
 
-                <div className="border-t border-neutral-100 pt-5">
+                <div className="border-t border-neutral-100 pt-5" data-completion-section="billings-bank-account">
                   <div className="mb-4">
                     <h3 className="text-sm font-semibold text-neutral-900">
                       Bank Account
@@ -3711,7 +4063,7 @@ export default function CompanySettings() {
                 </div>
               </section>
             ) : activeTab === "online-presence" ? (
-              <section className="pb-5 pt-5">
+              <section className="pb-5 pt-5" data-completion-section="online-presence-main">
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                   <Input
                     label="Facebook"
@@ -3758,7 +4110,7 @@ export default function CompanySettings() {
                 </div>
               </section>
             ) : activeTab === "business-settings" ? (
-              <section className="pb-5 pt-5">
+              <section className="pb-5 pt-5" data-completion-section="business-settings-main">
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                   <Select
                     label="Financial Year"
@@ -3830,7 +4182,7 @@ export default function CompanySettings() {
                 </div>
               </section>
             ) : activeTab === "documents" ? (
-              <section className="pb-5 pt-5">
+              <section className="pb-5 pt-5" data-completion-section="documents-main">
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   <FileUploadField
                     label="GST Certificate"
@@ -3907,7 +4259,7 @@ export default function CompanySettings() {
                 </div>
               </section>
             ) : activeTab === "additional-info" ? (
-              <section className="pb-5 pt-5">
+              <section className="pb-5 pt-5" data-completion-section="additional-info-main">
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                   <Input
                     label="Number of Employees"

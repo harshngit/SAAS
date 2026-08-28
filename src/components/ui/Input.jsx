@@ -8,9 +8,14 @@ const Input = forwardRef(function Input(
   const Component = as
   const [showPassword, setShowPassword] = useState(false)
   const isPassword = as === 'input' && type === 'password'
+  const fieldAnchorId = typeof rest.name === 'string' ? rest.name : undefined
 
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
+    <div
+      id={fieldAnchorId}
+      data-profile-field={fieldAnchorId}
+      className={`flex flex-col gap-1.5 ${className}`}
+    >
       {label && (
         <label className="text-sm font-medium text-neutral-700">
           {label}

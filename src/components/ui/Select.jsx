@@ -140,7 +140,11 @@ const Select = forwardRef(function Select(
   }
 
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
+    <div
+      id={name}
+      data-profile-field={name}
+      className={`flex flex-col gap-1.5 ${className}`}
+    >
       {label && (
         <label htmlFor={selectId} className="text-sm font-medium text-neutral-700">
           {label}
