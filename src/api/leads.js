@@ -1,5 +1,6 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { getCustomer, updateCustomer } from './customers'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -171,7 +172,7 @@ export async function createLead(payload) {
 
 export async function updateLead(leadId, payload) {
   try {
-    const { data } = await apiClient.put(`/leads/${leadId}`, buildLeadBody(payload), {
+    const { data } = await apiClient.patch(`/leads/${leadId}`, buildLeadBody(payload), {
       headers: authHeader(),
     })
 
@@ -209,13 +210,41 @@ export async function convertLeadToCustomer(leadId, payload = {}) {
       headers: authHeader(),
     })
 
+    const customerId = data?.customer_id || data?.customer?.id || ''
+    let customer = data?.customer || null
+
+    // convert-to-customer's own schema has no room for these 4 fields (they live in a
+    // different section of the customer profile) - so once the customer exists, round-trip
+    // through getCustomer()+updateCustomer() to set them safely. Must merge onto the FULL
+    // current profile, not send these 4 fields alone - updateCustomer's PATCH body is always a
+    // complete section snapshot, so a partial payload would blank out name/contact/address/etc.
+    const hasExtraFields =
+      customerId &&
+      (payload.customerType || payload.customerSince || payload.status || payload.googleMapsLocation)
+
+    if (hasExtraFields) {
+      const currentResult = await getCustomer(customerId)
+
+      if (currentResult.success) {
+        const updateResult = await updateCustomer(customerId, {
+          ...currentResult.customer,
+          customerType: payload.customerType || currentResult.customer.customerType,
+          customerSince: payload.customerSince || currentResult.customer.customerSince,
+          status: payload.status || currentResult.customer.status,
+          googleMapsLocation: payload.googleMapsLocation || currentResult.customer.googleMapsLocation,
+        })
+
+        if (updateResult.success) customer = updateResult.customer
+      }
+    }
+
     return {
       success: true,
       leadId: data?.lead_id || leadId,
-      customerId: data?.customer_id || data?.customer?.id || '',
+      customerId,
       leadStatus: data?.lead_status || 'won',
       converted: data?.converted !== false,
-      customer: data?.customer || null,
+      customer,
     }
   } catch (error) {
     const errorData = error.response?.data

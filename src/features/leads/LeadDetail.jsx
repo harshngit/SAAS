@@ -6,8 +6,10 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ClipboardList,
   Clock,
   Mail,
+  MapPin,
   Pencil,
   Phone,
   Plus,
@@ -39,6 +41,7 @@ import {
 } from '../../api/leads'
 import { listCustomers } from '../../api/customers'
 import { listUsers } from '../../api/users'
+import { listVisits } from '../../api/visits'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import { customerBasePathByRole } from '../customers/customerConstants'
@@ -210,6 +213,10 @@ export default function LeadDetail() {
   const [isSavingStatus, setIsSavingStatus] = useState(false)
   const [statusError, setStatusError] = useState('')
 
+  const [visits, setVisits] = useState([])
+  const [isLoadingVisits, setIsLoadingVisits] = useState(true)
+  const [visitsError, setVisitsError] = useState('')
+
   const loadLead = async () => {
     setIsLoading(true)
     setLoadError('')
@@ -229,6 +236,34 @@ export default function LeadDetail() {
   useEffect(() => {
     loadLead()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadVisits() {
+      setIsLoadingVisits(true)
+      setVisitsError('')
+
+      const result = await listVisits({ leadId: id })
+
+      if (!isMounted) return
+
+      if (!result.success) {
+        setVisits([])
+        setVisitsError(result.error)
+        setIsLoadingVisits(false)
+        return
+      }
+
+      setVisits(result.visits.sort((a, b) => new Date(b.visitDate) - new Date(a.visitDate)))
+      setIsLoadingVisits(false)
+    }
+
+    loadVisits()
+    return () => {
+      isMounted = false
+    }
   }, [id])
 
   useEffect(() => {
@@ -700,6 +735,73 @@ export default function LeadDetail() {
             isLast
           />
         </div>
+      </Section>
+
+      <Section title="Visits & Follow-ups" icon={MapPin}>
+        {visitsError ? (
+          <div className="py-6 text-center">
+            <p className="text-sm text-red-600">{visitsError}</p>
+          </div>
+        ) : isLoadingVisits ? (
+          <LoadingSpinner label="Loading visits..." />
+        ) : visits.length === 0 ? (
+          <p className="py-6 text-center text-sm text-neutral-400">No visits recorded for this lead yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {visits.map((visit) => (
+              <div key={visit.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900">
+                      <Calendar className="size-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
+                      {formatDateTime(visit.visitDate)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-neutral-500">
+                      {formatLabel(visit.visitType)}
+                      {visit.purpose ? ` · ${visit.purpose}` : ''}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={visit.status === 'completed' ? 'success' : visit.status === 'cancelled' ? 'neutral' : 'info'}
+                  >
+                    {formatLabel(visit.status)}
+                  </Badge>
+                </div>
+
+                {visit.notes && (
+                  <p className="mt-3 whitespace-pre-line border-t border-neutral-100 pt-3 text-sm text-neutral-700">{visit.notes}</p>
+                )}
+                {visit.outcome && (
+                  <p className="mt-2 text-sm text-neutral-600">
+                    <span className="font-medium text-neutral-800">Outcome:</span> {visit.outcome}
+                  </p>
+                )}
+
+                {visit.followUps.length > 0 && (
+                  <div className="mt-3 space-y-2 border-t border-neutral-100 pt-3">
+                    {visit.followUps.map((task) => (
+                      <div key={task.id} className="flex items-start gap-2.5 rounded-lg bg-white p-2.5 shadow-(--shadow-xs)">
+                        <ClipboardList className="mt-0.5 size-4 shrink-0 text-primary-600" aria-hidden="true" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-neutral-900">{task.title}</p>
+                            <Badge variant={task.status === 'completed' ? 'success' : 'warning'}>
+                              {formatLabel(task.status)}
+                            </Badge>
+                          </div>
+                          <p className="mt-0.5 text-xs text-neutral-500">
+                            Due {formatDateTime(task.dueDate)}
+                            {task.assignedToName ? ` · ${task.assignedToName}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
 
       <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Lead" className="max-w-2xl">

@@ -122,6 +122,26 @@ export function LeadEditForm({ lead, customerOptions, salespersonOptions, saving
   )
 }
 
+export const customerTypeOptions = [
+  { value: 'individual', label: 'Individual' },
+  { value: 'business', label: 'Business' },
+  { value: 'government', label: 'Government' },
+  { value: 'dealer', label: 'Dealer' },
+  { value: 'distributor', label: 'Distributor' },
+  { value: 'vendor', label: 'Vendor' },
+]
+
+export const customerStatusOptions = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'blacklisted', label: 'Blacklisted' },
+  { value: 'prospect', label: 'Prospect' },
+]
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export function ConvertLeadForm({ lead, salespersonOptions, saving, formError, onClose, onSave }) {
   const [formData, setFormData] = useState(() => ({
     name: lead?.name || lead?.customerName || '',
@@ -136,6 +156,10 @@ export function ConvertLeadForm({ lead, salespersonOptions, saving, formError, o
     openingBalance: '',
     category: '',
     notes: lead?.notes || '',
+    customerType: 'individual',
+    customerSince: todayIso(),
+    status: 'active',
+    googleMapsLocation: '',
   }))
   const [errors, setErrors] = useState({})
 
@@ -169,86 +193,113 @@ export function ConvertLeadForm({ lead, salespersonOptions, saving, formError, o
       {formError && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Input
-          label="Business / Customer Name"
-          required
-          value={formData.name}
-          onChange={(event) => updateField('name', event.target.value)}
-          error={errors.name}
-        />
-        <Input
-          label="Primary Contact Person"
-          value={formData.primaryContactPerson}
-          onChange={(event) => updateField('primaryContactPerson', event.target.value)}
-        />
-        <Input
-          label="Phone"
-          required
-          value={formData.phone}
-          onChange={(event) => updateField('phone', event.target.value)}
-          error={errors.phone}
-        />
-        <Input
-          label="Email"
-          type="email"
-          value={formData.email}
-          onChange={(event) => updateField('email', event.target.value)}
-        />
-        <Input
-          label="GST Number"
-          value={formData.gstNumber}
-          onChange={(event) => updateField('gstNumber', event.target.value)}
-        />
-        <Select
-          label="Category"
-          options={[{ value: '', label: 'No category' }, ...customerCategoryOptions]}
-          value={formData.category}
-          onChange={(event) => updateField('category', event.target.value)}
-        />
-        <Select
-          label="Assigned Sales Officer"
-          options={[{ value: '', label: 'Unassigned' }, ...salespersonOptions]}
-          value={formData.assignedSalesOfficerId}
-          onChange={(event) => updateField('assignedSalesOfficerId', event.target.value)}
-        />
-        <Input
-          label="Credit Limit"
-          type="number"
-          min="0"
-          step="0.01"
-          value={formData.creditLimit}
-          onChange={(event) => updateField('creditLimit', event.target.value)}
-        />
-        <Input
-          label="Opening Balance"
-          type="number"
-          step="0.01"
-          value={formData.openingBalance}
-          onChange={(event) => updateField('openingBalance', event.target.value)}
-        />
-        <Input
-          label="Billing Address"
-          value={formData.billingAddress}
-          onChange={(event) => updateField('billingAddress', event.target.value)}
-          className="sm:col-span-2"
-        />
-        <Input
-          label="Delivery Address"
-          value={formData.deliveryAddress}
-          onChange={(event) => updateField('deliveryAddress', event.target.value)}
-          className="sm:col-span-2"
-        />
-        <Input
-          as="textarea"
-          label="Notes"
-          value={formData.notes}
-          onChange={(event) => updateField('notes', event.target.value)}
-          inputClassName="min-h-20"
-          className="sm:col-span-2"
-        />
+      <div className="max-h-[60vh] overflow-y-auto pr-1">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Business / Customer Name"
+            required
+            value={formData.name}
+            onChange={(event) => updateField('name', event.target.value)}
+            error={errors.name}
+          />
+          <Input
+            label="Primary Contact Person"
+            value={formData.primaryContactPerson}
+            onChange={(event) => updateField('primaryContactPerson', event.target.value)}
+          />
+          <Input
+            label="Phone"
+            required
+            value={formData.phone}
+            onChange={(event) => updateField('phone', event.target.value)}
+            error={errors.phone}
+          />
+          <Input
+            label="Email"
+            type="email"
+            value={formData.email}
+            onChange={(event) => updateField('email', event.target.value)}
+          />
+          <Select
+            label="Customer Type"
+            options={customerTypeOptions}
+            value={formData.customerType}
+            onChange={(event) => updateField('customerType', event.target.value)}
+          />
+          <Select
+            label="Status"
+            options={customerStatusOptions}
+            value={formData.status}
+            onChange={(event) => updateField('status', event.target.value)}
+          />
+          <Input
+            label="Customer Since"
+            type="date"
+            value={formData.customerSince}
+            onChange={(event) => updateField('customerSince', event.target.value)}
+          />
+          <Input
+            label="GST Number"
+            value={formData.gstNumber}
+            onChange={(event) => updateField('gstNumber', event.target.value)}
+          />
+          <Select
+            label="Category"
+            options={[{ value: '', label: 'No category' }, ...customerCategoryOptions]}
+            value={formData.category}
+            onChange={(event) => updateField('category', event.target.value)}
+          />
+          <Select
+            label="Assigned Sales Officer"
+            options={[{ value: '', label: 'Unassigned' }, ...salespersonOptions]}
+            value={formData.assignedSalesOfficerId}
+            onChange={(event) => updateField('assignedSalesOfficerId', event.target.value)}
+          />
+          <Input
+            label="Credit Limit"
+            type="number"
+            min="0"
+            step="0.01"
+            value={formData.creditLimit}
+            onChange={(event) => updateField('creditLimit', event.target.value)}
+          />
+          <Input
+            label="Opening Balance"
+            type="number"
+            step="0.01"
+            value={formData.openingBalance}
+            onChange={(event) => updateField('openingBalance', event.target.value)}
+          />
+          <Input
+            label="Google Maps Location"
+            placeholder="Paste Google Maps link or coordinates"
+            value={formData.googleMapsLocation}
+            onChange={(event) => updateField('googleMapsLocation', event.target.value)}
+            className="sm:col-span-2"
+          />
+          <Input
+            label="Billing Address"
+            value={formData.billingAddress}
+            onChange={(event) => updateField('billingAddress', event.target.value)}
+            className="sm:col-span-2"
+          />
+          <Input
+            label="Delivery Address"
+            value={formData.deliveryAddress}
+            onChange={(event) => updateField('deliveryAddress', event.target.value)}
+            className="sm:col-span-2"
+          />
+          <Input
+            as="textarea"
+            label="Notes"
+            value={formData.notes}
+            onChange={(event) => updateField('notes', event.target.value)}
+            inputClassName="min-h-20"
+            className="sm:col-span-2"
+          />
+        </div>
       </div>
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
         <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>Cancel</Button>
         <Button type="submit" loading={saving}>Convert to Customer</Button>
       </div>
