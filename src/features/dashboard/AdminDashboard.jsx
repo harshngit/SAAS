@@ -244,47 +244,47 @@ function FeaturedSalesCard({
       className="group relative flex h-[320px] w-full min-w-0 flex-col overflow-hidden rounded-[1.55rem] bg-[linear-gradient(180deg,#175e17_0%,#0c4608_100%)] p-4 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-4"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_33%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.06),transparent_28%)] opacity-85 transition-opacity duration-300 group-hover:opacity-100" />
-      <div className="pointer-events-none absolute right-4 top-4 flex size-[4.55rem] items-center justify-center rounded-full bg-white/12 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-105">
-        <IndianRupee className="size-7" aria-hidden="true" />
+      <div className="pointer-events-none absolute right-4 top-4 flex size-14 items-center justify-center rounded-full bg-white/12 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-105">
+        <IndianRupee className="size-5.5" aria-hidden="true" />
       </div>
 
       <div className="min-w-0 pr-16">
-        <p className="max-w-full whitespace-nowrap text-[0.85rem] font-semibold uppercase tracking-[0.14em] text-white/78">
+        <p className="max-w-full whitespace-nowrap text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/78">
           Today&apos;s Sales
         </p>
-        <p className="mt-1 font-(--font-display) text-[2.3rem] font-semibold leading-none tracking-tight text-white">
+        <p className="mt-1 font-(--font-display) text-[1.85rem] font-semibold leading-none tracking-tight text-white">
           {formatCurrency(totalSales)}
         </p>
       </div>
 
-      <div className="relative mt-9 grid grid-cols-2 gap-x-4 gap-y-2">
+      <div className="relative mt-7 grid grid-cols-2 gap-x-4 gap-y-2">
         <div className="min-w-0">
-          <p className="text-[0.90rem] font-medium leading-none text-white/86">Received</p>
-          <p className="mt-1 text-[1.50rem] font-semibold leading-none tracking-tight text-white">
+          <p className="text-[0.76rem] font-medium leading-none text-white/86">Received</p>
+          <p className="mt-1 truncate text-[1.15rem] font-semibold leading-none tracking-tight text-white">
             {formatCurrency(monthlyAchieved)}
           </p>
         </div>
         <div className="min-w-0">
-          <p className="text-[0.90rem] font-medium leading-none text-white/86">Pending</p>
-          <p className="mt-1 text-[1.50rem] font-semibold leading-none tracking-tight text-white">
+          <p className="text-[0.76rem] font-medium leading-none text-white/86">Pending</p>
+          <p className="mt-1 truncate text-[1.15rem] font-semibold leading-none tracking-tight text-white">
             {formatCurrency(remainingTarget)}
           </p>
         </div>
         <div className="col-span-2 h-3" />
       </div>
 
-      <div className="mt-11 grid grid-cols-3 divide-x divide-white/25 text-left">
+      <div className="mt-8 grid grid-cols-3 divide-x divide-white/25 text-left">
         <div className="pr-3">
-          <p className="text-[0.84rem] font-medium leading-none text-white/88">Orders</p>
-          <p className="mt-1 text-[1.45rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
+          <p className="text-[0.7rem] font-medium leading-none text-white/88">Orders</p>
+          <p className="mt-1 text-[1.1rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
         </div>
         <div className="px-3">
-          <p className="text-[0.84rem] font-medium leading-none text-white/88">Delivered</p>
-          <p className="mt-1 text-[1.45rem] font-semibold leading-none tracking-tight text-white">{formatCount(deliveredCount)}</p>
+          <p className="text-[0.7rem] font-medium leading-none text-white/88">Delivered</p>
+          <p className="mt-1 text-[1.1rem] font-semibold leading-none tracking-tight text-white">{formatCount(deliveredCount)}</p>
         </div>
         <div className="pl-3">
-          <p className="text-[0.84rem] font-medium leading-none text-white/88">Pending</p>
-          <p className="mt-1 text-[1.45rem] font-semibold leading-none tracking-tight text-white">{formatCount(pendingOrdersCount)}</p>
+          <p className="text-[0.7rem] font-medium leading-none text-white/88">Pending</p>
+          <p className="mt-1 text-[1.1rem] font-semibold leading-none tracking-tight text-white">{formatCount(pendingOrdersCount)}</p>
         </div>
       </div>
 

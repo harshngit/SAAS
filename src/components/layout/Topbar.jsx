@@ -185,7 +185,7 @@ export default function Topbar() {
           >
             <Bell className="size-4.5" />
             {unreadCount > 0 && (
-              <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500 ring-2 ring-white" />
+              <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-red-500 ring-2 ring-white" />
             )}
           </button>
 
