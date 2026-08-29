@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Edit,
+  MapPin,
+  Phone,
   Plus,
   RotateCw,
   Search,
@@ -43,12 +45,25 @@ const normalizeCustomer = (customer) => ({
   outstandingBalance: customer.outstanding_balance || customer.outstandingBalance || 0,
   creditLimit: customer.credit_limit ?? customer.creditLimit ?? 0,
   gstNumber: customer.gst_number || customer.gstNumber || '',
+  contactPerson: customer.primary_contact_person || customer.contactPerson || '',
+  city: customer.city || '',
+  lastOrderDate: customer.last_order_date || customer.lastOrderDate || null,
+  lastVisitDate: customer.last_visit_date || customer.lastVisitDate || null,
+  mapsLatitude: customer.maps_latitude ?? customer.mapsLatitude ?? null,
+  mapsLongitude: customer.maps_longitude ?? customer.mapsLongitude ?? null,
   joinedAt: customer.created_at || customer.joinedAt,
   updatedAt: customer.updated_at || customer.updatedAt,
   notes: customer.notes || '',
   isActive: customer.is_active ?? customer.isActive,
   status: customer.is_active === false || customer.status === 'inactive' ? 'inactive' : 'active',
 })
+
+function formatListDate(value, emptyLabel) {
+  if (!value) return emptyLabel
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return emptyLabel
+  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
+}
 
 const normalizeUser = (user) => ({
   id: user.id,
@@ -422,9 +437,12 @@ export default function CustomerList() {
               <thead>
                 <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
                   <th className="whitespace-nowrap px-4 py-3">Customer</th>
+                  <th className="whitespace-nowrap px-4 py-3">Contact Person</th>
                   <th className="whitespace-nowrap px-4 py-3">Phone</th>
+                  <th className="whitespace-nowrap px-4 py-3">Location</th>
                   <th className="whitespace-nowrap px-4 py-3">Sales Officer</th>
-                  <th className="whitespace-nowrap px-4 py-3">Credit Limit</th>
+                  <th className="whitespace-nowrap px-4 py-3">Last Order</th>
+                  <th className="whitespace-nowrap px-4 py-3">Last Visit</th>
                   <th className="whitespace-nowrap px-4 py-3">Outstanding</th>
                   <th className="whitespace-nowrap px-4 py-3">Status</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
@@ -448,12 +466,17 @@ export default function CustomerList() {
                         </div>
                       </div>
                     </td>
+                    <td className="px-4 py-3.5 text-neutral-600">{customer.contactPerson || '—'}</td>
                     <td className="px-4 py-3.5 text-neutral-600">{customer.phone}</td>
+                    <td className="px-4 py-3.5 text-neutral-600">{customer.city || '—'}</td>
                     <td className="px-4 py-3.5 text-neutral-600">
                       {salesOfficerById.get(customer.assignedSalesOfficerId) || 'Unassigned'}
                     </td>
-                    <td className="px-4 py-3.5 font-medium text-neutral-700">
-                      {formatCurrency(customer.creditLimit)}
+                    <td className="px-4 py-3.5 text-neutral-600">
+                      {formatListDate(customer.lastOrderDate, 'No order yet')}
+                    </td>
+                    <td className="px-4 py-3.5 text-neutral-600">
+                      {formatListDate(customer.lastVisitDate, 'No visit yet')}
                     </td>
                     <td className="px-4 py-3.5">
                       {customer.outstandingBalance > 0 ? (
@@ -468,19 +491,46 @@ export default function CustomerList() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
-                      <ActionMenu
-                        items={[
-                          { label: 'View Details', icon: UserCheck, onClick: () => navigate(`${basePath}/${customer.id}`) },
-                          { label: 'Edit', icon: Edit, onClick: () => handleOpenForm(customer) },
-                          // { label: 'Reassign Sales Officer', icon: UserCheck, onClick: () => handleOpenForm(customer) },
-                          {
-                            label: 'Delete',
-                            icon: Trash2,
-                            danger: true,
-                            onClick: () => setDeleteCustomer(customer),
-                          },
-                        ]}
-                      />
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          disabled={!customer.phone}
+                          onClick={() => { window.location.href = `tel:${customer.phone}` }}
+                          className="flex size-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={`Call ${customer.name}`}
+                          title={customer.phone ? `Call ${customer.phone}` : 'No phone number on file'}
+                        >
+                          <Phone className="size-4" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={customer.mapsLatitude == null || customer.mapsLongitude == null}
+                          onClick={() =>
+                            window.open(
+                              `https://www.google.com/maps?q=${customer.mapsLatitude},${customer.mapsLongitude}`,
+                              '_blank',
+                              'noopener,noreferrer',
+                            )
+                          }
+                          className="flex size-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={`View ${customer.name} on map`}
+                          title={customer.mapsLatitude != null && customer.mapsLongitude != null ? 'View on map' : 'No saved location'}
+                        >
+                          <MapPin className="size-4" aria-hidden="true" />
+                        </button>
+                        <ActionMenu
+                          items={[
+                            { label: 'View Details', icon: UserCheck, onClick: () => navigate(`${basePath}/${customer.id}`) },
+                            { label: 'Edit', icon: Edit, onClick: () => handleOpenForm(customer) },
+                            {
+                              label: 'Delete',
+                              icon: Trash2,
+                              danger: true,
+                              onClick: () => setDeleteCustomer(customer),
+                            },
+                          ]}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}

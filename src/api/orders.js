@@ -94,7 +94,16 @@ function buildItemBody(item) {
 
   if (item.unitPrice !== undefined && item.unitPrice !== '') body.unit_price = Number(item.unitPrice)
   if (item.unit_price !== undefined && item.unit_price !== '') body.unit_price = Number(item.unit_price)
-  if (item.discount !== undefined && item.discount !== '') body.discount = Number(item.discount)
+
+  // discount_percent (0-100) is the real input field - the backend computes the flat `discount`
+  // amount itself from it. Kept `discount` as a fallback for any caller still passing a flat
+  // amount directly, but discount_percent always wins when both are present.
+  const discountPercent = item.discountPercent ?? item.discount_percent
+  if (discountPercent !== undefined && discountPercent !== '') body.discount_percent = Number(discountPercent)
+  else if (item.discount !== undefined && item.discount !== '') body.discount = Number(item.discount)
+
+  const uom = item.uom
+  if (uom) body.uom = uom
 
   const taxRate = item.taxRate ?? item.tax_rate
   if (taxRate !== undefined && taxRate !== '') body.tax_rate = Number(taxRate)
@@ -131,10 +140,13 @@ function normalizeOrderItem(item) {
   const quantity = Number(item.quantity) || 0
   const unitPrice = Number(item.unit_price) || 0
   const discount = Number(item.discount) || 0
+  const discountPercent = Number(item.discount_percent) || 0
   const taxRate = Number(item.tax_rate) || 0
   const subtotal = quantity * unitPrice
-  const discounted = subtotal - subtotal * (discount / 100)
+  const discounted = subtotal - subtotal * (discountPercent / 100)
   const fallbackLineTotal = discounted + discounted * (taxRate / 100)
+  const orderedQuantity = item.ordered_quantity ?? quantity
+  const deliveredQuantity = item.delivered_quantity ?? 0
 
   return {
     id: item.id,
@@ -142,11 +154,16 @@ function normalizeOrderItem(item) {
     variantId: item.variant_id,
     productName: item.product_name || item.name || '',
     quantity,
+    orderedQuantity,
     unitPrice,
     discount,
+    discountPercent,
+    costPrice: item.cost_price ?? null,
+    uom: item.uom || '',
     taxRate,
     reservedQuantity: item.reserved_quantity ?? 0,
-    deliveredQuantity: item.delivered_quantity ?? 0,
+    deliveredQuantity,
+    remainingQuantity: item.remaining_quantity ?? Math.max(orderedQuantity - deliveredQuantity, 0),
     lineTotal: item.line_total ?? fallbackLineTotal,
   }
 }
@@ -182,6 +199,10 @@ function normalizeOrder(order) {
     assignedDeliveryPartnerId: order.assigned_delivery_partner_id || order.delivery_partner?.id || '',
     assignedDeliveryPartnerName: order.delivery_partner?.name || '',
     quotationId: order.quotation_id || null,
+    deliveryId: order.delivery_id || null,
+    deliveryNumber: order.delivery_number || null,
+    invoiceId: order.invoice_id || null,
+    invoiceNumber: order.invoice_number || null,
     notes: order.notes || '',
     discount: order.discount ?? 0,
     tax: order.tax ?? 0,

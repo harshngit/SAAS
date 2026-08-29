@@ -234,6 +234,7 @@ function FeaturedSalesCard({
 }) {
   const navigate = useNavigate()
   const remainingTarget = Math.max((monthlyTarget || 0) - (monthlyAchieved || 0), 0)
+  const targetPct = monthlyTarget > 0 ? Math.min(100, ((monthlyAchieved || 0) / monthlyTarget) * 100) : 0
   const formatCount = (value) => new Intl.NumberFormat('en-IN').format(Number(value) || 0)
 
   return (
@@ -270,7 +271,15 @@ function FeaturedSalesCard({
             {formatCurrency(remainingTarget)}
           </p>
         </div>
-        <div className="col-span-2 h-3" />
+        <div className="col-span-2 mt-1">
+          <div className="flex items-center justify-between text-[0.66rem] font-medium leading-none text-white/70">
+            <span>Monthly Target</span>
+            <span className="text-white/90">{formatCurrency(monthlyTarget)}</span>
+          </div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/15">
+            <div className="h-full rounded-full bg-white/80" style={{ width: `${targetPct}%` }} />
+          </div>
+        </div>
       </div>
 
       <div className="mt-8 grid grid-cols-3 divide-x divide-white/25 text-left">

@@ -203,7 +203,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
           index === existingIndex ? { ...item, quantity: item.quantity + 1 } : item,
         )
       }
-      return [...current, { productId: product.id, unitPrice: product.price || 0, taxRate: product.tax_rate || 0, quantity: 1 }]
+      return [...current, { productId: product.id, unitPrice: product.price || 0, taxRate: product.tax_rate || 0, quantity: 1, discountPercent: 0 }]
     })
     setErrors((current) => ({ ...current, items: '' }))
     setIsProductPickerOpen(false)
@@ -227,7 +227,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       const unitPrice = Number(item.unitPrice) || 0
       const quantity = Number(item.quantity) || 0
       const taxRate = Number(item.taxRate) || 0
-      return { product, unitPrice, quantity, taxRate, lineSubtotal: unitPrice * quantity }
+      const discountPercent = Math.min(Math.max(Number(item.discountPercent) || 0, 0), 100)
+      const grossLineSubtotal = unitPrice * quantity
+      const lineSubtotal = grossLineSubtotal - grossLineSubtotal * (discountPercent / 100)
+      return { product, unitPrice, quantity, taxRate, discountPercent, lineSubtotal }
     })
 
     const subtotal = lines.reduce((sum, line) => sum + line.lineSubtotal, 0)
@@ -290,6 +293,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
         quantity: Number(item.quantity) || 0,
         unitPrice: Number(item.unitPrice) || 0,
         taxRate: Number(item.taxRate) || 0,
+        discountPercent: Number(item.discountPercent) || 0,
       })),
     })
 
@@ -531,6 +535,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       <th className="px-5 py-3">Product</th>
                       <th className="px-3 py-3">Unit Price (₹)</th>
                       <th className="px-3 py-3 text-center">Qty</th>
+                      <th className="px-3 py-3">Disc (%)</th>
                       <th className="px-3 py-3">Tax (%)</th>
                       <th className="px-3 py-3 text-right">Line Total (₹)</th>
                       <th className="w-10 px-3 py-3" />
@@ -604,9 +609,20 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               </button>
                             </div>
                           </td>
+                          <td className="px-3 py-3.5">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={item.discountPercent ?? 0}
+                              onChange={(event) => updateOrderItem(item.productId, 'discountPercent', event.target.value)}
+                              className="h-9 w-20 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                            />
+                          </td>
                           <td className="px-3 py-3.5 text-neutral-500">{formatGstPercent(item.taxRate || 0)}%</td>
                           <td className="px-3 py-3.5 text-right font-semibold text-neutral-900">
-                            {formatCurrency(unitPrice * quantity)}
+                            {formatCurrency(unitPrice * quantity * (1 - Math.min(Math.max(Number(item.discountPercent) || 0, 0), 100) / 100))}
                           </td>
                           <td className="px-3 py-3.5 text-right">
                             <button

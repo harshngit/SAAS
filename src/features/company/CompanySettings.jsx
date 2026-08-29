@@ -1320,43 +1320,27 @@ function CompanyProfileCompletionModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Company Profile Completion"
-      className="!w-[96vw] !max-w-[78rem]"
-      footer={
-        <Button type="button" variant="ghost" onClick={handleClose}>
-          Close
-        </Button>
-      }
+      className="!max-w-md"
     >
-      <div className="max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <div
-                className="grid size-16 shrink-0 place-items-center rounded-full"
-                style={{
-                  background: `conic-gradient(rgb(22 101 52) ${completion.percent}%, rgb(229 231 235) 0)`,
-                }}
-              >
-                <div className="grid size-12 place-items-center rounded-full bg-white text-sm font-bold text-neutral-900">
-                  {completion.percent}%
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald-900/80">
-                  Company Profile Completion
-                </h3>
-                <p className="mt-1 text-sm text-neutral-600">
-                  Complete your company profile.
-                </p>
+      <div className="max-h-[65vh] overflow-y-auto pr-1">
+        <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 p-2.5">
+          <div className="flex items-center gap-2.5">
+            <div
+              className="grid size-9 shrink-0 place-items-center rounded-full"
+              style={{
+                background: `conic-gradient(rgb(22 101 52) ${completion.percent}%, rgb(229 231 235) 0)`,
+              }}
+            >
+              <div className="grid size-6.5 place-items-center rounded-full bg-white text-[0.62rem] font-bold text-neutral-900">
+                {completion.percent}%
               </div>
             </div>
 
-            <div className="lg:min-w-[19rem]">
-              <p className="text-sm font-semibold text-neutral-900">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-neutral-900">
                 {completion.completedRequiredFields} of {completion.totalRequiredFields} required fields completed
               </p>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/70">
                 <div
                   className="h-full rounded-full bg-primary-600 transition-all duration-300"
                   style={{ width: `${completion.percent}%` }}
@@ -1366,7 +1350,7 @@ function CompanyProfileCompletionModal({
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="mt-2.5 space-y-2">
           {incompleteSections.length > 0 ? (
             incompleteSections.map((section) => {
               const missingSummary = section.incompleteFields.map((field) => field.label);
@@ -1374,58 +1358,65 @@ function CompanyProfileCompletionModal({
               return (
                 <article
                   key={section.id}
-                  className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                  className="rounded-lg border border-neutral-100 bg-white p-2.5 shadow-sm transition-shadow hover:shadow-md"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h4 className="text-base font-semibold text-neutral-900">
+                      <h4 className="text-xs font-semibold text-neutral-900">
                         {section.label}
                       </h4>
-                      <p className="mt-1 text-sm text-neutral-500">
+                      <p className="mt-0.5 text-[0.7rem] text-neutral-500">
                         {section.incompleteFields.length} required field
                         {section.incompleteFields.length === 1 ? "" : "s"} is missing
                       </p>
                     </div>
-                    <span className="inline-flex shrink-0 items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                    <span className="inline-flex shrink-0 items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[0.62rem] font-semibold text-amber-700">
                       Incomplete
                     </span>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2 text-xs text-neutral-600">
+                  <div className="mt-2 flex flex-wrap gap-1 text-[0.66rem] text-neutral-600">
                     {missingSummary.map((fieldLabel) => (
                       <span
                         key={fieldLabel}
-                        className="inline-flex items-center rounded-full bg-neutral-50 px-2.5 py-1 font-medium text-neutral-700"
+                        className="inline-flex items-center rounded-full bg-neutral-50 px-1.5 py-0.5 font-medium text-neutral-700"
                       >
                         {fieldLabel}
                       </span>
                     ))}
                   </div>
 
-                  <div className="mt-4 flex items-center justify-end">
+                  <div className="mt-2 flex items-center justify-end">
                     <Button
                       type="button"
+                      size="sm"
                       onClick={() => handleCompleteSection(section.id)}
-                      className="whitespace-nowrap"
+                      className="whitespace-nowrap text-xs"
                     >
                       Complete Now
-                      <ArrowRight className="size-4" />
+                      <ArrowRight className="size-3.5" />
                     </Button>
                   </div>
                 </article>
               );
             })
           ) : (
-            <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/60 p-5 text-sm text-neutral-500 lg:col-span-2">
+            <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/60 p-3 text-xs text-neutral-500">
               All profile sections are complete.
             </div>
           )}
         </div>
 
-        <div className="mt-5 flex items-center gap-2 rounded-2xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-          <Info className="size-4 shrink-0 text-emerald-700" />
+        <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-neutral-50 px-2.5 py-2 text-[0.7rem] text-neutral-600">
+          <Info className="size-3.5 shrink-0 text-emerald-700" />
           <span>You&apos;ll be taken directly to the first missing field in the selected section.</span>
         </div>
+      </div>
+
+      <div className="mt-3 flex justify-end border-t border-neutral-100 pt-3">
+        <Button type="button" variant="ghost" size="sm" onClick={handleClose}>
+          Close
+        </Button>
       </div>
     </Modal>
   );
@@ -2006,16 +1997,16 @@ function CompanyOverviewDashboard({
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="rounded-[1.15rem] border border-neutral-100 bg-white p-5 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset,0_12px_30px_-20px_rgba(15,23,42,0.35)]">
+        <div className="flex h-full flex-col rounded-[1.15rem] border border-neutral-100 bg-white p-5 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset,0_12px_30px_-20px_rgba(15,23,42,0.35)]">
           <div className="flex items-start gap-3">
-            <div className="grid size-12 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-900 shadow-[0_0_0_1px_rgba(6,95,70,0.08)]">
-              <Building2 className="size-5" />
+            <div className="grid size-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-900 shadow-[0_0_0_1px_rgba(6,95,70,0.08)]">
+              <Building2 className="size-4" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-[1.05rem] font-bold tracking-tight text-slate-900">
+              <h3 className="text-sm font-bold tracking-tight text-slate-900">
                 Profile Completion
               </h3>
-              <p className="mt-1 max-w-xl text-[0.78rem] leading-4 text-slate-500">
+              <p className="mt-1 max-w-xl text-xs leading-4 text-slate-500">
                 Complete the missing information to finish your company profile.
               </p>
             </div>
@@ -2027,31 +2018,31 @@ function CompanyOverviewDashboard({
             />
           </div>
           <div className="mt-3">
-            <p className="text-[1.4rem] font-black tracking-tight text-slate-950 sm:text-[1.8rem] sm:leading-none">
+            <p className="text-lg font-bold tracking-tight text-slate-950">
               {completion.percent}% Complete
             </p>
-            <p className="mt-1 text-[0.82rem] text-slate-600">
+            <p className="mt-1 text-xs text-slate-600">
               {completion.completedRequiredFields} of {completion.totalRequiredFields} required fields completed
             </p>
           </div>
           <div className="mt-3">
             {completion.percent >= 100 ? (
-              <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-[0.72rem] font-semibold text-emerald-800">
+              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[0.7rem] font-semibold text-emerald-800">
                 Profile Complete
               </span>
             ) : (
-              <span className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-[0.72rem] font-semibold text-slate-800">
-                <span className="size-2 rounded-full bg-amber-500" />
+              <span className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-2.5 py-1 text-[0.7rem] font-semibold text-slate-800">
+                <span className="size-1.5 rounded-full bg-amber-500" />
                 {Math.max(completion.totalRequiredFields - completion.completedRequiredFields, 0)} fields remaining
               </span>
             )}
           </div>
-          <div className="mt-4">
+          <div className="mt-auto pt-4">
             <Button
               type="button"
               size="sm"
               onClick={onViewAllCompletion}
-              className="w-full justify-center py-2 text-sm font-semibold shadow-[0_16px_30px_-18px_rgba(6,95,70,0.8)]"
+              className="w-full justify-center py-2 text-xs font-semibold shadow-[0_16px_30px_-18px_rgba(6,95,70,0.8)]"
             >
               View Missing Fields
               <ArrowRight className="size-3.5" />

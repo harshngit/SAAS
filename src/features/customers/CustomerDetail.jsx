@@ -139,6 +139,7 @@ const normalizeUser = (user) => ({
 const normalizeCustomerPayment = (payment) => ({
   id: payment.id,
   customerId: payment.customer_id,
+  receiptNumber: payment.receipt_number || '',
   orderId: payment.order_id || '',
   invoiceId: payment.invoice_id || '',
   invoice: payment.invoice,
@@ -148,6 +149,11 @@ const normalizeCustomerPayment = (payment) => ({
   note: payment.note || '',
   receivedOn: payment.received_on,
   createdAt: payment.created_at,
+  // 5-part payment snapshot (Order Amount / Previous Pending / Amount Collected / Payment
+  // Method / Remaining Receivable) - orderAmount is null for advance/on-account payments.
+  orderAmount: payment.order_amount ?? null,
+  previousPending: payment.previous_pending ?? null,
+  remainingReceivable: payment.remaining_receivable ?? null,
 })
 
 const getInitials = (name = '') =>
@@ -727,7 +733,7 @@ export default function CustomerDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
         <MetricCard
           icon={ShoppingBag}
           label="Total Orders"
@@ -739,12 +745,6 @@ export default function CustomerDetail() {
           label="Total Received"
           value={formatCurrency(customer.totalReceived || 0)}
           action={{ label: 'View Payments', onClick: () => document.getElementById('payment-history')?.scrollIntoView({ behavior: 'smooth' }) }}
-        />
-        <MetricCard
-          icon={CreditCard}
-          label="Credit Limit"
-          value={formatCurrency(customer.creditLimit)}
-          action={{ label: 'Edit Limit', onClick: goToEdit }}
         />
         <MetricCard
           icon={Wallet}
@@ -771,6 +771,21 @@ export default function CustomerDetail() {
             <Field label="Primary Contact Person" value={customer.primaryContactPerson} />
             <Field label="Designation" value={customer.designation} />
             <Field label="Communication Preference" value={customer.preferredCommunication} />
+          </div>
+          <div className="mt-4 border-t border-neutral-100 pt-4">
+            <p className="text-xs text-neutral-400">Social Media</p>
+            <div className="mt-2">
+              <SocialLinks
+                links={{
+                  website: customer.website,
+                  facebook: customer.facebook,
+                  instagram: customer.instagram,
+                  linkedin: customer.linkedin,
+                  twitter: customer.twitter,
+                  youtube: customer.youtube,
+                }}
+              />
+            </div>
           </div>
         </Section>
 
@@ -821,22 +836,6 @@ export default function CustomerDetail() {
             </div>
           </div>
         </Section>
-      </div>
-
-      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-        <p className="text-sm text-neutral-400">Social Media</p>
-        <div className="mt-3 border-t border-neutral-100 pt-3">
-          <SocialLinks
-            links={{
-              website: customer.website,
-              facebook: customer.facebook,
-              instagram: customer.instagram,
-              linkedin: customer.linkedin,
-              twitter: customer.twitter,
-              youtube: customer.youtube,
-            }}
-          />
-        </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
@@ -900,6 +899,28 @@ export default function CustomerDetail() {
                       {payment.receivedOn ? new Date(payment.receivedOn).toLocaleDateString() : '-'}
                       {payment.invoice?.invoice_number || payment.invoiceId ? ` · ${payment.invoice?.invoice_number || payment.invoiceId}` : ''}
                     </p>
+                    {(payment.orderAmount != null || payment.previousPending != null || payment.remainingReceivable != null) && (
+                      <div className="mt-2 grid grid-cols-3 gap-2 border-t border-neutral-100 pt-2 text-[0.7rem]">
+                        <div>
+                          <p className="text-neutral-400">Order Amt</p>
+                          <p className="font-medium text-neutral-700">
+                            {payment.orderAmount != null ? formatCurrency(payment.orderAmount) : 'On Account'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-neutral-400">Prev. Pending</p>
+                          <p className="font-medium text-neutral-700">
+                            {payment.previousPending != null ? formatCurrency(payment.previousPending) : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-neutral-400">Remaining</p>
+                          <p className="font-medium text-neutral-700">
+                            {payment.remainingReceivable != null ? formatCurrency(payment.remainingReceivable) : '—'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <div className="mt-2 flex justify-end gap-1">
                       <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleOpenReceipt(payment)} loading={downloadingReceiptId === payment.id}>
                         <FileText className="size-3.5" aria-hidden="true" />

@@ -914,6 +914,9 @@ export default function DeliveryDetail() {
           <InfoField label="Delivery Address" value={delivery.customerDeliveryAddress || delivery.deliveryAddress || 'N/A'} />
           <InfoField label="Dispatched At" value={formatDate(delivery.dispatchedAt)} />
           <InfoField label="Confirmed At" value={formatDate(delivery.confirmedAt)} />
+          {delivery.previousPendingBalance != null && (
+            <InfoField label="Previous Pending Balance" value={formatCurrency(delivery.previousPendingBalance)} />
+          )}
           <InfoField label="Amount Due" value={formatCurrency(delivery.amountDue)} />
           {delivery.failureReason && <InfoField label="Failure Reason" value={delivery.failureReason} />}
         </div>

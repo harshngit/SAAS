@@ -483,7 +483,7 @@ export default function OrderDetail() {
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card) sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card) sm:grid-cols-2 lg:grid-cols-6">
         <div>
           <p className="flex items-center gap-1.5 text-xs text-neutral-400"><User className="size-3.5" />Customer</p>
           <Link to={`/admin/customers/${order.customerId}`} className="mt-1 block truncate text-sm font-medium text-primary-700 hover:underline">
@@ -507,6 +507,27 @@ export default function OrderDetail() {
         <div>
           <p className="flex items-center gap-1.5 text-xs text-neutral-400"><IndianRupee className="size-3.5" />Total Amount</p>
           <p className="mt-1 text-sm font-semibold text-neutral-900">{formatCurrency(order.total)}</p>
+        </div>
+        <div>
+          <p className="flex items-center gap-1.5 text-xs text-neutral-400"><FileText className="size-3.5" />Delivery / Invoice</p>
+          <p className="mt-1 text-sm font-medium">
+            {order.deliveryId ? (
+              <Link to={`/admin/deliveries/${order.deliveryId}`} className="text-primary-700 hover:underline">
+                {order.deliveryNumber || 'View Delivery'}
+              </Link>
+            ) : (
+              <span className="text-neutral-400">No delivery yet</span>
+            )}
+          </p>
+          <p className="text-xs">
+            {order.invoiceId ? (
+              <Link to={`/admin/invoices/${order.invoiceNumber || order.invoiceId}`} className="text-primary-700 hover:underline">
+                {order.invoiceNumber || 'View Invoice'}
+              </Link>
+            ) : (
+              <span className="text-neutral-400">No invoice yet</span>
+            )}
+          </p>
         </div>
       </div>
 
@@ -535,9 +556,11 @@ export default function OrderDetail() {
                   <th className="whitespace-nowrap px-5 py-3">#</th>
                   <th className="whitespace-nowrap px-5 py-3">Product</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Unit Price</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">Disc %</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Qty</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Reserved</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Delivered</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">Remaining</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Line Total</th>
                 </tr>
               </thead>
@@ -548,17 +571,26 @@ export default function OrderDetail() {
                     <td className="whitespace-nowrap px-5 py-3.5">
                       <p className="font-medium text-neutral-800">{item.productName}</p>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{formatCurrency(item.unitPrice)}</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">
+                      {formatCurrency(item.unitPrice)}
+                      {item.costPrice != null && (
+                        <p className="text-xs font-normal text-neutral-400">Cost: {formatCurrency(item.costPrice)}</p>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">
+                      {item.discountPercent > 0 ? `${item.discountPercent}%` : '—'}
+                    </td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.quantity}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.reservedQuantity}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.deliveredQuantity}</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.remainingQuantity}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
                   </tr>
                 ))}
                 <tr className="bg-neutral-50/60 font-semibold text-neutral-900">
-                  <td colSpan={3} />
+                  <td colSpan={4} />
                   <td className="px-5 py-3 text-right">{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
-                  <td colSpan={2} />
+                  <td colSpan={3} />
                   <td className="px-5 py-3 text-right">{formatCurrency(order.total)}</td>
                 </tr>
               </tbody>

@@ -52,6 +52,8 @@ import VehicleLoading from '../features/vehicleStock/VehicleLoading'
 import AssignedDeliveries from '../features/deliveries/AssignedDeliveries'
 import DeliveryDetail from '../features/deliveries/DeliveryDetail'
 import MyExpenses from '../features/expenses/MyExpenses'
+import MyLeaves from '../features/leaves/MyLeaves'
+import LeaveApprovalQueue from '../features/leaves/LeaveApprovalQueue'
 import EndOfDayReturn from '../features/vehicleStock/EndOfDayReturn'
 import MyAttendance from '../features/attendance/MyAttendance'
 import PurchaseInvoices from '../features/invoices/PurchaseInvoices'
@@ -225,6 +227,7 @@ export default function AppRoutes() {
           <Route path="/admin/notifications" element={<NotificationsList />} />
           <Route path="/admin/audit-logs" element={<AuditLogList />} />
           <Route path="/admin/object-fields" element={<ObjectFieldsSettings />} />
+          <Route path="/admin/leaves" element={<LeaveApprovalQueue />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
         </Route>
 
@@ -258,6 +261,7 @@ export default function AppRoutes() {
           <Route path="/sales/visits" element={<VisitCheckIn />} />
           <Route path="/sales/followups" element={<FollowUpsList />} />
           <Route path="/sales/attendance" element={<MyAttendance />} />
+          <Route path="/sales/leaves" element={<MyLeaves />} />
           <Route path="/sales/performance" element={<MyTargets />} />
         </Route>
 
@@ -283,6 +287,7 @@ export default function AppRoutes() {
           <Route path="/delivery/expenses" element={<MyExpenses />} />
           <Route path="/delivery/end-of-day" element={<EndOfDayReturn />} />
           <Route path="/delivery/attendance" element={<MyAttendance />} />
+          <Route path="/delivery/leaves" element={<MyLeaves />} />
           <Route path="/delivery/vehicle-stock" element={<VehicleStockOverview />} />
         </Route>
 
@@ -298,6 +303,7 @@ export default function AppRoutes() {
           <Route path="/accounts/invoices/sales" element={<SalesInvoices />} />
           <Route path="/accounts/payments/record" element={<RecordPayment />} />
           <Route path="/accounts/expenses/approval" element={<ExpenseApprovalQueue />} />
+          <Route path="/accounts/leaves" element={<MyLeaves />} />
           <Route path="/accounts/reconciliation/cash" element={<CashReconciliation />} />
           <Route path="/accounts/outstanding" element={<ReceivablesPayables />} />
           <Route path="/accounts/gst" element={<GSTSummary />} />

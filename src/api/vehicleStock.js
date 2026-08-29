@@ -44,8 +44,10 @@ function normalizeSessionItem(item) {
   const deliveredQuantity = item.delivered_qty ?? item.delivered_quantity ?? 0
   const returnedQuantity = item.returned_qty ?? item.returned_quantity ?? 0
   const extraQuantity = item.extra_qty ?? item.extra_quantity ?? 0
+  const remainingQuantity = item.remaining_qty ?? Math.max(loadedQuantity + extraQuantity - deliveredQuantity, 0)
 
   return {
+    id: item.id,
     productId: item.product_id,
     variantId: item.variant_id,
     productName: item.product_name || item.name || '',
@@ -53,7 +55,42 @@ function normalizeSessionItem(item) {
     extraQuantity,
     deliveredQuantity,
     returnedQuantity,
-    remainingQuantity: Math.max(loadedQuantity + extraQuantity - deliveredQuantity - returnedQuantity, 0),
+    remainingQuantity,
+    expectedClosingQty: item.expected_closing_qty ?? Math.max(remainingQuantity - returnedQuantity, 0),
+  }
+}
+
+function normalizeReconciliationItem(item) {
+  if (!item) return item
+
+  return {
+    id: item.id,
+    loadingItemId: item.loading_item_id,
+    productId: item.product_id,
+    variantId: item.variant_id,
+    productName: item.product_name || '',
+    loadedQuantity: item.loaded_qty ?? 0,
+    extraQuantity: item.extra_qty ?? 0,
+    deliveredQuantity: item.delivered_qty ?? 0,
+    returnedQuantity: item.returned_qty ?? 0,
+    expectedClosingQty: item.expected_closing_qty ?? 0,
+    physicalQuantity: item.physical_qty ?? 0,
+    varianceQuantity: item.variance_qty ?? 0,
+    notes: item.notes || '',
+  }
+}
+
+function normalizeReconciliation(reconciliation) {
+  if (!reconciliation) return reconciliation
+
+  return {
+    id: reconciliation.id,
+    loadingId: reconciliation.loading_id,
+    reconciledById: reconciliation.reconciled_by_id || '',
+    status: reconciliation.status || 'reconciled',
+    notes: reconciliation.notes || '',
+    items: (reconciliation.items || []).map(normalizeReconciliationItem),
+    createdAt: reconciliation.created_at,
   }
 }
 
@@ -214,6 +251,62 @@ export async function listVehicleStockSessions(params = {}) {
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to load vehicle stock sessions. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+// Physical-count variance audit against a (usually just-closed) loading session - does not
+// touch warehouse stock, it's a read-only reconciliation record layered on top.
+export async function reconcileVehicleStock(sessionId, { items, notes } = {}) {
+  try {
+    const requestBody = {
+      items: (items || []).map((item) => {
+        const body = {
+          physical_qty: Math.trunc(Number(item.physicalQty ?? item.physical_qty)) || 0,
+        }
+        const productId = item.productId || item.product_id
+        if (productId) body.product_id = productId
+        const variantId = item.variantId || item.variant_id
+        if (variantId) body.variant_id = variantId
+        const loadingItemId = item.loadingItemId || item.loading_item_id || item.id
+        if (loadingItemId) body.loading_item_id = loadingItemId
+        if (item.notes) body.notes = item.notes
+        return body
+      }),
+    }
+    if (notes) requestBody.notes = notes
+
+    const { data } = await apiClient.post(`/vehicle-stock/${sessionId}/reconcile`, requestBody, {
+      headers: authHeader(),
+    })
+
+    return { success: true, reconciliation: normalizeReconciliation(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to record the stock reconciliation. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function listVehicleStockReconciliations(sessionId) {
+  try {
+    const { data } = await apiClient.get(`/vehicle-stock/${sessionId}/reconciliations`, {
+      headers: authHeader(),
+    })
+
+    const reconciliations = Array.isArray(data) ? data : data?.reconciliations || []
+    return { success: true, reconciliations: reconciliations.map(normalizeReconciliation) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load past reconciliations. Please try again.',
     )
 
     return { success: false, error: message }

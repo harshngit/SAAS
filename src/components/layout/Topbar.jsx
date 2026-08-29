@@ -165,7 +165,7 @@ export default function Topbar() {
         </div>
       )}
 
-      <div className="ml-5 flex items-center gap-5">
+      <div className="ml-auto flex items-center gap-5">
         {logoutError && <p className="hidden text-sm text-red-600 md:block">{logoutError}</p>}
         <button
           type="button"
@@ -185,7 +185,7 @@ export default function Topbar() {
           >
             <Bell className="size-4.5" />
             {unreadCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+              <span className="absolute right-0 top-0 size-2.5 -translate-y-1/2 translate-x-1/2 rounded-full bg-red-500 ring-2 ring-white" />
             )}
           </button>
 

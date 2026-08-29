@@ -1,35 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Calendar, CheckCircle, Clock, MapPin, RefreshCw, Users } from 'lucide-react'
+import { Calendar, CheckCircle, Clock, MapPin, RefreshCw } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { listUsers } from '../../api/users'
-
-const initialVisits = [
-  {
-    id: 1,
-    customerName: 'Rajesh Kumar',
-    checkIn: '2024-07-17 10:30 AM',
-    checkOut: '2024-07-17 11:15 AM',
-    notes: 'Discussed new product range, placed order for 100 units',
-    followUpTaskStatus: 'not_required',
-    followUpTaskError: '',
-    followUpTask: null,
-    followUpTaskDraft: null,
-  },
-  {
-    id: 2,
-    customerName: 'Priya Desai',
-    checkIn: '2024-07-16 02:00 PM',
-    checkOut: '2024-07-16 02:45 PM',
-    notes: 'Follow-up on previous order, collected payment',
-    followUpTaskStatus: 'not_required',
-    followUpTaskError: '',
-    followUpTask: null,
-    followUpTaskDraft: null,
-  },
-]
+import { listCustomers } from '../../api/customers'
+import { createVisit, createVisitFollowUp, listVisits, updateVisit } from '../../api/visits'
+import { useAuthStore } from '../../store/authStore'
+import { ROLES } from '../../auth/roles'
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -43,13 +23,12 @@ function emptyTaskFields() {
     dueTime: '10:00',
     assigneeId: '',
     priority: 'medium',
-    reminder: 'none',
   }
 }
 
 function emptyCheckInData() {
   return {
-    customerName: '',
+    customerId: '',
     notes: '',
     createFollowUpTask: false,
     ...emptyTaskFields(),
@@ -63,47 +42,84 @@ const taskPriorityOptions = [
   { value: 'urgent', label: 'Urgent' },
 ]
 
-const reminderOptions = [
-  { value: 'none', label: 'No reminder' },
-  { value: '15m', label: '15 minutes before' },
-  { value: '1h', label: '1 hour before' },
-  { value: '1d', label: '1 day before' },
-]
+function formatVisitDateTime(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
 
 export default function VisitCheckIn() {
-  const [visits, setVisits] = useState(initialVisits)
+  const currentUser = useAuthStore((state) => state.currentUser)
+
+  const [visits, setVisits] = useState([])
+  const [isLoadingVisits, setIsLoadingVisits] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [isCheckIn, setIsCheckIn] = useState(true)
   const [checkInData, setCheckInData] = useState(emptyCheckInData)
   const [activeVisitId, setActiveVisitId] = useState(null)
+  const [customers, setCustomers] = useState([])
   const [staffMembers, setStaffMembers] = useState([])
-  const [isLoadingStaff, setIsLoadingStaff] = useState(true)
+  const [isLoadingOptions, setIsLoadingOptions] = useState(true)
   const [formMessage, setFormMessage] = useState('')
   const [formError, setFormError] = useState('')
+  const [isSavingVisit, setIsSavingVisit] = useState(false)
+  const [isSavingCheckout, setIsSavingCheckout] = useState(false)
+  // Only tracks visits whose follow-up task creation FAILED and needs a manual retry -
+  // successfully created tasks live on visit.followUps (server truth), not here.
+  const [taskErrors, setTaskErrors] = useState({})
+
+  const loadVisits = async () => {
+    setIsLoadingVisits(true)
+    setLoadError('')
+
+    const result = currentUser?.id ? await listVisits({ userId: currentUser.id }) : await listVisits()
+
+    if (!result.success) {
+      setLoadError(result.error)
+      setIsLoadingVisits(false)
+      return
+    }
+
+    setVisits(result.visits.sort((a, b) => new Date(b.visitDate) - new Date(a.visitDate)))
+    setIsLoadingVisits(false)
+  }
+
+  useEffect(() => {
+    loadVisits()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id])
 
   useEffect(() => {
     let isMounted = true
 
-    async function loadStaff() {
-      const result = await listUsers({ is_active: true })
+    async function loadOptions() {
+      // GET /users is admin-only and 403s for every other role - a non-admin can't list org-wide
+      // staff anyway, so they just get "assign to me" instead of a doomed request.
+      const usersPromise = currentUser?.role === ROLES.ADMIN ? listUsers({ is_active: true }) : Promise.resolve({ success: true, users: [] })
+      const [usersResult, customersResult] = await Promise.all([
+        usersPromise,
+        listCustomers(),
+      ])
 
       if (!isMounted) return
 
-      setIsLoadingStaff(false)
-      if (!result.success) {
-        setStaffMembers([])
-        return
+      setIsLoadingOptions(false)
+      if (currentUser?.role !== ROLES.ADMIN) {
+        setStaffMembers(
+          currentUser?.id ? [{ id: currentUser.id, name: currentUser.name || 'Me', email: currentUser.email }] : [],
+        )
+      } else if (usersResult.success) {
+        setStaffMembers(Array.isArray(usersResult.users) ? usersResult.users : [])
       }
-
-      const users = Array.isArray(result.users) ? result.users : []
-      setStaffMembers(users)
+      if (customersResult.success) setCustomers(customersResult.customers)
     }
 
-    loadStaff()
-
+    loadOptions()
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [currentUser?.id, currentUser?.name, currentUser?.email, currentUser?.role])
 
   const assigneeOptions = useMemo(
     () =>
@@ -114,173 +130,128 @@ export default function VisitCheckIn() {
     [staffMembers],
   )
 
+  const customerOptions = useMemo(
+    () => customers.map((customer) => ({ value: customer.id, label: `${customer.name}${customer.phone ? ` • ${customer.phone}` : ''}` })),
+    [customers],
+  )
+
   const activeVisit = visits.find((visit) => visit.id === activeVisitId)
 
-  const createVisitTask = (visit, taskDraft) => {
-    if (!taskDraft) {
-      return { success: true, visit }
-    }
-
-    if (visit.followUpTask?.id) {
-      return { success: true, visit }
-    }
-
-    if (!taskDraft.title.trim()) {
-      return { success: false, error: 'Enter a task title.' }
-    }
-
-    if (!taskDraft.assigneeId) {
-      return { success: false, error: 'Select an assignee for the follow-up task.' }
-    }
-
-    const assignee = staffMembers.find((user) => user.id === taskDraft.assigneeId)
-    if (!assignee) {
-      return { success: false, error: 'The selected assignee is no longer available.' }
-    }
-
-    const taskId = `visit-task-${visit.id}`
-    const task = {
-      id: taskId,
-      visitId: visit.id,
-      customerName: visit.customerName,
-      title: taskDraft.title.trim(),
-      description: taskDraft.description.trim(),
-      dueDate: taskDraft.dueDate,
-      dueTime: taskDraft.dueTime,
-      assigneeId: taskDraft.assigneeId,
-      assigneeName: assignee.name || assignee.display_name || assignee.email || 'Assigned user',
-      priority: taskDraft.priority,
-      reminder: taskDraft.reminder,
-      status: 'open',
-    }
-
-    setVisits((current) =>
-      current.map((entry) =>
-        entry.id === visit.id
-          ? {
-              ...entry,
-              followUpTaskStatus: 'linked',
-              followUpTaskError: '',
-              followUpTask: task,
-              followUpTaskDraft: taskDraft,
-            }
-          : entry,
-      ),
-    )
-
-    return { success: true, visit, task }
-  }
-
-  const handleCheckIn = (event) => {
+  const handleCheckIn = async (event) => {
     event.preventDefault()
     setFormError('')
     setFormMessage('')
 
-    if (!checkInData.customerName.trim()) {
-      setFormError('Enter a customer name.')
+    if (!checkInData.customerId) {
+      setFormError('Select a customer for this visit.')
       return
     }
 
-    const taskDraft = checkInData.createFollowUpTask
-      ? {
-          title: checkInData.title,
-          description: checkInData.description,
-          dueDate: checkInData.dueDate,
-          dueTime: checkInData.dueTime,
-          assigneeId: checkInData.assigneeId,
-          priority: checkInData.priority,
-          reminder: checkInData.reminder,
-        }
-      : null
-
-    const newVisit = {
-      id: Date.now(),
-      customerName: checkInData.customerName.trim(),
-      checkIn: new Date().toLocaleString(),
-      checkOut: null,
-      notes: checkInData.notes.trim(),
-      followUpTaskStatus: taskDraft ? 'pending' : 'not_required',
-      followUpTaskError: '',
-      followUpTask: null,
-      followUpTaskDraft: taskDraft,
+    if (checkInData.createFollowUpTask && !checkInData.title.trim()) {
+      setFormError('Enter a follow-up task title.')
+      return
     }
 
-    setVisits((current) => [newVisit, ...current])
-    setActiveVisitId(newVisit.id)
+    setIsSavingVisit(true)
+
+    const result = await createVisit({
+      customerId: checkInData.customerId,
+      visitType: 'site_visit',
+      status: 'planned',
+      notes: checkInData.notes.trim(),
+    })
+
+    if (!result.success) {
+      setFormError(result.error)
+      setIsSavingVisit(false)
+      return
+    }
+
+    const visit = result.visit
+    setVisits((current) => [visit, ...current])
+    setActiveVisitId(visit.id)
     setIsCheckIn(false)
-    setCheckInData(emptyCheckInData())
+    setIsSavingVisit(false)
     setFormMessage('Visit saved successfully.')
 
-    if (taskDraft) {
-      const taskResult = createVisitTask(newVisit, taskDraft)
-      if (!taskResult.success) {
-        setVisits((current) =>
-          current.map((entry) =>
-            entry.id === newVisit.id
-              ? {
-                  ...entry,
-                  followUpTaskStatus: 'error',
-                  followUpTaskError: taskResult.error,
-                }
-              : entry,
-          ),
-        )
-        setFormMessage('Visit saved, but follow-up task needs a retry.')
-        return
-      }
+    if (checkInData.createFollowUpTask) {
+      const dueDate = `${checkInData.dueDate}T${checkInData.dueTime}:00`
+      const taskResult = await createVisitFollowUp(visit.id, {
+        customerId: checkInData.customerId,
+        title: checkInData.title,
+        description: checkInData.description,
+        dueDate,
+        priority: checkInData.priority,
+        assigneeId: checkInData.assigneeId,
+      })
 
-      setFormMessage('Visit saved and follow-up task created.')
+      if (!taskResult.success) {
+        setTaskErrors((current) => ({
+          ...current,
+          [visit.id]: { draft: { ...checkInData, dueDate }, error: taskResult.error },
+        }))
+        setFormMessage('Visit saved, but the follow-up task needs a retry.')
+      } else {
+        setVisits((current) =>
+          current.map((entry) => (entry.id === visit.id ? { ...entry, followUps: [...entry.followUps, taskResult.followUp] } : entry)),
+        )
+        setFormMessage('Visit saved and follow-up task created.')
+      }
     }
+
+    setCheckInData(emptyCheckInData())
   }
 
-  const handleRetryTaskCreation = (visitId) => {
-    const visit = visits.find((entry) => entry.id === visitId)
-    if (!visit || !visit.followUpTaskDraft) return
+  const handleRetryTaskCreation = async (visitId) => {
+    const entry = taskErrors[visitId]
+    if (!entry) return
 
     setFormError('')
     setFormMessage('')
 
-    const result = createVisitTask(visit, visit.followUpTaskDraft)
+    const result = await createVisitFollowUp(visitId, {
+      customerId: entry.draft.customerId,
+      title: entry.draft.title,
+      description: entry.draft.description,
+      dueDate: entry.draft.dueDate,
+      priority: entry.draft.priority,
+      assigneeId: entry.draft.assigneeId,
+    })
+
     if (!result.success) {
-      setVisits((current) =>
-        current.map((entry) =>
-          entry.id === visitId
-            ? {
-                ...entry,
-                followUpTaskStatus: 'error',
-                followUpTaskError: result.error,
-              }
-            : entry,
-        ),
-      )
+      setTaskErrors((current) => ({ ...current, [visitId]: { ...entry, error: result.error } }))
       setFormError(result.error)
       return
     }
 
     setVisits((current) =>
-      current.map((entry) =>
-        entry.id === visitId
-          ? {
-              ...entry,
-              followUpTaskStatus: 'linked',
-              followUpTaskError: '',
-            }
-          : entry,
-      ),
+      current.map((visit) => (visit.id === visitId ? { ...visit, followUps: [...visit.followUps, result.followUp] } : visit)),
     )
+    setTaskErrors((current) => {
+      const { [visitId]: removed, ...rest } = current
+      void removed
+      return rest
+    })
     setFormMessage('Follow-up task created successfully.')
   }
 
-  const handleCheckOut = (visitId, notes) => {
-    setVisits((current) =>
-      current.map((visit) =>
-        visit.id === visitId
-          ? { ...visit, checkOut: new Date().toLocaleString(), notes: notes || visit.notes }
-          : visit,
-      ),
-    )
+  const handleCheckOut = async (visitId, notes) => {
+    setIsSavingCheckout(true)
+    setFormError('')
+
+    const result = await updateVisit(visitId, { status: 'completed', outcome: notes || '' })
+
+    setIsSavingCheckout(false)
+
+    if (!result.success) {
+      setFormError(result.error)
+      return
+    }
+
+    setVisits((current) => current.map((visit) => (visit.id === visitId ? { ...visit, ...result.visit, followUps: visit.followUps } : visit)))
     setActiveVisitId(null)
     setIsCheckIn(true)
+    setFormMessage('Visit checked out successfully.')
   }
 
   return (
@@ -313,10 +284,14 @@ export default function VisitCheckIn() {
 
               {isCheckIn ? (
                 <form onSubmit={handleCheckIn} className="space-y-4">
-                  <Input
-                    label="Customer Name"
-                    value={checkInData.customerName}
-                    onChange={(event) => setCheckInData((current) => ({ ...current, customerName: event.target.value }))}
+                  <Select
+                    label="Customer"
+                    options={customerOptions}
+                    value={checkInData.customerId}
+                    onChange={(event) => setCheckInData((current) => ({ ...current, customerId: event.target.value }))}
+                    placeholder={isLoadingOptions ? 'Loading customers...' : 'Select customer'}
+                    disabled={isLoadingOptions}
+                    searchable
                     required
                   />
 
@@ -378,32 +353,20 @@ export default function VisitCheckIn() {
                         options={assigneeOptions}
                         value={checkInData.assigneeId}
                         onChange={(event) => setCheckInData((current) => ({ ...current, assigneeId: event.target.value }))}
-                        placeholder={isLoadingStaff ? 'Loading employees...' : 'Select assignee'}
-                        disabled={isLoadingStaff || !assigneeOptions.length}
+                        placeholder={isLoadingOptions ? 'Loading employees...' : 'Defaults to you if left blank'}
+                        disabled={isLoadingOptions}
+                      />
+                      <Select
+                        label="Priority"
+                        options={taskPriorityOptions}
+                        value={checkInData.priority}
+                        onChange={(event) => setCheckInData((current) => ({ ...current, priority: event.target.value }))}
                         required
                       />
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Select
-                          label="Priority"
-                          options={taskPriorityOptions}
-                          value={checkInData.priority}
-                          onChange={(event) => setCheckInData((current) => ({ ...current, priority: event.target.value }))}
-                          required
-                        />
-                        <Select
-                          label="Reminder"
-                          options={reminderOptions}
-                          value={checkInData.reminder}
-                          onChange={(event) => setCheckInData((current) => ({ ...current, reminder: event.target.value }))}
-                        />
-                      </div>
-                      {!assigneeOptions.length && !isLoadingStaff && (
-                        <p className="text-xs text-amber-700">No active employees are available to assign the task.</p>
-                      )}
                     </div>
                   )}
 
-                  <Button type="submit" className="w-full" disabled={isLoadingStaff}>
+                  <Button type="submit" className="w-full" loading={isSavingVisit} disabled={isLoadingOptions}>
                     <MapPin className="mr-2 size-4" />
                     Check In
                   </Button>
@@ -417,21 +380,21 @@ export default function VisitCheckIn() {
                         <span className="font-semibold text-green-800">Checked In</span>
                       </div>
                       <p className="mb-1 text-sm text-green-700">{activeVisit.customerName}</p>
-                      <p className="text-xs text-green-600">{activeVisit.checkIn}</p>
+                      <p className="text-xs text-green-600">{formatVisitDateTime(activeVisit.visitDate)}</p>
                     </div>
                     <Input
-                      label="Check Out Notes"
+                      label="Check Out Notes / Outcome"
                       as="textarea"
-                      value={activeVisit.notes}
+                      value={activeVisit.outcome || activeVisit.notes}
                       onChange={(event) =>
                         setVisits((current) =>
                           current.map((visit) =>
-                            visit.id === activeVisitId ? { ...visit, notes: event.target.value } : visit,
+                            visit.id === activeVisitId ? { ...visit, outcome: event.target.value } : visit,
                           ),
                         )
                       }
                     />
-                    <Button onClick={() => handleCheckOut(activeVisit.id, activeVisit.notes)} className="w-full">
+                    <Button onClick={() => handleCheckOut(activeVisit.id, activeVisit.outcome)} className="w-full" loading={isSavingCheckout}>
                       <CheckCircle className="mr-2 size-4" />
                       Check Out
                     </Button>
@@ -445,117 +408,111 @@ export default function VisitCheckIn() {
         <div className="space-y-4 lg:col-span-2">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-neutral-900">Visit History</h3>
-            {isLoadingStaff && (
+            {isLoadingOptions && (
               <span className="text-xs text-neutral-400">Loading employees for task assignees...</span>
             )}
           </div>
-          {visits.map((visit) => (
-            <Card key={visit.id}>
-              <div className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <h4 className="font-semibold text-neutral-900">{visit.customerName}</h4>
-                    <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-neutral-500">
-                      <span className="flex items-center gap-1">
-                        <Clock className="size-3" />
-                        In: {visit.checkIn}
-                      </span>
-                      {visit.checkOut && (
+
+          {loadError ? (
+            <Card>
+              <div className="p-6 text-center">
+                <p className="text-sm text-red-600">{loadError}</p>
+                <Button type="button" variant="outline" size="sm" className="mt-3" onClick={loadVisits}>Retry</Button>
+              </div>
+            </Card>
+          ) : isLoadingVisits ? (
+            <Card>
+              <LoadingSpinner label="Loading visits..." />
+            </Card>
+          ) : visits.length === 0 ? (
+            <Card>
+              <p className="p-6 text-center text-sm text-neutral-500">No visits recorded yet. Check in above to log your first visit.</p>
+            </Card>
+          ) : (
+            visits.map((visit) => (
+              <Card key={visit.id}>
+                <div className="p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h4 className="font-semibold text-neutral-900">{visit.customerName || 'Unknown customer'}</h4>
+                      <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-neutral-500">
                         <span className="flex items-center gap-1">
                           <Clock className="size-3" />
-                          Out: {visit.checkOut}
+                          Visit: {formatVisitDateTime(visit.visitDate)}
                         </span>
-                      )}
-                    </div>
-                  </div>
-                  {visit.checkOut ? (
-                    <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
-                      Completed
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
-                      Active
-                    </span>
-                  )}
-                </div>
-
-                {visit.notes && (
-                  <p className="mt-4 border-t border-neutral-100 pt-4 text-sm text-neutral-600">
-                    {visit.notes}
-                  </p>
-                )}
-
-                {visit.followUpTaskDraft && (
-                  <div className="mt-4 rounded-2xl border border-neutral-100 bg-neutral-50/60 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                          Follow-up Task
-                        </p>
-                        <p className="mt-1 font-semibold text-neutral-900">
-                          {visit.followUpTask?.title || visit.followUpTaskDraft.title}
-                        </p>
                       </div>
-                      {visit.followUpTaskStatus === 'linked' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-                          <CheckCircle className="size-3.5" />
-                          Linked
-                        </span>
-                      ) : visit.followUpTaskStatus === 'error' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
-                          <Users className="size-3.5" />
-                          Needs retry
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
-                          <Calendar className="size-3.5" />
-                          Pending
-                        </span>
-                      )}
                     </div>
-                    <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-neutral-600 md:grid-cols-2">
-                      <p>
-                        <span className="font-medium text-neutral-800">Assignee:</span>{' '}
-                        {visit.followUpTask?.assigneeName || 'Not assigned'}
-                      </p>
-                      <p>
-                        <span className="font-medium text-neutral-800">Due:</span>{' '}
-                        {visit.followUpTask
-                          ? `${visit.followUpTask.dueDate} ${visit.followUpTask.dueTime}`
-                          : `${visit.followUpTaskDraft.dueDate} ${visit.followUpTaskDraft.dueTime}`}
-                      </p>
-                      <p>
-                        <span className="font-medium text-neutral-800">Priority:</span>{' '}
-                        {(visit.followUpTask?.priority || visit.followUpTaskDraft.priority || '').toUpperCase()}
-                      </p>
-                      <p>
-                        <span className="font-medium text-neutral-800">Reminder:</span>{' '}
-                        {visit.followUpTask?.reminder || visit.followUpTaskDraft.reminder}
-                      </p>
-                    </div>
-                    {visit.followUpTaskError && (
-                      <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        {visit.followUpTaskError}
-                      </div>
+                    {visit.status === 'completed' ? (
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                        Completed
+                      </span>
+                    ) : visit.status === 'cancelled' ? (
+                      <span className="inline-flex items-center rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-500">
+                        Cancelled
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
+                        Planned
+                      </span>
                     )}
-                    {visit.followUpTaskStatus === 'error' && (
-                      <div className="mt-3 flex justify-end">
+                  </div>
+
+                  {visit.notes && (
+                    <p className="mt-4 border-t border-neutral-100 pt-4 text-sm text-neutral-600">
+                      {visit.notes}
+                    </p>
+                  )}
+                  {visit.outcome && (
+                    <p className="mt-2 text-sm text-neutral-500"><span className="font-medium text-neutral-700">Outcome:</span> {visit.outcome}</p>
+                  )}
+
+                  {visit.followUps.map((task) => (
+                    <div key={task.id} className="mt-4 rounded-2xl border border-neutral-100 bg-neutral-50/60 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-neutral-400">
+                            Follow-up Task
+                          </p>
+                          <p className="mt-1 font-semibold text-neutral-900">{task.title}</p>
+                        </div>
+                        {task.status === 'completed' ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
+                            <CheckCircle className="size-3.5" />
+                            Completed
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
+                            <Calendar className="size-3.5" />
+                            Pending
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-neutral-600 md:grid-cols-2">
+                        <p><span className="font-medium text-neutral-800">Assignee:</span> {task.assignedToName || 'Not assigned'}</p>
+                        <p><span className="font-medium text-neutral-800">Due:</span> {formatVisitDateTime(task.dueDate)}</p>
+                        <p><span className="font-medium text-neutral-800">Priority:</span> {task.priority.toUpperCase()}</p>
+                      </div>
+                      {task.description && (
+                        <p className="mt-3 whitespace-pre-line border-t border-neutral-100 pt-3 text-sm text-neutral-600">{task.description}</p>
+                      )}
+                    </div>
+                  ))}
+
+                  {taskErrors[visit.id] && (
+                    <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-red-700">{taskErrors[visit.id].error}</p>
                         <Button type="button" variant="outline" size="sm" onClick={() => handleRetryTaskCreation(visit.id)}>
                           <RefreshCw className="mr-2 size-4" />
                           Retry Task
                         </Button>
                       </div>
-                    )}
-                    {visit.followUpTask?.description && (
-                      <p className="mt-3 whitespace-pre-line border-t border-neutral-100 pt-3 text-sm text-neutral-600">
-                        {visit.followUpTask.description}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </Card>
-          ))}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            ))
+          )}
         </div>
       </div>
     </div>
