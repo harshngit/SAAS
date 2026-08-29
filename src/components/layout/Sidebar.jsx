@@ -290,14 +290,14 @@ export default function Sidebar({
                       {keepMenuAlwaysOpen ? (
                         <>
                           <div
-                            className={`hidden items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.34em] text-neutral-400 md:flex ${
+                            className={`hidden items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 md:flex ${
                               isExpanded ? sectionLabelVisibilityClass : 'invisible h-0 max-w-0 pb-0 opacity-0'
                             }`}
                           >
                             <span className="truncate">MAIN MENU</span>
                             <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
                           </div>
-                          <div className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.34em] text-neutral-400 md:hidden">
+                          <div className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 md:hidden">
                             <span>MAIN MENU</span>
                             <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
                           </div>
@@ -308,7 +308,7 @@ export default function Sidebar({
                             type="button"
                             onClick={() => toggleSection(group.section)}
                             aria-expanded={openSections[group.section] !== false}
-                            className={`hidden w-full items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.34em] text-neutral-400 transition-all duration-150 hover:text-neutral-600 md:flex ${
+                            className={`hidden w-full items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 transition-all duration-150 md:flex ${
                               isExpanded ? sectionLabelVisibilityClass : 'invisible h-0 max-w-0 pb-0 opacity-0'
                             }`}
                           >
@@ -322,7 +322,7 @@ export default function Sidebar({
                             type="button"
                             onClick={() => toggleSection(group.section)}
                             aria-expanded={openSections[group.section] !== false}
-                            className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.34em] text-neutral-400 transition-colors hover:text-neutral-600 md:hidden"
+                            className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 transition-colors md:hidden"
                           >
                             <span>{group.section}</span>
                             <ChevronDown
@@ -334,7 +334,7 @@ export default function Sidebar({
                       )}
                     </>
                   )}
-                  <div className={`space-y-1 ${keepMenuAlwaysOpen ? '' : `${openSections[group.section] === false && isExpanded ? 'md:hidden' : ''} ${openSections[group.section] === false ? 'hidden md:block' : ''}`}`}>
+                  <div className={`space-y-0.5 ${keepMenuAlwaysOpen ? '' : `${openSections[group.section] === false && isExpanded ? 'md:hidden' : ''} ${openSections[group.section] === false ? 'hidden md:block' : ''}`}`}>
                     {group.items.map((item) => {
                       const badgeCount = navBadgeCounts[NAV_BADGE_COUNTS[item.path]] || 0
 
@@ -346,7 +346,7 @@ export default function Sidebar({
                         aria-label={!isExpanded ? item.label : undefined}
                         title={!isExpanded ? item.label : undefined}
                           className={({ isActive }) =>
-                          `group relative flex items-center rounded-[0.9rem] py-2.5 text-sm font-medium transition-all duration-150 ${
+                          `group relative flex items-center rounded-[0.9rem] py-2 text-sm font-medium transition-all duration-150 ${
                             isExpanded
                               ? 'gap-3 px-3.5 md:justify-start'
                               : 'gap-3 px-3.5 md:gap-0 md:px-0 md:justify-center'

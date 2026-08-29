@@ -5,11 +5,10 @@ import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import { listUsers } from '../../api/users'
+import { listAssignableStaff } from '../../api/users'
 import { listCustomers } from '../../api/customers'
 import { createVisit, createVisitFollowUp, listVisits, updateVisit } from '../../api/visits'
 import { useAuthStore } from '../../store/authStore'
-import { ROLES } from '../../auth/roles'
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -94,23 +93,21 @@ export default function VisitCheckIn() {
     let isMounted = true
 
     async function loadOptions() {
-      // GET /users is admin-only and 403s for every other role - a non-admin can't list org-wide
-      // staff anyway, so they just get "assign to me" instead of a doomed request.
-      const usersPromise = currentUser?.role === ROLES.ADMIN ? listUsers({ is_active: true }) : Promise.resolve({ success: true, users: [] })
-      const [usersResult, customersResult] = await Promise.all([
-        usersPromise,
+      // GET /users/assignable is a privacy-safe picker usable by anyone with follow_ups:create
+      // permission (Admin, Sales Officer) - unlike admin-only GET /users. Falls back to
+      // "assign to me" if the call fails for any reason (e.g. a role with no create permission).
+      const [staffResult, customersResult] = await Promise.all([
+        listAssignableStaff(),
         listCustomers(),
       ])
 
       if (!isMounted) return
 
       setIsLoadingOptions(false)
-      if (currentUser?.role !== ROLES.ADMIN) {
-        setStaffMembers(
-          currentUser?.id ? [{ id: currentUser.id, name: currentUser.name || 'Me', email: currentUser.email }] : [],
-        )
-      } else if (usersResult.success) {
-        setStaffMembers(Array.isArray(usersResult.users) ? usersResult.users : [])
+      if (staffResult.success && staffResult.users.length > 0) {
+        setStaffMembers(staffResult.users)
+      } else if (currentUser?.id) {
+        setStaffMembers([{ id: currentUser.id, name: currentUser.name || 'Me', email: currentUser.email }])
       }
       if (customersResult.success) setCustomers(customersResult.customers)
     }
@@ -119,7 +116,7 @@ export default function VisitCheckIn() {
     return () => {
       isMounted = false
     }
-  }, [currentUser?.id, currentUser?.name, currentUser?.email, currentUser?.role])
+  }, [currentUser?.id, currentUser?.name, currentUser?.email])
 
   const assigneeOptions = useMemo(
     () =>

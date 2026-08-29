@@ -3,12 +3,13 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Droplet } from "lucide-react";
+import { FcGoogle } from "react-icons/fc";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import FullScreenLoader from "../../components/ui/FullScreenLoader";
 import AuthShowcase from "../../components/auth/AuthShowcase";
 import { zodResolver } from "../../utils/zodResolver";
-import { forgotPassword, login, resetPassword } from "../../api/auth";
+import { forgotPassword, googleLoginRedirect, login, resetPassword } from "../../api/auth";
 import { roleHomePath } from "../../auth/roles";
 
 const schema = z.object({
@@ -280,6 +281,21 @@ export default function Login() {
                 >
                   Sign in
                 </Button>
+
+                <div className="flex items-center gap-3">
+                  <span className="h-px flex-1 bg-neutral-200" />
+                  <span className="text-xs font-medium text-neutral-400">OR</span>
+                  <span className="h-px flex-1 bg-neutral-200" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={googleLoginRedirect}
+                  className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-neutral-200 bg-white py-2.5 text-sm font-medium text-neutral-700 shadow-(--shadow-xs) transition-colors hover:bg-neutral-50"
+                >
+                  <FcGoogle className="size-5" aria-hidden="true" />
+                  Continue with Google
+                </button>
               </form>
             )}
 

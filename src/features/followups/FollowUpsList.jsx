@@ -15,6 +15,7 @@ import {
   updateFollowUp,
 } from '../../api/followups'
 import { listCustomers } from '../../api/customers'
+import { listAssignableStaff } from '../../api/users'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
 
@@ -30,6 +31,7 @@ function emptyFormData() {
     dueDate: todayIso(),
     dueTime: '10:00',
     priority: 'medium',
+    assigneeId: '',
   }
 }
 
@@ -49,6 +51,8 @@ export default function FollowUpsList() {
   const [listError, setListError] = useState('')
   const [customers, setCustomers] = useState([])
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true)
+  const [staffMembers, setStaffMembers] = useState([])
+  const [isLoadingStaff, setIsLoadingStaff] = useState(true)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingFollowUp, setEditingFollowUp] = useState(null)
@@ -84,11 +88,19 @@ export default function FollowUpsList() {
       setIsLoadingCustomers(false)
       if (result.success) setCustomers(result.customers)
     })
+    listAssignableStaff().then((result) => {
+      setIsLoadingStaff(false)
+      if (result.success) setStaffMembers(result.users)
+    })
   }, [])
 
   const customerOptions = useMemo(
     () => customers.map((customer) => ({ value: customer.id, label: `${customer.name}${customer.phone ? ` • ${customer.phone}` : ''}` })),
     [customers],
+  )
+  const assigneeOptions = useMemo(
+    () => staffMembers.map((user) => ({ value: user.id, label: user.name })),
+    [staffMembers],
   )
 
   const handleAddFollowUp = () => {
@@ -109,6 +121,7 @@ export default function FollowUpsList() {
       dueDate: dueDate.toISOString().slice(0, 10),
       dueTime: dueDate.toTimeString().slice(0, 5),
       priority: followUp.priority,
+      assigneeId: followUp.assignedToId || '',
     })
     setIsModalOpen(true)
   }
@@ -151,6 +164,7 @@ export default function FollowUpsList() {
       description: formData.description,
       dueDate,
       priority: formData.priority,
+      assigneeId: formData.assigneeId || undefined,
     }
 
     const result = editingFollowUp
@@ -312,6 +326,14 @@ export default function FollowUpsList() {
             options={FOLLOW_UP_PRIORITY_OPTIONS}
             value={formData.priority}
             onChange={(e) => setFormData((current) => ({ ...current, priority: e.target.value }))}
+          />
+          <Select
+            label="Assignee"
+            options={assigneeOptions}
+            value={formData.assigneeId}
+            onChange={(e) => setFormData((current) => ({ ...current, assigneeId: e.target.value }))}
+            placeholder={isLoadingStaff ? 'Loading staff...' : 'Defaults to you if left blank'}
+            disabled={isLoadingStaff}
           />
           <Input
             label="Description"

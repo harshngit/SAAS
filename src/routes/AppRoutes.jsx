@@ -4,6 +4,8 @@ import ProtectedRoute from '../auth/ProtectedRoute'
 import RequirePermissionRoute from '../auth/RequirePermission'
 import Login from '../features/auth/Login'
 import Register from '../auth/Register'
+import GoogleAuthCallback from '../features/auth/GoogleAuthCallback'
+import GoogleRegister from '../features/auth/GoogleRegister'
 import SuperAdminDashboard from '../features/dashboard/SuperAdminDashboard'
 import AdminDashboard from '../features/dashboard/AdminDashboard'
 import SalesOfficerDashboard from '../features/dashboard/SalesOfficerDashboard'
@@ -100,6 +102,8 @@ export default function AppRoutes() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/auth/callback" element={<GoogleAuthCallback />} />
+        <Route path="/auth/register/google" element={<GoogleRegister />} />
         <Route path="/superadmin/login" element={<Navigate to="/login" replace />} />
 
         <Route

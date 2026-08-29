@@ -400,6 +400,27 @@ export async function listUsers(params = {}) {
   }
 }
 
+// Privacy-safe staff picker (id/name/role only) usable by any role with follow_ups:create
+// permission (Admin, Sales Officer) - unlike listUsers() above, which is admin-only and 403s
+// for everyone else. Use this for any "assign to" dropdown instead of listUsers().
+export async function listAssignableStaff() {
+  try {
+    const { data } = await apiClient.get('/users/assignable', {
+      headers: authHeader(),
+    })
+
+    return { success: true, users: Array.isArray(data) ? data : [] }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load assignable staff. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 // Per-field upload/clear endpoints (POST/DELETE /users/{id}/files/{field}) were removed.
 // Files are now uploaded generically via POST /files/upload (see api/files.js's uploadFile/
 // uploadFiles) and the resulting URL is attached with a normal sectioned PATCH /users/{id}.

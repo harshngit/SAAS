@@ -1,5 +1,5 @@
 import { useAuthStore } from '../store/authStore'
-import { apiClient, normalizeTokens } from './client'
+import { apiClient, API_BASE_URL, normalizeTokens } from './client'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -199,5 +199,78 @@ export async function logout() {
     return { success: false, error: message }
   } finally {
     useAuthStore.getState().logout()
+  }
+}
+
+// Full-page redirect (never fetch/axios) - GET /auth/google issues a 307 straight to Google's
+// consent screen, so the browser itself must navigate there, not an XHR.
+export function googleLoginRedirect() {
+  window.location.href = `${API_BASE_URL}auth/google`
+}
+
+// AuthResponse ({user, organization, tokens}) is the same shape login()/registerOrganization()
+// already produce via setAuthenticatedSession, so this plugs into the exact same session store.
+export async function exchangeGoogleCode(code) {
+  try {
+    const { data } = await apiClient.post('/auth/exchange', { code })
+    useAuthStore.getState().setAuthenticatedSession(data)
+    return { success: true, ...data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'This sign-in link has expired. Please try signing in again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function getGoogleRegistrationInfo(registrationCode) {
+  try {
+    const { data } = await apiClient.post('/auth/google/registration-info', {
+      registration_code: registrationCode,
+    })
+
+    return { success: true, email: data?.email || '', name: data?.name || '' }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'This registration link has expired. Please start over.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+export async function completeGoogleRegistration(payload) {
+  try {
+    const requestBody = {
+      registration_code: payload.registrationCode,
+      organization_name: payload.organizationName?.trim(),
+      admin_name: payload.adminName?.trim(),
+      password: payload.password,
+    }
+
+    if (payload.businessType) requestBody.business_type = payload.businessType.trim()
+    if (payload.gstNumber) requestBody.gst_number = payload.gstNumber.trim()
+    if (payload.panNumber) requestBody.pan_number = payload.panNumber.trim()
+    if (payload.address) requestBody.address = payload.address.trim()
+    if (payload.phone) requestBody.phone = payload.phone.trim()
+    if (payload.financialYear) requestBody.financial_year = payload.financialYear.trim()
+    if (payload.logoUrl) requestBody.logo_url = payload.logoUrl.trim()
+
+    const { data } = await apiClient.post('/auth/google/complete-registration', requestBody)
+    useAuthStore.getState().setAuthenticatedSession(data)
+    return { success: true, ...data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to complete registration. Please try again.',
+    )
+
+    return { success: false, error: message }
   }
 }
