@@ -39,10 +39,11 @@ export default function SocialLinks({ links, emptyLabel = 'No social links added
           href={href}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3.5 py-1.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50/60"
+          title={label}
+          aria-label={label}
+          className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-neutral-200 text-primary-700 transition-colors hover:bg-primary-50/60"
         >
           <Icon className="size-4 shrink-0 text-neutral-500" aria-hidden="true" />
-          {label}
         </a>
       ))}
     </div>

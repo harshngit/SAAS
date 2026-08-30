@@ -98,8 +98,11 @@ export default function OrderList() {
   const stats = useMemo(
     () => ({
       totalOrders: orders.length,
-      awaitingApproval: orders.filter((order) => order.status === 'awaiting_approval').length,
-      processing: orders.filter((order) => order.status === 'processing').length,
+      // Backend now normalizes order.status to just placed/confirmed/completed/cancelled
+      // (draft/awaiting_approval collapse into "placed", internal "processing" becomes
+      // "confirmed") - these stats track the same public buckets shown in the status badges.
+      awaitingApproval: orders.filter((order) => order.status === 'placed').length,
+      processing: orders.filter((order) => order.status === 'confirmed').length,
       outstandingValue: orders.filter((order) => order.status !== 'cancelled').reduce((sum, order) => sum + order.total, 0),
     }),
     [orders],
@@ -139,8 +142,8 @@ export default function OrderList() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={ShoppingCart} iconVariant="primary" label="Total Orders" value={stats.totalOrders} />
-        <StatCard icon={Clock3} iconVariant="warning" label="Awaiting Approval" value={stats.awaitingApproval} />
-        <StatCard icon={Truck} iconVariant="info" label="Processing" value={stats.processing} />
+        <StatCard icon={Clock3} iconVariant="warning" label="Placed" value={stats.awaitingApproval} />
+        <StatCard icon={Truck} iconVariant="info" label="Confirmed" value={stats.processing} />
         <StatCard icon={Wallet} iconVariant="danger" label="Order Value" value={formatCurrency(stats.outstandingValue)} />
       </div>
 

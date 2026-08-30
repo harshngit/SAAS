@@ -246,10 +246,14 @@ export default function SalesOfficerDashboard() {
     (order) => (order.deliveryDate || '').slice(0, 10) === today && order.status !== 'cancelled',
   ).length
 
+  // order.status is the backend's normalized public value: placed/confirmed/completed/
+  // cancelled only (draft/awaiting_approval collapse into "placed", the old "processing" now
+  // shows as "confirmed") - "Draft" is no longer separable from "Placed", so that tile now
+  // tracks Cancelled instead, the one other real bucket the API still distinguishes.
   const orderStatusCounts = {
-    draft: orders.filter((order) => order.status === 'draft').length,
+    cancelled: orders.filter((order) => order.status === 'cancelled').length,
     placed: orders.filter((order) => order.status === 'placed').length,
-    processing: orders.filter((order) => order.status === 'processing' || order.status === 'awaiting_approval').length,
+    processing: orders.filter((order) => order.status === 'confirmed').length,
     completed: orders.filter((order) => order.status === 'completed').length,
   }
 
@@ -351,9 +355,9 @@ export default function SalesOfficerDashboard() {
 
         <SectionCard icon={ShoppingCart} title="Order Status">
           <div className="flex gap-3">
-            <OrderStatusTile icon={FileText} iconClassName="bg-neutral-100 text-neutral-500" label="Draft" count={orderStatusCounts.draft} />
+            <OrderStatusTile icon={FileText} iconClassName="bg-neutral-100 text-neutral-500" label="Cancelled" count={orderStatusCounts.cancelled} />
             <OrderStatusTile icon={CheckCircle2} iconClassName="bg-green-50 text-green-600" label="Placed" count={orderStatusCounts.placed} />
-            <OrderStatusTile icon={Truck} iconClassName="bg-blue-50 text-blue-600" label="Processing" count={orderStatusCounts.processing} />
+            <OrderStatusTile icon={Truck} iconClassName="bg-blue-50 text-blue-600" label="Confirmed" count={orderStatusCounts.processing} />
             <OrderStatusTile icon={Box} iconClassName="bg-emerald-50 text-emerald-600" label="Completed" count={orderStatusCounts.completed} />
           </div>
           <button

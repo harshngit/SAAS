@@ -43,7 +43,12 @@ import { listWarehouses } from '../../api/warehouses'
 import { formatCurrency } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
 
+// delivery.status is the backend's normalized public value: pending | accepted | in_transit |
+// partially_delivered | delivered | returned | cancelled (planned/rejected collapse into
+// "pending"; accepted/ready/loaded collapse into "accepted"; failed shows as "returned"). Raw
+// keys kept harmlessly in case an older API build is ever hit.
 const statusVariant = {
+  pending: 'info',
   delivered: 'success',
   partially_delivered: 'warning',
   in_transit: 'warning',
@@ -52,33 +57,34 @@ const statusVariant = {
   ready: 'success',
   rejected: 'danger',
   loaded: 'info',
+  returned: 'danger',
   failed: 'danger',
   cancelled: 'neutral',
 }
 
+// Only 5 stages are distinguishable from the public status + picking_status the API now
+// returns - "Ready" and "Loaded" both collapse into "accepted" server-side with no separate
+// field to tell them apart, so they're merged into one "Prepared" stage here rather than
+// falsely claiming to know they happened.
 const WORKFLOW_STEPS = [
   { key: 'planned', label: 'Planned' },
   { key: 'accepted', label: 'Accepted' },
-  { key: 'picked', label: 'Picked' },
-  { key: 'ready', label: 'Ready' },
-  { key: 'loaded', label: 'Loaded' },
+  { key: 'prepared', label: 'Prepared' },
   { key: 'in_transit', label: 'In Transit' },
   { key: 'delivered', label: 'Delivered' },
 ]
 
 function workflowStepIndex(delivery) {
-  if (delivery.status === 'rejected' || delivery.status === 'cancelled' || delivery.status === 'failed') return -1
-  if (delivery.status === 'delivered' || delivery.status === 'partially_delivered') return 6
-  if (delivery.status === 'in_transit') return 5
-  if (delivery.status === 'loaded') return 4
-  if (delivery.status === 'ready') return 3
+  if (delivery.status === 'returned' || delivery.status === 'cancelled') return -1
+  if (delivery.status === 'delivered' || delivery.status === 'partially_delivered') return 4
+  if (delivery.status === 'in_transit') return 3
   if (delivery.status === 'accepted' && delivery.pickingStatus === 'picked') return 2
   if (delivery.status === 'accepted') return 1
   return 0
 }
 
 function WorkflowTimeline({ delivery }) {
-  if (['rejected', 'cancelled', 'failed'].includes(delivery.status)) {
+  if (['returned', 'cancelled'].includes(delivery.status)) {
     return (
       <div className="flex items-center gap-2 text-sm text-neutral-500">
         <Badge variant={statusVariant[delivery.status] || 'danger'} dot>
@@ -323,14 +329,20 @@ export default function DeliveryDetail() {
     )
   }
 
-  const canAcceptOrReject = !isAdminView && delivery.status === 'planned'
+  // The backend now normalizes delivery.status to just pending/accepted/in_transit/
+  // partially_delivered/delivered/returned/cancelled - "ready" and "loaded" both collapse into
+  // "accepted" with no other field distinguishing them, and "rejected" collapses into
+  // "pending". Mark Ready / Load Vehicle / Dispatch are therefore all shown together once
+  // items are picked, and the backend's own sequencing errors (e.g. "Delivery must be ready
+  // before vehicle loading") correct whichever one doesn't apply yet.
+  const canAcceptOrReject = !isAdminView && delivery.status === 'pending'
   const canPick = isAdminView && delivery.status === 'accepted'
   const canMarkReady = isAdminView && delivery.status === 'accepted' && delivery.pickingStatus === 'picked'
-  const canLoad = isAdminView && delivery.status === 'ready'
-  const canDispatch = isAdminView && delivery.status === 'loaded'
-  const canReassign = isAdminView && delivery.status === 'rejected'
-  const canEdit = isAdminView && delivery.status === 'planned'
-  const canCancel = isAdminView && ['planned', 'accepted', 'ready'].includes(delivery.status)
+  const canLoad = isAdminView && delivery.status === 'accepted' && delivery.pickingStatus === 'picked'
+  const canDispatch = isAdminView && delivery.status === 'accepted' && delivery.pickingStatus === 'picked'
+  const canReassign = isAdminView && delivery.status === 'pending'
+  const canEdit = isAdminView && delivery.status === 'pending'
+  const canCancel = isAdminView && ['pending', 'accepted'].includes(delivery.status)
   const canConfirm = !isAdminView && ['in_transit', 'partially_delivered'].includes(delivery.status)
   const warehouseName = delivery.warehouseName || warehouses.find((warehouse) => warehouse.id === delivery.warehouseId)?.name || delivery.warehouseId
   const podPhotoFileIds = Array.isArray(delivery.pod?.photo_file_ids) ? delivery.pod.photo_file_ids.filter(Boolean) : []
@@ -634,11 +646,6 @@ export default function DeliveryDetail() {
                   Picking {delivery.pickingStatus.replace(/_/g, ' ')}
                 </Badge>
               )}
-              {isAdminView && delivery.status === 'rejected' && (
-                <Badge variant="danger" dot>
-                  Needs reassignment
-                </Badge>
-              )}
             </div>
             <p className="mt-1 text-sm text-neutral-500">
               Order {delivery.orderNumber || 'N/A'} | {delivery.customerName || 'Customer not assigned'}
@@ -725,24 +732,6 @@ export default function DeliveryDetail() {
           <div className="flex items-center gap-3 text-sm text-neutral-600">
             <Clock className="size-5 shrink-0 text-amber-500" aria-hidden="true" />
             Accepted — waiting for warehouse preparation.
-          </div>
-        </Card>
-      )}
-
-      {!isAdminView && delivery.status === 'ready' && (
-        <Card title="Ready">
-          <div className="flex items-center gap-3 text-sm text-neutral-600">
-            <Clock className="size-5 shrink-0 text-amber-500" aria-hidden="true" />
-            Ready for loading.
-          </div>
-        </Card>
-      )}
-
-      {!isAdminView && delivery.status === 'loaded' && (
-        <Card title="Loaded">
-          <div className="flex items-center gap-3 text-sm text-neutral-600">
-            <Clock className="size-5 shrink-0 text-amber-500" aria-hidden="true" />
-            Loaded — waiting for dispatch.
           </div>
         </Card>
       )}

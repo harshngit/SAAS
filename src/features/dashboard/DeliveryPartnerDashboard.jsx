@@ -220,13 +220,16 @@ export default function DeliveryPartnerDashboard() {
   const today = todayIso()
   const todaysDeliveries = deliveries.filter((delivery) => (delivery.scheduledDate || '').slice(0, 10) === today)
 
+  // delivery.status is the backend's normalized public value (pending/accepted/in_transit/
+  // partially_delivered/delivered/returned/cancelled) - planned/rejected collapse into
+  // "pending", ready/loaded collapse into "accepted", failed shows as "returned".
   const completedToday = todaysDeliveries.filter((delivery) => delivery.status === 'delivered').length
-  const pendingToday = todaysDeliveries.filter((delivery) => ['planned', 'accepted', 'loaded', 'in_transit'].includes(delivery.status)).length
+  const pendingToday = todaysDeliveries.filter((delivery) => ['pending', 'accepted', 'in_transit'].includes(delivery.status)).length
   const paymentPendingToday = todaysDeliveries.filter((delivery) => (delivery.amountDue || 0) > 0).length
-  const failedToday = todaysDeliveries.filter((delivery) => delivery.status === 'failed').length
+  const failedToday = todaysDeliveries.filter((delivery) => delivery.status === 'returned').length
   const partialToday = todaysDeliveries.filter((delivery) => delivery.status === 'partially_delivered').length
-  const awaitingAcceptanceToday = todaysDeliveries.filter((delivery) => delivery.status === 'planned').length
-  const readyToday = todaysDeliveries.filter((delivery) => ['accepted', 'loaded'].includes(delivery.status)).length
+  const awaitingAcceptanceToday = todaysDeliveries.filter((delivery) => delivery.status === 'pending').length
+  const readyToday = todaysDeliveries.filter((delivery) => delivery.status === 'accepted').length
   const inTransitToday = todaysDeliveries.filter((delivery) => delivery.status === 'in_transit').length
   const completedPercent = todaysDeliveries.length > 0 ? Math.round((completedToday / todaysDeliveries.length) * 100) : 0
 

@@ -203,9 +203,10 @@ export async function logout() {
 }
 
 // Full-page redirect (never fetch/axios) - GET /auth/google issues a 307 straight to Google's
-// consent screen, so the browser itself must navigate there, not an XHR.
+// consent screen, so the browser itself must navigate there, not an XHR. Trims/adds the slash
+// explicitly rather than relying on API_BASE_URL always ending in one - safe either way.
 export function googleLoginRedirect() {
-  window.location.href = `${API_BASE_URL}auth/google`
+  window.location.href = `${API_BASE_URL.replace(/\/+$/, '')}/auth/google`
 }
 
 // AuthResponse ({user, organization, tokens}) is the same shape login()/registerOrganization()

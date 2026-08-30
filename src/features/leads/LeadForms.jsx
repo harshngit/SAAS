@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { LocateFixed } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
@@ -270,13 +271,31 @@ export function ConvertLeadForm({ lead, salespersonOptions, saving, formError, o
             value={formData.openingBalance}
             onChange={(event) => updateField('openingBalance', event.target.value)}
           />
-          <Input
-            label="Google Maps Location"
-            placeholder="Paste Google Maps link or coordinates"
-            value={formData.googleMapsLocation}
-            onChange={(event) => updateField('googleMapsLocation', event.target.value)}
-            className="sm:col-span-2"
-          />
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <label className="text-sm font-medium text-neutral-700">Google Maps Location</label>
+            <div className="flex rounded-xl border border-neutral-200 bg-neutral-50 transition-all focus-within:border-primary-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-primary-500/12">
+              <input
+                value={formData.googleMapsLocation}
+                onChange={(event) => updateField('googleMapsLocation', event.target.value)}
+                placeholder="Paste Google Maps link or coordinates"
+                className="min-w-0 flex-1 rounded-l-xl bg-transparent px-3.5 py-2.5 text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
+              />
+              <a
+                href={
+                  formData.googleMapsLocation
+                    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.googleMapsLocation)}`
+                    : 'https://www.google.com/maps'
+                }
+                target="_blank"
+                rel="noreferrer"
+                title="Open map picker"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-r-xl border-l border-neutral-200 px-3.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50"
+              >
+                <LocateFixed className="size-4" aria-hidden="true" />
+                Pick
+              </a>
+            </div>
+          </div>
           <Input
             label="Billing Address"
             value={formData.billingAddress}

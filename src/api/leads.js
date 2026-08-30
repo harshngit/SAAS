@@ -1,6 +1,6 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
-import { getCustomer, updateCustomer } from './customers'
+import { parseMapsCoordinates } from './customers'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -206,45 +206,30 @@ export async function convertLeadToCustomer(leadId, payload = {}) {
     if (payload.notes) body.notes = payload.notes.trim()
     if (payload.primaryContactPerson) body.primary_contact_person = payload.primaryContactPerson.trim()
 
+    // Backend's LeadConvertToCustomerIn now accepts these 4 fields directly (confirmed live
+    // against the OpenAPI schema), so they go in the same single convert call - no more
+    // fetch-then-patch round trip needed.
+    if (payload.customerType) body.customer_type = payload.customerType
+    if (payload.customerSince) body.customer_since = payload.customerSince
+    if (payload.status) body.status = payload.status
+
+    const coordinates = parseMapsCoordinates(payload.googleMapsLocation)
+    if (coordinates) {
+      body.maps_latitude = coordinates.lat
+      body.maps_longitude = coordinates.lng
+    }
+
     const { data } = await apiClient.post(`/leads/${leadId}/convert-to-customer`, body, {
       headers: authHeader(),
     })
 
-    const customerId = data?.customer_id || data?.customer?.id || ''
-    let customer = data?.customer || null
-
-    // convert-to-customer's own schema has no room for these 4 fields (they live in a
-    // different section of the customer profile) - so once the customer exists, round-trip
-    // through getCustomer()+updateCustomer() to set them safely. Must merge onto the FULL
-    // current profile, not send these 4 fields alone - updateCustomer's PATCH body is always a
-    // complete section snapshot, so a partial payload would blank out name/contact/address/etc.
-    const hasExtraFields =
-      customerId &&
-      (payload.customerType || payload.customerSince || payload.status || payload.googleMapsLocation)
-
-    if (hasExtraFields) {
-      const currentResult = await getCustomer(customerId)
-
-      if (currentResult.success) {
-        const updateResult = await updateCustomer(customerId, {
-          ...currentResult.customer,
-          customerType: payload.customerType || currentResult.customer.customerType,
-          customerSince: payload.customerSince || currentResult.customer.customerSince,
-          status: payload.status || currentResult.customer.status,
-          googleMapsLocation: payload.googleMapsLocation || currentResult.customer.googleMapsLocation,
-        })
-
-        if (updateResult.success) customer = updateResult.customer
-      }
-    }
-
     return {
       success: true,
       leadId: data?.lead_id || leadId,
-      customerId,
+      customerId: data?.customer_id || data?.customer?.id || '',
       leadStatus: data?.lead_status || 'won',
       converted: data?.converted !== false,
-      customer,
+      customer: data?.customer || null,
     }
   } catch (error) {
     const errorData = error.response?.data

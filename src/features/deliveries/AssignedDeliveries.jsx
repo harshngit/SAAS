@@ -12,6 +12,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { formatCurrency } from '../../utils/format'
 
 const statusVariant = {
+  pending: 'info',
   delivered: 'success',
   in_transit: 'warning',
   planned: 'info',
@@ -20,6 +21,7 @@ const statusVariant = {
   ready: 'success',
   loaded: 'info',
   partially_delivered: 'warning',
+  returned: 'danger',
   failed: 'danger',
   cancelled: 'neutral',
 }
@@ -139,7 +141,7 @@ export default function AssignedDeliveries() {
             emptyDescription="Deliveries assigned to you will show up here."
             actions={(row) => [
               { label: 'View Details', icon: Truck, onClick: () => navigate(`/delivery/deliveries/${row.id}`) },
-              ...(row.status === 'planned'
+              ...(row.status === 'pending'
                 ? [
                     { label: 'Accept', icon: Check, onClick: () => handleAccept(row) },
                     { label: 'Reject', icon: Ban, danger: true, onClick: () => setRejectTarget(row) },

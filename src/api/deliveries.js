@@ -37,7 +37,11 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
+// delivery.status is now normalized to these public values (pending covers planned/rejected,
+// accepted covers accepted/ready/loaded, returned covers failed) - the old raw values are kept
+// here too since GET /deliveries still accepts them as filter query params.
 export const DELIVERY_STATUS_OPTIONS = [
+  { value: 'pending', label: 'Pending' },
   { value: 'planned', label: 'Planned' },
   { value: 'accepted', label: 'Accepted' },
   { value: 'rejected', label: 'Rejected' },
@@ -46,6 +50,7 @@ export const DELIVERY_STATUS_OPTIONS = [
   { value: 'in_transit', label: 'In Transit' },
   { value: 'partially_delivered', label: 'Partially Delivered' },
   { value: 'delivered', label: 'Delivered' },
+  { value: 'returned', label: 'Returned' },
   { value: 'failed', label: 'Failed' },
   { value: 'cancelled', label: 'Cancelled' },
 ]

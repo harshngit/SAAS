@@ -41,16 +41,21 @@ import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
 import { formatCurrency } from '../../utils/format'
 
+// order.status is the backend's normalized public value - only ever placed/confirmed/
+// completed/cancelled (draft/awaiting_approval/placed collapse to "placed", the old internal
+// "processing" now shows as "confirmed"). Raw keys kept harmlessly in case an older API build
+// is ever hit, but they're not expected to match live responses.
 const statusBadgeVariant = {
   draft: 'neutral',
   placed: 'info',
   awaiting_approval: 'warning',
   processing: 'primary',
+  confirmed: 'primary',
   completed: 'success',
   cancelled: 'danger',
 }
 
-const cancellableStatuses = ['draft', 'placed', 'processing']
+const cancellableStatuses = ['placed', 'confirmed']
 const billableDeliveryStatuses = ['delivered', 'partially_delivered']
 
 const formatDate = (value) => {
@@ -215,9 +220,13 @@ export default function OrderDetail() {
   }
 
   const isPickupOrder = order.fulfilmentMethod === 'pickup'
-  const canConfirmDraft = order.status === 'draft'
-  const canApprove = order.status === 'awaiting_approval'
-  const canPlanDelivery = !isPickupOrder && ['placed', 'processing'].includes(order.status) && !order.assignedDeliveryPartnerId
+  // The backend collapses draft/awaiting_approval/placed into one public "placed" bucket, so
+  // the frontend can no longer tell which of those three an order is actually in. Show both
+  // pre-confirmation actions together here and let the backend's own validation (it returns a
+  // clear message, e.g. "Only a draft order may be confirmed") reject whichever doesn't apply.
+  const canConfirmDraft = order.status === 'placed'
+  const canApprove = order.status === 'placed'
+  const canPlanDelivery = !isPickupOrder && ['placed', 'confirmed'].includes(order.status) && !order.assignedDeliveryPartnerId
   const canCancel = cancellableStatuses.includes(order.status)
   const isReserved = ['reserved', 'planned', 'loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)
   const isLoaded = ['loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)
@@ -225,7 +234,7 @@ export default function OrderDetail() {
   const isDelivered = order.fulfilmentStatus === 'delivered'
   const hasDeliveredQuantity = order.items.some((item) => (item.deliveredQuantity || 0) > 0)
 
-  const canPickupPick = isPickupOrder && ['placed', 'processing'].includes(order.status) && order.pickupStatus === 'not_started'
+  const canPickupPick = isPickupOrder && ['placed', 'confirmed'].includes(order.status) && order.pickupStatus === 'not_started'
   const canPickupReady = isPickupOrder && order.pickupStatus === 'picking'
   const canConfirmPickup = isPickupOrder && order.pickupStatus === 'ready'
   const isPickupCollected = isPickupOrder && order.pickupStatus === 'collected'
@@ -421,7 +430,7 @@ export default function OrderDetail() {
               Confirm Pickup
             </Button>
           )}
-          {['placed', 'processing', 'completed'].includes(order.status) && (() => {
+          {['placed', 'confirmed', 'completed'].includes(order.status) && (() => {
             const wholeOrderInvoice = orderInvoices.find((invoice) => !invoice.deliveryId)
 
             if (wholeOrderInvoice) {

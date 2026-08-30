@@ -40,8 +40,8 @@ import {
   updateLead,
 } from '../../api/leads'
 import { listCustomers } from '../../api/customers'
-import { listUsers } from '../../api/users'
-import { listVisits } from '../../api/visits'
+import { listAssignableStaff, listUsers } from '../../api/users'
+import { VISIT_TYPE_OPTIONS, createVisit, createVisitFollowUp, listVisits } from '../../api/visits'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import { customerBasePathByRole } from '../customers/customerConstants'
@@ -87,10 +87,57 @@ function daysSince(value) {
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
 }
 
+function todayIso() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+const taskPriorityOptions = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'urgent', label: 'Urgent' },
+]
+
+function emptyVisitFormData() {
+  return {
+    visitType: 'site_visit',
+    purpose: '',
+    notes: '',
+    outcome: '',
+    createFollowUpTask: false,
+    title: '',
+    description: '',
+    dueDate: todayIso(),
+    dueTime: '10:00',
+    assigneeId: '',
+    priority: 'medium',
+  }
+}
+
 function formatLabel(value = '') {
   return String(value)
     .replace(/[_-]+/g, ' ')
     .replace(/\b\w/g, (character) => character.toUpperCase())
+}
+
+// Notes are stored as one flat string (the backend has no notes-log table) - each "Add Note"
+// prepends a "[timestamp] text" entry, joined by a blank line. Parse that back into individual
+// entries so they render as a proper timeline instead of one raw block of bracketed text.
+function parseNoteEntries(notes) {
+  if (!notes) return []
+
+  return notes
+    .split(/\n{2,}/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry, index) => {
+      const match = entry.match(/^\[(.+?)\]\s*([\s\S]*)$/)
+      return {
+        id: index,
+        timestamp: match ? match[1] : null,
+        text: match ? match[2] : entry,
+      }
+    })
 }
 
 function StatTile({ icon: Icon, label, children }) {
@@ -217,6 +264,12 @@ export default function LeadDetail() {
   const [isLoadingVisits, setIsLoadingVisits] = useState(true)
   const [visitsError, setVisitsError] = useState('')
 
+  const [isVisitOpen, setIsVisitOpen] = useState(false)
+  const [visitFormData, setVisitFormData] = useState(emptyVisitFormData)
+  const [isSavingVisit, setIsSavingVisit] = useState(false)
+  const [visitFormError, setVisitFormError] = useState('')
+  const [assignableStaff, setAssignableStaff] = useState([])
+
   const loadLead = async () => {
     setIsLoading(true)
     setLoadError('')
@@ -272,7 +325,10 @@ export default function LeadDetail() {
     async function loadOptions() {
       const customersPromise = listCustomers()
       const usersPromise = currentUser?.role === ROLES.SALES_OFFICER ? Promise.resolve({ success: true, users: [] }) : listUsers()
-      const [customersResult, usersResult] = await Promise.all([customersPromise, usersPromise])
+      // GET /users/assignable is the privacy-safe picker any follow_ups:create role can call
+      // (unlike admin-only GET /users) - used for the Log Visit follow-up task assignee field.
+      const staffPromise = listAssignableStaff()
+      const [customersResult, usersResult, staffResult] = await Promise.all([customersPromise, usersPromise, staffPromise])
       if (!isMounted) return
 
       if (customersResult.success) setCustomers(customersResult.customers)
@@ -289,6 +345,11 @@ export default function LeadDetail() {
             .filter((user) => user.role === ROLES.SALES_OFFICER || user.role === ROLES.ADMIN),
         )
       }
+      if (staffResult.success && staffResult.users.length > 0) {
+        setAssignableStaff(staffResult.users)
+      } else if (currentUser?.id) {
+        setAssignableStaff([{ id: currentUser.id, name: currentUser.name || 'Me' }])
+      }
     }
 
     loadOptions()
@@ -304,6 +365,10 @@ export default function LeadDetail() {
   const salespersonOptions = useMemo(
     () => salespeople.map((user) => ({ value: user.id, label: user.name })),
     [salespeople],
+  )
+  const assigneeOptions = useMemo(
+    () => assignableStaff.map((user) => ({ value: user.id, label: user.name || 'User' })),
+    [assignableStaff],
   )
 
   const daysOld = lead ? daysSince(lead.createdAt) : null
@@ -367,6 +432,8 @@ export default function LeadDetail() {
 
     return events.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0))
   }, [lead])
+
+  const noteEntries = useMemo(() => parseNoteEntries(lead?.notes), [lead?.notes])
 
   const handleSaveLead = async (formData) => {
     setIsSaving(true)
@@ -449,6 +516,70 @@ export default function LeadDetail() {
     setIsSavingNote(false)
     setIsNoteOpen(false)
     showToast({ title: 'Note added', message: 'Your note has been saved to this lead.' })
+  }
+
+  const openVisitModal = () => {
+    setVisitFormData(emptyVisitFormData())
+    setVisitFormError('')
+    setIsVisitOpen(true)
+  }
+
+  const handleSaveVisit = async () => {
+    if (visitFormData.createFollowUpTask && !visitFormData.title.trim()) {
+      setVisitFormError('Enter a follow-up task title.')
+      return
+    }
+
+    setIsSavingVisit(true)
+    setVisitFormError('')
+
+    // Lead-only visit: pass lead_id, deliberately omit customer_id (backend now allows either).
+    const result = await createVisit({
+      leadId: id,
+      visitType: visitFormData.visitType,
+      purpose: visitFormData.purpose.trim(),
+      notes: visitFormData.notes.trim(),
+      outcome: visitFormData.outcome.trim(),
+      status: 'completed',
+    })
+
+    if (!result.success) {
+      setVisitFormError(result.error)
+      setIsSavingVisit(false)
+      return
+    }
+
+    let visit = result.visit
+
+    if (visitFormData.createFollowUpTask) {
+      const dueDate = `${visitFormData.dueDate}T${visitFormData.dueTime}:00`
+      const taskResult = await createVisitFollowUp(visit.id, {
+        title: visitFormData.title,
+        description: visitFormData.description,
+        dueDate,
+        priority: visitFormData.priority,
+        assigneeId: visitFormData.assigneeId,
+      })
+
+      if (taskResult.success) {
+        visit = { ...visit, followUps: [...visit.followUps, taskResult.followUp] }
+      }
+
+      setVisits((current) => [visit, ...current])
+      setIsSavingVisit(false)
+      setIsVisitOpen(false)
+      showToast(
+        taskResult.success
+          ? { title: 'Visit logged', message: 'The visit and follow-up task have been saved.' }
+          : { title: 'Visit saved, follow-up failed', message: taskResult.error, variant: 'error' },
+      )
+      return
+    }
+
+    setVisits((current) => [visit, ...current])
+    setIsSavingVisit(false)
+    setIsVisitOpen(false)
+    showToast({ title: 'Visit logged', message: 'The visit has been saved to this lead.' })
   }
 
   const openStatusModal = () => {
@@ -633,9 +764,27 @@ export default function LeadDetail() {
               </Button>
             }
           >
-            <div className="min-h-20 whitespace-pre-line rounded-xl border border-neutral-100 bg-neutral-50/60 p-3 text-sm text-neutral-700">
-              {lead.notes || '—'}
-            </div>
+            {noteEntries.length === 0 ? (
+              <div className="min-h-20 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/60 p-4 text-center text-sm text-neutral-400">
+                No notes added yet.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {noteEntries.map((entry) => (
+                  <div key={entry.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
+                    {entry.timestamp && (
+                      <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-400">
+                        <Clock className="size-3.5 shrink-0" aria-hidden="true" />
+                        {entry.timestamp}
+                      </p>
+                    )}
+                    <p className={`whitespace-pre-line text-sm text-neutral-700 ${entry.timestamp ? 'mt-1.5' : ''}`}>
+                      {entry.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </Section>
         </div>
 
@@ -737,7 +886,16 @@ export default function LeadDetail() {
         </div>
       </Section>
 
-      <Section title="Visits & Follow-ups" icon={MapPin}>
+      <Section
+        title="Visits & Follow-ups"
+        icon={MapPin}
+        actions={
+          <Button type="button" variant="outline" size="sm" onClick={openVisitModal}>
+            <Plus className="size-4" aria-hidden="true" />
+            Log Visit
+          </Button>
+        }
+      >
         {visitsError ? (
           <div className="py-6 text-center">
             <p className="text-sm text-red-600">{visitsError}</p>
@@ -877,6 +1035,100 @@ export default function LeadDetail() {
             <Button type="button" variant="secondary" disabled={isSavingStatus} onClick={() => setIsStatusOpen(false)}>Cancel</Button>
             <Button type="button" loading={isSavingStatus} onClick={handleSaveStatus}>Save Status</Button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isVisitOpen} onClose={() => { if (!isSavingVisit) setIsVisitOpen(false) }} title="Log Visit" className="max-w-lg">
+        <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
+          {visitFormError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{visitFormError}</div>
+          )}
+          <Select
+            label="Visit Type"
+            options={VISIT_TYPE_OPTIONS}
+            value={visitFormData.visitType}
+            onChange={(event) => setVisitFormData((current) => ({ ...current, visitType: event.target.value }))}
+          />
+          <Input
+            label="Purpose"
+            value={visitFormData.purpose}
+            onChange={(event) => setVisitFormData((current) => ({ ...current, purpose: event.target.value }))}
+            placeholder="e.g. Requirement check"
+          />
+          <Input
+            as="textarea"
+            label="Notes"
+            value={visitFormData.notes}
+            onChange={(event) => setVisitFormData((current) => ({ ...current, notes: event.target.value }))}
+            inputClassName="min-h-20"
+          />
+          <Input
+            as="textarea"
+            label="Outcome"
+            value={visitFormData.outcome}
+            onChange={(event) => setVisitFormData((current) => ({ ...current, outcome: event.target.value }))}
+            inputClassName="min-h-16"
+          />
+
+          <label className="flex items-center gap-2 rounded-xl border border-neutral-100 bg-neutral-50/60 px-3.5 py-3 text-sm font-medium text-neutral-800">
+            <input
+              type="checkbox"
+              checked={visitFormData.createFollowUpTask}
+              onChange={(event) => setVisitFormData((current) => ({ ...current, createFollowUpTask: event.target.checked }))}
+              className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+            />
+            Create Follow-up Task
+          </label>
+
+          {visitFormData.createFollowUpTask && (
+            <div className="space-y-4 rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-xs)">
+              <Input
+                label="Task Title"
+                value={visitFormData.title}
+                onChange={(event) => setVisitFormData((current) => ({ ...current, title: event.target.value }))}
+                required
+              />
+              <Input
+                label="Action / Notes"
+                as="textarea"
+                value={visitFormData.description}
+                onChange={(event) => setVisitFormData((current) => ({ ...current, description: event.target.value }))}
+              />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Input
+                  label="Due Date"
+                  type="date"
+                  value={visitFormData.dueDate}
+                  onChange={(event) => setVisitFormData((current) => ({ ...current, dueDate: event.target.value }))}
+                  required
+                />
+                <Input
+                  label="Due Time"
+                  type="time"
+                  value={visitFormData.dueTime}
+                  onChange={(event) => setVisitFormData((current) => ({ ...current, dueTime: event.target.value }))}
+                  required
+                />
+              </div>
+              <Select
+                label="Assignee"
+                options={assigneeOptions}
+                value={visitFormData.assigneeId}
+                onChange={(event) => setVisitFormData((current) => ({ ...current, assigneeId: event.target.value }))}
+                placeholder="Defaults to you if left blank"
+              />
+              <Select
+                label="Priority"
+                options={taskPriorityOptions}
+                value={visitFormData.priority}
+                onChange={(event) => setVisitFormData((current) => ({ ...current, priority: event.target.value }))}
+              />
+            </div>
+          )}
+        </div>
+        <div className="mt-4 flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
+          <Button type="button" variant="secondary" disabled={isSavingVisit} onClick={() => setIsVisitOpen(false)}>Cancel</Button>
+          <Button type="button" loading={isSavingVisit} onClick={handleSaveVisit}>Save Visit</Button>
         </div>
       </Modal>
     </div>

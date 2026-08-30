@@ -1,0 +1,16 @@
+# SPA fallback for React Router. Without this, any deep-link URL (e.g. /auth/callback,
+# /auth/register/google, or a page refresh on any admin/sales/etc. route) 404s on a plain
+# Apache static host - the server looks for a real file/folder at that path and finds nothing,
+# since these routes only exist inside the React app's JS router, not on disk.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Let real files and directories (JS, CSS, images, etc.) be served as-is.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Everything else falls back to index.html so React Router can handle the route.
+  RewriteRule ^ index.html [L]
+</IfModule>

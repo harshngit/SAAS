@@ -7,10 +7,11 @@ import DataTable from '../../components/ui/DataTable'
 import StatCard from '../../components/ui/StatCard'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
-import { DELIVERY_STATUS_OPTIONS, listDeliveries } from '../../api/deliveries'
+import { listDeliveries } from '../../api/deliveries'
 import { formatCurrency } from '../../utils/format'
 
 const statusVariant = {
+  pending: 'info',
   delivered: 'success',
   in_transit: 'warning',
   planned: 'info',
@@ -19,9 +20,23 @@ const statusVariant = {
   ready: 'success',
   loaded: 'info',
   partially_delivered: 'warning',
+  returned: 'danger',
   failed: 'danger',
   cancelled: 'neutral',
 }
+
+// delivery.status here is always the backend's normalized public value (this list filters the
+// already-fetched, already-normalized rows client-side) - only these 7 values can ever appear,
+// unlike the raw+legacy DELIVERY_STATUS_OPTIONS export which is meant for server query params.
+const publicDeliveryStatusOptions = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'accepted', label: 'Accepted' },
+  { value: 'in_transit', label: 'In Transit' },
+  { value: 'partially_delivered', label: 'Partially Delivered' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'returned', label: 'Returned' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
 
 export default function AdminDeliveries() {
   const navigate = useNavigate()
@@ -53,9 +68,11 @@ export default function AdminDeliveries() {
 
   const stats = useMemo(() => {
     const delivered = deliveries.filter((row) => row.status === 'delivered').length
-    const inProgress = deliveries.filter((row) => ['planned', 'accepted', 'ready', 'loaded', 'in_transit'].includes(row.status)).length
-    const failed = deliveries.filter((row) => row.status === 'failed').length
-    const rejected = deliveries.filter((row) => row.status === 'rejected').length
+    const inProgress = deliveries.filter((row) => ['accepted', 'in_transit'].includes(row.status)).length
+    const failed = deliveries.filter((row) => row.status === 'returned').length
+    // "rejected" is no longer separable from "pending" (not-yet-accepted) at the public status
+    // level - this now tracks all deliveries awaiting a partner's response either way.
+    const rejected = deliveries.filter((row) => row.status === 'pending').length
     return { total: deliveries.length, delivered, inProgress, failed, rejected }
   }, [deliveries])
 
@@ -76,8 +93,8 @@ export default function AdminDeliveries() {
         <StatCard icon={CheckCircle2} label="Delivered" value={stats.delivered} iconVariant="success" />
         <StatCard icon={Clock} label="In Progress" value={stats.inProgress} iconVariant="warning" />
         <StatCard icon={XCircle} label="Failed" value={stats.failed} iconVariant="danger" />
-        <button type="button" className="block w-full text-left" onClick={() => setStatusFilter('rejected')}>
-          <StatCard icon={Ban} label="Rejected · Needs Reassignment" value={stats.rejected} iconVariant="danger" />
+        <button type="button" className="block w-full text-left" onClick={() => setStatusFilter('pending')}>
+          <StatCard icon={Ban} label="Pending" value={stats.rejected} iconVariant="danger" />
         </button>
       </div>
 
@@ -94,7 +111,7 @@ export default function AdminDeliveries() {
           <>
             <div className="mb-4 flex justify-end">
               <Select
-                options={[{ value: 'all', label: 'All status' }, ...DELIVERY_STATUS_OPTIONS]}
+                options={[{ value: 'all', label: 'All status' }, ...publicDeliveryStatusOptions]}
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
                 className="sm:w-52"
@@ -114,7 +131,7 @@ export default function AdminDeliveries() {
                   sortable: true,
                   render: (row) => (
                     <Badge variant={statusVariant[row.status] || 'neutral'} dot>
-                      {DELIVERY_STATUS_OPTIONS.find((option) => option.value === row.status)?.label || row.status}
+                      {publicDeliveryStatusOptions.find((option) => option.value === row.status)?.label || row.status}
                     </Badge>
                   ),
                 },

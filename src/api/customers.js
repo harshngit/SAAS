@@ -52,7 +52,7 @@ function toDateOnly(value) {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10)
 }
 
-function parseMapsCoordinates(value) {
+export function parseMapsCoordinates(value) {
   if (!value) return null
 
   const text = String(value).trim()
