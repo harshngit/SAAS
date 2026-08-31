@@ -101,6 +101,9 @@ export default function OrderDetail() {
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [isActing, setIsActing] = useState(false)
+  // Set once a Confirm/Approve attempt is rejected as "not applicable" - proves the order
+  // has already cleared both pre-placement stages, so neither button is retried for this order.
+  const [preConfirmationResolved, setPreConfirmationResolved] = useState(false)
 
   const [deliveryPartners, setDeliveryPartners] = useState([])
   const [vehicles, setVehicles] = useState([])
@@ -125,6 +128,7 @@ export default function OrderDetail() {
   const loadOrder = async () => {
     setIsLoading(true)
     setLoadError('')
+    setPreConfirmationResolved(false)
 
     const result = await getOrder(id)
 
@@ -224,8 +228,8 @@ export default function OrderDetail() {
   // the frontend can no longer tell which of those three an order is actually in. Show both
   // pre-confirmation actions together here and let the backend's own validation (it returns a
   // clear message, e.g. "Only a draft order may be confirmed") reject whichever doesn't apply.
-  const canConfirmDraft = order.status === 'placed'
-  const canApprove = order.status === 'placed'
+  const canConfirmDraft = order.status === 'placed' && !preConfirmationResolved
+  const canApprove = order.status === 'placed' && !preConfirmationResolved
   const canPlanDelivery = !isPickupOrder && ['placed', 'confirmed'].includes(order.status) && !order.assignedDeliveryPartnerId
   const canCancel = cancellableStatuses.includes(order.status)
   const isReserved = ['reserved', 'planned', 'loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)
@@ -262,6 +266,16 @@ export default function OrderDetail() {
         { label: 'Delivered', status: isDelivered ? 'done' : isInTransit ? 'current' : 'pending' },
       ]
 
+  // The backend collapses draft/awaiting_approval/placed into one public "placed" status,
+  // so the frontend can't tell in advance which of Confirm/Approve actually applies - both
+  // buttons show together and the backend's own validation decides. But whichever one gets
+  // rejected as "not applicable" (order is neither a draft nor awaiting approval) proves the
+  // order has already cleared *both* pre-placement stages - so that single rejection is enough
+  // to retire both buttons for the rest of this view, instead of leaving the user to hit the
+  // same dead end twice.
+  const notDraftPattern = /only a draft order may be confirmed/i
+  const notAwaitingApprovalPattern = /only an order awaiting approval can be approved/i
+
   const runAction = async (action) => {
     setIsActing(true)
     setActionError('')
@@ -269,7 +283,12 @@ export default function OrderDetail() {
     const result = await action()
 
     if (!result.success) {
-      setActionError(result.error)
+      if (notDraftPattern.test(result.error) || notAwaitingApprovalPattern.test(result.error)) {
+        setPreConfirmationResolved(true)
+        setActionError('')
+      } else {
+        setActionError(result.error)
+      }
       setIsActing(false)
       return false
     }
@@ -490,6 +509,12 @@ export default function OrderDetail() {
 
       {actionError && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
+      )}
+
+      {preConfirmationResolved && order.status === 'placed' && (
+        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          This order is already placed and doesn&apos;t need confirming or approving — it&apos;s ready for the next step (Plan Delivery / Create Invoice).
+        </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card) sm:grid-cols-2 lg:grid-cols-6">
@@ -756,10 +781,16 @@ export default function OrderDetail() {
                     type="number"
                     min="0"
                     max={item.quantity}
+                    step="1"
                     value={planItemQuantities[item.id] ?? item.quantity}
                     onChange={(event) =>
                       setPlanItemQuantities((current) => ({ ...current, [item.id]: Number(event.target.value) }))
                     }
+                    onBlur={(event) => {
+                      const rounded = Math.round(Number(event.target.value))
+                      const clamped = Math.min(Math.max(Number.isFinite(rounded) ? rounded : 0, 0), item.quantity)
+                      setPlanItemQuantities((current) => ({ ...current, [item.id]: clamped }))
+                    }}
                     className="h-9 w-24 shrink-0 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm"
                   />
                 </div>
@@ -807,10 +838,16 @@ export default function OrderDetail() {
                     type="number"
                     min="0"
                     max={item.quantity}
+                    step="1"
                     value={pickupItemQuantities[item.id] ?? item.quantity}
                     onChange={(event) =>
                       setPickupItemQuantities((current) => ({ ...current, [item.id]: Number(event.target.value) }))
                     }
+                    onBlur={(event) => {
+                      const rounded = Math.round(Number(event.target.value))
+                      const clamped = Math.min(Math.max(Number.isFinite(rounded) ? rounded : 0, 0), item.quantity)
+                      setPickupItemQuantities((current) => ({ ...current, [item.id]: clamped }))
+                    }}
                     className="h-9 w-24 shrink-0 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm"
                   />
                 </div>

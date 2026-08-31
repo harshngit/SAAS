@@ -324,7 +324,19 @@ export default function QuotationFormPage() {
                 <Input label="Quantity" required type="number" min="0" step="1" value={item.quantity} onChange={(event) => updateItem(index, 'quantity', event.target.value)} />
                 <Select label="UOM" options={uomOptions} value={item.uom} onChange={(event) => updateItem(index, 'uom', event.target.value)} placeholder="Select UOM" />
                 <Input label="Unit Price" required type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => updateItem(index, 'unitPrice', event.target.value)} />
-                <Input label="Discount (%)" type="number" min="0" step="0.01" value={item.discount} onChange={(event) => updateItem(index, 'discount', event.target.value)} />
+                <Input
+                  label="Discount (%)"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={item.discount}
+                  onChange={(event) => updateItem(index, 'discount', event.target.value)}
+                  onBlur={(event) => {
+                    const rounded = Math.round(Number(event.target.value))
+                    updateItem(index, 'discount', String(Number.isFinite(rounded) ? Math.min(Math.max(rounded, 0), 100) : 0))
+                  }}
+                />
                 <Select label="Tax (%)" options={taxOptions} value={String(item.taxRate ?? '')} onChange={(event) => updateItem(index, 'taxRate', event.target.value)} placeholder="Select tax" />
                 <Input label="Line Total" value={formatCurrency(calculateLineTotal(item))} disabled />
               </div>

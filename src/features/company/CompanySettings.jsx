@@ -4262,8 +4262,14 @@ export default function CompanySettings() {
                     label="Number of Employees"
                     name="numberOfEmployees"
                     type="number"
+                    step="1"
+                    min="0"
                     value={companyData.numberOfEmployees}
                     onChange={handleChange}
+                    onBlur={(event) => {
+                      const rounded = Math.round(Number(event.target.value))
+                      setCompanyData((prev) => ({ ...prev, numberOfEmployees: Number.isFinite(rounded) ? String(Math.max(rounded, 0)) : '' }))
+                    }}
                     disabled={!isActiveSectionEditing}
                   />
                   <Input

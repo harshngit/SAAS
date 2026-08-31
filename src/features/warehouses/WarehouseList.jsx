@@ -73,9 +73,14 @@ function StockAdjustForm({ warehouse, saving, formError, onClose, onSave }) {
         label="Quantity"
         type="number"
         required
+        step="1"
         placeholder="Positive to add, negative to remove"
         value={quantity}
         onChange={(event) => setQuantity(event.target.value)}
+        onBlur={(event) => {
+          const rounded = Math.round(Number(event.target.value))
+          setQuantity(Number.isFinite(rounded) ? String(rounded) : '')
+        }}
       />
       <Input
         label="Note"

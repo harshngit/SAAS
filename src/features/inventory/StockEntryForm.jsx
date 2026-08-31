@@ -37,6 +37,14 @@ export default function StockEntryForm({ isOpen, onClose, product, saving = fals
     setQuantities((current) => ({ ...current, [rowKey(row)]: value }))
   }
 
+  // Rounds on blur, not on every keystroke - a controlled number input jumps its cursor to the
+  // end after any programmatic value change mid-typing, so rounding while "5." is still being
+  // typed turns the next digit into the wrong place (e.g. "50" instead of "5").
+  const handleQuantityBlur = (row) => (event) => {
+    const rounded = Math.round(Number(event.target.value))
+    setQuantities((current) => ({ ...current, [rowKey(row)]: Number.isFinite(rounded) ? String(Math.max(rounded, 0)) : '' }))
+  }
+
   const handleSubmit = (event) => {
     event.preventDefault()
 
@@ -126,8 +134,10 @@ export default function StockEntryForm({ isOpen, onClose, product, saving = fals
                     <input
                       type="number"
                       min="0"
+                      step="1"
                       value={quantities[rowKey(row)] || ''}
                       onChange={(event) => handleQuantityChange(row, event.target.value)}
+                      onBlur={handleQuantityBlur(row)}
                       placeholder="0"
                       className="w-28 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-900 transition-all focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                     />

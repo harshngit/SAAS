@@ -75,7 +75,15 @@ export default function EndOfDayReturn() {
   }
 
   const updateReturn = (productId, value) => {
-    setReturns((current) => ({ ...current, [productId]: Math.max(0, Number(value)) }))
+    setReturns((current) => ({ ...current, [productId]: value }))
+  }
+
+  // Rounds/clamps on blur, not on every keystroke - forcing the value while a "5." is still
+  // being typed jumps the input's cursor to the end, mangling the next digit typed.
+  const roundReturnOnBlur = (productId, maxQuantity) => (event) => {
+    const rounded = Math.round(Number(event.target.value))
+    const safe = Number.isFinite(rounded) ? rounded : 0
+    setReturns((current) => ({ ...current, [productId]: Math.min(Math.max(safe, 0), maxQuantity) }))
   }
 
   const handleSubmit = async (event) => {
@@ -86,7 +94,7 @@ export default function EndOfDayReturn() {
 
     const result = await endOfDayReturn(
       session.id,
-      session.items.map((item) => ({ productId: item.productId, returnedQty: returns[item.productId] ?? 0 })),
+      session.items.map((item) => ({ productId: item.productId, returnedQty: Math.round(Number(returns[item.productId])) || 0 })),
     )
 
     if (!result.success) {
@@ -103,7 +111,13 @@ export default function EndOfDayReturn() {
   }
 
   const updatePhysicalCount = (itemId, value) => {
-    setPhysicalCounts((current) => ({ ...current, [itemId]: Math.max(0, Number(value)) }))
+    setPhysicalCounts((current) => ({ ...current, [itemId]: value }))
+  }
+
+  // Rounds/clamps on blur, not on every keystroke - see roundReturnOnBlur above for why.
+  const roundPhysicalCountOnBlur = (itemId) => (event) => {
+    const rounded = Math.round(Number(event.target.value))
+    setPhysicalCounts((current) => ({ ...current, [itemId]: Math.max(Number.isFinite(rounded) ? rounded : 0, 0) }))
   }
 
   const handleReconcile = async (event) => {
@@ -118,7 +132,7 @@ export default function EndOfDayReturn() {
         loadingItemId: item.id,
         productId: item.productId,
         variantId: item.variantId,
-        physicalQty: physicalCounts[item.id] ?? item.expectedClosingQty,
+        physicalQty: physicalCounts[item.id] !== undefined ? Math.round(Number(physicalCounts[item.id])) || 0 : item.expectedClosingQty,
       })),
     })
 
@@ -168,7 +182,9 @@ export default function EndOfDayReturn() {
                         label="Physical Count"
                         value={physicalQty}
                         onChange={(event) => updatePhysicalCount(item.id, event.target.value)}
+                        onBlur={roundPhysicalCountOnBlur(item.id)}
                         min="0"
+                        step="1"
                         required
                       />
                     </div>
@@ -284,8 +300,10 @@ export default function EndOfDayReturn() {
                       label="Actual Return"
                       value={actualReturn}
                       onChange={(e) => updateReturn(item.productId, e.target.value)}
+                      onBlur={roundReturnOnBlur(item.productId, item.loadedQuantity)}
                       min="0"
                       max={item.loadedQuantity}
+                      step="1"
                       required
                     />
                     {hasNegativeSold && (

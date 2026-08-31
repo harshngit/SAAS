@@ -200,7 +200,7 @@ export async function adjustWarehouseStock(warehouseId, payload) {
     const requestBody = {
       product_id: payload.productId || payload.product_id,
       variant_id: payload.variantId || payload.variant_id || undefined,
-      quantity: Number(payload.quantity),
+      quantity: Math.round(Number(payload.quantity)) || 0,
       movement_type: payload.movementType || payload.movement_type || 'adjustment',
       note: payload.note || undefined,
     }

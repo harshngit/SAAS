@@ -499,9 +499,6 @@ export default function AdminDashboard() {
   const grossProfit = summary.gross_profit ?? 0
   const netProfit = summary.net_profit ?? 0
   const salesGrowth = summary.sales_growth_percentage ?? 0
-  const monthlyTarget = summary.monthly_target ?? 80000
-  const monthlySales = summary.month_sales ?? summary.period_sales ?? 0
-  const monthlyTargetProgress = monthlyTarget > 0 ? Math.min(100, (monthlySales / monthlyTarget) * 100) : 0
   const totalReceivables = receivablesPayables.receivables ?? 0
   const totalPayables = receivablesPayables.payables ?? 0
   const totalOutstanding = totalReceivables + totalPayables
@@ -535,22 +532,26 @@ export default function AdminDashboard() {
     total: row.total,
     orderDate: formatOrderDate(row.date),
   }))
-  const deliveredOrderStatuses = new Set(['delivered', 'partially_delivered'])
-  const featuredOrdersCount = Number(ordersSummary.total ?? ordersSummary.total_orders ?? ordersSummary.orders ?? recentOrders.length)
-  const featuredDeliveredCount = Number(
-    ordersSummary.delivered ?? ordersSummary.completed ?? recentOrders.filter((order) => deliveredOrderStatuses.has(order.status)).length,
-  )
-  const featuredPendingCount = Number(
-    ordersSummary.pending ?? ordersSummary.processing ?? Math.max(featuredOrdersCount - featuredDeliveredCount, 0),
-  )
+  // "TODAY'S SALES" card is strictly today's orders - amount, received (delivered value),
+  // pending (undelivered value), and the 3 order counts all derive from the same
+  // todaysOrders list below, not from all-time/period summaries (ordersSummary/recentOrders
+  // are separate, period-scoped data used elsewhere on this dashboard, e.g. Order
+  // Cancellations and the Recent Orders table).
   const today = new Date().toISOString().slice(0, 10)
   const todaysOrders = orders.filter(
     (order) => (order.orderDate || order.createdAt || '').slice(0, 10) === today && order.status !== 'cancelled',
   )
   const todaysSalesAmount = todaysOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0)
-  const orderAmounts = orders.reduce(
+  const isOrderFullyDelivered = (order) => {
+    const status = String(order?.status || '').toLowerCase()
+    const fulfilmentStatus = String(order?.fulfilmentStatus || order?.fulfilment_status || '').toLowerCase()
+    return status === 'completed' || fulfilmentStatus === 'delivered'
+  }
+  const featuredOrdersCount = todaysOrders.length
+  const featuredDeliveredCount = todaysOrders.filter(isOrderFullyDelivered).length
+  const featuredPendingCount = Math.max(featuredOrdersCount - featuredDeliveredCount, 0)
+  const orderAmounts = todaysOrders.reduce(
     (totals, order) => {
-      if (order.status === 'cancelled') return totals
       const { deliveredAmount, pendingAmount } = getOrderAmountSplit(order)
       return {
         deliveredAmount: totals.deliveredAmount + deliveredAmount,
@@ -600,7 +601,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 gap-2 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
         <div className="min-w-0 self-start">
           <FeaturedSalesCard
-            salesAmount={summary.today_sales ?? todaysSalesAmount}
+            salesAmount={todaysSalesAmount}
             receivedAmount={orderAmounts.deliveredAmount}
             pendingAmount={orderAmounts.pendingAmount}
             ordersCount={featuredOrdersCount}
@@ -716,18 +717,6 @@ export default function AdminDashboard() {
               <SignalRow label="Receivables Overdue" positive={(receivablesPayables.overdue_receivables || 0) === 0} />
               <SignalRow label="Payables Overdue" positive={(receivablesPayables.overdue_payables || 0) === 0} />
               <SignalRow label="Order Cancellations" positive={(ordersSummary.cancelled || 0) === 0} />
-            </div>
-            <div className="mt-3 rounded-[1rem] bg-[linear-gradient(180deg,#175e17_0%,#0c4608_100%)] p-3 text-white">
-              <div className="flex items-center justify-between gap-3 text-[0.72rem] font-semibold">
-                <span className="text-white/88">Monthly Target</span>
-                <span className="text-white/92">{formatCurrency(monthlyTarget)}</span>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/12">
-                <div
-                  className="h-full rounded-full bg-white/80 transition-all duration-300"
-                  style={{ width: `${monthlyTargetProgress}%` }}
-                />
-              </div>
             </div>
           </DashboardCard>
 

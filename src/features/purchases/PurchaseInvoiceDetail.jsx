@@ -180,6 +180,14 @@ export default function PurchaseInvoiceDetail({ purchaseId, isOpen, onClose, onC
     }))
   }
 
+  // Rounds/clamps on blur, not on every keystroke - see the identical pattern used for order
+  // items elsewhere (rounding mid-typing jumps the cursor and mangles later digits).
+  const roundReturnQuantityOnBlur = (productId, maxQuantity) => (event) => {
+    const rounded = Math.round(Number(event.target.value))
+    const safe = Number.isFinite(rounded) ? rounded : 1
+    updateReturnItem(productId, 'quantity', String(Math.min(Math.max(safe, 1), maxQuantity)))
+  }
+
   const handleReturn = async () => {
     const items = Object.entries(returnItems)
       .filter(([, values]) => values.checked)
@@ -455,8 +463,10 @@ export default function PurchaseInvoiceDetail({ purchaseId, isOpen, onClose, onC
                       type="number"
                       min="1"
                       max={item.quantity}
+                      step="1"
                       value={values.quantity}
                       onChange={(event) => updateReturnItem(item.productId, 'quantity', event.target.value)}
+                      onBlur={roundReturnQuantityOnBlur(item.productId, item.quantity)}
                       className="w-24 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
                     />
                   </div>

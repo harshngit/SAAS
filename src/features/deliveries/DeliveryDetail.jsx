@@ -754,8 +754,14 @@ export default function DeliveryDetail() {
                     type="number"
                     min="0"
                     max={item.plannedQuantity}
+                    step="1"
                     value={pickedQuantities[item.id] ?? 0}
                     onChange={(event) => setPickedQuantities((current) => ({ ...current, [item.id]: Number(event.target.value) }))}
+                    onBlur={(event) => {
+                      const rounded = Math.round(Number(event.target.value))
+                      const clamped = Math.min(Math.max(Number.isFinite(rounded) ? rounded : 0, 0), item.plannedQuantity)
+                      setPickedQuantities((current) => ({ ...current, [item.id]: clamped }))
+                    }}
                     className="h-10 w-32 rounded-lg border border-neutral-200 bg-white px-3 text-sm"
                   />
                 </div>

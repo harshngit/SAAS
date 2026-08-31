@@ -107,6 +107,16 @@ export default function PurchaseInvoiceForm({ isOpen, onClose, invoice, onSaved 
 
   const updateField = (field, value) => setFormState((current) => ({ ...current, [field]: value }))
 
+  // Rounds/clamps on blur, not on every keystroke - a controlled number input jumps its cursor
+  // to the end after any programmatic value change mid-typing, so rounding while "10." is still
+  // being typed turns the next digit into the wrong place (e.g. "100" instead of "10").
+  const roundItemFieldOnBlur = (index, field, { min = 0, max } = {}) => (event) => {
+    const rounded = Math.round(Number(event.target.value))
+    const safe = Number.isFinite(rounded) ? rounded : min
+    const clamped = max !== undefined ? Math.min(Math.max(safe, min), max) : Math.max(safe, min)
+    updateItem(index, field, String(clamped))
+  }
+
   const updateItem = (index, field, value) => {
     setFormState((current) => ({
       ...current,
@@ -267,8 +277,10 @@ export default function PurchaseInvoiceForm({ isOpen, onClose, invoice, onSaved 
                       <input
                         type="number"
                         min="1"
+                        step="1"
                         value={item.quantity}
                         onChange={(event) => updateItem(index, 'quantity', event.target.value)}
+                        onBlur={roundItemFieldOnBlur(index, 'quantity', { min: 1 })}
                         className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
                       />
                     </td>
@@ -287,9 +299,10 @@ export default function PurchaseInvoiceForm({ isOpen, onClose, invoice, onSaved 
                         type="number"
                         min="0"
                         max="100"
-                        step="0.01"
+                        step="1"
                         value={item.discount}
                         onChange={(event) => updateItem(index, 'discount', event.target.value)}
+                        onBlur={roundItemFieldOnBlur(index, 'discount', { min: 0, max: 100 })}
                         className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
                       />
                     </td>

@@ -48,14 +48,21 @@ export default function VehicleLoading() {
   }
 
   const updateQuantity = (productId, quantity) => {
-    setItems((current) => current.map((item) => (item.productId === productId ? { ...item, quantity: Math.max(0, Number(quantity)) } : item)))
+    setItems((current) => current.map((item) => (item.productId === productId ? { ...item, quantity } : item)))
+  }
+
+  // Rounds/clamps on blur, not on every keystroke - forcing the value while a "5." is still
+  // being typed jumps the input's cursor to the end, mangling the next digit typed.
+  const roundQuantityOnBlur = (productId) => (event) => {
+    const rounded = Math.round(Number(event.target.value))
+    updateQuantity(productId, Math.max(0, Number.isFinite(rounded) ? rounded : 0))
   }
 
   const removeItem = (productId) => {
     setItems((current) => current.filter((item) => item.productId !== productId))
   }
 
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
+  const totalItems = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -71,7 +78,7 @@ export default function VehicleLoading() {
     const result = await loadVehicleStock({
       deliveryPartnerId: currentUser?.id,
       date: loadingDate,
-      items: items.map((item) => ({ productId: item.productId, loadedQty: item.quantity })),
+      items: items.map((item) => ({ productId: item.productId, loadedQty: Math.round(Number(item.quantity)) || 0 })),
     })
 
     if (!result.success) {
@@ -157,7 +164,9 @@ export default function VehicleLoading() {
                       label="Quantity"
                       value={item.quantity}
                       onChange={(e) => updateQuantity(item.productId, e.target.value)}
+                      onBlur={roundQuantityOnBlur(item.productId)}
                       min="0"
+                      step="1"
                       required
                     />
                     <button

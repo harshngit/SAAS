@@ -210,6 +210,20 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     setProductSearch('')
   }
 
+  // Quantity, per-item Discount %, Unit Price, and the order-level Discount are all
+  // whole-number fields here (no paise, no fractional %). Rounding is applied on blur, not on
+  // every keystroke - a controlled <input type="number"> jumps its cursor to the end after any
+  // programmatic value change, so rounding while a "10." is still being typed turns the next
+  // keystroke into "1007" instead of "10" (the decimal point silently vanishes and later digits
+  // land in the wrong place). Blur-time rounding still guarantees nothing but a whole number is
+  // ever kept in state past the point the field is submitted.
+  const roundToWholeNumberOnBlur = (productId, field, { min = 0, max } = {}) => (event) => {
+    const rounded = Math.round(Number(event.target.value))
+    const safe = Number.isFinite(rounded) ? rounded : min
+    const clamped = max !== undefined ? Math.min(Math.max(safe, min), max) : Math.max(safe, min)
+    updateOrderItem(productId, field, String(clamped))
+  }
+
   const updateOrderItem = (productId, field, value) => {
     setOrderItems((current) =>
       current.map((item) => (item.productId === productId ? { ...item, [field]: value } : item)),
@@ -575,9 +589,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                             <input
                               type="number"
                               min="0"
-                              step="0.01"
+                              step="1"
                               value={item.unitPrice}
                               onChange={(event) => updateOrderItem(item.productId, 'unitPrice', event.target.value)}
+                              onBlur={roundToWholeNumberOnBlur(item.productId, 'unitPrice', { min: 0 })}
                               className="h-9 w-24 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                             />
                           </td>
@@ -597,6 +612,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                                 step="1"
                                 value={item.quantity}
                                 onChange={(event) => updateOrderItem(item.productId, 'quantity', event.target.value)}
+                                onBlur={roundToWholeNumberOnBlur(item.productId, 'quantity', { min: 1 })}
                                 className="h-9 w-14 rounded-lg border border-neutral-200 bg-white text-center text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                               />
                               <button
@@ -614,9 +630,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               type="number"
                               min="0"
                               max="100"
-                              step="0.01"
+                              step="1"
                               value={item.discountPercent ?? 0}
                               onChange={(event) => updateOrderItem(item.productId, 'discountPercent', event.target.value)}
+                              onBlur={roundToWholeNumberOnBlur(item.productId, 'discountPercent', { min: 0, max: 100 })}
                               className="h-9 w-20 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                             />
                           </td>
@@ -798,9 +815,13 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <input
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="1"
                       value={discountValue}
                       onChange={(event) => setDiscountValue(event.target.value)}
+                      onBlur={(event) => {
+                        const rounded = Math.round(Number(event.target.value))
+                        setDiscountValue(String(Number.isFinite(rounded) ? Math.max(rounded, 0) : 0))
+                      }}
                       className="h-11 w-full min-w-0 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                     />
                     <span className="text-sm font-medium text-neutral-500">{discountType === 'percentage' ? '%' : '₹'}</span>
