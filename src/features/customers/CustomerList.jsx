@@ -438,7 +438,6 @@ export default function CustomerList() {
                 <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
                   <th className="whitespace-nowrap px-4 py-3">Customer</th>
                   <th className="whitespace-nowrap px-4 py-3">Contact Person</th>
-                  <th className="whitespace-nowrap px-4 py-3">Phone</th>
                   <th className="whitespace-nowrap px-4 py-3">Location</th>
                   <th className="whitespace-nowrap px-4 py-3">Sales Officer</th>
                   <th className="whitespace-nowrap px-4 py-3">Last Order</th>
@@ -467,7 +466,6 @@ export default function CustomerList() {
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-neutral-600">{customer.contactPerson || '—'}</td>
-                    <td className="px-4 py-3.5 text-neutral-600">{customer.phone}</td>
                     <td className="px-4 py-3.5 text-neutral-600">{customer.city || '—'}</td>
                     <td className="px-4 py-3.5 text-neutral-600">
                       {salesOfficerById.get(customer.assignedSalesOfficerId) || 'Unassigned'}

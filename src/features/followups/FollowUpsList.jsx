@@ -145,7 +145,12 @@ export default function FollowUpsList() {
   const handleSaveFollowUp = async (event) => {
     event.preventDefault()
 
-    if (!formData.customerId) {
+    // Only new, standalone (no parent visit) follow-ups created from this page need a
+    // customer picked here. A lead-only follow-up (created from a lead's visit, so it has
+    // no customer_id) keeps that identity when edited here - forcing a customer pick would
+    // wrongly convert it into a customer follow-up just for e.g. changing its due date.
+    const requiresCustomer = !editingFollowUp?.visitId
+    if (requiresCustomer && !formData.customerId) {
       setFormError('Select a customer for this follow-up.')
       return
     }
@@ -294,10 +299,16 @@ export default function FollowUpsList() {
             options={customerOptions}
             value={formData.customerId}
             onChange={(event) => setFormData((current) => ({ ...current, customerId: event.target.value }))}
-            placeholder={isLoadingCustomers ? 'Loading customers...' : 'Select customer'}
+            placeholder={
+              isLoadingCustomers
+                ? 'Loading customers...'
+                : editingFollowUp?.visitId && !formData.customerId
+                  ? 'No customer (linked to a lead visit)'
+                  : 'Select customer'
+            }
             disabled={isLoadingCustomers}
             searchable
-            required
+            required={!editingFollowUp?.visitId}
           />
           <Input
             label="Task Title"

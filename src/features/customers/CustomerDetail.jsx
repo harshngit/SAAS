@@ -154,6 +154,13 @@ const normalizeCustomerPayment = (payment) => ({
   orderAmount: payment.order_amount ?? null,
   previousPending: payment.previous_pending ?? null,
   remainingReceivable: payment.remaining_receivable ?? null,
+  // Method-specific details - only ever one of these is populated, matching
+  // whichever paymentMode was used. Null for cash, or for older payments
+  // recorded before the backend persisted these.
+  upiId: payment.upi_id || '',
+  cardType: payment.card_type || '',
+  cardLastFour: payment.card_last_four || '',
+  collectionInstructions: payment.collection_instructions || '',
 })
 
 const getInitials = (name = '') =>
@@ -841,14 +848,15 @@ export default function CustomerDetail() {
       <div className="grid gap-4 xl:grid-cols-3">
         <Section number={4} title="Financial Summary" icon={Banknote}>
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-            <Field label="Credit Limit" value={formatCurrency(customer.creditLimit)} />
             <Field label="Outstanding Balance" value={formatCurrency(customer.outstandingBalance)} />
             <Field label="Available Credit" value={formatCurrency(customer.availableCredit)} />
             <Field label="Total Received" value={formatCurrency(customer.totalReceived || 0)} />
             <Field label="Total Billed" value={formatCurrency(customer.totalBilled || 0)} />
             <Field label="Opening Balance" value={formatCurrency(customer.openingBalance || 0)} />
             <Field label="Total Purchases" value={formatCurrency(customer.totalPurchases || 0)} />
-            <Field label="Customer Lifetime Value" value={formatCurrency(customer.customerLifetimeValue || 0)} />
+            <div className="col-span-2">
+              <Field label="Customer Lifetime Value" value={formatCurrency(customer.customerLifetimeValue || 0)} />
+            </div>
           </div>
         </Section>
 
@@ -899,6 +907,13 @@ export default function CustomerDetail() {
                       {payment.receivedOn ? new Date(payment.receivedOn).toLocaleDateString() : '-'}
                       {payment.invoice?.invoice_number || payment.invoiceId ? ` · ${payment.invoice?.invoice_number || payment.invoiceId}` : ''}
                     </p>
+                    {(payment.upiId || payment.cardLastFour || payment.collectionInstructions) && (
+                      <p className="mt-1 text-xs text-neutral-500">
+                        {payment.upiId && `UPI · ${payment.upiId}`}
+                        {payment.cardLastFour && `${payment.cardType ? `${payment.cardType} card` : 'Card'} •••• ${payment.cardLastFour}`}
+                        {payment.collectionInstructions && `Collection note: ${payment.collectionInstructions}`}
+                      </p>
+                    )}
                     {(payment.orderAmount != null || payment.previousPending != null || payment.remainingReceivable != null) && (
                       <div className="mt-2 grid grid-cols-3 gap-2 border-t border-neutral-100 pt-2 text-[0.7rem]">
                         <div>
