@@ -78,6 +78,7 @@ import AdminExpenses from '../features/expenses/AdminExpenses'
 import AdminInvoices from '../features/invoices/AdminInvoices'
 import CreateSalesInvoice from '../features/invoices/CreateSalesInvoice'
 import InvoiceDetail from '../features/invoices/InvoiceDetail'
+import InvoicePrintView from '../features/invoices/InvoicePrintView'
 import InvoiceSettings from '../features/invoices/InvoiceSettings'
 import AdminSettings from '../features/settings/AdminSettings'
 import ObjectFieldsSettings from '../features/settings/ObjectFieldsSettings'
@@ -105,6 +106,9 @@ export default function AppRoutes() {
         <Route path="/auth/callback" element={<GoogleAuthCallback />} />
         <Route path="/auth/register/google" element={<GoogleRegister />} />
         <Route path="/superadmin/login" element={<Navigate to="/login" replace />} />
+        {/* Public headless-render target for backend PDF generation - see InvoicePrintView.jsx.
+            No ProtectedRoute: auth is a short-lived token in the URL, not a logged-in session. */}
+        <Route path="/print/invoices/:id" element={<InvoicePrintView />} />
 
         <Route
           element={

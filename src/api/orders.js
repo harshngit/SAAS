@@ -204,6 +204,9 @@ function normalizeOrder(order) {
     invoiceId: order.invoice_id || null,
     invoiceNumber: order.invoice_number || null,
     notes: order.notes || '',
+    billingAddress: order.billing_address || '',
+    deliveryAddress: order.delivery_address || '',
+    paymentTerms: order.payment_terms || '',
     discount: order.discount ?? 0,
     tax: order.tax ?? 0,
     subtotal: order.subtotal ?? fallbackSubtotal,
@@ -276,6 +279,59 @@ export async function createOrder(payload) {
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to create order. Please try again.',
+    )
+
+    return shortages ? { success: false, error: message, shortages } : { success: false, error: message }
+  }
+}
+
+// PATCH /orders/{id} - unlike createOrder's buildOrderBody (which always sends a full create
+// payload), this only includes fields the caller actually passed, since the backend treats a
+// missing field as "leave unchanged" and `items` specifically means "replace the whole line-item
+// list" - never send it unless the caller is genuinely editing items. Editable per the backend
+// contract: notes, payment_terms, billing_address, delivery_address, customer_id, warehouse_id,
+// salesperson_id, discount, tax, items. Blocked (400) once the order is cancelled/completed, has
+// an invoice, or has an out-for-delivery/loaded delivery - the backend enforces this, the
+// frontend only needs to hide the action, not duplicate the rule.
+function buildOrderUpdateBody(payload) {
+  const body = {}
+
+  if (payload.notes !== undefined) body.notes = payload.notes
+  if (payload.paymentTerms !== undefined || payload.payment_terms !== undefined) {
+    body.payment_terms = payload.paymentTerms ?? payload.payment_terms
+  }
+  if (payload.billingAddress !== undefined || payload.billing_address !== undefined) {
+    body.billing_address = payload.billingAddress ?? payload.billing_address
+  }
+  if (payload.deliveryAddress !== undefined || payload.delivery_address !== undefined) {
+    body.delivery_address = payload.deliveryAddress ?? payload.delivery_address
+  }
+  const customerId = payload.customerId || payload.customer_id
+  if (customerId) body.customer_id = customerId
+  const warehouseId = payload.warehouseId || payload.warehouse_id
+  if (warehouseId) body.warehouse_id = warehouseId
+  const salespersonId = payload.salespersonId || payload.salesperson_id
+  if (salespersonId) body.salesperson_id = salespersonId
+  if (payload.discount !== undefined && payload.discount !== '') body.discount = Number(payload.discount) || 0
+  if (payload.tax !== undefined && payload.tax !== '') body.tax = Number(payload.tax) || 0
+  if (Array.isArray(payload.items)) body.items = payload.items.map(buildItemBody)
+
+  return body
+}
+
+export async function updateOrder(orderId, payload) {
+  try {
+    const { data } = await apiClient.patch(`/orders/${orderId}`, buildOrderUpdateBody(payload), {
+      headers: authHeader(),
+    })
+
+    return { success: true, order: normalizeOrder(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const shortages = extractShortages(errorData)
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to update order. Please try again.',
     )
 
     return shortages ? { success: false, error: message, shortages } : { success: false, error: message }

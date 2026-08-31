@@ -21,7 +21,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import { downloadInvoicePdf, getInvoice, getInvoiceSettings } from '../../api/invoices'
 import { getOrganizationSettings } from '../../api/organizations'
-import { templateComponents, money as formatPreviewMoney } from './invoiceTemplates'
+import { templateComponents, money as formatPreviewMoney, buildInvoicePreviewData } from './invoiceTemplates'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
 import { formatCurrency } from '../../utils/format'
 
@@ -81,46 +81,6 @@ function HeaderInfoItem({ icon: Icon, iconClassName, label, children }) {
       </div>
     </div>
   )
-}
-
-// Shapes real invoice + organization data exactly like invoiceTemplates.jsx's sampleInvoice,
-// so the same template renderers used on the Invoice Settings page work here unmodified.
-function buildInvoicePreviewData(invoice, org) {
-  const company = org || {}
-
-  return {
-    company: {
-      name: company.name || 'Your Company',
-      address: company.registered_address || company.address || '',
-      cityLine: [company.city, company.state, company.pin_code].filter(Boolean).join(', '),
-      gstin: company.gst_number || '',
-    },
-    invoiceNo: invoice.invoiceNumber,
-    invoiceDate: formatDateLabel(invoice.invoiceDate),
-    dueDate: formatDateLabel(invoice.dueDate),
-    billTo: {
-      name: invoice.customerName || invoice.walkInName || 'Walk-in Customer',
-      address: invoice.billingAddress || '',
-      cityLine: '',
-    },
-    items: (invoice.items || []).map((item) => ({
-      name: item.productName,
-      hsn: item.hsnCode,
-      qty: item.quantity,
-      unit: '',
-      rate: item.unitPrice,
-      taxRate: item.taxRate,
-      amount: item.lineTotal,
-    })),
-    subtotal: invoice.subtotal,
-    taxTotal: invoice.tax,
-    total: invoice.total,
-    bank: {
-      name: company.bank_name || '',
-      account: company.bank_account_details || '',
-      ifsc: company.bank_ifsc || '',
-    },
-  }
 }
 
 const ZOOM_MIN = 60

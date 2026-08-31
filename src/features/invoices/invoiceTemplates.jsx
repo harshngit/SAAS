@@ -23,6 +23,53 @@ export function money(value) {
   return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+function formatDateLabel(dateString) {
+  if (!dateString) return '—'
+  return new Date(dateString).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+// Shapes real invoice + organization data exactly like sampleInvoice above, so the same
+// template renderers used for the Invoice Settings preview work unmodified for a real invoice
+// (InvoiceDetail.jsx's on-screen preview and InvoicePrintView.jsx's headless-render-to-PDF page
+// both call this - one place that defines what "the invoice" looks like as template props).
+export function buildInvoicePreviewData(invoice, org) {
+  const company = org || {}
+
+  return {
+    company: {
+      name: company.name || 'Your Company',
+      address: company.registered_address || company.address || '',
+      cityLine: [company.city, company.state, company.pin_code].filter(Boolean).join(', '),
+      gstin: company.gst_number || '',
+    },
+    invoiceNo: invoice.invoiceNumber,
+    invoiceDate: formatDateLabel(invoice.invoiceDate),
+    dueDate: formatDateLabel(invoice.dueDate),
+    billTo: {
+      name: invoice.customerName || invoice.walkInName || 'Walk-in Customer',
+      address: invoice.billingAddress || '',
+      cityLine: '',
+    },
+    items: (invoice.items || []).map((item) => ({
+      name: item.productName,
+      hsn: item.hsnCode,
+      qty: item.quantity,
+      unit: '',
+      rate: item.unitPrice,
+      taxRate: item.taxRate,
+      amount: item.lineTotal,
+    })),
+    subtotal: invoice.subtotal,
+    taxTotal: invoice.tax,
+    total: invoice.total,
+    bank: {
+      name: company.bank_name || '',
+      account: company.bank_account_details || '',
+      ifsc: company.bank_ifsc || '',
+    },
+  }
+}
+
 export function ClassicPreview({ primaryColor, fields, footerText, terms, data = sampleInvoice }) {
   const { company, billTo, items, subtotal, taxTotal, total, bank } = data
 
