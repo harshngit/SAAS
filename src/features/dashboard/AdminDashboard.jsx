@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatCompactCurrency, formatCurrency } from '../../utils/format'
 import { getAdminDashboard } from '../../api/dashboard'
+import { listOrders } from '../../api/orders'
 import {
   Ban,
   BarChart3,
@@ -224,17 +225,53 @@ function ProfitSummaryCard({ grossProfit, netProfit }) {
   )
 }
 
+function getOrderAmountSplit(order) {
+  const total = Number(order?.total) || 0
+  const items = Array.isArray(order?.items) ? order.items : []
+
+  let deliveredAmount = 0
+  let pendingAmount = 0
+  let hasDeliveryData = false
+
+  items.forEach((item) => {
+    const lineTotal = Number(item?.lineTotal ?? item?.line_total) || 0
+    const orderedQuantity = Number(item?.orderedQuantity ?? item?.ordered_quantity ?? item?.quantity) || 0
+    const deliveredQuantity = Number(item?.deliveredQuantity ?? item?.delivered_quantity)
+
+    if (orderedQuantity > 0 && Number.isFinite(deliveredQuantity) && deliveredQuantity >= 0 && deliveredQuantity <= orderedQuantity) {
+      const deliveredShare = lineTotal * (deliveredQuantity / orderedQuantity)
+      deliveredAmount += deliveredShare
+      pendingAmount += lineTotal - deliveredShare
+      hasDeliveryData = true
+    }
+  })
+
+  if (!hasDeliveryData) {
+    const status = String(order?.status || '').toLowerCase()
+    const fulfilmentStatus = String(order?.fulfilmentStatus || order?.fulfilment_status || '').toLowerCase()
+    const isDelivered = status === 'completed' || fulfilmentStatus === 'delivered' || fulfilmentStatus === 'partially_delivered'
+
+    return {
+      deliveredAmount: isDelivered ? total : 0,
+      pendingAmount: isDelivered ? 0 : total,
+    }
+  }
+
+  return {
+    deliveredAmount: Math.min(total, deliveredAmount),
+    pendingAmount: Math.max(total - deliveredAmount, 0),
+  }
+}
+
 function FeaturedSalesCard({
-  totalSales,
-  monthlyTarget = 80000,
-  monthlyAchieved = 0,
+  salesAmount,
+  receivedAmount = 0,
+  pendingAmount = 0,
   ordersCount = 0,
   deliveredCount = 0,
   pendingOrdersCount = 0,
 }) {
   const navigate = useNavigate()
-  const remainingTarget = Math.max((monthlyTarget || 0) - (monthlyAchieved || 0), 0)
-  const targetPct = monthlyTarget > 0 ? Math.min(100, ((monthlyAchieved || 0) / monthlyTarget) * 100) : 0
   const formatCount = (value) => new Intl.NumberFormat('en-IN').format(Number(value) || 0)
 
   return (
@@ -251,53 +288,46 @@ function FeaturedSalesCard({
 
       <div className="min-w-0 pr-16">
         <p className="max-w-full whitespace-nowrap text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/78">
-          Today&apos;s Sales
+          TODAY&apos;S SALES
         </p>
-        <p className="mt-1 font-(--font-display) text-[1.85rem] font-semibold leading-none tracking-tight text-white">
-          {formatCurrency(totalSales)}
+        <p className="mt-1 font-(--font-display) text-[2.1rem] font-semibold leading-none tracking-tight text-white">
+          {formatCurrency(salesAmount)}
         </p>
       </div>
 
-      <div className="relative mt-7 grid grid-cols-2 gap-x-4 gap-y-2">
+      <div className="relative mt-8 grid grid-cols-2 gap-x-8 gap-y-2">
         <div className="min-w-0">
-          <p className="text-[0.76rem] font-medium leading-none text-white/86">Received</p>
-          <p className="mt-1 truncate text-[1.15rem] font-semibold leading-none tracking-tight text-white">
-            {formatCurrency(monthlyAchieved)}
+          <p className="text-[0.92rem] font-semibold leading-none text-white/90">Received</p>
+          <p className="mt-1 truncate text-[1.50rem] font-semibold leading-none tracking-tight text-white">
+            {formatCurrency(receivedAmount)}
           </p>
         </div>
         <div className="min-w-0">
-          <p className="text-[0.76rem] font-medium leading-none text-white/86">Pending</p>
-          <p className="mt-1 truncate text-[1.15rem] font-semibold leading-none tracking-tight text-white">
-            {formatCurrency(remainingTarget)}
+          <p className="text-[0.92rem] font-semibold leading-none text-white/90">Pending</p>
+          <p className="mt-1 truncate text-[1.50rem] font-semibold leading-none tracking-tight text-white">
+            {formatCurrency(pendingAmount)}
           </p>
-        </div>
-        <div className="col-span-2 mt-1">
-          <div className="flex items-center justify-between text-[0.66rem] font-medium leading-none text-white/70">
-            <span>Monthly Target</span>
-            <span className="text-white/90">{formatCurrency(monthlyTarget)}</span>
-          </div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/15">
-            <div className="h-full rounded-full bg-white/80" style={{ width: `${targetPct}%` }} />
-          </div>
         </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-3 divide-x divide-white/25 text-left">
+      <div className="flex-1" />
+
+      <div className="mb-5 grid grid-cols-3 divide-x divide-white/25 text-left">
         <div className="pr-3">
-          <p className="text-[0.7rem] font-medium leading-none text-white/88">Orders</p>
-          <p className="mt-1 text-[1.1rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
+          <p className="text-[0.78rem] font-semibold leading-none text-white/88">Orders</p>
+          <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
         </div>
         <div className="px-3">
-          <p className="text-[0.7rem] font-medium leading-none text-white/88">Delivered</p>
-          <p className="mt-1 text-[1.1rem] font-semibold leading-none tracking-tight text-white">{formatCount(deliveredCount)}</p>
+          <p className="text-[0.78rem] font-semibold leading-none text-white/88">Delivered</p>
+          <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(deliveredCount)}</p>
         </div>
         <div className="pl-3">
-          <p className="text-[0.7rem] font-medium leading-none text-white/88">Pending</p>
-          <p className="mt-1 text-[1.1rem] font-semibold leading-none tracking-tight text-white">{formatCount(pendingOrdersCount)}</p>
+          <p className="text-[0.78rem] font-semibold leading-none text-white/88">Pending</p>
+          <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(pendingOrdersCount)}</p>
         </div>
       </div>
 
-      <div className="mt-auto flex items-end justify-end pt-3 text-[0.84rem] font-medium leading-4 text-white/90">
+      <div className="mt-auto flex items-end justify-end pt-3 text-[0.92rem] font-semibold leading-4 text-white/90">
         <span className="inline-flex items-center gap-1.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-white">
           View Sales
           <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
@@ -381,6 +411,7 @@ export default function AdminDashboard() {
   const [recentOrdersSearch, setRecentOrdersSearch] = useState('')
   const [topProductsMetric, setTopProductsMetric] = useState('amount')
   const [dashboard, setDashboard] = useState(null)
+  const [orders, setOrders] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(() => {
@@ -392,16 +423,20 @@ export default function AdminDashboard() {
     setIsLoading(true)
     setError('')
 
-    const result = await getAdminDashboard(resolveDateRange(preset))
+    const [dashboardResult, ordersResult] = await Promise.all([
+      getAdminDashboard(resolveDateRange(preset)),
+      listOrders(),
+    ])
 
     setIsLoading(false)
 
-    if (!result.success) {
-      setError(result.error)
+    if (!dashboardResult.success) {
+      setError(dashboardResult.error)
       return
     }
 
-    setDashboard(result.dashboard)
+    setDashboard(dashboardResult.dashboard)
+    setOrders(ordersResult.success ? ordersResult.orders : [])
   }, [])
 
   useEffect(() => {
@@ -464,6 +499,9 @@ export default function AdminDashboard() {
   const grossProfit = summary.gross_profit ?? 0
   const netProfit = summary.net_profit ?? 0
   const salesGrowth = summary.sales_growth_percentage ?? 0
+  const monthlyTarget = summary.monthly_target ?? 80000
+  const monthlySales = summary.month_sales ?? summary.period_sales ?? 0
+  const monthlyTargetProgress = monthlyTarget > 0 ? Math.min(100, (monthlySales / monthlyTarget) * 100) : 0
   const totalReceivables = receivablesPayables.receivables ?? 0
   const totalPayables = receivablesPayables.payables ?? 0
   const totalOutstanding = totalReceivables + totalPayables
@@ -504,6 +542,22 @@ export default function AdminDashboard() {
   )
   const featuredPendingCount = Number(
     ordersSummary.pending ?? ordersSummary.processing ?? Math.max(featuredOrdersCount - featuredDeliveredCount, 0),
+  )
+  const today = new Date().toISOString().slice(0, 10)
+  const todaysOrders = orders.filter(
+    (order) => (order.orderDate || order.createdAt || '').slice(0, 10) === today && order.status !== 'cancelled',
+  )
+  const todaysSalesAmount = todaysOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0)
+  const orderAmounts = orders.reduce(
+    (totals, order) => {
+      if (order.status === 'cancelled') return totals
+      const { deliveredAmount, pendingAmount } = getOrderAmountSplit(order)
+      return {
+        deliveredAmount: totals.deliveredAmount + deliveredAmount,
+        pendingAmount: totals.pendingAmount + pendingAmount,
+      }
+    },
+    { deliveredAmount: 0, pendingAmount: 0 },
   )
   const recentOrdersSearchTerm = recentOrdersSearch.trim().toLowerCase()
   const filteredRecentOrders = !recentOrdersSearchTerm
@@ -546,9 +600,9 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 gap-2 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
         <div className="min-w-0 self-start">
           <FeaturedSalesCard
-            totalSales={summary.today_sales}
-            monthlyTarget={summary.monthly_target ?? 80000}
-            monthlyAchieved={summary.month_sales ?? summary.period_sales ?? 0}
+            salesAmount={summary.today_sales ?? todaysSalesAmount}
+            receivedAmount={orderAmounts.deliveredAmount}
+            pendingAmount={orderAmounts.pendingAmount}
             ordersCount={featuredOrdersCount}
             deliveredCount={featuredDeliveredCount}
             pendingOrdersCount={featuredPendingCount}
@@ -663,12 +717,17 @@ export default function AdminDashboard() {
               <SignalRow label="Payables Overdue" positive={(receivablesPayables.overdue_payables || 0) === 0} />
               <SignalRow label="Order Cancellations" positive={(ordersSummary.cancelled || 0) === 0} />
             </div>
-            <div className="mt-3 h-16 overflow-hidden rounded-[1rem] bg-linear-to-r from-white to-emerald-50/80 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={salesTrendData}>
-                  <Line type="monotone" dataKey="value" stroke="#16a34a" strokeWidth={2.4} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="mt-3 rounded-[1rem] bg-[linear-gradient(180deg,#175e17_0%,#0c4608_100%)] p-3 text-white">
+              <div className="flex items-center justify-between gap-3 text-[0.72rem] font-semibold">
+                <span className="text-white/88">Monthly Target</span>
+                <span className="text-white/92">{formatCurrency(monthlyTarget)}</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/12">
+                <div
+                  className="h-full rounded-full bg-white/80 transition-all duration-300"
+                  style={{ width: `${monthlyTargetProgress}%` }}
+                />
+              </div>
             </div>
           </DashboardCard>
 
@@ -724,7 +783,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="mt-1 space-y-3.5 xl:-mt-30">
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
             <DashboardCard
               title="Cashflow"
               subtitle={`Net for period ${formatCurrency(summary.period_sales ?? summary.month_sales)}`}
@@ -732,11 +791,17 @@ export default function AdminDashboard() {
               className="h-full min-h-[420px]"
             >
               <div className="-mr-2">
-                <ResponsiveContainer width="100%" height={320}>
+                <ResponsiveContainer width="100%" height={350}>
                   <BarChart data={cashflowData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid vertical={false} stroke="#edf1f5" />
                     <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval={4} />
-                    <YAxis tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} tickFormatter={formatCompactCurrency} width={22} />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: '#9aa1ac' }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={formatCompactCurrency}
+                      width={40}
+                    />
                     <Tooltip content={<CashflowTooltip />} cursor={{ fill: '#f8f9fa' }} />
                     <Bar name="Inflow" dataKey="value" fill="#14532d" radius={[6, 6, 0, 0]} barSize={18} />
                     <Bar name="Outflow" dataKey="outflow" fill="#d1d5db" radius={[6, 6, 0, 0]} barSize={18} />
@@ -809,22 +874,53 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </DashboardCard>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+            <DashboardCard
+              title="Sales Trend"
+              subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
+              actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
+              className="h-full min-h-[350px] self-start"
+            >
+                <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={salesTrendData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke="#edf1f5" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval={5} />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: '#9aa1ac' }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={formatCompactCurrency}
+                    width={40}
+                  />
+                  <Tooltip content={<CashflowTooltip />} />
+                  <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="mt-3 flex items-center justify-center text-[0.7rem]">
+                <button className="inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                  View Sales Report
+                  <ChevronRight className="size-4 text-primary-600" />
+                </button>
+              </div>
+            </DashboardCard>
 
             <DashboardCard
               title="Expense Breakdown"
               subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
-              className="h-full min-h-[420px] [&>div:first-child]:mb-4"
+              className="h-full min-h-[350px] [&>div:first-child]:mb-4"
             >
-              <div className="relative">
-                <ResponsiveContainer width="100%" height={175}>
+              <div className="relative mx-auto h-[176px] w-[176px]">
+                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={expenseBreakdown}
                       dataKey="value"
                       nameKey="name"
-                      innerRadius="58%"
-                      outerRadius="86%"
+                      innerRadius={58}
+                      outerRadius={88}
                       paddingAngle={3}
                       stroke="none"
                     >
@@ -855,7 +951,7 @@ export default function AdminDashboard() {
                 )}
               </div>
               <div className="mt-auto flex items-center justify-center text-[0.7rem]">
-                <button className=" mt-31 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                <button className=" mt-40 inline-flex items-center gap-1.5 font-semibold text-primary-600">
                   View Expense Report
                   <ChevronRight className="size-4 text-primary-600" />
                 </button>
@@ -863,30 +959,7 @@ export default function AdminDashboard() {
             </DashboardCard>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
-            <DashboardCard
-              title="Sales Trend"
-              subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
-              actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
-              className="h-full min-h-[350px] self-start"
-            >
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={salesTrendData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="#edf1f5" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval={5} />
-                  <YAxis tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} tickFormatter={formatCompactCurrency} width={28} />
-                  <Tooltip content={<CashflowTooltip />} />
-                  <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-              <div className="mt-3 flex items-center justify-center text-[0.7rem]">
-                <button className="inline-flex items-center gap-1.5 font-semibold text-primary-600">
-                  View Sales Report
-                  <ChevronRight className="size-4 text-primary-600" />
-                </button>
-              </div>
-            </DashboardCard>
-
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
             <DashboardCard
               title="Top Selling Products"
               subtitle={topProductsMetric === 'amount' ? 'Amount' : 'Quantity'}
@@ -914,7 +987,7 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               }
-              className="h-full min-h-[420px] [&>div:first-child]:mb-4"
+              className="h-full min-h-[330px] [&>div:first-child]:mb-4"
             >
               <div className="flex h-full flex-col">
                 {topProductsSorted.length === 0 ? (
@@ -943,8 +1016,8 @@ export default function AdminDashboard() {
                     })}
                   </div>
                 )}
-                <div className="mt-auto flex items-center justify-center pt-3 text-[0.7rem]">
-                  <button className="mt-73 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                <div className="mt-20 flex items-center justify-center pt-3 text-[0.7rem]">
+                  <button className="inline-flex items-center gap-1.5 font-semibold text-primary-600">
                     View Product Report
                     <ChevronRight className="size-4 text-primary-600" />
                   </button>
@@ -953,16 +1026,10 @@ export default function AdminDashboard() {
             </DashboardCard>
 
             <DashboardCard
-              title={
-                <>
-                  <span className="whitespace-nowrap">Top 5 Customers</span>
-                  <br />
-                  <span className="whitespace-nowrap">by Sales</span>
-                </>
-              }
+              title="Top Selling Customers"
               subtitle={dateRangePresets.find((preset) => preset.value === datePreset)?.label}
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{dateRangePresets.find((preset) => preset.value === datePreset)?.label}</span>}
-              className="min-h-[350px] [&>div:first-child_h3]:text-[0.78rem]"
+              className="min-h-[300px] [&>div:first-child_h3]:text-[0.78rem]"
             >
               <div className="flex h-full flex-col">
                 {topCustomers.length === 0 ? (
@@ -985,8 +1052,8 @@ export default function AdminDashboard() {
                     })}
                   </div>
                 )}
-                <div className="mt-auto flex items-center justify-center pt-3 text-[0.7rem]">
-                  <button className="mt-78 inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                <div className="mt-44 flex items-center justify-center pt-3 text-[0.7rem]">
+                  <button className="inline-flex items-center gap-1.5 font-semibold text-primary-600">
                     View Customer Report
                     <ChevronRight className="size-4 text-primary-600" />
                   </button>
