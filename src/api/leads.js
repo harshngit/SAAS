@@ -38,11 +38,22 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
+// Full status set (used for list badges + filters). The backend value stays `won`;
+// the UI calls it "Converted" - it means the lead became a customer.
 export const LEAD_STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
   { value: 'contacted', label: 'Contacted' },
   { value: 'qualified', label: 'Qualified' },
-  { value: 'won', label: 'Won' },
+  { value: 'won', label: 'Converted' },
+  { value: 'lost', label: 'Lost' },
+]
+
+// The only statuses a user may set by hand. "Converted" is applied automatically
+// by the Convert-to-Customer flow, never chosen manually.
+export const LEAD_MANUAL_STATUS_OPTIONS = [
+  { value: 'new', label: 'New' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'qualified', label: 'Qualified' },
   { value: 'lost', label: 'Lost' },
 ]
 

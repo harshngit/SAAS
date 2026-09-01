@@ -70,7 +70,7 @@ export default function SupplierForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full rounded-[1.75rem] border border-neutral-100 bg-white p-6 shadow-(--shadow-card)"
+      className="w-full rounded-2xl border border-neutral-100 bg-white p-6 shadow-(--shadow-card)"
     >
       <div className="flex flex-col gap-4 border-b border-neutral-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
         <div>

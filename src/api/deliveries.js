@@ -37,9 +37,10 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
-// delivery.status is now normalized to these public values (pending covers planned/rejected,
-// accepted covers accepted/ready/loaded, returned covers failed) - the old raw values are kept
-// here too since GET /deliveries still accepts them as filter query params.
+// Raw status values GET /deliveries still accepts as a `?status=` query-param filter. NOT for
+// display - the UI derives its 6-stage vocabulary in features/deliveries/deliveryStage.js from
+// the collapsed public status the API returns (pending covers planned/rejected, accepted covers
+// accepted/ready/loaded, returned covers failed).
 export const DELIVERY_STATUS_OPTIONS = [
   { value: 'pending', label: 'Pending' },
   { value: 'planned', label: 'Planned' },
@@ -120,6 +121,7 @@ function normalizeDelivery(delivery) {
     dispatchedById: delivery.dispatched_by_id || '',
     confirmedAt: delivery.confirmed_at || null,
     failureReason: delivery.failure_reason || '',
+    receiverName: delivery.receiver_name || '',
     notes: delivery.notes || '',
     items: (delivery.items || []).map(normalizeDeliveryItem),
     plannedTotal: delivery.planned_total ?? 0,
@@ -391,6 +393,10 @@ export async function confirmDelivery(deliveryId, payload) {
     if (payload.podPhotoFileIds?.length) requestBody.pod_photo_file_ids = payload.podPhotoFileIds
     if (payload.signatureFileId) requestBody.signature_file_id = payload.signatureFileId
     if (payload.notes) requestBody.notes = payload.notes
+    const receiverName = payload.receiverName ?? payload.receiver_name
+    if (!payload.failed && receiverName && String(receiverName).trim()) {
+      requestBody.receiver_name = String(receiverName).trim()
+    }
     if (payload.failed && payload.failureReason) requestBody.failure_reason = payload.failureReason
 
     const { data } = await apiClient.post(`/deliveries/${deliveryId}/confirm`, requestBody, {

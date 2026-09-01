@@ -125,9 +125,20 @@ function normalizeUploadedDocument(document) {
 
 // The API takes a "sectioned" body (basic_information, contact_information, address_information, ...).
 // CustomerForm keeps working with a flat camelCase shape, so this is the only place that knows the split.
+// The customer profile image lives at basic_information.profile_image_id (a raw file_id from
+// POST /files/upload). A freshly uploaded id is sent; an explicit '' clears it; an untouched
+// value (a display URL after normalize) is left alone so a plain edit never wipes the image.
+function toProfileImageField(payload) {
+  const raw = payload.profileImage ?? payload.profile_image_id ?? payload.profile_image
+  if (isFileId(raw)) return String(raw).trim()
+  if (raw === '') return ''
+  return undefined
+}
+
 function buildCustomerRequestBody(payload) {
   const customerName = (payload.customerName || payload.name || '').trim()
   const coordinates = parseMapsCoordinates(payload.googleMapsLocation || payload.google_maps_location)
+  const profileImageId = toProfileImageField(payload)
   // Documents are attached the same way whether the customer is brand-new or already exists:
   // upload with POST /files/upload, then send the returned file_id here (per the backend's
   // DocumentsSection contract). A field is included only when there's something to write - a
@@ -155,6 +166,7 @@ function buildCustomerRequestBody(payload) {
       customer_category: payload.customerCategory || '',
       customer_since: toIsoDateTime(payload.customerSince || payload.customer_since),
       status: payload.status || 'active',
+      ...(profileImageId !== undefined ? { profile_image_id: profileImageId } : {}),
     },
     contact_information: {
       primary_contact_person: (payload.primaryContactPerson || payload.primary_contact_person || '').trim(),
@@ -261,6 +273,8 @@ function normalizeSectionedCustomer(data) {
     category: basic.customer_category || '',
     customerSince: basic.customer_since,
     status: basic.status || (data.is_active === false ? 'inactive' : 'active'),
+    profileImageId: basic.profile_image_id || '',
+    profileImage: getFileUrl(basic.profile_image_id),
 
     primaryContactPerson: contact.primary_contact_person || '',
     designation: contact.designation || '',

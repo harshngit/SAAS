@@ -610,7 +610,7 @@ export default function UserEdit() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-[1.75rem] border border-neutral-100 bg-white shadow-(--shadow-card)"
+      className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)"
     >
       <div className="grid flex-1 lg:grid-cols-[17rem_minmax(0,1fr)]">
         <aside className="border-b border-neutral-100 p-6 lg:border-b-0 lg:border-r">

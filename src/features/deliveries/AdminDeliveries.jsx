@@ -8,35 +8,8 @@ import StatCard from '../../components/ui/StatCard'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
 import { listDeliveries } from '../../api/deliveries'
+import { DELIVERY_STAGE_FILTER_OPTIONS, getDeliveryStage } from './deliveryStage'
 import { formatCurrency } from '../../utils/format'
-
-const statusVariant = {
-  pending: 'info',
-  delivered: 'success',
-  in_transit: 'warning',
-  planned: 'info',
-  accepted: 'success',
-  rejected: 'danger',
-  ready: 'success',
-  loaded: 'info',
-  partially_delivered: 'warning',
-  returned: 'danger',
-  failed: 'danger',
-  cancelled: 'neutral',
-}
-
-// delivery.status here is always the backend's normalized public value (this list filters the
-// already-fetched, already-normalized rows client-side) - only these 7 values can ever appear,
-// unlike the raw+legacy DELIVERY_STATUS_OPTIONS export which is meant for server query params.
-const publicDeliveryStatusOptions = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'accepted', label: 'Accepted' },
-  { value: 'in_transit', label: 'In Transit' },
-  { value: 'partially_delivered', label: 'Partially Delivered' },
-  { value: 'delivered', label: 'Delivered' },
-  { value: 'returned', label: 'Returned' },
-  { value: 'cancelled', label: 'Cancelled' },
-]
 
 export default function AdminDeliveries() {
   const navigate = useNavigate()
@@ -67,18 +40,17 @@ export default function AdminDeliveries() {
   }, [loadDeliveries])
 
   const stats = useMemo(() => {
-    const delivered = deliveries.filter((row) => row.status === 'delivered').length
-    const inProgress = deliveries.filter((row) => ['accepted', 'in_transit'].includes(row.status)).length
-    const failed = deliveries.filter((row) => row.status === 'returned').length
-    // "rejected" is no longer separable from "pending" (not-yet-accepted) at the public status
-    // level - this now tracks all deliveries awaiting a partner's response either way.
-    const rejected = deliveries.filter((row) => row.status === 'pending').length
-    return { total: deliveries.length, delivered, inProgress, failed, rejected }
+    const stageOf = (row) => getDeliveryStage(row).key
+    const delivered = deliveries.filter((row) => stageOf(row) === 'delivered').length
+    const inProgress = deliveries.filter((row) => ['accepted', 'picking', 'loaded', 'in_transit'].includes(stageOf(row))).length
+    const failed = deliveries.filter((row) => stageOf(row) === 'failed').length
+    const awaiting = deliveries.filter((row) => ['assigned', 'rejected'].includes(stageOf(row))).length
+    return { total: deliveries.length, delivered, inProgress, failed, awaiting }
   }, [deliveries])
 
   const filteredDeliveries = useMemo(() => {
     if (statusFilter === 'all') return deliveries
-    return deliveries.filter((row) => row.status === statusFilter)
+    return deliveries.filter((row) => getDeliveryStage(row).key === statusFilter)
   }, [deliveries, statusFilter])
 
   return (
@@ -93,12 +65,12 @@ export default function AdminDeliveries() {
         <StatCard icon={CheckCircle2} label="Delivered" value={stats.delivered} iconVariant="success" />
         <StatCard icon={Clock} label="In Progress" value={stats.inProgress} iconVariant="warning" />
         <StatCard icon={XCircle} label="Failed" value={stats.failed} iconVariant="danger" />
-        <button type="button" className="block w-full text-left" onClick={() => setStatusFilter('pending')}>
-          <StatCard icon={Ban} label="Pending" value={stats.rejected} iconVariant="danger" />
+        <button type="button" className="block w-full text-left" onClick={() => setStatusFilter('assigned')}>
+          <StatCard icon={Ban} label="Awaiting Response" value={stats.awaiting} iconVariant="danger" />
         </button>
       </div>
 
-      <Card title="All Deliveries" subtitle="Planned, loaded, in transit, and completed">
+      <Card title="All Deliveries" subtitle="Every delivery across the organization">
         {error ? (
           <div className="py-8 text-center">
             <p className="text-sm text-red-600">{error}</p>
@@ -111,7 +83,7 @@ export default function AdminDeliveries() {
           <>
             <div className="mb-4 flex justify-end">
               <Select
-                options={[{ value: 'all', label: 'All status' }, ...publicDeliveryStatusOptions]}
+                options={[{ value: 'all', label: 'All status' }, ...DELIVERY_STAGE_FILTER_OPTIONS]}
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
                 className="sm:w-52"
@@ -129,11 +101,10 @@ export default function AdminDeliveries() {
                   key: 'status',
                   header: 'Status',
                   sortable: true,
-                  render: (row) => (
-                    <Badge variant={statusVariant[row.status] || 'neutral'} dot>
-                      {publicDeliveryStatusOptions.find((option) => option.value === row.status)?.label || row.status}
-                    </Badge>
-                  ),
+                  render: (row) => {
+                    const stage = getDeliveryStage(row)
+                    return <Badge variant={stage.variant} dot>{stage.label}</Badge>
+                  },
                 },
                 { key: 'scheduledDate', header: 'Scheduled Date', sortable: true },
                 { key: 'amountDue', header: 'Amount Due', sortable: true, align: 'right', render: (row) => formatCurrency(row.amountDue) },

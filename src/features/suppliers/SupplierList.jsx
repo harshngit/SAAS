@@ -216,7 +216,7 @@ export default function SupplierList() {
   return (
     <div className="space-y-5">
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-5 py-4">
+        <div className="border-b border-neutral-100 px-4 py-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-5">
               {supplierStatusTabs.map((tab) => {
@@ -246,7 +246,7 @@ export default function SupplierList() {
           </div>
         </div>
 
-        <div className="border-b border-neutral-100 px-5 py-3">
+        <div className="border-b border-neutral-100 px-4 py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative w-full sm:w-80">
@@ -278,7 +278,7 @@ export default function SupplierList() {
           </div>
         </div>
 
-        <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">
+        <div className="overflow-x-auto bg-neutral-50/35 py-4">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -377,7 +377,7 @@ export default function SupplierList() {
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-3 text-xs text-neutral-400">
+        <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-xs text-neutral-400">
           <span>
             {filteredSuppliers.length === 0 ? '0' : `1 to ${filteredSuppliers.length}`} of {suppliers.length}
           </span>

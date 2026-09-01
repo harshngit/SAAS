@@ -2,7 +2,20 @@ import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
-export default function Modal({ isOpen, onClose, title, children, footer, className = '' }) {
+const MODAL_SIZE_CLASS = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
+  '4xl': 'max-w-4xl',
+}
+
+export default function Modal({ isOpen, onClose, title, children, footer, size = 'md', className = '' }) {
+  // A width class passed via `className` still wins; otherwise the `size` prop drives it.
+  const hasWidthOverride = /(^|\s)(max-w-|w-\[)/.test(className)
+  const sizeClass = MODAL_SIZE_CLASS[size] || MODAL_SIZE_CLASS.md
   useEffect(() => {
     if (!isOpen) return
 
@@ -30,7 +43,7 @@ export default function Modal({ isOpen, onClose, title, children, footer, classN
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'modal-title' : undefined}
-        className={`w-full max-w-md rounded-xl border border-neutral-200 bg-[#fbfbfa] shadow-[0_1px_0_rgba(0,0,0,0.02)] ${className}`}
+        className={`max-h-[calc(100vh-2rem)] w-full overflow-y-auto rounded-xl border border-neutral-200 bg-[#fbfbfa] shadow-[0_1px_0_rgba(0,0,0,0.02)] ${hasWidthOverride ? '' : sizeClass} ${className}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">

@@ -48,7 +48,9 @@ export default function EndOfDayReturn() {
       }
 
       setSession(result.session)
-      setReturns(Object.fromEntries(result.session.items.map((item) => [item.productId, 0])))
+      if (result.session) {
+        setReturns(Object.fromEntries(result.session.items.map((item) => [item.productId, 0])))
+      }
       setIsLoading(false)
     })
   }, [currentUser?.id])

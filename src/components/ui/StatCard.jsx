@@ -12,13 +12,13 @@ const iconVariantClasses = {
 export default function StatCard({ icon: Icon, label, value, iconVariant = 'primary', delta, actions, className = '' }) {
   return (
     <div
-      className={`group rounded-[1.25rem] border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card) transition-all duration-200 hover:-translate-y-0.5 hover:shadow-(--shadow-card-hover) ${className}`}
+      className={`group rounded-2xl border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card) transition-all duration-200 hover:-translate-y-0.5 hover:shadow-(--shadow-card-hover) ${className}`}
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium leading-5 text-neutral-500">{label}</p>
         <div className="flex shrink-0 items-center gap-1">
           {Icon && (
-            <div className={`flex size-10 items-center justify-center rounded-[0.9rem] ${iconVariantClasses[iconVariant]}`}>
+            <div className={`flex size-10 items-center justify-center rounded-2xl ${iconVariantClasses[iconVariant]}`}>
               <Icon className="size-4" aria-hidden="true" />
             </div>
           )}

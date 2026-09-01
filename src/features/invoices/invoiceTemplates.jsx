@@ -20,7 +20,7 @@ export const sampleInvoice = {
 
 export function money(value) {
   const amount = Number(value) || 0
-  return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `₹ ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function formatDateLabel(dateString) {

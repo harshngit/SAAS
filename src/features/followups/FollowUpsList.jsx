@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Edit, Trash2, Calendar, CheckCircle, RotateCw } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowRightCircle, Plus, Edit, Trash2, CheckCircle, RotateCw } from 'lucide-react'
+import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs'
 import {
   completeFollowUp,
   createFollowUp,
@@ -15,9 +18,124 @@ import {
   updateFollowUp,
 } from '../../api/followups'
 import { listCustomers } from '../../api/customers'
+import { listVisits } from '../../api/visits'
+import { listLeads } from '../../api/leads'
 import { listAssignableStaff } from '../../api/users'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
+import { FOLLOWUP_OUTCOME_OPTIONS, deriveFollowUpType, describeDueDate, dayDelta } from '../leads/leadActivity'
+import ConvertLeadModal from '../leads/ConvertLeadModal'
+import { DEMO_RECORDS_ENABLED, demoFollowUps, demoLeads, isDemoRecord } from '../leads/demoData'
+
+// The single most relevant next action for a completed follow-up, based on its outcome.
+// Convert/View-Customer only apply to Leads (never Customers, never Lost/Converted leads).
+function followUpNextAction(followUp, contact) {
+  if (followUp.status !== 'completed') return null
+  const isLead = contact.kind === 'Lead'
+
+  if (isLead && (contact.convertedCustomerId || contact.leadStatus === 'won')) {
+    return contact.convertedCustomerId
+      ? { kind: 'viewCustomer', customerId: contact.convertedCustomerId }
+      : null
+  }
+  if (isLead && contact.leadStatus === 'lost') return null
+
+  switch (followUp.outcome) {
+    case 'ready_to_convert':
+      return isLead ? { kind: 'convert', leadId: contact.leadId } : null
+    case 'need_another_followup':
+      return { kind: 'addFollowUp' }
+    case 'ready_for_visit':
+      return { kind: 'logVisit' }
+    default:
+      return null
+  }
+}
+
+const FOLLOWUP_TABS = [
+  { value: 'today', label: 'Today' },
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'overdue', label: 'Overdue' },
+  { value: 'completed', label: 'Completed' },
+]
+
+function bucketForFollowUp(followUp) {
+  if (followUp.status === 'completed') return 'completed'
+  const delta = dayDelta(followUp.dueDate)
+  if (delta === null) return 'upcoming'
+  if (delta < 0) return 'overdue'
+  if (delta === 0) return 'today'
+  return 'upcoming'
+}
+
+const PRIORITY_VARIANT = { low: 'neutral', medium: 'info', high: 'warning', urgent: 'danger' }
+
+function titleCase(value = '') {
+  return String(value).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function FollowUpRow({ followUp, contact, actingId, onComplete, onEdit, onDelete }) {
+  const isDone = followUp.status === 'completed'
+  const due = describeDueDate(followUp.dueDate)
+  const type = deriveFollowUpType(followUp.title)
+
+  return (
+    <tr className={`transition-colors hover:bg-primary-50/30 ${isDone ? 'opacity-60' : ''}`}>
+      <td className="px-4 py-3.5">
+        <p className="font-medium text-neutral-900">
+          {followUp.title}
+          {isDemoRecord(followUp.id) && (
+            <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
+          )}
+        </p>
+        {followUp.description && <p className="mt-0.5 max-w-md truncate text-xs text-neutral-400">{followUp.description}</p>}
+        {followUp.outcome && (
+          <p className="mt-0.5 text-xs text-neutral-500">Outcome: {titleCase(followUp.outcome)}</p>
+        )}
+      </td>
+      <td className="px-4 py-3.5">
+        <p className="font-medium text-neutral-900">{contact.name}</p>
+        {contact.kind && (
+          <span className="mt-0.5 inline-block rounded-md bg-neutral-100 px-2 py-0.5 text-[0.7rem] font-medium text-neutral-500">
+            {contact.kind}
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-3.5">
+        <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-600">{type}</span>
+      </td>
+      <td className={`whitespace-nowrap px-4 py-3.5 text-sm ${due.tone === 'danger' && !isDone ? 'font-medium text-red-600' : 'text-neutral-600'}`}>
+        {isDone ? formatDueDate(followUp.dueDate) : due.label}
+      </td>
+      <td className="px-4 py-3.5">
+        <Badge variant={PRIORITY_VARIANT[followUp.priority] || 'neutral'}>{titleCase(followUp.priority)}</Badge>
+      </td>
+      <td className="px-4 py-3.5">
+        <Badge variant={isDone ? 'success' : 'warning'}>{isDone ? 'Completed' : 'Pending'}</Badge>
+      </td>
+      <td className="px-4 py-3.5 text-right">
+        <div className="flex items-center justify-end gap-1">
+          {!isDone && (
+            <button
+              onClick={onComplete}
+              disabled={actingId === followUp.id}
+              className="rounded-lg p-2 text-neutral-500 hover:bg-green-50 hover:text-green-600 disabled:opacity-40"
+              title="Complete"
+            >
+              <CheckCircle className="size-4" />
+            </button>
+          )}
+          <button onClick={onEdit} className="rounded-lg p-2 text-neutral-500 hover:bg-primary-50 hover:text-primary-600" title="Edit">
+            <Edit className="size-4" />
+          </button>
+          <button onClick={onDelete} className="rounded-lg p-2 text-neutral-500 hover:bg-red-50 hover:text-red-600" title="Delete">
+            <Trash2 className="size-4" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
+}
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -44,6 +162,7 @@ function formatDueDate(value) {
 
 export default function FollowUpsList() {
   const { showToast } = useToast()
+  const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
 
   const [followUps, setFollowUps] = useState([])
@@ -53,6 +172,13 @@ export default function FollowUpsList() {
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true)
   const [staffMembers, setStaffMembers] = useState([])
   const [isLoadingStaff, setIsLoadingStaff] = useState(true)
+  // Visits + leads are loaded only to resolve the real Lead/Customer name (and lead
+  // status) for follow-ups created from a visit - they carry no such info themselves.
+  const [visits, setVisits] = useState([])
+  const [leads, setLeads] = useState([])
+  const [convertLeadId, setConvertLeadId] = useState(null)
+  // Demo-lead status overrides after a simulated conversion (UI testing only).
+  const [demoLeadOverrides, setDemoLeadOverrides] = useState({})
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingFollowUp, setEditingFollowUp] = useState(null)
@@ -61,6 +187,10 @@ export default function FollowUpsList() {
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [actingId, setActingId] = useState('')
+  const [activeTab, setActiveTab] = useState('today')
+  const [completingFollowUp, setCompletingFollowUp] = useState(null)
+  const [completeOutcome, setCompleteOutcome] = useState('interested')
+  const [completeNotes, setCompleteNotes] = useState('')
 
   const loadFollowUps = useCallback(async () => {
     setIsLoading(true)
@@ -75,7 +205,9 @@ export default function FollowUpsList() {
       return
     }
 
-    setFollowUps(result.followUps.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)))
+    // Demo rows (UI testing only) are appended locally - never sent to the backend.
+    const rows = DEMO_RECORDS_ENABLED ? [...result.followUps, ...demoFollowUps] : result.followUps
+    setFollowUps(rows.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)))
     setIsLoading(false)
   }, [currentUser?.id])
 
@@ -92,7 +224,60 @@ export default function FollowUpsList() {
       setIsLoadingStaff(false)
       if (result.success) setStaffMembers(result.users)
     })
+    listVisits().then((result) => {
+      if (result.success) setVisits(result.visits)
+    })
+    listLeads().then((result) => {
+      if (result.success) setLeads(result.leads)
+    })
   }, [])
+
+  const leadIndex = useMemo(() => {
+    const map = new Map()
+    leads.forEach((lead) => map.set(lead.id, lead))
+    if (DEMO_RECORDS_ENABLED) {
+      demoLeads.forEach((lead) => map.set(lead.id, { ...lead, ...(demoLeadOverrides[lead.id] || {}) }))
+    }
+    return map
+  }, [leads, demoLeadOverrides])
+
+  // visit id -> { name, kind, leadId, customerId }
+  const visitIndex = useMemo(() => {
+    const map = new Map()
+    visits.forEach((visit) => {
+      map.set(visit.id, {
+        name: visit.customerName || visit.leadName || (visit.leadId ? 'Lead' : 'Customer'),
+        kind: visit.leadId ? 'Lead' : 'Customer',
+        leadId: visit.leadId || '',
+        customerId: visit.customerId || '',
+      })
+    })
+    return map
+  }, [visits])
+
+  const resolveContact = useCallback(
+    (followUp) => {
+      let base
+      if (followUp.customerName) {
+        base = { name: followUp.customerName, kind: 'Customer', leadId: '', customerId: followUp.customerId }
+      } else if (followUp.leadId) {
+        base = { name: followUp.leadName || 'Lead', kind: 'Lead', leadId: followUp.leadId, customerId: '' }
+      } else if (followUp.visitId && visitIndex.has(followUp.visitId)) {
+        base = { ...visitIndex.get(followUp.visitId) }
+      } else {
+        return { name: 'Unknown contact', kind: null, leadId: '', customerId: '', leadStatus: '', convertedCustomerId: '' }
+      }
+      // Enrich a lead contact with its live status so eligibility rules can be applied.
+      const lead = base.leadId ? leadIndex.get(base.leadId) : null
+      return {
+        ...base,
+        name: lead?.name || base.name,
+        leadStatus: lead?.leadStatus || '',
+        convertedCustomerId: lead?.convertedCustomerId || '',
+      }
+    },
+    [visitIndex, leadIndex],
+  )
 
   const customerOptions = useMemo(
     () => customers.map((customer) => ({ value: customer.id, label: `${customer.name}${customer.phone ? ` • ${customer.phone}` : ''}` })),
@@ -102,6 +287,14 @@ export default function FollowUpsList() {
     () => staffMembers.map((user) => ({ value: user.id, label: user.name })),
     [staffMembers],
   )
+
+  const buckets = useMemo(() => {
+    const grouped = { today: [], upcoming: [], overdue: [], completed: [] }
+    followUps.forEach((followUp) => {
+      grouped[bucketForFollowUp(followUp)].push(followUp)
+    })
+    return grouped
+  }, [followUps])
 
   const handleAddFollowUp = () => {
     setEditingFollowUp(null)
@@ -128,6 +321,13 @@ export default function FollowUpsList() {
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return
+
+    // Demo rows are local-only - drop them without hitting the backend.
+    if (isDemoRecord(deleteTarget.id)) {
+      setFollowUps((current) => current.filter((entry) => entry.id !== deleteTarget.id))
+      setDeleteTarget(null)
+      return
+    }
 
     setActingId(deleteTarget.id)
     const result = await deleteFollowUp(deleteTarget.id)
@@ -159,10 +359,24 @@ export default function FollowUpsList() {
       return
     }
 
+    const dueDate = `${formData.dueDate}T${formData.dueTime}:00`
+
+    // Editing a demo row stays local - no backend PATCH.
+    if (editingFollowUp && isDemoRecord(editingFollowUp.id)) {
+      setFollowUps((current) =>
+        current.map((entry) =>
+          entry.id === editingFollowUp.id
+            ? { ...entry, title: formData.title, description: formData.description, dueDate, priority: formData.priority }
+            : entry,
+        ),
+      )
+      setIsModalOpen(false)
+      return
+    }
+
     setIsSaving(true)
     setFormError('')
 
-    const dueDate = `${formData.dueDate}T${formData.dueTime}:00`
     const payload = {
       customerId: formData.customerId,
       title: formData.title,
@@ -191,10 +405,38 @@ export default function FollowUpsList() {
     setIsModalOpen(false)
   }
 
-  const toggleStatus = async (followUp) => {
+  const openComplete = (followUp) => {
     if (followUp.status === 'completed') return
+    setCompletingFollowUp(followUp)
+    setCompleteOutcome('interested')
+    setCompleteNotes('')
+  }
+
+  const handleComplete = async () => {
+    const followUp = completingFollowUp
+    if (!followUp) return
+
+    // Completing a demo row stays local - no backend call.
+    const applyLocal = (base) =>
+      setFollowUps((current) =>
+        current.map((entry) =>
+          entry.id === followUp.id
+            ? { ...base, status: 'completed', completedAt: new Date().toISOString(), outcome: completeOutcome, outcomeNotes: completeNotes.trim() }
+            : entry,
+        ),
+      )
+
+    if (isDemoRecord(followUp.id)) {
+      applyLocal(followUp)
+      setCompletingFollowUp(null)
+      showToast({ title: 'Follow-up completed', message: `Outcome: ${completeOutcome.replace(/_/g, ' ')}.` })
+      return
+    }
 
     setActingId(followUp.id)
+    // The API has no outcome/notes field on complete yet - we call the existing
+    // /complete endpoint and keep the outcome locally for display.
+    // TODO: send { outcome, notes } once the backend accepts them.
     const result = await completeFollowUp(followUp.id)
     setActingId('')
 
@@ -203,7 +445,56 @@ export default function FollowUpsList() {
       return
     }
 
-    setFollowUps((current) => current.map((entry) => (entry.id === followUp.id ? result.followUp : entry)))
+    applyLocal(result.followUp)
+
+    setCompletingFollowUp(null)
+    // The next action (Convert / Add Follow-up / Log Visit) is surfaced inline on the
+    // row itself via followUpNextAction() - no separate banner needed.
+    showToast({ title: 'Follow-up completed', message: `Outcome: ${completeOutcome.replace(/_/g, ' ')}.` })
+  }
+
+  const runNextAction = (action, contact) => {
+    if (action.kind === 'convert') {
+      setConvertLeadId(action.leadId) // demo leads open a simulated modal
+      return
+    }
+
+    // Demo rows shouldn't navigate to real (nonexistent) records.
+    if (isDemoRecord(contact.leadId) || isDemoRecord(action.customerId)) {
+      const what =
+        action.kind === 'viewCustomer' ? 'open the customer record' : action.kind === 'logVisit' ? 'open Log Visit' : 'open Add Follow-up'
+      showToast({ title: 'Demo record', message: `On a real lead this would ${what}.` })
+      return
+    }
+
+    if (action.kind === 'viewCustomer') {
+      navigate(`/sales/customers/${action.customerId}`)
+    } else if (action.kind === 'logVisit') {
+      navigate('/sales/visits')
+    } else if (action.kind === 'addFollowUp') {
+      if (contact.kind === 'Lead' && contact.leadId) {
+        navigate(`/sales/leads/${contact.leadId}`)
+      } else {
+        handleAddFollowUp()
+        if (contact.customerId) setFormData((current) => ({ ...current, customerId: contact.customerId }))
+      }
+    }
+  }
+
+  // Marks a lead as converted in local state so its follow-up rows immediately flip
+  // Convert -> View Customer without a full refetch.
+  const applyLeadConverted = ({ leadId, customerId }) => {
+    if (isDemoRecord(leadId)) {
+      setDemoLeadOverrides((current) => ({ ...current, [leadId]: { leadStatus: 'won', convertedCustomerId: customerId } }))
+    } else {
+      setLeads((current) =>
+        current.map((lead) =>
+          lead.id === leadId ? { ...lead, leadStatus: 'won', convertedCustomerId: customerId || lead.convertedCustomerId } : lead,
+        ),
+      )
+    }
+    setConvertLeadId(null)
+    showToast({ title: 'Lead converted', message: 'A customer record was created.' })
   }
 
   return (
@@ -233,61 +524,93 @@ export default function FollowUpsList() {
         <Card>
           <LoadingSpinner label="Loading follow-ups..." />
         </Card>
-      ) : followUps.length === 0 ? (
-        <Card>
-          <p className="p-8 text-center text-sm text-neutral-500">No follow-up tasks yet. Add one above to get started.</p>
-        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {followUps.map((followUp) => (
-            <Card key={followUp.id} className={`hover:shadow-lg transition-all ${followUp.status === 'completed' ? 'opacity-75' : ''}`}>
-              <div className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`flex size-10 items-center justify-center rounded-xl ${followUp.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {followUp.status === 'completed' ? <CheckCircle className="size-5" /> : <Calendar className="size-5" />}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-neutral-900">{followUp.customerName || followUp.title}</h3>
-                      <p className="text-xs text-neutral-500">{formatDueDate(followUp.dueDate)}</p>
-                    </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6 flex-wrap">
+            {FOLLOWUP_TABS.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>
+                {tab.label} ({buckets[tab.value].length})
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          {FOLLOWUP_TABS.map((tab) => (
+            <TabsContent key={tab.value} value={tab.value}>
+              {buckets[tab.value].length === 0 ? (
+                <Card>
+                  <p className="p-8 text-center text-sm text-neutral-500">
+                    {tab.value === 'completed' ? 'No completed follow-ups yet.' : `Nothing ${tab.label.toLowerCase()}.`}
+                  </p>
+                </Card>
+              ) : (
+                <Card className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-205 text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                          <th className="px-4 py-3">Follow-up</th>
+                          <th className="px-4 py-3">Contact</th>
+                          <th className="px-4 py-3">Type</th>
+                          <th className="px-4 py-3">Due</th>
+                          <th className="px-4 py-3">Priority</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="w-24 px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100">
+                        {buckets[tab.value].map((followUp) => {
+                          const contact = resolveContact(followUp)
+                          const next = followUpNextAction(followUp, contact)
+                          return (
+                            <Fragment key={followUp.id}>
+                              <FollowUpRow
+                                followUp={followUp}
+                                contact={contact}
+                                actingId={actingId}
+                                onComplete={() => openComplete(followUp)}
+                                onEdit={() => handleEditFollowUp(followUp)}
+                                onDelete={() => setDeleteTarget(followUp)}
+                              />
+                              {next && (
+                                <tr className="bg-primary-50/30">
+                                  <td colSpan={7} className="px-4 py-2.5">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant={next.kind === 'convert' ? undefined : 'outline'}
+                                      onClick={() => runNextAction(next, contact)}
+                                    >
+                                      {next.kind === 'convert' && <ArrowRightCircle className="mr-2 size-4" />}
+                                      {next.kind === 'convert'
+                                        ? 'Convert to Customer'
+                                        : next.kind === 'viewCustomer'
+                                          ? 'View Customer'
+                                          : next.kind === 'logVisit'
+                                            ? 'Log Visit'
+                                            : 'Add Follow-up'}
+                                    </Button>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => toggleStatus(followUp)}
-                      disabled={actingId === followUp.id || followUp.status === 'completed'}
-                      className="p-2 text-neutral-500 hover:text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-40"
-                      title="Mark completed"
-                    >
-                      <CheckCircle className="size-4" />
-                    </button>
-                    <button
-                      onClick={() => handleEditFollowUp(followUp)}
-                      className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg"
-                    >
-                      <Edit className="size-4" />
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(followUp)}
-                      className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
-                </div>
-                <p className="mt-4 font-medium text-neutral-800">{followUp.title}</p>
-                {followUp.description && <p className="mt-1 text-sm text-neutral-600">{followUp.description}</p>}
-                <div className="mt-4 flex items-center justify-between">
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${followUp.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {followUp.status === 'completed' ? 'Completed' : 'Pending'}
-                  </span>
-                  <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">{followUp.priority}</span>
-                </div>
-              </div>
-            </Card>
+                </Card>
+              )}
+            </TabsContent>
           ))}
-        </div>
+        </Tabs>
       )}
+
+      <ConvertLeadModal
+        isOpen={Boolean(convertLeadId)}
+        onClose={() => setConvertLeadId(null)}
+        leadId={convertLeadId || ''}
+        onConverted={applyLeadConverted}
+      />
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingFollowUp ? 'Edit Follow-up' : 'Add Follow-up'}>
         <form onSubmit={handleSaveFollowUp} className="space-y-4">
@@ -357,6 +680,29 @@ export default function FollowUpsList() {
             <Button type="submit" loading={isSaving}>{editingFollowUp ? 'Update' : 'Add'} Follow-up</Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={Boolean(completingFollowUp)} onClose={() => setCompletingFollowUp(null)} title="Complete Follow-up">
+        <div className="space-y-4">
+          <p className="text-sm text-neutral-500">{completingFollowUp?.title}</p>
+          <Select
+            label="Outcome"
+            options={FOLLOWUP_OUTCOME_OPTIONS}
+            value={completeOutcome}
+            onChange={(event) => setCompleteOutcome(event.target.value)}
+          />
+          <Input
+            label="Notes"
+            as="textarea"
+            value={completeNotes}
+            onChange={(event) => setCompleteNotes(event.target.value)}
+            placeholder="What was the result of this follow-up?"
+          />
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setCompletingFollowUp(null)} disabled={actingId === completingFollowUp?.id}>Cancel</Button>
+            <Button type="button" loading={actingId === completingFollowUp?.id} onClick={handleComplete}>Complete Follow-up</Button>
+          </div>
+        </div>
       </Modal>
 
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Follow-up">

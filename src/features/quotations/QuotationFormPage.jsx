@@ -357,7 +357,7 @@ export default function QuotationFormPage() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full overflow-hidden rounded-[1.75rem] border border-neutral-100 bg-white shadow-(--shadow-card)"
+      className="w-full overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)"
     >
       <div className="grid min-h-[34rem]" style={{ gridTemplateColumns: '18rem minmax(0, 1fr)' }}>
         <aside className="border-b border-neutral-100 p-4 lg:border-b-0 lg:border-r lg:p-5">

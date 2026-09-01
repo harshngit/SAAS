@@ -98,7 +98,7 @@ export default function GoogleRegister() {
 
   return (
     <div className="h-svh overflow-hidden bg-neutral-50 p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto flex h-[calc(100svh-2rem)] max-w-7xl overflow-hidden rounded-[2rem] border border-neutral-200 bg-white p-3 shadow-popover sm:h-[calc(100svh-3rem)] lg:h-[calc(100svh-4rem)]">
+      <div className="mx-auto flex h-[calc(100svh-2rem)] max-w-7xl overflow-hidden rounded-2xl border border-neutral-200 bg-white p-3 shadow-popover sm:h-[calc(100svh-3rem)] lg:h-[calc(100svh-4rem)]">
         <AuthShowcase
           kicker="New workspace"
           title="Finish setting up your account"

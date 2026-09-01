@@ -37,7 +37,9 @@ const Select = forwardRef(function Select(
     const normalizedQuery = searchQuery.trim().toLowerCase()
     if (!normalizedQuery) return options
 
-    return options.filter((option) => option.label.toLowerCase().includes(normalizedQuery))
+    return options.filter((option) =>
+      `${option.label} ${option.searchText || ''}`.toLowerCase().includes(normalizedQuery),
+    )
   }, [options, searchable, searchQuery])
 
   useEffect(() => {

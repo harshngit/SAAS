@@ -5,26 +5,11 @@ import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import DataTable from '../../components/ui/DataTable'
 import Button from '../../components/ui/Button'
-import Modal from '../../components/ui/Modal'
-import { DELIVERY_STATUS_OPTIONS, acceptDelivery, listDeliveries, rejectDelivery } from '../../api/deliveries'
+import { acceptDelivery, listDeliveries } from '../../api/deliveries'
+import { getDeliveryStage } from './deliveryStage'
+import RejectDeliveryModal from './RejectDeliveryModal'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
-import { formatCurrency } from '../../utils/format'
-
-const statusVariant = {
-  pending: 'info',
-  delivered: 'success',
-  in_transit: 'warning',
-  planned: 'info',
-  accepted: 'success',
-  rejected: 'danger',
-  ready: 'success',
-  loaded: 'info',
-  partially_delivered: 'warning',
-  returned: 'danger',
-  failed: 'danger',
-  cancelled: 'neutral',
-}
 
 export default function AssignedDeliveries() {
   const navigate = useNavigate()
@@ -34,9 +19,7 @@ export default function AssignedDeliveries() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [rejectTarget, setRejectTarget] = useState(null)
-  const [rejectReason, setRejectReason] = useState('')
-  const [isRejecting, setIsRejecting] = useState(false)
-  const [rejectError, setRejectError] = useState('')
+  const [acceptingId, setAcceptingId] = useState('')
 
   const loadDeliveries = useCallback(async () => {
     if (!currentUser?.id) return
@@ -62,7 +45,11 @@ export default function AssignedDeliveries() {
   }, [loadDeliveries])
 
   const handleAccept = async (delivery) => {
+    if (acceptingId) return
+    setAcceptingId(delivery.id)
+
     const result = await acceptDelivery(delivery.id)
+    setAcceptingId('')
 
     if (!result.success) {
       showToast({ title: 'Unable to accept', message: result.error, variant: 'error' })
@@ -70,33 +57,16 @@ export default function AssignedDeliveries() {
     }
 
     setDeliveries((current) => current.map((item) => (item.id === delivery.id ? result.delivery : item)))
-    showToast({ title: 'Delivery accepted', message: `${delivery.orderNumber} is ready to load.` })
+    showToast({ title: 'Delivery accepted', message: `${delivery.deliveryNumber || delivery.orderNumber} — start picking next.` })
   }
 
-  const handleReject = async () => {
-    if (!rejectTarget) return
-
-    if (!rejectReason.trim()) {
-      setRejectError('Enter a reason for rejecting this delivery.')
-      return
-    }
-
-    setIsRejecting(true)
-    setRejectError('')
-
-    const result = await rejectDelivery(rejectTarget.id, rejectReason.trim())
-
-    if (!result.success) {
-      setRejectError(result.error)
-      setIsRejecting(false)
-      return
-    }
-
-    setDeliveries((current) => current.filter((item) => item.id !== rejectTarget.id))
-    setIsRejecting(false)
-    setRejectTarget(null)
-    setRejectReason('')
-    showToast({ title: 'Delivery rejected', message: 'The admin has been notified to reassign this delivery.' })
+  const handleRejected = (updatedDelivery) => {
+    setDeliveries((current) =>
+      updatedDelivery
+        ? current.map((item) => (item.id === updatedDelivery.id ? updatedDelivery : item))
+        : current.filter((item) => item.id !== rejectTarget?.id),
+    )
+    showToast({ title: 'Delivery rejected', message: 'The sales team has been notified to reassign this delivery.' })
   }
 
   return (
@@ -106,7 +76,7 @@ export default function AssignedDeliveries() {
         <p className="mt-1 text-sm text-neutral-500">View and manage your assigned deliveries</p>
       </div>
 
-      <Card title="My Deliveries" subtitle="Planned, loaded, in transit, and completed">
+      <Card title="My Deliveries" subtitle="Everything assigned to you, newest first">
         {error ? (
           <div className="py-8 text-center">
             <p className="text-sm text-red-600">{error}</p>
@@ -119,31 +89,34 @@ export default function AssignedDeliveries() {
           <DataTable
             loading={isLoading}
             columns={[
-              { key: 'orderNumber', header: 'Order #', sortable: true },
+              { key: 'orderNumber', header: 'Delivery / Order #', sortable: true, render: (row) => row.deliveryNumber || row.orderNumber || '—' },
               { key: 'customerName', header: 'Customer', sortable: true },
+              {
+                key: 'location',
+                header: 'Location',
+                render: (row) => row.customerDeliveryAddress || row.deliveryAddress || '—',
+              },
+              { key: 'scheduledDate', header: 'Delivery Date', sortable: true },
               {
                 key: 'status',
                 header: 'Status',
                 sortable: true,
-                render: (row) => (
-                  <Badge variant={statusVariant[row.status] || 'neutral'} dot>
-                    {DELIVERY_STATUS_OPTIONS.find((option) => option.value === row.status)?.label || row.status}
-                  </Badge>
-                ),
+                render: (row) => {
+                  const stage = getDeliveryStage(row)
+                  return <Badge variant={stage.variant} dot>{stage.label}</Badge>
+                },
               },
-              { key: 'scheduledDate', header: 'Scheduled Date', sortable: true },
-              { key: 'amountDue', header: 'Amount Due', sortable: true, align: 'right', render: (row) => formatCurrency(row.amountDue) },
             ]}
             data={deliveries}
-            searchKeys={['orderNumber', 'customerName', 'status']}
+            searchKeys={['deliveryNumber', 'orderNumber', 'customerName']}
             searchPlaceholder="Search deliveries…"
             emptyTitle="No deliveries assigned"
             emptyDescription="Deliveries assigned to you will show up here."
             actions={(row) => [
               { label: 'View Details', icon: Truck, onClick: () => navigate(`/delivery/deliveries/${row.id}`) },
-              ...(row.status === 'pending'
+              ...(getDeliveryStage(row).key === 'assigned'
                 ? [
-                    { label: 'Accept', icon: Check, onClick: () => handleAccept(row) },
+                    { label: acceptingId === row.id ? 'Accepting…' : 'Accept', icon: Check, onClick: () => handleAccept(row) },
                     { label: 'Reject', icon: Ban, danger: true, onClick: () => setRejectTarget(row) },
                   ]
                 : []),
@@ -152,51 +125,12 @@ export default function AssignedDeliveries() {
         )}
       </Card>
 
-      <Modal
+      <RejectDeliveryModal
+        delivery={rejectTarget}
         isOpen={Boolean(rejectTarget)}
-        onClose={() => {
-          if (isRejecting) return
-          setRejectError('')
-          setRejectReason('')
-          setRejectTarget(null)
-        }}
-        title="Reject Delivery"
-      >
-        <div className="space-y-5">
-          <p className="text-sm leading-6 text-neutral-600">
-            Reject {rejectTarget?.orderNumber || 'this delivery'}? It will be cleared from your assignments and the admin will be notified to reassign it.
-          </p>
-          <textarea
-            value={rejectReason}
-            onChange={(event) => setRejectReason(event.target.value)}
-            placeholder="Reason for rejecting this delivery (required)"
-            maxLength={500}
-            className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-          />
-          {rejectError && (
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {rejectError}
-            </div>
-          )}
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={isRejecting}
-              onClick={() => {
-                setRejectError('')
-                setRejectReason('')
-                setRejectTarget(null)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="button" variant="danger" loading={isRejecting} onClick={handleReject}>
-              Confirm Rejection
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        onClose={() => setRejectTarget(null)}
+        onRejected={handleRejected}
+      />
     </div>
   )
 }

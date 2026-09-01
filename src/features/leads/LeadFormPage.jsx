@@ -16,12 +16,14 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, createLead } from '../../api/leads'
+import { LEAD_SOURCE_OPTIONS, createLead } from '../../api/leads'
 import { listCustomers } from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 
+// Every new lead starts as "New" - the status is never chosen at creation time
+// (a user must not be able to create a lead directly as Won/Lost).
 const emptyForm = {
   name: '',
   contactPerson: '',
@@ -35,22 +37,15 @@ const emptyForm = {
   leadStatus: 'new',
 }
 
-const leadStatusVariant = {
-  new: 'info',
-  contacted: 'warning',
-  qualified: 'purple',
-  won: 'success',
-  lost: 'danger',
-}
-
 export default function LeadFormPage() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
-  const basePath = currentUser?.role === ROLES.SALES_OFFICER ? '/sales/leads' : '/admin/leads'
+  const isSalesOfficer = currentUser?.role === ROLES.SALES_OFFICER
+  const basePath = isSalesOfficer ? '/sales/leads' : '/admin/leads'
 
   const [formData, setFormData] = useState(() => ({
     ...emptyForm,
-    assignedSalespersonId: currentUser?.role === ROLES.SALES_OFFICER ? currentUser.id : '',
+    assignedSalespersonId: isSalesOfficer ? currentUser.id : '',
   }))
   const [errors, setErrors] = useState({})
   const [customers, setCustomers] = useState([])
@@ -65,13 +60,13 @@ export default function LeadFormPage() {
 
     async function loadOptions() {
       const customersPromise = listCustomers()
-      const usersPromise = currentUser?.role === ROLES.SALES_OFFICER ? Promise.resolve({ success: true, users: [] }) : listUsers()
+      const usersPromise = isSalesOfficer ? Promise.resolve({ success: true, users: [] }) : listUsers()
       const [customersResult, usersResult] = await Promise.all([customersPromise, usersPromise])
 
       if (!isMounted) return
 
       if (customersResult.success) setCustomers(customersResult.customers)
-      if (currentUser?.role === ROLES.SALES_OFFICER) {
+      if (isSalesOfficer) {
         setSalespeople(
           currentUser?.id
             ? [
@@ -110,7 +105,7 @@ export default function LeadFormPage() {
     return () => {
       isMounted = false
     }
-  }, [currentUser?.id, currentUser?.name, currentUser?.role])
+  }, [currentUser?.id, currentUser?.name, isSalesOfficer])
 
   const customerOptions = useMemo(
     () => [
@@ -123,10 +118,11 @@ export default function LeadFormPage() {
     [customers],
   )
 
-  const salespersonOptions = useMemo(
-    () => salespeople.map((user) => ({ value: user.id, label: user.name })),
-    [salespeople],
-  )
+  const salespersonOptions = useMemo(() => {
+    const people = salespeople.map((user) => ({ value: user.id, label: user.name }))
+    // Sales Officer picker is locked to self; Admin may leave a lead Unassigned.
+    return isSalesOfficer ? people : [{ value: '', label: 'Unassigned' }, ...people]
+  }, [salespeople, isSalesOfficer])
 
   const selectedSalesperson = useMemo(
     () => salespersonOptions.find((option) => option.value === formData.assignedSalespersonId),
@@ -136,11 +132,6 @@ export default function LeadFormPage() {
   const selectedCustomer = useMemo(
     () => customerOptions.find((option) => option.value === formData.customerId),
     [customerOptions, formData.customerId],
-  )
-
-  const selectedLeadStatus = useMemo(
-    () => LEAD_STATUS_OPTIONS.find((option) => option.value === formData.leadStatus),
-    [formData.leadStatus],
   )
 
   const updateField = (field, value) => {
@@ -156,7 +147,10 @@ export default function LeadFormPage() {
     if (formData.mobileNumber.trim() && !/^[0-9+\-\s()]{7,16}$/.test(formData.mobileNumber.trim())) {
       nextErrors.mobileNumber = 'Enter a valid mobile number.'
     }
-    if (!formData.assignedSalespersonId) nextErrors.assignedSalespersonId = 'Assigned salesperson is required.'
+    // Admins may create an Unassigned lead; a Sales Officer's is always themselves.
+    if (isSalesOfficer && !formData.assignedSalespersonId) {
+      nextErrors.assignedSalespersonId = 'Assigned salesperson is required.'
+    }
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -210,7 +204,7 @@ export default function LeadFormPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <form
           onSubmit={handleSubmit}
-          className="overflow-hidden rounded-[1.75rem] border border-neutral-100 bg-white shadow-[0_24px_80px_-48px_rgb(15_23_42/0.35)]"
+          className="overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-[0_24px_80px_-48px_rgb(15_23_42/0.35)]"
         >
           <div className="border-b border-neutral-100 px-6 py-5">
             <div className="flex items-center gap-4">
@@ -297,20 +291,13 @@ export default function LeadFormPage() {
               />
               <Select
                 label="Assigned Salesperson"
-                required
+                required={isSalesOfficer}
                 options={salespersonOptions}
                 value={formData.assignedSalespersonId}
                 onChange={(event) => updateField('assignedSalespersonId', event.target.value)}
-                placeholder={isLoadingOptions ? 'Loading...' : 'Select salesperson'}
+                placeholder={isLoadingOptions ? 'Loading...' : isSalesOfficer ? '' : 'Unassigned'}
                 error={errors.assignedSalespersonId}
-                disabled={isLoadingOptions}
-              />
-              <Select
-                label="Lead Status"
-                required
-                options={LEAD_STATUS_OPTIONS}
-                value={formData.leadStatus}
-                onChange={(event) => updateField('leadStatus', event.target.value)}
+                disabled={isLoadingOptions || isSalesOfficer}
               />
               <Input
                 label="Interested Product"
@@ -345,7 +332,7 @@ export default function LeadFormPage() {
         </form>
 
         <aside className="grid gap-4">
-          <section className="rounded-[1.5rem] border border-neutral-100 bg-white p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
+          <section className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
             <div className="flex items-center gap-3">
               <div className="flex size-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
                 <Lightbulb className="size-5" aria-hidden="true" />
@@ -370,7 +357,7 @@ export default function LeadFormPage() {
             </ul>
           </section>
 
-          <section className="rounded-[1.5rem] border border-neutral-100 bg-white p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
+          <section className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
             <div className="flex items-center gap-3">
               <div className="flex size-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
                 <Users className="size-5" aria-hidden="true" />
@@ -384,14 +371,12 @@ export default function LeadFormPage() {
             <div className="mt-5 space-y-4">
               <div>
                 <p className="text-sm text-neutral-500">Salesperson</p>
-                <p className="mt-1 font-medium text-neutral-900">{selectedSalesperson?.label || '—'}</p>
+                <p className="mt-1 font-medium text-neutral-900">{selectedSalesperson?.label || 'Unassigned'}</p>
               </div>
               <div className="border-t border-dashed border-neutral-200 pt-4">
                 <p className="text-sm text-neutral-500">Lead Status</p>
                 <div className="mt-2">
-                  <Badge variant={leadStatusVariant[formData.leadStatus] || 'info'}>
-                    {selectedLeadStatus?.label || 'New'}
-                  </Badge>
+                  <Badge variant="info">New</Badge>
                 </div>
               </div>
               <div className="border-t border-dashed border-neutral-200 pt-4">
@@ -405,7 +390,7 @@ export default function LeadFormPage() {
             </div>
           </section>
 
-          <section className="rounded-[1.5rem] border border-neutral-100 bg-white p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
+          <section className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
             <div className="flex items-center gap-3">
               <div className="flex size-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
                 <NotebookText className="size-5" aria-hidden="true" />

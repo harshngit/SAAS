@@ -7,6 +7,7 @@ import {
   FileText,
   Globe2,
   Handshake,
+  ImagePlus,
   LocateFixed,
   MapPin,
   Phone,
@@ -20,7 +21,7 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
 import { deleteCustomerDocument, listCustomerDocuments, updateCustomer } from '../../api/customers'
-import { deleteFile, uploadFiles as uploadGenericFiles } from '../../api/files'
+import { deleteFile, getFileUrl, uploadFile, uploadFiles as uploadGenericFiles } from '../../api/files'
 import { formatCurrency } from '../../utils/format'
 
 const documentTypeByField = {
@@ -41,6 +42,7 @@ const today = new Date().toISOString().slice(0, 10)
 
 const baseFields = {
   customerId: '',
+  profileImage: '',
   customerType: '',
   customType: '',
   customerName: '',
@@ -181,6 +183,7 @@ function section(title, fields) {
 
 const formSections = [
   section('Basic Information', [
+    { name: 'profileImage', label: 'Customer Image', description: 'Photo or logo shown on the customer profile.', type: 'Image Upload', input: 'image', wide: true },
     { name: 'customerId', label: 'Customer ID', description: 'Unique customer identifier. Auto-generated.', type: 'Text (Auto Number)', required: true, input: 'readonly' },
     { name: 'customerType', label: 'Customer Type', description: 'Individual, Business, Government, Dealer, Distributor, Vendor.', type: 'Dropdown', input: 'select', required: true },
     { name: 'customerName', label: 'Customer Name', description: 'Name of the customer or business.', type: 'Text (Max 100 chars)', required: true, maxLength: 100 },
@@ -318,6 +321,7 @@ function hydrateCustomer(formCustomer, isSalesOfficer, currentUser, salesOfficer
     ...baseFields,
     ...formCustomer,
     customerId: formCustomer?.customerId || formCustomer?.id || makeCustomerId(),
+    profileImage: formCustomer?.profileImage || formCustomer?.profile_image || '',
     customerType,
     customerName,
     legalBusinessName: formCustomer?.legalBusinessName || formCustomer?.businessName || formCustomer?.business_name || '',
@@ -343,6 +347,51 @@ function hydrateCustomer(formCustomer, isSalesOfficer, currentUser, salesOfficer
 
 function CustomerField({ children, className = '' }) {
   return <div className={className}>{children}</div>
+}
+
+function CustomerImageField({ value, uploading, error, onSelect, onRemove }) {
+  const inputRef = useRef(null)
+  const previewUrl = value ? getFileUrl(value) : ''
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium text-neutral-700">Customer Image</label>
+      <div className="flex items-center gap-4">
+        <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-neutral-200 bg-neutral-50">
+          {previewUrl ? (
+            <img src={previewUrl} alt="Customer" className="size-full object-cover" />
+          ) : (
+            <ImagePlus className="size-7 text-neutral-300" aria-hidden="true" />
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="sm" loading={uploading} onClick={() => inputRef.current?.click()}>
+            <Upload className="size-4" aria-hidden="true" />
+            {previewUrl ? 'Replace' : 'Upload'}
+          </Button>
+          {previewUrl && !uploading && (
+            <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+              <Trash2 className="size-4" aria-hidden="true" />
+              Remove
+            </Button>
+          )}
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              event.target.value = ''
+              if (file) onSelect(file)
+            }}
+          />
+        </div>
+      </div>
+      <p className="text-xs text-neutral-400">PNG or JPG, up to 5MB.</p>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </div>
+  )
 }
 
 const createUploadPreview = (file) => ({
@@ -555,6 +604,8 @@ export default function CustomerForm({
   const stagedFileIdsRef = useRef({})
   const [uploadingField, setUploadingField] = useState('')
   const [documentsError, setDocumentsError] = useState('')
+  const [profileImageUploading, setProfileImageUploading] = useState(false)
+  const [profileImageError, setProfileImageError] = useState('')
 
   const salesOfficerOptions = useMemo(
     () => salesOfficers.map((user) => ({ value: user.id, label: user.name })),
@@ -592,6 +643,8 @@ export default function CustomerForm({
     })
     setUploadedFileUrls({})
     stagedFileIdsRef.current = {}
+    setProfileImageError('')
+    setProfileImageUploading(false)
   }, [customer, currentUser, initialCustomer, isOpen, isSalesOfficer, salesOfficerOptions])
 
   useEffect(() => {
@@ -869,6 +922,31 @@ export default function CustomerForm({
     setSubmitError('')
   }
 
+  // Profile image: upload once to POST /files/upload, keep the returned file_id in formData so
+  // the eventual create/update sends it as basic_information.profile_image_id.
+  const handleProfileImageChange = async (file) => {
+    if (!file.type.startsWith('image/')) {
+      setProfileImageError('Please choose an image file (PNG or JPG).')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileImageError('Image must be 5MB or smaller.')
+      return
+    }
+
+    setProfileImageError('')
+    setProfileImageUploading(true)
+    const result = await uploadFile(file)
+    setProfileImageUploading(false)
+
+    if (!result.success) {
+      setProfileImageError(result.error)
+      return
+    }
+
+    updateField('profileImage', result.file.file_id || result.file.url || '')
+  }
+
   const validate = () => {
     const nextErrors = {}
 
@@ -1026,6 +1104,21 @@ export default function CustomerForm({
       )
     }
 
+    if (field.input === 'image') {
+      return (
+        <CustomerImageField
+          value={formData.profileImage}
+          uploading={profileImageUploading}
+          error={profileImageError}
+          onSelect={handleProfileImageChange}
+          onRemove={() => {
+            updateField('profileImage', '')
+            setProfileImageError('')
+          }}
+        />
+      )
+    }
+
     if (field.input === 'file') {
       return (
         <CustomerUploadField
@@ -1070,11 +1163,11 @@ export default function CustomerForm({
     <div>
       <form
         onSubmit={handleSubmit}
-        className="w-full overflow-hidden rounded-[1.75rem] border border-neutral-100 bg-white shadow-(--shadow-card)"
+        className="w-full overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)"
       >
-        <div className="grid min-h-[34rem]" style={{ gridTemplateColumns: '22rem minmax(0, 1fr)' }}>
-          <aside className="border-b border-neutral-100 p-4 lg:border-b-0 lg:border-r lg:p-5">
-            <nav className="sticky top-6 flex flex-col gap-3">
+        <div className="grid items-start" style={{ gridTemplateColumns: '22rem minmax(0, 1fr)' }}>
+          <aside className="border-b border-neutral-100 p-4 lg:border-b-0 lg:border-r lg:p-4">
+            <nav className="sticky top-6 flex flex-col gap-1.5">
               {formSections.map((sectionItem) => {
                 const Icon = sectionItem.icon
                 const isActive = sectionItem.id === activeSection
@@ -1084,7 +1177,7 @@ export default function CustomerForm({
                     key={sectionItem.id}
                     type="button"
                     onClick={() => setActiveSection(sectionItem.id)}
-                    className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all ${
+                    className={`flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium transition-all ${
                       isActive
                         ? 'bg-white text-primary-700 shadow-(--shadow-xs) ring-1 ring-neutral-200'
                         : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
@@ -1122,7 +1215,7 @@ export default function CustomerForm({
               </div>
             </div>
 
-            <section className="flex-1 border-b border-neutral-100 py-5">
+            <section className="border-b border-neutral-100 py-5">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {activeFormSection.fields.map((field) => {
                   if (

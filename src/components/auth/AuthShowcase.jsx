@@ -2,7 +2,7 @@ import { Droplet } from 'lucide-react'
 
 export default function AuthShowcase() {
   return (
-    <aside className="relative hidden min-h-0 w-1/2 overflow-hidden rounded-[1.75rem] border border-neutral-200 bg-white shadow-(--shadow-popover) lg:block">
+    <aside className="relative hidden min-h-0 w-1/2 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-(--shadow-popover) lg:block">
       <img
         src="/image/digital illustration .jpeg"
         alt=""

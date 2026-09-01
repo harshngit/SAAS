@@ -3,14 +3,15 @@ import { LocateFixed } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
-import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS } from '../../api/leads'
+import { LEAD_MANUAL_STATUS_OPTIONS, LEAD_SOURCE_OPTIONS } from '../../api/leads'
+import { formatLeadStatus } from './leadActivity'
 
 export const customerCategoryOptions = ['Retail', 'Wholesale', 'Corporate', 'VIP', 'Dealer', 'Distributor'].map((value) => ({
   value,
   label: value,
 }))
 
-export function LeadEditForm({ lead, customerOptions, salespersonOptions, saving, formError, onClose, onSave }) {
+export function LeadEditForm({ lead, customerOptions, salespersonOptions, saving, formError, onClose, onSave, lockAssignee = false }) {
   const [formData, setFormData] = useState(lead)
   const [errors, setErrors] = useState({})
 
@@ -24,11 +25,18 @@ export function LeadEditForm({ lead, customerOptions, salespersonOptions, saving
     setErrors((current) => ({ ...current, [field]: '' }))
   }
 
+  // Sales Officers can't reassign a lead to someone else - the picker is locked to
+  // the person it's already assigned to. Admins may assign to anyone or leave it
+  // Unassigned, so the field is no longer strictly required here.
+  const assigneeSelectOptions = lockAssignee
+    ? salespersonOptions
+    : [{ value: '', label: 'Unassigned' }, ...salespersonOptions]
+
   const validate = () => {
     const nextErrors = {}
     if (!formData.leadSource) nextErrors.leadSource = 'Lead source is required.'
     if (!formData.mobileNumber?.trim()) nextErrors.mobileNumber = 'Mobile number is required.'
-    if (!formData.assignedSalespersonId) nextErrors.assignedSalespersonId = 'Assigned salesperson is required.'
+    if (lockAssignee && !formData.assignedSalespersonId) nextErrors.assignedSalespersonId = 'Assigned salesperson is required.'
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -87,19 +95,25 @@ export function LeadEditForm({ lead, customerOptions, salespersonOptions, saving
         />
         <Select
           label="Assigned Salesperson"
-          required
-          options={salespersonOptions}
+          required={lockAssignee}
+          options={assigneeSelectOptions}
           value={formData.assignedSalespersonId}
           onChange={(event) => updateField('assignedSalespersonId', event.target.value)}
           error={errors.assignedSalespersonId}
+          disabled={lockAssignee}
         />
-        <Select
-          label="Lead Status"
-          required
-          options={LEAD_STATUS_OPTIONS}
-          value={formData.leadStatus}
-          onChange={(event) => updateField('leadStatus', event.target.value)}
-        />
+        {formData.leadStatus === 'won' ? (
+          // A converted lead's status is locked - it can't be changed back by hand.
+          <Input label="Lead Status" value={formatLeadStatus('won')} readOnly disabled />
+        ) : (
+          <Select
+            label="Lead Status"
+            required
+            options={LEAD_MANUAL_STATUS_OPTIONS}
+            value={formData.leadStatus}
+            onChange={(event) => updateField('leadStatus', event.target.value)}
+          />
+        )}
         <Input
           label="Interested Product"
           value={formData.interestedProduct}

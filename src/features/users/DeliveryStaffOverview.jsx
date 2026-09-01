@@ -176,7 +176,7 @@ export function DeliveryStaffOverviewPanels({
                   <p className="text-xs text-neutral-400">{field.label}</p>
                   <p className="mt-0.5 text-base font-semibold text-neutral-900">
                     {field.currency
-                      ? formatCurrency(overview.summary[field.key]) || '₹0'
+                      ? formatCurrency(overview.summary[field.key]) || '₹ 0'
                       : String(overview.summary[field.key])}
                   </p>
                 </div>

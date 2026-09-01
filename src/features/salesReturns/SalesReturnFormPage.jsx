@@ -304,7 +304,7 @@ export default function SalesReturnFormPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex justify-end border-t border-neutral-100 px-5 py-4">
+            <div className="flex justify-end border-t border-neutral-100 px-4 py-4">
               <div className="rounded-xl bg-primary-50 px-4 py-3 text-right">
                 <p className="text-xs font-medium text-primary-700">Estimated Credit</p>
                 <p className="mt-1 text-xl font-semibold text-primary-900">{formatCurrency(creditEstimate)}</p>

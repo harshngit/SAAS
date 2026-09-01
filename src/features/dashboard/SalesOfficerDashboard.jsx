@@ -264,7 +264,7 @@ export default function SalesOfficerDashboard() {
 
   return (
     <div className="space-y-5 lg:space-y-6">
-      <div className="flex flex-col gap-5 rounded-[1.25rem] border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card) lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card) lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-start gap-4">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-500">
             <Sun className="size-6" aria-hidden="true" />

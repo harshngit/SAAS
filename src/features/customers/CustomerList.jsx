@@ -20,6 +20,7 @@ import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
 import { RequirePermission } from '../../auth/RequirePermission'
 import { createCustomer, deleteCustomer as deleteCustomerApi, getCustomer, listCustomers, updateCustomer } from '../../api/customers'
+import { getFileUrl } from '../../api/files'
 import { listUsers } from '../../api/users'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
@@ -37,6 +38,12 @@ const normalizeCustomer = (customer) => ({
   ...customer,
   organizationId: customer.organization_id || customer.organizationId,
   businessName: customer.business_name || customer.businessName || customer.name,
+  profileImage: getFileUrl(
+    customer.profile_image_id
+    || customer.profile_image_url
+    || customer.profile_image
+    || customer.basic_information?.profile_image_id,
+  ),
   type: customer.category || customer.type || '',
   billingAddress: customer.billing_address || customer.billingAddress || customer.address || '',
   deliveryAddress: customer.delivery_address || customer.deliveryAddress || customer.address || '',
@@ -343,7 +350,7 @@ export default function CustomerList() {
   return (
     <div className="space-y-5">
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-5 py-4">
+        <div className="border-b border-neutral-100 px-4 py-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-5">
               {customerStatusTabs.map((tab) => {
@@ -375,7 +382,7 @@ export default function CustomerList() {
           </div>
         </div>
 
-        <div className="border-b border-neutral-100 px-5 py-3">
+        <div className="border-b border-neutral-100 px-4 py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative w-full sm:w-80">
@@ -406,7 +413,7 @@ export default function CustomerList() {
           </div>
         </div>
 
-        <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">
+        <div className="overflow-x-auto bg-neutral-50/35 py-4">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -456,8 +463,12 @@ export default function CustomerList() {
                   >
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex size-9 items-center justify-center rounded-full bg-primary-50 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">
-                          {getInitials(customer.name)}
+                        <div className="flex size-9 items-center justify-center overflow-hidden rounded-full bg-primary-50 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">
+                          {customer.profileImage ? (
+                            <img src={customer.profileImage} alt={customer.name} className="size-full object-cover" />
+                          ) : (
+                            getInitials(customer.name)
+                          )}
                         </div>
                         <div>
                           <span className="font-medium text-neutral-900">{customer.name}</span>
@@ -536,7 +547,7 @@ export default function CustomerList() {
             </table>
           )}
         </div>
-        <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-3 text-xs text-neutral-400">
+        <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-xs text-neutral-400">
           <span>
             {filteredCustomers.length === 0 ? '0' : `1 to ${filteredCustomers.length}`} of {customers.length}
           </span>

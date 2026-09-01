@@ -260,7 +260,7 @@ export default function Topbar() {
           {isMenuOpen && (
             <div
               role="menu"
-              className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-[1rem] border border-neutral-100 bg-white p-1.5 shadow-(--shadow-popover)"
+              className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-2xl border border-neutral-100 bg-white p-1.5 shadow-(--shadow-popover)"
             >
               <div className="px-3 py-2.5 sm:hidden">
                 <p className="text-sm font-medium leading-tight text-neutral-900">{currentUser.name}</p>
@@ -270,7 +270,7 @@ export default function Topbar() {
                 type="button"
                 role="menuitem"
                 onClick={handleProfileSettings}
-                className="flex w-full items-center gap-2.5 rounded-[0.8rem] px-3 py-2.5 text-left text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+                className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
               >
                 <Settings className="size-4" aria-hidden="true" />
                 Profile Settings
@@ -280,7 +280,7 @@ export default function Topbar() {
                 role="menuitem"
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="flex w-full items-center gap-2.5 rounded-[0.8rem] px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
               >
                 <LogOut className="size-4" aria-hidden="true" />
                 {isLoggingOut ? 'Logging out...' : 'Logout'}

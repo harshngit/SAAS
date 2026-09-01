@@ -163,10 +163,16 @@ export async function getCurrentVehicleStock(deliveryPartnerId) {
 
     return { success: true, session: normalizeSession(data) }
   } catch (error) {
+    // A 404 just means the partner has not recorded an opening load yet - that's an
+    // empty state, not a failure the user needs to retry.
+    if (error.response?.status === 404) {
+      return { success: true, session: null }
+    }
+
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'No active loading session found.',
+      'Unable to load vehicle stock. Please try again.',
     )
 
     return { success: false, error: message }

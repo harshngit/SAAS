@@ -73,7 +73,7 @@ export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Quick Add Customer" className="w-full max-w-lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Quick Add Customer" size="2xl">
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="-mt-2 text-sm text-neutral-500">Add basic customer details to create a new customer and continue.</p>
 

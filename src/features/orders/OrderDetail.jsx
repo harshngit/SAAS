@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import {
@@ -124,6 +124,20 @@ export default function OrderDetail() {
   const [orderInvoices, setOrderInvoices] = useState([])
   const [hasMoreToInvoice, setHasMoreToInvoice] = useState(false)
   const [invoiceMode, setInvoiceMode] = useState('per_delivery')
+
+  // Backend has no per-line "invoiced qty" field - derive it from the invoice line items so the
+  // items table can show Ordered / Delivered / Invoiced / Remaining.
+  const invoicedByProduct = useMemo(() => {
+    const map = {}
+    orderInvoices.forEach((invoice) => {
+      if (invoice.isCreditNote) return
+      ;(invoice.items || []).forEach((line) => {
+        const key = line.productId || line.id
+        if (key) map[key] = (map[key] || 0) + (Number(line.quantity) || 0)
+      })
+    })
+    return map
+  }, [orderInvoices])
 
   const loadOrder = async () => {
     setIsLoading(true)
@@ -517,7 +531,7 @@ export default function OrderDetail() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card) sm:grid-cols-2 lg:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) sm:grid-cols-2 lg:grid-cols-6">
         <div>
           <p className="flex items-center gap-1.5 text-xs text-neutral-400"><User className="size-3.5" />Customer</p>
           <Link to={`/admin/customers/${order.customerId}`} className="mt-1 block truncate text-sm font-medium text-primary-700 hover:underline">
@@ -573,7 +587,7 @@ export default function OrderDetail() {
         </div>
       )}
 
-      <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
         <div className="flex items-start">
           {fulfillmentSteps.map((step, index) => (
             <StepperNode key={step.label} index={index + 1} isLast={index === fulfillmentSteps.length - 1} {...step} />
@@ -591,9 +605,10 @@ export default function OrderDetail() {
                   <th className="whitespace-nowrap px-5 py-3">Product</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Unit Price</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Disc %</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Qty</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">Ordered</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Reserved</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Delivered</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">Invoiced</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Remaining</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Line Total</th>
                 </tr>
@@ -617,6 +632,7 @@ export default function OrderDetail() {
                     <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.quantity}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.reservedQuantity}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.deliveredQuantity}</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{invoicedByProduct[item.productId || item.id] || 0}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.remainingQuantity}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
                   </tr>
@@ -624,7 +640,7 @@ export default function OrderDetail() {
                 <tr className="bg-neutral-50/60 font-semibold text-neutral-900">
                   <td colSpan={4} />
                   <td className="px-5 py-3 text-right">{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
-                  <td colSpan={3} />
+                  <td colSpan={4} />
                   <td className="px-5 py-3 text-right">{formatCurrency(order.total)}</td>
                 </tr>
               </tbody>
@@ -673,7 +689,7 @@ export default function OrderDetail() {
               <div className="flex items-center justify-between"><span className="text-neutral-500">Fulfilment Method</span><span className="font-medium capitalize text-neutral-900">{order.fulfilmentMethod}</span></div>
               <div className="flex items-center justify-between"><span className="text-neutral-500">Expected Delivery</span><span className="font-medium text-neutral-900">{formatDate(order.deliveryDate)}</span></div>
               <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Fulfilment Status</span>
+                <span className="text-neutral-500">Delivery Status</span>
                 <Badge variant={isDelivered ? 'success' : 'warning'}>{order.fulfilmentStatus.replace(/_/g, ' ')}</Badge>
               </div>
             </div>

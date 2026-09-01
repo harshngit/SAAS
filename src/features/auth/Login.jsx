@@ -139,7 +139,7 @@ export default function Login() {
   return (
     <div className="min-h-svh bg-neutral-50 p-4 sm:p-6 lg:p-8">
       {isRedirecting && <FullScreenLoader label="Signing you in..." />}
-      <div className="mx-auto flex min-h-[calc(100svh-2rem)] max-w-7xl overflow-hidden rounded-[2rem] border border-neutral-200 bg-white p-3 shadow-popover sm:min-h-[calc(100svh-3rem)] lg:min-h-[calc(100svh-4rem)]">
+      <div className="mx-auto flex min-h-[calc(100svh-2rem)] max-w-7xl overflow-hidden rounded-2xl border border-neutral-200 bg-white p-3 shadow-popover sm:min-h-[calc(100svh-3rem)] lg:min-h-[calc(100svh-4rem)]">
         <AuthShowcase
           kicker="Live workspace"
           title="Run distribution from one dashboard"

@@ -82,7 +82,7 @@ export default function RoleForm() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-[1.75rem] border border-neutral-100 bg-white p-6 shadow-(--shadow-card)">
+    <div className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-2xl border border-neutral-100 bg-white p-6 shadow-(--shadow-card)">
       <div className="flex flex-col gap-4 border-b border-neutral-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-lg font-semibold text-neutral-900">{isEditing ? 'Edit role' : 'Create a new role'}</p>

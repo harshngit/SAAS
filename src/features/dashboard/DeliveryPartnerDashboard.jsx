@@ -23,24 +23,12 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
-import { DELIVERY_STATUS_OPTIONS, listDeliveries } from '../../api/deliveries'
+import { listDeliveries } from '../../api/deliveries'
+import { getDeliveryStage } from '../deliveries/deliveryStage'
 import { getCurrentVehicleStock } from '../../api/vehicleStock'
 import { getMyAttendance } from '../../api/attendance'
 import { postLocationPing } from '../../api/users'
 import { formatCurrency } from '../../utils/format'
-
-const deliveryStatusVariant = {
-  delivered: 'success',
-  in_transit: 'warning',
-  planned: 'info',
-  accepted: 'success',
-  rejected: 'danger',
-  ready: 'success',
-  loaded: 'info',
-  partially_delivered: 'warning',
-  failed: 'danger',
-  cancelled: 'neutral',
-}
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -48,10 +36,10 @@ function todayIso() {
 
 function StatCard({ icon: Icon, iconClassName, label, value, footer, footerClassName = 'text-primary-700', onClick }) {
   return (
-    <article className="rounded-[1.35rem] border border-neutral-100 bg-white p-5 shadow-[0_14px_32px_-26px_rgb(15_23_42/0.22)]">
+    <article className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-[0_14px_32px_-26px_rgb(15_23_42/0.22)]">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm text-neutral-500">{label}</p>
-        <div className={`flex size-11 items-center justify-center rounded-[1rem] ${iconClassName}`}>
+        <div className={`flex size-11 items-center justify-center rounded-2xl ${iconClassName}`}>
           <Icon className="size-5" aria-hidden="true" />
         </div>
       </div>
@@ -67,7 +55,7 @@ function StatCard({ icon: Icon, iconClassName, label, value, footer, footerClass
 
 function ShellCard({ title, action, children, className = '' }) {
   return (
-    <section className={`rounded-[1.5rem] border border-neutral-100 bg-white p-5 shadow-[0_16px_36px_-26px_rgb(15_23_42/0.22)] ${className}`}>
+    <section className={`rounded-2xl border border-neutral-100 bg-white p-5 shadow-[0_16px_36px_-26px_rgb(15_23_42/0.22)] ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold tracking-tight text-neutral-900">{title}</h2>
         {action}
@@ -220,17 +208,18 @@ export default function DeliveryPartnerDashboard() {
   const today = todayIso()
   const todaysDeliveries = deliveries.filter((delivery) => (delivery.scheduledDate || '').slice(0, 10) === today)
 
-  // delivery.status is the backend's normalized public value (pending/accepted/in_transit/
-  // partially_delivered/delivered/returned/cancelled) - planned/rejected collapse into
-  // "pending", ready/loaded collapse into "accepted", failed shows as "returned".
-  const completedToday = todaysDeliveries.filter((delivery) => delivery.status === 'delivered').length
-  const pendingToday = todaysDeliveries.filter((delivery) => ['pending', 'accepted', 'in_transit'].includes(delivery.status)).length
+  // Display stages are derived from the backend's collapsed status - see features/deliveries/deliveryStage.
+  const stageOf = (delivery) => getDeliveryStage(delivery).key
+  const countStage = (...keys) => todaysDeliveries.filter((delivery) => keys.includes(stageOf(delivery))).length
+  const completedToday = countStage('delivered')
+  const pendingToday = countStage('assigned', 'accepted', 'picking', 'loaded', 'in_transit')
   const paymentPendingToday = todaysDeliveries.filter((delivery) => (delivery.amountDue || 0) > 0).length
-  const failedToday = todaysDeliveries.filter((delivery) => delivery.status === 'returned').length
-  const partialToday = todaysDeliveries.filter((delivery) => delivery.status === 'partially_delivered').length
-  const awaitingAcceptanceToday = todaysDeliveries.filter((delivery) => delivery.status === 'pending').length
-  const readyToday = todaysDeliveries.filter((delivery) => delivery.status === 'accepted').length
-  const inTransitToday = todaysDeliveries.filter((delivery) => delivery.status === 'in_transit').length
+  const failedToday = countStage('failed')
+  const partialToday = countStage('partially_delivered')
+  const awaitingAcceptanceToday = countStage('assigned', 'rejected')
+  const pickingToday = countStage('accepted', 'picking')
+  const loadedToday = countStage('loaded')
+  const inTransitToday = countStage('in_transit')
   const completedPercent = todaysDeliveries.length > 0 ? Math.round((completedToday / todaysDeliveries.length) * 100) : 0
 
   const stats = [
@@ -310,8 +299,9 @@ export default function DeliveryPartnerDashboard() {
   ]
 
   const deliveryStatusTiles = [
-    { label: 'Awaiting Acceptance', value: awaitingAcceptanceToday, icon: Clock, iconClassName: 'bg-red-50 text-red-500' },
-    { label: 'Ready', value: readyToday, icon: Truck, iconClassName: 'bg-neutral-50 text-neutral-500' },
+    { label: 'Assigned', value: awaitingAcceptanceToday, icon: Clock, iconClassName: 'bg-red-50 text-red-500' },
+    { label: 'Picking', value: pickingToday, icon: Package, iconClassName: 'bg-amber-50 text-amber-600' },
+    { label: 'Vehicle Loaded', value: loadedToday, icon: Truck, iconClassName: 'bg-neutral-50 text-neutral-500' },
     { label: 'In Transit', value: inTransitToday, icon: Truck, iconClassName: 'bg-blue-50 text-blue-600' },
     { label: 'Delivered', value: completedToday, icon: CheckCircle2, iconClassName: 'bg-green-50 text-green-600' },
     { label: 'Failed', value: failedToday, icon: XCircle, iconClassName: 'bg-red-50 text-red-600' },
@@ -322,7 +312,7 @@ export default function DeliveryPartnerDashboard() {
 
   return (
     <div className="space-y-5 lg:space-y-6">
-      <div className="relative overflow-hidden rounded-[1.25rem] bg-linear-to-br from-[#0d5d12] via-[#0f4f10] to-[#0c3f0d] px-5 py-5 shadow-[0_16px_36px_-16px_rgb(6_59_0/0.55)] sm:px-6 sm:py-6">
+      <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-[#0d5d12] via-[#0f4f10] to-[#0c3f0d] px-5 py-5 shadow-[0_16px_36px_-16px_rgb(6_59_0/0.55)] sm:px-6 sm:py-6">
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-4">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-white/15 text-lg font-semibold text-white ring-1 ring-white/25">
@@ -466,11 +456,10 @@ export default function DeliveryPartnerDashboard() {
                 key: 'status',
                 header: 'Status',
                 sortable: true,
-                render: (row) => (
-                  <Badge variant={deliveryStatusVariant[row.status] || 'neutral'} dot>
-                    {DELIVERY_STATUS_OPTIONS.find((option) => option.value === row.status)?.label || row.status}
-                  </Badge>
-                ),
+                render: (row) => {
+                  const stage = getDeliveryStage(row)
+                  return <Badge variant={stage.variant} dot>{stage.label}</Badge>
+                },
               },
               { key: 'amountDue', header: 'Amount Due', sortable: true, align: 'right', render: (row) => formatCurrency(row.amountDue) },
             ]}

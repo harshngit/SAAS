@@ -167,7 +167,7 @@ export default function AccountantDashboard() {
 
   return (
     <div className="space-y-5 lg:space-y-6">
-      <div className="rounded-[1.25rem] border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card)">
         <h1 className="font-(--font-display) text-3xl font-semibold tracking-tight text-neutral-900">Accounts Overview</h1>
         <p className="mt-1.5 text-sm text-neutral-500">{currentUser?.name || 'Accountant'} · Accountant · as of {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
       </div>

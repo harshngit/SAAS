@@ -83,7 +83,7 @@ export default function FinancialReports({
       </div>
 
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-5 py-4">
+        <div className="border-b border-neutral-100 px-4 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <Select
               options={REPORT_TYPES}

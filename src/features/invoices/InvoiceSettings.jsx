@@ -64,7 +64,7 @@ function InvoicePreviewPanel({ template, primaryColor, paperSize, fields, footer
   const TemplateComponent = templateComponents[template] || templateComponents.classic
 
   return (
-    <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+    <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
       <p className="text-sm font-semibold text-neutral-900">Invoice Preview</p>
       <p className="text-xs text-neutral-400">This is how your invoice will look ({templates.find((t) => t.value === template)?.label} template)</p>
 
@@ -99,7 +99,7 @@ export default function InvoiceSettings() {
 
   if (isLoading) {
     return (
-      <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-10 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-white p-10 shadow-(--shadow-card)">
         <LoadingSpinner label="Loading invoice settings..." />
       </div>
     )
@@ -107,7 +107,7 @@ export default function InvoiceSettings() {
 
   if (loadError || !settings) {
     return (
-      <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-10 text-center shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-white p-10 text-center shadow-(--shadow-card)">
         <p className="text-sm text-red-600">{loadError || 'Unable to load invoice settings.'}</p>
       </div>
     )
@@ -173,7 +173,7 @@ export default function InvoiceSettings() {
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="space-y-5">
-          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
             <p className="text-sm font-semibold text-neutral-900">1. Choose Template</p>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {templates.map((option) => (
@@ -202,7 +202,7 @@ export default function InvoiceSettings() {
             </div>
           </div>
 
-          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
             <p className="text-sm font-semibold text-neutral-900">2. Branding & Paper</p>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
@@ -238,7 +238,7 @@ export default function InvoiceSettings() {
             </div>
           </div>
 
-          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
             <p className="text-sm font-semibold text-neutral-900">3. Show / Hide Fields</p>
             <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
               {fieldRows.flat().map((field) => (
@@ -250,7 +250,7 @@ export default function InvoiceSettings() {
             </div>
           </div>
 
-          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
             <p className="text-sm font-semibold text-neutral-900">4. Footer Text</p>
             <textarea
               value={settings.footerText}
@@ -261,7 +261,7 @@ export default function InvoiceSettings() {
             <p className="mt-1 text-right text-xs text-neutral-400">{settings.footerText.length}/200</p>
           </div>
 
-          <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
             <p className="text-sm font-semibold text-neutral-900">5. Terms & Conditions</p>
             <textarea
               value={settings.terms}

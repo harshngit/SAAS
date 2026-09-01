@@ -63,7 +63,7 @@ export default function Layout() {
         />
         <div
           className={`flex min-w-0 flex-1 flex-col ${
-            isDashboardRoute ? 'bg-transparent md:rounded-l-none md:shadow-none' : 'bg-white md:rounded-l-[2rem] md:shadow-(--shadow-card)'
+            isDashboardRoute ? 'bg-transparent md:rounded-l-none md:shadow-none' : 'bg-white md:rounded-l-2xl md:shadow-(--shadow-card)'
           }`}
         >
           <header className="flex h-16 shrink-0 items-center gap-3 bg-transparent pr-7 lg:h-[4.75rem] ">
@@ -79,7 +79,7 @@ export default function Layout() {
           </button>
           <Topbar />
           </header>
-          <main className={`flex-1 overflow-y-auto ${isDashboardRoute ? 'rounded-b-none bg-transparent' : 'rounded-b-[2rem] bg-white'}`}>
+          <main className={`flex-1 overflow-y-auto ${isDashboardRoute ? 'rounded-b-none bg-transparent' : 'rounded-b-2xl bg-white'}`}>
             <PageWrapper>
               <Outlet />
             </PageWrapper>

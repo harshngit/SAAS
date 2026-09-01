@@ -134,7 +134,7 @@ function SalesInvoicesPanel() {
         <StatCard icon={Receipt} iconVariant="info" label="Paid This Month" value={formatCurrency(stats.paidThisMonth)} />
       </div>
 
-      <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-[14rem] flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
@@ -158,7 +158,7 @@ function SalesInvoicesPanel() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[1.25rem] border border-neutral-100 bg-white shadow-(--shadow-card)">
+      <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
         {listError ? (
           <div className="p-10 text-center">
             <p className="text-sm text-red-600">{listError}</p>
@@ -384,7 +384,7 @@ function PurchaseInvoicesPanel() {
         <StatCard icon={Receipt} iconVariant="success" label="Paid This Month" value={formatCurrency(stats.paidThisMonth)} />
       </div>
 
-      <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-[14rem] flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
@@ -414,7 +414,7 @@ function PurchaseInvoicesPanel() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[1.25rem] border border-neutral-100 bg-white shadow-(--shadow-card)">
+      <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
         {listError ? (
           <div className="p-10 text-center">
             <p className="text-sm text-red-600">{listError}</p>

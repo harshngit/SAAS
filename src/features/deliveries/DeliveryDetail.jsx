@@ -5,13 +5,14 @@ import {
   Ban,
   Camera,
   Check,
-  Clock,
   Download,
   PackageCheck,
   PackageSearch,
   Pencil,
   Truck,
   UserCog,
+  Wallet,
+  Warehouse as WarehouseIcon,
   X,
   XOctagon,
 } from 'lucide-react'
@@ -22,8 +23,10 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import { DELIVERY_STAGES, deliveryStageIndex, getDeliveryStage, getNextDeliveryAction } from './deliveryStage'
+import RejectDeliveryModal from './RejectDeliveryModal'
+import RecordCollectionModal from './RecordCollectionModal'
 import {
-  DELIVERY_STATUS_OPTIONS,
   acceptDelivery,
   confirmDelivery,
   dispatchDelivery,
@@ -34,72 +37,37 @@ import {
   markDeliveryReady,
   pickDeliveryItems,
   reassignDelivery,
-  rejectDelivery,
   updateDeliveryPlan,
 } from '../../api/deliveries'
+import { getSalesWorkflowSettings } from '../../api/settings'
 import { getFileUrl, uploadFiles } from '../../api/files'
 import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
 import { formatCurrency } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
 
-// delivery.status is the backend's normalized public value: pending | accepted | in_transit |
-// partially_delivered | delivered | returned | cancelled (planned/rejected collapse into
-// "pending"; accepted/ready/loaded collapse into "accepted"; failed shows as "returned"). Raw
-// keys kept harmlessly in case an older API build is ever hit.
-const statusVariant = {
-  pending: 'info',
-  delivered: 'success',
-  partially_delivered: 'warning',
-  in_transit: 'warning',
-  planned: 'info',
-  accepted: 'success',
-  ready: 'success',
-  rejected: 'danger',
-  loaded: 'info',
-  returned: 'danger',
-  failed: 'danger',
-  cancelled: 'neutral',
-}
-
-// Only 5 stages are distinguishable from the public status + picking_status the API now
-// returns - "Ready" and "Loaded" both collapse into "accepted" server-side with no separate
-// field to tell them apart, so they're merged into one "Prepared" stage here rather than
-// falsely claiming to know they happened.
-const WORKFLOW_STEPS = [
-  { key: 'planned', label: 'Planned' },
-  { key: 'accepted', label: 'Accepted' },
-  { key: 'prepared', label: 'Prepared' },
-  { key: 'in_transit', label: 'In Transit' },
-  { key: 'delivered', label: 'Delivered' },
-]
-
-function workflowStepIndex(delivery) {
-  if (delivery.status === 'returned' || delivery.status === 'cancelled') return -1
-  if (delivery.status === 'delivered' || delivery.status === 'partially_delivered') return 4
-  if (delivery.status === 'in_transit') return 3
-  if (delivery.status === 'accepted' && delivery.pickingStatus === 'picked') return 2
-  if (delivery.status === 'accepted') return 1
-  return 0
-}
+// The 6-stage flow (Assigned -> Accepted -> Picking -> Vehicle Loaded -> In Transit ->
+// Delivered) and its badge vocabulary are derived from the backend's collapsed status in
+// ./deliveryStage - this file never maps raw status values itself.
 
 function WorkflowTimeline({ delivery }) {
-  if (['returned', 'cancelled'].includes(delivery.status)) {
+  const stage = getDeliveryStage(delivery)
+
+  // rejected / failed / cancelled leave the linear flow; partially_delivered still shows it.
+  if (stage.offFlow && stage.key !== 'partially_delivered') {
     return (
       <div className="flex items-center gap-2 text-sm text-neutral-500">
-        <Badge variant={statusVariant[delivery.status] || 'danger'} dot>
-          {DELIVERY_STATUS_OPTIONS.find((option) => option.value === delivery.status)?.label || delivery.status}
-        </Badge>
+        <Badge variant={stage.variant} dot>{stage.label}</Badge>
         <span>This delivery left the standard workflow.</span>
       </div>
     )
   }
 
-  const currentIndex = workflowStepIndex(delivery)
+  const currentIndex = deliveryStageIndex(delivery)
 
   return (
     <div className="flex items-start overflow-x-auto pb-1">
-      {WORKFLOW_STEPS.map((step, index) => {
+      {DELIVERY_STAGES.map((step, index) => {
         const isDone = index < currentIndex
         const isCurrent = index === currentIndex
         return (
@@ -120,7 +88,7 @@ function WorkflowTimeline({ delivery }) {
                 {step.label}
               </p>
             </div>
-            {index < WORKFLOW_STEPS.length - 1 && (
+            {index < DELIVERY_STAGES.length - 1 && (
               <div className={`mt-3.5 h-0.5 flex-1 ${isDone ? 'bg-primary-500' : 'bg-neutral-100'}`} />
             )}
           </div>
@@ -225,20 +193,25 @@ export default function DeliveryDetail() {
   const [isActing, setIsActing] = useState(false)
   const [actionError, setActionError] = useState('')
 
-  // Delivery partner: accept/reject
-  const [showRejectForm, setShowRejectForm] = useState(false)
-  const [rejectReason, setRejectReason] = useState('')
+  // Delivery partner: reject
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
 
   // Delivery partner: confirm/POD
   const [deliveredQuantities, setDeliveredQuantities] = useState({})
+  const [receiverName, setReceiverName] = useState('')
   const [notes, setNotes] = useState('')
   const [podFiles, setPodFiles] = useState([])
   const [isUploadingPod, setIsUploadingPod] = useState(false)
   const [showFailForm, setShowFailForm] = useState(false)
   const [failureReason, setFailureReason] = useState('')
 
-  // Admin: picking
+  // Delivery partner: picking
   const [pickedQuantities, setPickedQuantities] = useState({})
+
+  // Collection (financial action, gated by the firm's delivery_collection_allowed setting)
+  const [collectionAllowed, setCollectionAllowed] = useState(true)
+  const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false)
+  const [collectionRecorded, setCollectionRecorded] = useState(false)
 
   // Admin: reassignment
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false)
@@ -290,17 +263,17 @@ export default function DeliveryDetail() {
     if (!isAdminView) return
     let isMounted = true
 
+    // Only the admin/back-office can read settings and record collections - the delivery
+    // partner role is 403'd on both, so it gets a read-only hand-off note instead.
+    getSalesWorkflowSettings().then((result) => {
+      if (isMounted && result.success) setCollectionAllowed(result.settings.deliveryCollectionAllowed !== false)
+    })
+
     Promise.all([listDeliveryPartners(), listVehicles(), listWarehouses()]).then(([partnersResult, vehiclesResult, warehousesResult]) => {
       if (!isMounted) return
-      if (partnersResult.success) {
-        setDeliveryPartners(partnersResult.partners)
-      }
-      if (vehiclesResult.success) {
-        setVehicles(vehiclesResult.vehicles)
-      }
-      if (warehousesResult.success) {
-        setWarehouses(warehousesResult.warehouses)
-      }
+      if (partnersResult.success) setDeliveryPartners(partnersResult.partners)
+      if (vehiclesResult.success) setVehicles(vehiclesResult.vehicles)
+      if (warehousesResult.success) setWarehouses(warehousesResult.warehouses)
     })
 
     return () => {
@@ -329,21 +302,20 @@ export default function DeliveryDetail() {
     )
   }
 
-  // The backend now normalizes delivery.status to just pending/accepted/in_transit/
-  // partially_delivered/delivered/returned/cancelled - "ready" and "loaded" both collapse into
-  // "accepted" with no other field distinguishing them, and "rejected" collapses into
-  // "pending". Mark Ready / Load Vehicle / Dispatch are therefore all shown together once
-  // items are picked, and the backend's own sequencing errors (e.g. "Delivery must be ready
-  // before vehicle loading") correct whichever one doesn't apply yet.
-  const canAcceptOrReject = !isAdminView && delivery.status === 'pending'
-  const canPick = isAdminView && delivery.status === 'accepted'
-  const canMarkReady = isAdminView && delivery.status === 'accepted' && delivery.pickingStatus === 'picked'
-  const canLoad = isAdminView && delivery.status === 'accepted' && delivery.pickingStatus === 'picked'
-  const canDispatch = isAdminView && delivery.status === 'accepted' && delivery.pickingStatus === 'picked'
-  const canReassign = isAdminView && delivery.status === 'pending'
-  const canEdit = isAdminView && delivery.status === 'pending'
-  const canCancel = isAdminView && ['pending', 'accepted'].includes(delivery.status)
-  const canConfirm = !isAdminView && ['in_transit', 'partially_delivered'].includes(delivery.status)
+  const deliveryStage = getDeliveryStage(delivery)
+  const stageKey = deliveryStage.key
+
+  // The delivery partner sees exactly ONE next action for the current stage; the admin sees
+  // no workflow buttons, only reassign / edit / cancel overrides. See ./deliveryStage.
+  const nextAction = getNextDeliveryAction(delivery, { isAdmin: isAdminView })
+  const isDeliveredStage = ['delivered', 'partially_delivered'].includes(stageKey)
+  const canReassign = isAdminView && ['assigned', 'rejected'].includes(stageKey)
+  const canEdit = isAdminView && ['assigned', 'rejected'].includes(stageKey)
+  const canCancel = isAdminView && ['assigned', 'accepted', 'picking'].includes(stageKey)
+  const amountDue = Number(delivery.amountDue) || 0
+  // Recording a receipt is a back-office action; the delivery partner sees a hand-off note.
+  const canRecordCollection = isAdminView && isDeliveredStage && collectionAllowed && amountDue > 0
+  const showCollectionHandoff = !isAdminView && isDeliveredStage && amountDue > 0
   const warehouseName = delivery.warehouseName || warehouses.find((warehouse) => warehouse.id === delivery.warehouseId)?.name || delivery.warehouseId
   const podPhotoFileIds = Array.isArray(delivery.pod?.photo_file_ids) ? delivery.pod.photo_file_ids.filter(Boolean) : []
   const podSignatureFileId = delivery.pod?.signature_file_id || ''
@@ -355,6 +327,7 @@ export default function DeliveryDetail() {
   const hasSerialTracking = delivery.items.some((item) => item.serialNumbers.length > 0)
 
   const handleAccept = async () => {
+    if (isActing) return
     setIsActing(true)
     setActionError('')
 
@@ -368,33 +341,17 @@ export default function DeliveryDetail() {
 
     setDelivery(result.delivery)
     setIsActing(false)
-    showToast({ title: 'Delivery accepted', message: 'The warehouse will prepare and load this delivery next.' })
+    showToast({ title: 'Delivery accepted', message: 'Start picking when you are ready to load.' })
   }
 
-  const handleReject = async () => {
-    if (!rejectReason.trim()) {
-      setActionError('Enter a reason for rejecting this delivery.')
-      return
-    }
-
-    setIsActing(true)
-    setActionError('')
-
-    const result = await rejectDelivery(delivery.id, rejectReason.trim())
-
-    if (!result.success) {
-      setActionError(result.error)
-      setIsActing(false)
-      return
-    }
-
-    setIsActing(false)
-    setShowRejectForm(false)
-    showToast({ title: 'Delivery rejected', message: 'The admin has been notified to reassign this delivery.' })
-    navigate('/delivery/deliveries')
+  const handleRejected = (updatedDelivery) => {
+    if (updatedDelivery) setDelivery(updatedDelivery)
+    else loadDetail()
+    showToast({ title: 'Delivery rejected', message: 'The sales team has been notified to reassign this delivery.' })
   }
 
-  const handlePick = async () => {
+  const handleStartPicking = async () => {
+    if (isActing) return
     setIsActing(true)
     setActionError('')
 
@@ -411,29 +368,25 @@ export default function DeliveryDetail() {
 
     setDelivery(result.delivery)
     setIsActing(false)
-    showToast({ title: 'Items picked', message: `Picking status: ${result.delivery.pickingStatus === 'picked' ? 'Picked' : result.delivery.pickingStatus}` })
+    showToast({ title: 'Items picked', message: 'Load the vehicle when picking is complete.' })
   }
 
-  const handleMarkReady = async () => {
+  // One button: mark ready (if the backend still needs it) then load the goods onto the
+  // vehicle. This is the only place warehouse stock physically moves, so it must never run twice.
+  const handleMarkLoaded = async () => {
+    if (isActing) return
     setIsActing(true)
     setActionError('')
 
-    const result = await markDeliveryReady(delivery.id)
-
-    if (!result.success) {
-      setActionError(result.error)
-      setIsActing(false)
-      return
+    if (delivery.pickingStatus === 'picked' || delivery.pickingStatus === 'not_started') {
+      const readyResult = await markDeliveryReady(delivery.id)
+      // A "already ready" style error is fine - only bail on a real failure.
+      if (!readyResult.success && !/already|ready|state|status/i.test(readyResult.error || '')) {
+        setActionError(readyResult.error)
+        setIsActing(false)
+        return
+      }
     }
-
-    setDelivery(result.delivery)
-    setIsActing(false)
-    showToast({ title: 'Marked ready', message: 'This delivery can now be loaded onto the vehicle.' })
-  }
-
-  const handleLoad = async () => {
-    setIsActing(true)
-    setActionError('')
 
     const result = await loadDeliveryOntoVehicle(delivery.id)
 
@@ -445,10 +398,11 @@ export default function DeliveryDetail() {
 
     setDelivery(result.delivery)
     setIsActing(false)
-    showToast({ title: 'Loaded', message: 'Delivery loaded onto the vehicle.' })
+    showToast({ title: 'Vehicle loaded', message: 'Start the delivery when you leave the warehouse.' })
   }
 
   const handleDispatch = async () => {
+    if (isActing) return
     setIsActing(true)
     setActionError('')
 
@@ -462,10 +416,11 @@ export default function DeliveryDetail() {
 
     setDelivery(result.delivery)
     setIsActing(false)
-    showToast({ title: 'Dispatched', message: 'Delivery is now in transit.' })
+    showToast({ title: 'Delivery started', message: 'Delivery is now in transit.' })
   }
 
   const handleReassign = async () => {
+    if (isActing) return
     if (!reassignPartnerId) {
       setActionError('Select a new delivery partner to reassign to.')
       return
@@ -508,6 +463,7 @@ export default function DeliveryDetail() {
   }
 
   const handleEditSave = async () => {
+    if (isActing) return
     setIsActing(true)
     setActionError('')
 
@@ -532,6 +488,7 @@ export default function DeliveryDetail() {
   }
 
   const handleCancelDelivery = async () => {
+    if (isActing) return
     setIsActing(true)
     setActionError('')
 
@@ -571,6 +528,7 @@ export default function DeliveryDetail() {
   }
 
   const handleConfirm = async () => {
+    if (isActing) return
     setIsActing(true)
     setActionError('')
 
@@ -581,6 +539,7 @@ export default function DeliveryDetail() {
         deliveredQuantity: deliveredQuantities[item.id] ?? 0,
       })),
       podPhotoFileIds: podFiles.map((file) => file.file_id).filter(Boolean),
+      receiverName: receiverName.trim() || undefined,
       notes: notes.trim() || undefined,
     })
 
@@ -596,6 +555,7 @@ export default function DeliveryDetail() {
   }
 
   const handleMarkFailed = async () => {
+    if (isActing) return
     if (!failureReason.trim()) {
       setActionError('Enter a reason for the failed delivery.')
       return
@@ -638,14 +598,7 @@ export default function DeliveryDetail() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold text-neutral-900">{delivery.deliveryNumber}</h1>
-              <Badge variant={statusVariant[delivery.status] || 'neutral'} dot>
-                {DELIVERY_STATUS_OPTIONS.find((option) => option.value === delivery.status)?.label || delivery.status}
-              </Badge>
-              {delivery.status === 'accepted' && delivery.pickingStatus && delivery.pickingStatus !== 'not_started' && (
-                <Badge variant="neutral" dot>
-                  Picking {delivery.pickingStatus.replace(/_/g, ' ')}
-                </Badge>
-              )}
+              <Badge variant={deliveryStage.variant} dot>{deliveryStage.label}</Badge>
             </div>
             <p className="mt-1 text-sm text-neutral-500">
               Order {delivery.orderNumber || 'N/A'} | {delivery.customerName || 'Customer not assigned'}
@@ -686,16 +639,16 @@ export default function DeliveryDetail() {
         <WorkflowTimeline delivery={delivery} />
       </Card>
 
-      {/* ---- Delivery partner: accept / reject ---- */}
-      {canAcceptOrReject && !showRejectForm && (
+      {/* ---- Current action - the delivery partner sees exactly one per stage ---- */}
+      {nextAction?.type === 'accept_reject' && (
         <Card title="New Delivery Assigned">
-          <p className="text-sm text-neutral-500">Accept this delivery to start warehouse preparation, or reject it if you cannot take it.</p>
+          <p className="text-sm text-neutral-500">Accept this delivery to start picking, or reject it if you cannot take it.</p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button type="button" loading={isActing} onClick={handleAccept}>
               <Check className="size-4" aria-hidden="true" />
-              Accept Delivery
+              Accept
             </Button>
-            <Button type="button" variant="danger" onClick={() => setShowRejectForm(true)}>
+            <Button type="button" variant="danger" disabled={isActing} onClick={() => setIsRejectModalOpen(true)}>
               <Ban className="size-4" aria-hidden="true" />
               Reject
             </Button>
@@ -703,43 +656,9 @@ export default function DeliveryDetail() {
         </Card>
       )}
 
-      {!isAdminView && showRejectForm && (
-        <Card title="Reject Delivery">
-          <div className="space-y-4">
-            <textarea
-              value={rejectReason}
-              onChange={(event) => setRejectReason(event.target.value)}
-              placeholder="Reason for rejecting this delivery (required)"
-              maxLength={500}
-              className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-            />
-            <div className="flex gap-3">
-              <Button type="button" variant="secondary" onClick={() => setShowRejectForm(false)}>
-                <X className="size-4" aria-hidden="true" />
-                Cancel
-              </Button>
-              <Button type="button" variant="danger" loading={isActing} onClick={handleReject}>
-                Confirm Rejection
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* ---- Delivery partner: waiting states ---- */}
-      {!isAdminView && delivery.status === 'accepted' && (
-        <Card title="Accepted">
-          <div className="flex items-center gap-3 text-sm text-neutral-600">
-            <Clock className="size-5 shrink-0 text-amber-500" aria-hidden="true" />
-            Accepted — waiting for warehouse preparation.
-          </div>
-        </Card>
-      )}
-
-      {/* ---- Admin: picking ---- */}
-      {canPick && (
-        <Card title="Pick Items">
-          <p className="text-sm text-neutral-500">Record how many units of each line were picked from the warehouse shelves.</p>
+      {nextAction?.type === 'start_picking' && (
+        <Card title="Start Picking">
+          <p className="text-sm text-neutral-500">Confirm how many units of each line you are taking from the warehouse.</p>
           <div className="mt-4 space-y-3">
             {delivery.items.map((item) => (
               <div key={item.id} className="grid grid-cols-1 items-center gap-3 rounded-lg bg-neutral-50 p-3 sm:grid-cols-[1fr_auto]">
@@ -768,50 +687,81 @@ export default function DeliveryDetail() {
               </div>
             ))}
           </div>
-          <Button type="button" className="mt-4" loading={isActing} onClick={handlePick}>
+          <Button type="button" className="mt-4" loading={isActing} onClick={handleStartPicking}>
             <PackageSearch className="size-4" aria-hidden="true" />
-            Pick Items
+            Start Picking
           </Button>
         </Card>
       )}
 
-      {canMarkReady && (
-        <Card title="Ready for Loading">
-          <p className="text-sm text-neutral-500">Picking status: Picked. This delivery can now be marked ready for vehicle loading.</p>
-          <Button type="button" className="mt-4" loading={isActing} onClick={handleMarkReady}>
-            <Check className="size-4" aria-hidden="true" />
-            Mark Ready
-          </Button>
-        </Card>
-      )}
-
-      {/* ---- Admin: load / dispatch ---- */}
-      {canLoad && (
-        <Card title="Load onto Vehicle">
-          <p className="text-sm text-neutral-500">Move the picked goods from the warehouse onto {delivery.vehicleNumber || 'the assigned vehicle'}.</p>
-          <Button type="button" className="mt-4" loading={isActing} onClick={handleLoad}>
+      {nextAction?.type === 'mark_loaded' && (
+        <Card title="Load the Vehicle">
+          <p className="text-sm text-neutral-500">
+            Move the picked goods onto {delivery.vehicleNumber || 'your vehicle'}. This takes the stock off the
+            warehouse and onto the van.
+          </p>
+          <Button type="button" className="mt-4" loading={isActing} onClick={handleMarkLoaded}>
             <PackageCheck className="size-4" aria-hidden="true" />
-            Load Vehicle
+            Mark Vehicle Loaded
           </Button>
         </Card>
       )}
 
-      {canDispatch && (
-        <Card title="Dispatch">
-          <p className="text-sm text-neutral-500">Send this delivery out for transit.</p>
+      {nextAction?.type === 'start_delivery' && (
+        <Card title="Ready to Go">
+          <p className="text-sm text-neutral-500">Start the delivery once you leave the warehouse - it moves to In Transit.</p>
           <Button type="button" className="mt-4" loading={isActing} onClick={handleDispatch}>
             <Truck className="size-4" aria-hidden="true" />
-            Dispatch
+            Start Delivery
           </Button>
         </Card>
       )}
 
-      {/* ---- Delivery partner: confirm / POD ---- */}
-      {canConfirm && !showFailForm && (
-        <Card title="Confirm Delivery">
+      {nextAction?.type === 'complete' && !showFailForm && (
+        <Card title="Complete Delivery">
           <div className="space-y-4">
+            <div className="space-y-3">
+              {delivery.items.map((item) => (
+                <div key={item.id} className="grid grid-cols-1 items-center gap-3 rounded-lg bg-neutral-50 p-3 sm:grid-cols-[1fr_auto]">
+                  <div>
+                    <p className="font-medium text-neutral-900">{item.productName}</p>
+                    <p className="text-sm text-neutral-500">Loaded: {item.loadedQuantity}</p>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-neutral-500">Delivered Qty</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={item.loadedQuantity || undefined}
+                      step="1"
+                      value={deliveredQuantities[item.id] ?? 0}
+                      onChange={(event) => setDeliveredQuantities((current) => ({ ...current, [item.id]: Number(event.target.value) }))}
+                      onBlur={(event) => {
+                        const rounded = Math.round(Number(event.target.value))
+                        const cap = item.loadedQuantity || Number.MAX_SAFE_INTEGER
+                        const clamped = Math.min(Math.max(Number.isFinite(rounded) ? rounded : 0, 0), cap)
+                        setDeliveredQuantities((current) => ({ ...current, [item.id]: clamped }))
+                      }}
+                      className="h-10 w-32 rounded-lg border border-neutral-200 bg-white px-3 text-sm"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-neutral-700">Proof of Delivery Photos (Optional)</label>
+              <label className="text-sm font-medium text-neutral-700">Receiver Name (optional)</label>
+              <input
+                type="text"
+                value={receiverName}
+                maxLength={120}
+                onChange={(event) => setReceiverName(event.target.value)}
+                className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-neutral-700">Proof of Delivery Photos (optional)</label>
               <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 px-3.5 py-4 text-sm text-neutral-500 hover:border-primary-300 hover:bg-primary-50/40">
                 {isUploadingPod ? (
                   <LoadingSpinner />
@@ -839,7 +789,7 @@ export default function DeliveryDetail() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-neutral-700">Notes (Optional)</label>
+              <label className="text-sm font-medium text-neutral-700">Delivery Notes (optional)</label>
               <textarea
                 value={notes}
                 maxLength={1000}
@@ -851,14 +801,26 @@ export default function DeliveryDetail() {
             <div className="flex flex-wrap items-center gap-3">
               <Button type="button" loading={isActing} onClick={handleConfirm}>
                 <PackageCheck className="size-4" aria-hidden="true" />
-                Confirm Delivery
+                Complete Delivery
               </Button>
-              <Button type="button" variant="danger" onClick={() => setShowFailForm(true)}>
+              <Button type="button" variant="danger" disabled={isActing} onClick={() => setShowFailForm(true)}>
                 <Ban className="size-4" aria-hidden="true" />
                 Mark as Failed
               </Button>
             </div>
           </div>
+        </Card>
+      )}
+
+      {/* ---- Admin: this delivery is run by the partner ---- */}
+      {isAdminView && !deliveryStage.offFlow && !isDeliveredStage && (
+        <Card title="Current Stage">
+          <p className="text-sm text-neutral-500">
+            <span className="font-medium text-neutral-800">{deliveryStage.label}</span>
+            {' — '}
+            {delivery.deliveryPartnerName ? `handled by ${delivery.deliveryPartnerName}.` : 'handled by the assigned delivery partner.'}
+            {' '}Use Reassign / Edit / Cancel above to intervene.
+          </p>
         </Card>
       )}
 
@@ -885,8 +847,47 @@ export default function DeliveryDetail() {
         </Card>
       )}
 
+      {/* ---- After delivery: information & the separate collection action (not a status) ---- */}
+      {isDeliveredStage && (
+        <Card title="After Delivery">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-sm">
+              <InfoField label="Delivery Summary" value={`${delivery.deliveredTotal ?? 0} delivered of ${delivery.plannedTotal ?? 0} planned`} />
+              <InfoField label="Received By" value={delivery.receiverName || '—'} />
+              <InfoField label="Proof of Delivery" value={(podPhotoFileIds.length > 0 || podSignatureFileId) ? 'Uploaded' : 'Not uploaded'} />
+              <InfoField label="Amount Due" value={formatCurrency(amountDue)} />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {canRecordCollection && !collectionRecorded && (
+                <Button type="button" onClick={() => setIsCollectionModalOpen(true)}>
+                  <Wallet className="size-4" aria-hidden="true" />
+                  Record Collection
+                </Button>
+              )}
+              {collectionRecorded && <Badge variant="success" dot>Collection recorded</Badge>}
+              {!isAdminView && (
+                <Button type="button" variant="outline" onClick={() => navigate('/delivery/vehicle-stock')}>
+                  <WarehouseIcon className="size-4" aria-hidden="true" />
+                  Vehicle / Return Stock
+                </Button>
+              )}
+            </div>
+            {showCollectionHandoff && !collectionRecorded && (
+              <p className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+                {formatCurrency(amountDue)} is still due on this order. Payment collection is recorded by the accounts team.
+              </p>
+            )}
+            {stageKey === 'partially_delivered' && (
+              <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                Some quantity is still pending. The sales team will plan the remaining delivery.
+              </p>
+            )}
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <DetailCard title="Delivery Number" value={delivery.deliveryNumber} subtitle={delivery.status.replace(/_/g, ' ')} />
+        <DetailCard title="Delivery Number" value={delivery.deliveryNumber} subtitle={deliveryStage.label} />
         <DetailCard
           title="Order Number"
           value={delivery.orderNumber || 'N/A'}
@@ -909,6 +910,7 @@ export default function DeliveryDetail() {
           <InfoField label="Delivery Address" value={delivery.customerDeliveryAddress || delivery.deliveryAddress || 'N/A'} />
           <InfoField label="Dispatched At" value={formatDate(delivery.dispatchedAt)} />
           <InfoField label="Confirmed At" value={formatDate(delivery.confirmedAt)} />
+          {delivery.receiverName && <InfoField label="Received By" value={delivery.receiverName} />}
           {delivery.previousPendingBalance != null && (
             <InfoField label="Previous Pending Balance" value={formatCurrency(delivery.previousPendingBalance)} />
           )}
@@ -1127,6 +1129,24 @@ export default function DeliveryDetail() {
           />
         </div>
       </Modal>
+
+      <RejectDeliveryModal
+        delivery={delivery}
+        isOpen={isRejectModalOpen}
+        onClose={() => setIsRejectModalOpen(false)}
+        onRejected={handleRejected}
+      />
+
+      <RecordCollectionModal
+        delivery={delivery}
+        isOpen={isCollectionModalOpen}
+        onClose={() => setIsCollectionModalOpen(false)}
+        onRecorded={() => {
+          setCollectionRecorded(true)
+          showToast({ title: 'Collection recorded', message: 'Payment receipt created.' })
+          loadDetail()
+        }}
+      />
     </div>
   )
 }

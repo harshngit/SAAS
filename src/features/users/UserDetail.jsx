@@ -906,7 +906,7 @@ export default function UserDetail() {
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{customer.city || '—'}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{customer.phone || customer.mobileNumber || '—'}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(customer.outstandingBalance) || '₹0'}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(customer.outstandingBalance) || '₹ 0'}</td>
                       </tr>
                     ))}
                   </tbody>

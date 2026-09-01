@@ -8,18 +8,13 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
-  Mail,
   MapPin,
   Pencil,
-  Phone,
   Plus,
   RefreshCw,
-  ShoppingBag,
-  Sparkles,
   StickyNote,
   Tag,
   Trash2,
-  UserPlus,
   UserRound,
   X,
 } from 'lucide-react'
@@ -30,11 +25,11 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs'
 import { useToast } from '../../components/ui/toastContext'
 import { ROLES } from '../../auth/roles'
 import {
-  LEAD_STATUS_OPTIONS,
-  convertLeadToCustomer,
+  LEAD_MANUAL_STATUS_OPTIONS,
   deleteLead,
   getLead,
   updateLead,
@@ -45,25 +40,18 @@ import { VISIT_TYPE_OPTIONS, createVisit, createVisitFollowUp, listVisits } from
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import { customerBasePathByRole } from '../customers/customerConstants'
-import { LeadEditForm, ConvertLeadForm } from './LeadForms'
-
-const statusVariant = {
-  new: 'info',
-  contacted: 'warning',
-  qualified: 'purple',
-  won: 'success',
-  lost: 'danger',
-}
-
-const journeyStatuses = ['new', 'contacted', 'qualified', 'won']
-
-const getInitials = (name = '') =>
-  name
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+import { LeadEditForm } from './LeadForms'
+import ConvertLeadModal from './ConvertLeadModal'
+import {
+  FOLLOWUP_OUTCOME_OPTIONS,
+  LEAD_STATUS_VARIANT as statusVariant,
+  buildLeadTimeline,
+  describeDueDate,
+  formatLeadLabel as formatLabel,
+  formatLeadStatus,
+  getLeadJourneyState,
+  isReadyToConvertOutcome,
+} from './leadActivity'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -79,13 +67,6 @@ function formatDateTime(value) {
   return `${new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
 }
 
-function daysSince(value) {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  const diffMs = Date.now() - date.getTime()
-  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
-}
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -114,10 +95,15 @@ function emptyVisitFormData() {
   }
 }
 
-function formatLabel(value = '') {
-  return String(value)
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase())
+function emptyFollowUpFormData() {
+  return {
+    title: '',
+    description: '',
+    dueDate: todayIso(),
+    dueTime: '10:00',
+    assigneeId: '',
+    priority: 'medium',
+  }
 }
 
 // Notes are stored as one flat string (the backend has no notes-log table) - each "Add Note"
@@ -140,14 +126,12 @@ function parseNoteEntries(notes) {
     })
 }
 
-function StatTile({ icon: Icon, label, children }) {
+// A compact label/value cell used in the summary strip and the info sections.
+function SummaryItem({ label, children }) {
   return (
-    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
-      <div className="flex items-center gap-2 text-neutral-400">
-        <Icon className="size-3.5" aria-hidden="true" />
-        <p className="text-xs font-medium">{label}</p>
-      </div>
-      <div className="mt-2.5">{children}</div>
+    <div className="min-w-0">
+      <p className="text-xs text-neutral-400">{label}</p>
+      <div className="mt-1 truncate text-sm font-medium text-neutral-900">{children}</div>
     </div>
   )
 }
@@ -229,7 +213,8 @@ export default function LeadDetail() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
-  const leadBasePath = currentUser?.role === ROLES.SALES_OFFICER ? '/sales/leads' : '/admin/leads'
+  const isSalesOfficer = currentUser?.role === ROLES.SALES_OFFICER
+  const leadBasePath = isSalesOfficer ? '/sales/leads' : '/admin/leads'
   const customerBasePath = customerBasePathByRole[currentUser?.role] || '/sales/customers'
 
   const [lead, setLead] = useState(null)
@@ -243,8 +228,6 @@ export default function LeadDetail() {
   const [formError, setFormError] = useState('')
 
   const [isConvertOpen, setIsConvertOpen] = useState(false)
-  const [isConverting, setIsConverting] = useState(false)
-  const [convertError, setConvertError] = useState('')
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -269,6 +252,24 @@ export default function LeadDetail() {
   const [isSavingVisit, setIsSavingVisit] = useState(false)
   const [visitFormError, setVisitFormError] = useState('')
   const [assignableStaff, setAssignableStaff] = useState([])
+
+  // Follow-ups raised directly on a lead. The backend /follow-ups endpoint needs a
+  // customer or a visit to attach to, and a raw lead has neither, so for this UI
+  // phase they live in local state (shape matches normalizeFollowUp so a real
+  // POST /follow-ups?lead_id=... can drop in later).
+  // TODO: replace with a real lead-follow-up endpoint once the backend adds one.
+  const [localFollowUps, setLocalFollowUps] = useState([])
+  const [activitiesTab, setActivitiesTab] = useState('followups')
+
+  const [isFollowUpOpen, setIsFollowUpOpen] = useState(false)
+  const [followUpFormData, setFollowUpFormData] = useState(emptyFollowUpFormData)
+  const [editingFollowUpId, setEditingFollowUpId] = useState(null)
+  const [followUpFormError, setFollowUpFormError] = useState('')
+
+  const [completingFollowUp, setCompletingFollowUp] = useState(null)
+  const [completeOutcome, setCompleteOutcome] = useState('interested')
+  const [completeNotes, setCompleteNotes] = useState('')
+  const [readyToConvertNudge, setReadyToConvertNudge] = useState(false)
 
   const loadLead = async () => {
     setIsLoading(true)
@@ -371,67 +372,14 @@ export default function LeadDetail() {
     [assignableStaff],
   )
 
-  const daysOld = lead ? daysSince(lead.createdAt) : null
   const isConverted = Boolean(lead?.convertedCustomerId)
 
-  const journeyState = useMemo(() => {
-    if (!lead) return { index: 0, isLost: false }
-    if (lead.leadStatus === 'lost') return { index: 3, isLost: true }
-    const index = journeyStatuses.indexOf(lead.leadStatus)
-    return { index: index === -1 ? 0 : index, isLost: false }
-  }, [lead])
+  const journeyState = useMemo(() => getLeadJourneyState(lead), [lead])
 
-  const timelineEvents = useMemo(() => {
-    if (!lead) return []
-    const events = []
-
-    events.push({
-      id: 'created',
-      icon: Sparkles,
-      iconClass: 'bg-primary-50 text-primary-700',
-      title: 'Lead Created',
-      subtitle: 'Lead has been created' + (lead.leadSource ? ` via ${lead.leadSource}` : ''),
-      timestamp: lead.createdAt,
-    })
-
-    if (lead.assignedSalespersonName) {
-      events.push({
-        id: 'assigned',
-        icon: UserRound,
-        iconClass: 'bg-blue-50 text-blue-600',
-        title: `Assigned to ${lead.assignedSalespersonName}`,
-        subtitle: 'Lead assigned for follow-up',
-        timestamp: lead.createdAt,
-      })
-    }
-
-    const meaningfullyUpdated =
-      lead.updatedAt && lead.createdAt && new Date(lead.updatedAt).getTime() - new Date(lead.createdAt).getTime() > 60_000
-
-    if (meaningfullyUpdated && lead.leadStatus !== 'new') {
-      events.push({
-        id: 'status',
-        icon: RefreshCw,
-        iconClass: 'bg-amber-50 text-amber-600',
-        title: `Status updated to ${formatLabel(lead.leadStatus)}`,
-        subtitle: 'Lead status was last changed here',
-        timestamp: lead.updatedAt,
-      })
-    }
-
-    if (lead.convertedAt) {
-      events.push({
-        id: 'converted',
-        icon: ShoppingBag,
-        iconClass: 'bg-green-50 text-green-600',
-        title: 'Converted to Customer',
-        subtitle: 'A customer record was created from this lead',
-        timestamp: lead.convertedAt,
-      })
-    }
-
-    return events.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0))
-  }, [lead])
+  const timelineEvents = useMemo(
+    () => buildLeadTimeline({ lead, visits, localFollowUps }),
+    [lead, visits, localFollowUps],
+  )
 
   const noteEntries = useMemo(() => parseNoteEntries(lead?.notes), [lead?.notes])
 
@@ -453,22 +401,9 @@ export default function LeadDetail() {
     showToast({ title: 'Lead updated', message: 'Changes have been saved.' })
   }
 
-  const handleConvertLead = async (formData) => {
-    setIsConverting(true)
-    setConvertError('')
-
-    const result = await convertLeadToCustomer(id, formData)
-
-    if (!result.success) {
-      setConvertError(result.error)
-      setIsConverting(false)
-      return
-    }
-
-    setIsConverting(false)
-    setIsConvertOpen(false)
+  const handleLeadConverted = async ({ customerId }) => {
     await loadLead()
-    navigate(`${customerBasePath}/${result.customerId}`)
+    if (customerId) navigate(`${customerBasePath}/${customerId}`)
   }
 
   const handleDeleteLead = async () => {
@@ -603,7 +538,109 @@ export default function LeadDetail() {
     setLead(result.lead)
     setIsSavingStatus(false)
     setIsStatusOpen(false)
-    showToast({ title: 'Status updated', message: `Lead status set to ${formatLabel(statusValue)}.` })
+    showToast({ title: 'Status updated', message: `Lead status set to ${formatLeadStatus(statusValue)}.` })
+  }
+
+  // --- Local (lead-scoped) follow-ups -------------------------------------------------
+  const openAddFollowUp = () => {
+    setEditingFollowUpId(null)
+    setFollowUpFormData(emptyFollowUpFormData())
+    setFollowUpFormError('')
+    setIsFollowUpOpen(true)
+  }
+
+  const openEditFollowUp = (task) => {
+    const due = task.dueDate ? new Date(task.dueDate) : new Date()
+    setEditingFollowUpId(task.id)
+    setFollowUpFormData({
+      title: task.title,
+      description: task.description,
+      dueDate: due.toISOString().slice(0, 10),
+      dueTime: due.toTimeString().slice(0, 5),
+      assigneeId: task.assignedToId || '',
+      priority: task.priority || 'medium',
+    })
+    setFollowUpFormError('')
+    setIsFollowUpOpen(true)
+  }
+
+  const handleSaveFollowUp = () => {
+    if (!followUpFormData.title.trim()) {
+      setFollowUpFormError('Enter a follow-up title.')
+      return
+    }
+
+    const dueDate = `${followUpFormData.dueDate}T${followUpFormData.dueTime}:00`
+    const assignee = assigneeOptions.find((option) => option.value === followUpFormData.assigneeId)
+
+    setLocalFollowUps((current) => {
+      if (editingFollowUpId) {
+        return current.map((task) =>
+          task.id === editingFollowUpId
+            ? {
+                ...task,
+                title: followUpFormData.title.trim(),
+                description: followUpFormData.description.trim(),
+                dueDate,
+                priority: followUpFormData.priority,
+                assignedToId: followUpFormData.assigneeId,
+                assignedToName: assignee?.label || task.assignedToName || '',
+              }
+            : task,
+        )
+      }
+      return [
+        {
+          id: `local-${Date.now()}`,
+          leadId: id,
+          title: followUpFormData.title.trim(),
+          description: followUpFormData.description.trim(),
+          dueDate,
+          priority: followUpFormData.priority,
+          status: 'pending',
+          assignedToId: followUpFormData.assigneeId,
+          assignedToName: assignee?.label || currentUser?.name || '',
+          outcome: '',
+          outcomeNotes: '',
+          createdAt: new Date().toISOString(),
+          completedAt: null,
+        },
+        ...current,
+      ]
+    })
+
+    setIsFollowUpOpen(false)
+    setActivitiesTab('followups')
+    showToast({
+      title: editingFollowUpId ? 'Follow-up updated' : 'Follow-up added',
+      message: 'Saved to this lead.',
+    })
+  }
+
+  const deleteLocalFollowUp = (taskId) => {
+    setLocalFollowUps((current) => current.filter((task) => task.id !== taskId))
+  }
+
+  const openCompleteFollowUp = (task) => {
+    setCompletingFollowUp(task)
+    setCompleteOutcome('interested')
+    setCompleteNotes('')
+  }
+
+  const handleCompleteFollowUp = () => {
+    setLocalFollowUps((current) =>
+      current.map((task) =>
+        task.id === completingFollowUp.id
+          ? { ...task, status: 'completed', completedAt: new Date().toISOString(), outcome: completeOutcome, outcomeNotes: completeNotes.trim() }
+          : task,
+      ),
+    )
+    const outcome = completeOutcome
+    setCompletingFollowUp(null)
+    if (isReadyToConvertOutcome(outcome) && !isConverted) {
+      setReadyToConvertNudge(true)
+    }
+    showToast({ title: 'Follow-up completed', message: `Outcome: ${formatLabel(outcome)}.` })
   }
 
   if (isLoading) {
@@ -637,329 +674,292 @@ export default function LeadDetail() {
         Back to Leads
       </button>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="font-(--font-display) text-2xl font-semibold tracking-tight text-neutral-900">
               {lead.name || lead.customerName || 'New prospect'}
             </h1>
-            <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLabel(lead.leadStatus)}</Badge>
+            <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLeadStatus(lead.leadStatus)}</Badge>
           </div>
-          <p className="mt-1 text-sm text-neutral-500">Lead ID: {lead.leadId}</p>
+          <p className="mt-1 text-sm text-neutral-500">{lead.leadId}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => { setFormError(''); setIsEditOpen(true) }}>
             <Pencil className="size-4" aria-hidden="true" />
             Edit Lead
           </Button>
+          <Button variant="outline" size="sm" onClick={openAddFollowUp}>
+            <ClipboardList className="size-4" aria-hidden="true" />
+            Add Follow-up
+          </Button>
+          <Button variant="outline" size="sm" onClick={openVisitModal}>
+            <MapPin className="size-4" aria-hidden="true" />
+            Log Visit
+          </Button>
           {isConverted ? (
-            <Button variant="outline" size="sm" onClick={() => navigate(`${customerBasePath}/${lead.convertedCustomerId}`)}>
+            <Button size="sm" onClick={() => navigate(`${customerBasePath}/${lead.convertedCustomerId}`)}>
               <ArrowRightCircle className="size-4" aria-hidden="true" />
               View Customer
             </Button>
           ) : (
-            <Button size="sm" onClick={() => { setConvertError(''); setIsConvertOpen(true) }}>
+            <Button size="sm" onClick={() => setIsConvertOpen(true)}>
               <ArrowRightCircle className="size-4" aria-hidden="true" />
               Convert to Customer
             </Button>
           )}
           <ActionMenu
             items={[
-              { label: 'Update Status', icon: RefreshCw, onClick: openStatusModal },
+              // A converted lead's status is locked - no manual Update Status.
+              ...(lead.leadStatus === 'won' ? [] : [{ label: 'Update Status', icon: RefreshCw, onClick: openStatusModal }]),
               { label: 'Delete Lead', icon: Trash2, danger: true, onClick: () => { setDeleteError(''); setIsDeleteOpen(true) } },
             ]}
           />
         </div>
       </div>
 
+      {/* Compact summary strip - the facts a rep needs at a glance, shown once. */}
       <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-        <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
-          <div className="flex items-start gap-4">
-            <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-primary-50 text-lg font-semibold text-primary-700 ring-1 ring-primary-100">
-              {getInitials(lead.name || lead.customerName || lead.mobileNumber)}
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg font-semibold text-neutral-900">{lead.name || lead.customerName || 'New prospect'}</p>
-              <p className="text-sm text-neutral-500">Contact Person</p>
-              <p className="text-sm font-medium text-neutral-700">{lead.contactPerson || '—'}</p>
-              <div className="mt-2 space-y-1 text-sm text-neutral-600">
-                {lead.mobileNumber && (
-                  <a href={`tel:${lead.mobileNumber}`} className="flex items-center gap-1.5 hover:text-primary-700">
-                    <Phone className="size-3.5 text-neutral-400" aria-hidden="true" />
-                    {lead.mobileNumber}
-                  </a>
-                )}
-                {lead.email && (
-                  <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 hover:text-primary-700">
-                    <Mail className="size-3.5 text-neutral-400" aria-hidden="true" />
-                    {lead.email}
-                  </a>
-                )}
-              </div>
-            </div>
-          </div>
+        <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-5">
+          <SummaryItem label="Phone">
+            {lead.mobileNumber ? (
+              <a href={`tel:${lead.mobileNumber}`} className="text-primary-700 hover:underline">{lead.mobileNumber}</a>
+            ) : '—'}
+          </SummaryItem>
+          <SummaryItem label="Source">{lead.leadSource || '—'}</SummaryItem>
+          <SummaryItem label="Assigned To">{lead.assignedSalespersonName || 'Unassigned'}</SummaryItem>
+          <SummaryItem label="Interested Product">{lead.interestedProduct || '—'}</SummaryItem>
+          <SummaryItem label="Created Date">{formatDate(lead.createdAt)}</SummaryItem>
+        </div>
+      </div>
 
-          <div className="grid gap-x-6 gap-y-4 border-t border-neutral-100 pt-5 sm:grid-cols-2 lg:border-t-0 lg:border-l lg:pl-6 lg:pt-0">
-            <Field label="Lead Source" value={lead.leadSource} />
-            <Field label="Assigned Sales Officer" value={lead.assignedSalespersonName} />
-            <Field label="Interested Product" value={lead.interestedProduct} />
-            <Field label="Created On" value={formatDateTime(lead.createdAt)} />
+      {readyToConvertNudge && !isConverted && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-primary-100 bg-primary-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-center gap-2 text-sm font-medium text-primary-900">
+            <CheckCircle2 className="size-4 shrink-0 text-primary-700" aria-hidden="true" />
+            A follow-up marked this lead ready — convert it to a customer.
+          </p>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => setIsConvertOpen(true)}>
+              <ArrowRightCircle className="size-4" aria-hidden="true" />
+              Convert to Customer
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setReadyToConvertNudge(false)}>Dismiss</Button>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        <StatTile icon={Tag} label="Lead Status">
-          <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLabel(lead.leadStatus)}</Badge>
-        </StatTile>
-        <StatTile icon={Clock} label="Days Since Created">
-          <p className="text-lg font-semibold text-neutral-900">{daysOld === null ? '—' : daysOld === 0 ? 'Today' : `${daysOld} day${daysOld === 1 ? '' : 's'}`}</p>
-        </StatTile>
-        <StatTile icon={UserRound} label="Assigned To">
-          <p className="truncate text-sm font-semibold text-neutral-900">{lead.assignedSalespersonName || 'Unassigned'}</p>
-        </StatTile>
-        <StatTile icon={Sparkles} label="Lead Source">
-          <p className="truncate text-sm font-semibold text-neutral-900">{lead.leadSource || '—'}</p>
-        </StatTile>
-        <StatTile icon={ShoppingBag} label="Interested Product">
-          <p className="truncate text-sm font-semibold text-neutral-900">{lead.interestedProduct || '—'}</p>
-        </StatTile>
-        <StatTile icon={CheckCircle2} label="Conversion Status">
-          <Badge variant={isConverted ? 'success' : 'neutral'}>{isConverted ? 'Converted' : 'Not Converted'}</Badge>
-        </StatTile>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="space-y-4">
-          <Section title="Contact Information" icon={UserRound}>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Name" value={lead.name || lead.customerName} />
-              <Field label="Mobile Number" value={lead.mobileNumber} />
-              <Field label="Contact Person" value={lead.contactPerson} />
-              <Field label="Email" value={lead.email} />
-            </div>
-          </Section>
-
-          <Section title="Lead Information" icon={Tag}>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Lead Source" value={lead.leadSource} />
-              <Field label="Assigned Sales Officer" value={lead.assignedSalespersonName} />
-              <div>
-                <p className="text-xs text-neutral-400">Lead Status</p>
-                <div className="mt-1">
-                  <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLabel(lead.leadStatus)}</Badge>
-                </div>
-              </div>
-              <Field label="Interested Product" value={lead.interestedProduct} />
-            </div>
-          </Section>
-
-          <Section
-            title="Notes / Requirements"
-            icon={StickyNote}
-            actions={
-              <Button type="button" variant="outline" size="sm" onClick={openNoteModal}>
-                <Plus className="size-4" aria-hidden="true" />
-                Add Note
-              </Button>
-            }
-          >
-            {noteEntries.length === 0 ? (
-              <div className="min-h-20 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/60 p-4 text-center text-sm text-neutral-400">
-                No notes added yet.
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {noteEntries.map((entry) => (
-                  <div key={entry.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
-                    {entry.timestamp && (
-                      <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-400">
-                        <Clock className="size-3.5 shrink-0" aria-hidden="true" />
-                        {entry.timestamp}
-                      </p>
-                    )}
-                    <p className={`whitespace-pre-line text-sm text-neutral-700 ${entry.timestamp ? 'mt-1.5' : ''}`}>
-                      {entry.text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Section>
+      <Section title="Contact Information" icon={UserRound}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Prospect / Business Name" value={lead.name || lead.customerName} />
+          <Field label="Contact Person" value={lead.contactPerson} />
+          <Field label="Mobile" value={lead.mobileNumber} />
+          <Field label="Email" value={lead.email} />
         </div>
+      </Section>
 
-        <div className="space-y-4">
-          <Section title="Conversion" icon={ArrowRightCircle}>
-            {isConverted ? (
-              <div className="rounded-xl border border-green-100 bg-green-50 p-4">
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-600" aria-hidden="true" />
-                  <div>
-                    <p className="text-sm font-medium text-green-900">This lead has been converted.</p>
-                    <p className="mt-1 text-xs text-green-700">Converted on {formatDate(lead.convertedAt)}</p>
-                  </div>
-                </div>
-                <Button className="mt-4 w-full" size="sm" onClick={() => navigate(`${customerBasePath}/${lead.convertedCustomerId}`)}>
-                  <ArrowRightCircle className="size-4" aria-hidden="true" />
-                  View Customer
-                </Button>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
-                <div className="flex items-start gap-2.5">
-                  <UserPlus className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden="true" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-900">This lead is not converted yet.</p>
-                    <p className="mt-1 text-xs text-amber-700">Convert this lead to a customer to start doing business.</p>
-                  </div>
-                </div>
-                <Button className="mt-4 w-full" size="sm" onClick={() => { setConvertError(''); setIsConvertOpen(true) }}>
-                  <ArrowRightCircle className="size-4" aria-hidden="true" />
-                  Convert to Customer
-                </Button>
-              </div>
-            )}
-          </Section>
-
-          <Section title="Activity Timeline" icon={Clock}>
-            {timelineEvents.length === 0 ? (
-              <p className="text-sm text-neutral-400">No activity recorded yet.</p>
-            ) : (
-              <div>
-                {timelineEvents.map((event, index) => (
-                  <TimelineItem key={event.id} {...event} isLast={index === timelineEvents.length - 1} />
-                ))}
-              </div>
-            )}
-          </Section>
-
-          <Section title="Quick Actions" icon={Sparkles}>
-            <div className="grid grid-cols-2 gap-2">
-              <a
-                href={lead.mobileNumber ? `tel:${lead.mobileNumber}` : undefined}
-                aria-disabled={!lead.mobileNumber}
-                className={`flex items-center justify-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm font-medium text-neutral-700 transition-colors ${lead.mobileNumber ? 'hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700' : 'pointer-events-none opacity-50'}`}
-              >
-                <Phone className="size-4" aria-hidden="true" />
-                Call
-              </a>
-              <a
-                href={lead.email ? `mailto:${lead.email}` : undefined}
-                aria-disabled={!lead.email}
-                className={`flex items-center justify-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm font-medium text-neutral-700 transition-colors ${lead.email ? 'hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700' : 'pointer-events-none opacity-50'}`}
-              >
-                <Mail className="size-4" aria-hidden="true" />
-                Email
-              </a>
-              <button
-                type="button"
-                onClick={openNoteModal}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm font-medium text-neutral-700 transition-colors hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700"
-              >
-                <StickyNote className="size-4" aria-hidden="true" />
-                Add Note
-              </button>
-              <button
-                type="button"
-                onClick={openStatusModal}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm font-medium text-neutral-700 transition-colors hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700"
-              >
-                <RefreshCw className="size-4" aria-hidden="true" />
-                Update Status
-              </button>
+      <Section title="Lead Information" icon={Tag}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Source" value={lead.leadSource} />
+          <Field label="Assigned Salesperson" value={lead.assignedSalespersonName} />
+          <div>
+            <p className="text-xs text-neutral-400">Status</p>
+            <div className="mt-1">
+              <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLeadStatus(lead.leadStatus)}</Badge>
             </div>
-          </Section>
-        </div>
-      </div>
-
-      <Section title="Lead Journey" icon={Calendar}>
-        <div className="flex items-start px-1">
-          <LeadJourneyNode index={1} label="New" state={journeyState.index > 0 ? 'done' : journeyState.index === 0 ? 'current' : 'pending'} />
-          <LeadJourneyNode index={2} label="Contacted" state={journeyState.index > 1 ? 'done' : journeyState.index === 1 ? 'current' : 'pending'} />
-          <LeadJourneyNode index={3} label="Qualified" state={journeyState.index > 2 ? 'done' : journeyState.index === 2 ? 'current' : 'pending'} />
-          <LeadJourneyNode
-            index={4}
-            label={journeyState.isLost ? 'Lost' : 'Won'}
-            state={journeyState.isLost ? 'lost' : journeyState.index >= 3 ? 'done' : journeyState.index === 2 ? 'pending' : 'pending'}
-            isLast
-          />
+          </div>
+          <Field label="Interested Product" value={lead.interestedProduct} />
+          <Field label="Created Date" value={formatDateTime(lead.createdAt)} />
         </div>
       </Section>
 
       <Section
-        title="Visits & Follow-ups"
-        icon={MapPin}
+        title="Notes / Requirements"
+        icon={StickyNote}
         actions={
-          <Button type="button" variant="outline" size="sm" onClick={openVisitModal}>
+          <Button type="button" variant="outline" size="sm" onClick={openNoteModal}>
             <Plus className="size-4" aria-hidden="true" />
-            Log Visit
+            Add Note
           </Button>
         }
       >
-        {visitsError ? (
-          <div className="py-6 text-center">
-            <p className="text-sm text-red-600">{visitsError}</p>
+        {noteEntries.length === 0 ? (
+          <div className="min-h-20 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/60 p-4 text-center text-sm text-neutral-400">
+            No notes added yet.
           </div>
-        ) : isLoadingVisits ? (
-          <LoadingSpinner label="Loading visits..." />
-        ) : visits.length === 0 ? (
-          <p className="py-6 text-center text-sm text-neutral-400">No visits recorded for this lead yet.</p>
         ) : (
-          <div className="space-y-3">
-            {visits.map((visit) => (
-              <div key={visit.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900">
-                      <Calendar className="size-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
-                      {formatDateTime(visit.visitDate)}
-                    </p>
-                    <p className="mt-0.5 text-xs text-neutral-500">
-                      {formatLabel(visit.visitType)}
-                      {visit.purpose ? ` · ${visit.purpose}` : ''}
-                    </p>
-                  </div>
-                  <Badge
-                    variant={visit.status === 'completed' ? 'success' : visit.status === 'cancelled' ? 'neutral' : 'info'}
-                  >
-                    {formatLabel(visit.status)}
-                  </Badge>
-                </div>
-
-                {visit.notes && (
-                  <p className="mt-3 whitespace-pre-line border-t border-neutral-100 pt-3 text-sm text-neutral-700">{visit.notes}</p>
-                )}
-                {visit.outcome && (
-                  <p className="mt-2 text-sm text-neutral-600">
-                    <span className="font-medium text-neutral-800">Outcome:</span> {visit.outcome}
+          <div className="space-y-2.5">
+            {noteEntries.map((entry) => (
+              <div key={entry.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
+                {entry.timestamp && (
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-400">
+                    <Clock className="size-3.5 shrink-0" aria-hidden="true" />
+                    {entry.timestamp}
                   </p>
                 )}
-
-                {visit.followUps.length > 0 && (
-                  <div className="mt-3 space-y-2 border-t border-neutral-100 pt-3">
-                    {visit.followUps.map((task) => (
-                      <div key={task.id} className="flex items-start gap-2.5 rounded-lg bg-white p-2.5 shadow-(--shadow-xs)">
-                        <ClipboardList className="mt-0.5 size-4 shrink-0 text-primary-600" aria-hidden="true" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-sm font-medium text-neutral-900">{task.title}</p>
-                            <Badge variant={task.status === 'completed' ? 'success' : 'warning'}>
-                              {formatLabel(task.status)}
-                            </Badge>
-                          </div>
-                          <p className="mt-0.5 text-xs text-neutral-500">
-                            Due {formatDateTime(task.dueDate)}
-                            {task.assignedToName ? ` · ${task.assignedToName}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <p className={`whitespace-pre-line text-sm text-neutral-700 ${entry.timestamp ? 'mt-1.5' : ''}`}>
+                  {entry.text}
+                </p>
               </div>
             ))}
           </div>
         )}
+      </Section>
+
+      <Section title="Lead Journey" icon={Calendar}>
+        <div className="flex items-start px-1">
+          <LeadJourneyNode index={1} label="New" state={journeyState.isLost ? 'done' : journeyState.index > 0 ? 'done' : 'current'} />
+          <LeadJourneyNode index={2} label="Contacted" state={journeyState.index > 1 ? 'done' : journeyState.index === 1 ? 'current' : 'pending'} />
+          <LeadJourneyNode index={3} label="Qualified" state={journeyState.index > 2 ? 'done' : journeyState.index === 2 ? 'current' : 'pending'} />
+          <LeadJourneyNode index={4} label="Converted" state={journeyState.index >= 3 ? 'done' : 'pending'} isLast />
+        </div>
+        {journeyState.isLost && (
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3.5 py-2.5">
+            <X className="size-4 shrink-0 text-red-600" aria-hidden="true" />
+            <p className="text-sm font-medium text-red-700">This lead was marked Lost.</p>
+          </div>
+        )}
+      </Section>
+
+      <Section title="Activity Timeline" icon={Clock}>
+        {timelineEvents.length === 0 ? (
+          <p className="text-sm text-neutral-400">No activity recorded yet.</p>
+        ) : (
+          <div>
+            {timelineEvents.map((event, index) => (
+              <TimelineItem key={event.id} {...event} isLast={index === timelineEvents.length - 1} />
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section
+        title="Activities"
+        icon={MapPin}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={openAddFollowUp}>
+              <Plus className="size-4" aria-hidden="true" />
+              Add Follow-up
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={openVisitModal}>
+              <Plus className="size-4" aria-hidden="true" />
+              Log Visit
+            </Button>
+          </div>
+        }
+      >
+        <Tabs value={activitiesTab} onValueChange={setActivitiesTab}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="followups">Follow-ups ({localFollowUps.length})</TabsTrigger>
+            <TabsTrigger value="visits">Visits ({visits.length})</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="followups">
+            {localFollowUps.length === 0 ? (
+              <p className="py-6 text-center text-sm text-neutral-400">No follow-ups for this lead yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {localFollowUps.map((task) => {
+                  const due = describeDueDate(task.dueDate)
+                  return (
+                    <div key={task.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-neutral-900">{task.title}</p>
+                          <p className={`mt-0.5 text-xs ${due.tone === 'danger' ? 'font-medium text-red-600' : 'text-neutral-500'}`}>
+                            {task.status === 'completed' ? `Completed ${formatDateTime(task.completedAt)}` : due.label}
+                          </p>
+                        </div>
+                        <Badge variant={task.status === 'completed' ? 'success' : 'warning'}>{formatLabel(task.status)}</Badge>
+                      </div>
+                      {task.description && (
+                        <p className="mt-3 whitespace-pre-line border-t border-neutral-100 pt-3 text-sm text-neutral-700">{task.description}</p>
+                      )}
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
+                        <span>Priority: {formatLabel(task.priority)}{task.assignedToName ? ` · ${task.assignedToName}` : ''}</span>
+                        {task.status === 'completed' ? (
+                          task.outcome && <span className="font-medium text-neutral-700">Outcome: {formatLabel(task.outcome)}</span>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <button type="button" onClick={() => openCompleteFollowUp(task)} className="rounded-md px-2 py-1 font-medium text-primary-700 hover:bg-primary-50">Complete</button>
+                            <button type="button" onClick={() => openEditFollowUp(task)} className="rounded-md px-2 py-1 font-medium text-neutral-600 hover:bg-neutral-100">Edit</button>
+                            <button type="button" onClick={() => deleteLocalFollowUp(task.id)} className="rounded-md px-2 py-1 font-medium text-red-600 hover:bg-red-50">Delete</button>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="visits">
+            {visitsError ? (
+              <div className="py-6 text-center">
+                <p className="text-sm text-red-600">{visitsError}</p>
+              </div>
+            ) : isLoadingVisits ? (
+              <LoadingSpinner label="Loading visits..." />
+            ) : visits.length === 0 ? (
+              <p className="py-6 text-center text-sm text-neutral-400">No visits recorded for this lead yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {visits.map((visit) => (
+                  <div key={visit.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900">
+                          <Calendar className="size-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
+                          {formatDateTime(visit.visitDate)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-neutral-500">
+                          {formatLabel(visit.visitType)}
+                          {visit.purpose ? ` · ${visit.purpose}` : ''}
+                        </p>
+                      </div>
+                      <Badge variant={visit.status === 'completed' ? 'success' : visit.status === 'cancelled' ? 'neutral' : 'info'}>
+                        {formatLabel(visit.status)}
+                      </Badge>
+                    </div>
+
+                    {visit.notes && (
+                      <p className="mt-3 whitespace-pre-line border-t border-neutral-100 pt-3 text-sm text-neutral-700">{visit.notes}</p>
+                    )}
+                    {visit.outcome && (
+                      <p className="mt-2 text-sm text-neutral-600">
+                        <span className="font-medium text-neutral-800">Outcome:</span> {visit.outcome}
+                      </p>
+                    )}
+
+                    {visit.followUps.length > 0 && (
+                      <div className="mt-3 space-y-2 border-t border-neutral-100 pt-3">
+                        {visit.followUps.map((task) => (
+                          <div key={task.id} className="flex items-start gap-2.5 rounded-lg bg-white p-2.5 shadow-(--shadow-xs)">
+                            <ClipboardList className="mt-0.5 size-4 shrink-0 text-primary-600" aria-hidden="true" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-medium text-neutral-900">{task.title}</p>
+                                <Badge variant={task.status === 'completed' ? 'success' : 'warning'}>
+                                  {formatLabel(task.status)}
+                                </Badge>
+                              </div>
+                              <p className="mt-0.5 text-xs text-neutral-500">
+                                Due {formatDateTime(task.dueDate)}
+                                {task.assignedToName ? ` · ${task.assignedToName}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </Section>
 
       <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Lead" className="max-w-2xl">
@@ -969,21 +969,19 @@ export default function LeadDetail() {
           salespersonOptions={salespersonOptions}
           saving={isSaving}
           formError={formError}
+          lockAssignee={isSalesOfficer}
           onClose={() => setIsEditOpen(false)}
           onSave={handleSaveLead}
         />
       </Modal>
 
-      <Modal isOpen={isConvertOpen} onClose={() => { if (!isConverting) setIsConvertOpen(false) }} title="Convert to Customer" className="max-w-2xl">
-        <ConvertLeadForm
-          lead={lead}
-          salespersonOptions={salespersonOptions}
-          saving={isConverting}
-          formError={convertError}
-          onClose={() => setIsConvertOpen(false)}
-          onSave={handleConvertLead}
-        />
-      </Modal>
+      <ConvertLeadModal
+        isOpen={isConvertOpen}
+        onClose={() => setIsConvertOpen(false)}
+        lead={lead}
+        salespersonOptions={salespersonOptions}
+        onConverted={handleLeadConverted}
+      />
 
       <Modal
         isOpen={isDeleteOpen}
@@ -1022,11 +1020,90 @@ export default function LeadDetail() {
         </div>
       </Modal>
 
+      <Modal isOpen={isFollowUpOpen} onClose={() => setIsFollowUpOpen(false)} title={editingFollowUpId ? 'Edit Follow-up' : 'Add Follow-up'} className="max-w-lg">
+        <div className="space-y-4">
+          {followUpFormError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{followUpFormError}</div>
+          )}
+          <Input
+            label="Follow-up Title"
+            value={followUpFormData.title}
+            onChange={(event) => setFollowUpFormData((current) => ({ ...current, title: event.target.value }))}
+            placeholder="e.g. Call to confirm quantity"
+            required
+          />
+          <Input
+            as="textarea"
+            label="Description"
+            value={followUpFormData.description}
+            onChange={(event) => setFollowUpFormData((current) => ({ ...current, description: event.target.value }))}
+            inputClassName="min-h-20"
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Due Date"
+              type="date"
+              value={followUpFormData.dueDate}
+              onChange={(event) => setFollowUpFormData((current) => ({ ...current, dueDate: event.target.value }))}
+              required
+            />
+            <Input
+              label="Due Time"
+              type="time"
+              value={followUpFormData.dueTime}
+              onChange={(event) => setFollowUpFormData((current) => ({ ...current, dueTime: event.target.value }))}
+              required
+            />
+          </div>
+          <Select
+            label="Assignee"
+            options={assigneeOptions}
+            value={followUpFormData.assigneeId}
+            onChange={(event) => setFollowUpFormData((current) => ({ ...current, assigneeId: event.target.value }))}
+            placeholder="Defaults to you if left blank"
+          />
+          <Select
+            label="Priority"
+            options={taskPriorityOptions}
+            value={followUpFormData.priority}
+            onChange={(event) => setFollowUpFormData((current) => ({ ...current, priority: event.target.value }))}
+          />
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setIsFollowUpOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={handleSaveFollowUp}>{editingFollowUpId ? 'Save Follow-up' : 'Add Follow-up'}</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={Boolean(completingFollowUp)} onClose={() => setCompletingFollowUp(null)} title="Complete Follow-up">
+        <div className="space-y-4">
+          <p className="text-sm text-neutral-500">{completingFollowUp?.title}</p>
+          <Select
+            label="Outcome"
+            options={FOLLOWUP_OUTCOME_OPTIONS}
+            value={completeOutcome}
+            onChange={(event) => setCompleteOutcome(event.target.value)}
+          />
+          <Input
+            as="textarea"
+            label="Notes"
+            value={completeNotes}
+            onChange={(event) => setCompleteNotes(event.target.value)}
+            inputClassName="min-h-20"
+            placeholder="What happened on this follow-up?"
+          />
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setCompletingFollowUp(null)}>Cancel</Button>
+            <Button type="button" onClick={handleCompleteFollowUp}>Complete Follow-up</Button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal isOpen={isStatusOpen} onClose={() => { if (!isSavingStatus) setIsStatusOpen(false) }} title="Update Lead Status">
         <div className="space-y-4">
           <Select
             label="Lead Status"
-            options={LEAD_STATUS_OPTIONS}
+            options={LEAD_MANUAL_STATUS_OPTIONS}
             value={statusValue}
             onChange={(event) => setStatusValue(event.target.value)}
             error={statusError}

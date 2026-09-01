@@ -291,7 +291,7 @@ function OrderInvoicePanel({ orderId }) {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
         <p className="text-sm font-semibold text-neutral-900">Invoicing Order {order.orderNumber}</p>
         <p className="mt-1 text-sm text-neutral-500">Customer: {order.customerName}</p>
         <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-100">
@@ -325,7 +325,7 @@ function OrderInvoicePanel({ orderId }) {
       </div>
 
       {invoiceMode === 'per_delivery' && allDeliveries.length > 0 && (
-        <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+        <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
           <p className="text-sm font-semibold text-neutral-900">Deliveries</p>
           <p className="mt-1 text-xs text-neutral-400">This organization bills per delivery. Select which delivery this invoice covers.</p>
           <div className="mt-3 space-y-2">
@@ -502,7 +502,7 @@ function FromOrderFlow({ onBack }) {
         Back
       </button>
 
-      <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
         <Select
           label="Select Customer"
           searchable
@@ -533,7 +533,7 @@ function FromOrderFlow({ onBack }) {
               return (
                 <div
                   key={order.id}
-                  className="rounded-[1.25rem] border border-neutral-100 bg-white p-4 shadow-(--shadow-card) sm:flex sm:items-center sm:justify-between sm:gap-4"
+                  className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card) sm:flex sm:items-center sm:justify-between sm:gap-4"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -882,7 +882,7 @@ export default function CreateSalesInvoice() {
           <button
             type="button"
             onClick={() => setCreateMode('from-order')}
-            className="rounded-[1.25rem] border border-neutral-100 bg-white p-6 text-left shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card-hover)"
+            className="rounded-2xl border border-neutral-100 bg-white p-6 text-left shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card-hover)"
           >
             <FileCheck2 className="size-6 text-primary-700" aria-hidden="true" />
             <p className="mt-3 text-base font-semibold text-neutral-900">From Sales Order</p>
@@ -891,7 +891,7 @@ export default function CreateSalesInvoice() {
           <button
             type="button"
             onClick={() => setCreateMode('direct')}
-            className="rounded-[1.25rem] border border-neutral-100 bg-white p-6 text-left shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card-hover)"
+            className="rounded-2xl border border-neutral-100 bg-white p-6 text-left shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card-hover)"
           >
             <Upload className="size-6 text-primary-700" aria-hidden="true" />
             <p className="mt-3 text-base font-semibold text-neutral-900">Direct / Walk-in Invoice</p>
@@ -928,7 +928,7 @@ export default function CreateSalesInvoice() {
               </div>
             )}
 
-            <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm font-medium text-neutral-700">
                   Customer<span className="text-red-500"> *</span>
@@ -966,7 +966,7 @@ export default function CreateSalesInvoice() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card) sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) sm:grid-cols-2">
               <Input label="Invoice Date" type="date" required value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} />
               <Select
                 label="Warehouse"
@@ -978,7 +978,7 @@ export default function CreateSalesInvoice() {
               />
             </div>
 
-            <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
               <p className="text-sm font-semibold text-neutral-900">Invoice Items</p>
               <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-100">
                 <table className="w-full min-w-3xl text-left text-sm">
@@ -1124,7 +1124,7 @@ export default function CreateSalesInvoice() {
               <Input label="Extra Discount (₹)" type="number" min="0" step="0.01" value={discount} onChange={(event) => setDiscount(event.target.value)} />
             </div>
 
-            <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
               <p className="text-sm font-semibold text-neutral-900">Notes</p>
               <textarea
                 value={notes}
@@ -1137,7 +1137,7 @@ export default function CreateSalesInvoice() {
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-[1.25rem] border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
               <p className="text-sm font-semibold text-neutral-900">Payment</p>
               <Select
                 className="mt-3"

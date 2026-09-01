@@ -30,6 +30,15 @@
   --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Lexend', 'Inter', system-ui, sans-serif;
 
+  /* Corner radius: every container box (cards, panels, inputs, selects, buttons,
+     modals, drawers, dropdowns, table wrappers) lands on a single 1rem radius.
+     Micro elements keep xs/sm/md; pills/avatars keep rounded-full. */
+  --radius-lg: 1rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1rem;
+  --radius-4xl: 1rem;
+
   /* Elevation: soft, layered shadows for a premium, quiet-depth feel */
   --shadow-xs: 0 1px 2px 0 rgb(17 24 39 / 0.04);
   --shadow-card: 0 1px 1px 0 rgb(17 24 39 / 0.03), 0 18px 44px -28px rgb(17 24 39 / 0.22);

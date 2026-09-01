@@ -2,7 +2,7 @@ import { Target, TrendingUp, CheckCircle2 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 
 const targets = [
-  { id: 1, name: 'Monthly Sales', target: 50000, achieved: 42000, unit: '₹' },
+  { id: 1, name: 'Monthly Sales', target: 50000, achieved: 42000, unit: '₹ ' },
   { id: 2, name: 'New Customers', target: 20, achieved: 15, unit: '' },
   { id: 3, name: 'Orders Created', target: 50, achieved: 45, unit: '' },
   { id: 4, name: 'Visits Completed', target: 30, achieved: 28, unit: '' },

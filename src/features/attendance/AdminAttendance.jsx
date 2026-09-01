@@ -295,7 +295,7 @@ export default function AdminAttendance() {
       </div>
 
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-5 py-4">
+        <div className="border-b border-neutral-100 px-4 py-4">
           <div className="flex flex-wrap items-center gap-2">
             <Select options={roleOptions} value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="w-44" triggerClassName="h-9 bg-neutral-50 py-1.5" />
             <Select options={staffOptions} value={userFilter} onChange={(event) => setUserFilter(event.target.value)} className="w-44" triggerClassName="h-9 bg-neutral-50 py-1.5" />
@@ -340,7 +340,7 @@ export default function AdminAttendance() {
           )}
         </div>
 
-        <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">
+        <div className="overflow-x-auto bg-neutral-50/35 py-4">
           {isLoading ? (
             <LoadingSpinner label="Loading attendance..." />
           ) : filteredRows.length === 0 ? (

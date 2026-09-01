@@ -98,7 +98,9 @@ export default function VehicleStockOverview() {
         setError(result.error)
         setSessions([])
       } else {
-        setSessions([result.session])
+        // result.session is null when there's no active loading session yet -
+        // fall through to the empty state rather than rendering a broken card.
+        setSessions(result.session ? [result.session] : [])
       }
     }
 
@@ -131,7 +133,15 @@ export default function VehicleStockOverview() {
         </Card>
       ) : sessions.length === 0 ? (
         <Card>
-          <EmptyState icon={Car} title="No active loading sessions" description="Vehicle stock sessions will appear here once a delivery partner loads a vehicle." />
+          <EmptyState
+            icon={Car}
+            title="No active loading session"
+            description={
+              isAdmin
+                ? 'Vehicle stock sessions will appear here once a delivery partner loads a vehicle.'
+                : 'Record your opening load from the Vehicle Loading page and it will show up here.'
+            }
+          />
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

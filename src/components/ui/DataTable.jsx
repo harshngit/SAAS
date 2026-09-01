@@ -90,7 +90,7 @@ export default function DataTable({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-[1rem] border border-neutral-100 bg-white shadow-(--shadow-xs)">
+      <div className="overflow-x-auto rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-xs)">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-neutral-100 bg-neutral-50/80">

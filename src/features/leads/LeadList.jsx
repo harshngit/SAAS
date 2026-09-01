@@ -9,20 +9,16 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, convertLeadToCustomer, deleteLead, listLeads, updateLead } from '../../api/leads'
+import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, deleteLead, listLeads, updateLead } from '../../api/leads'
 import { listCustomers } from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
-import { LeadEditForm, ConvertLeadForm } from './LeadForms'
+import { LeadEditForm } from './LeadForms'
+import ConvertLeadModal from './ConvertLeadModal'
+import { LEAD_STATUS_VARIANT, formatLeadStatus, getLeadActivity } from './leadActivity'
 
-const statusVariant = {
-  new: 'info',
-  contacted: 'warning',
-  qualified: 'purple',
-  won: 'success',
-  lost: 'danger',
-}
+const statusVariant = LEAD_STATUS_VARIANT
 
 const avatarClasses = [
   'bg-blue-500 text-white',
@@ -50,7 +46,8 @@ function formatDate(value) {
 export default function LeadList() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
-  const leadBasePath = currentUser?.role === ROLES.SALES_OFFICER ? '/sales/leads' : '/admin/leads'
+  const isSalesOfficer = currentUser?.role === ROLES.SALES_OFFICER
+  const leadBasePath = isSalesOfficer ? '/sales/leads' : '/admin/leads'
 
   const [leads, setLeads] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -72,8 +69,6 @@ export default function LeadList() {
   const [deleteError, setDeleteError] = useState('')
 
   const [convertTarget, setConvertTarget] = useState(null)
-  const [isConverting, setIsConverting] = useState(false)
-  const [convertError, setConvertError] = useState('')
 
   const loadLeads = useCallback(async () => {
     setIsLoading(true)
@@ -149,11 +144,13 @@ export default function LeadList() {
     return leads.filter((lead) => {
       const matchesSearch =
         !normalizedSearch ||
-        [lead.leadId, lead.customerName, lead.mobileNumber]
+        [lead.leadId, lead.name, lead.customerName, lead.mobileNumber, lead.email]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(normalizedSearch))
       const matchesSource = sourceFilter === 'all' || lead.leadSource === sourceFilter
-      const matchesTeam = teamFilter === 'all' || lead.assignedSalespersonId === teamFilter
+      const matchesTeam =
+        teamFilter === 'all' ||
+        (teamFilter === 'unassigned' ? !lead.assignedSalespersonId : lead.assignedSalespersonId === teamFilter)
 
       return matchesSearch && matchesSource && matchesTeam
     })
@@ -186,16 +183,22 @@ export default function LeadList() {
 
   const exportCsv = () => {
     const rows = [
-      ['Lead ID', 'Customer', 'Mobile', 'Source', 'Assigned', 'Status', 'Created'],
-      ...filteredLeads.map((lead) => [
-        lead.leadId,
-        lead.customerName,
-        lead.mobileNumber,
-        lead.leadSource,
-        lead.assignedSalespersonName,
-        lead.leadStatus,
-        lead.createdAt,
-      ]),
+      ['Lead ID', 'Lead', 'Mobile', 'Email', 'Source', 'Assigned', 'Status', 'Last Activity', 'Next Follow-up', 'Created'],
+      ...filteredLeads.map((lead) => {
+        const activity = getLeadActivity(lead)
+        return [
+          lead.leadId,
+          lead.name || lead.customerName,
+          lead.mobileNumber,
+          lead.email,
+          lead.leadSource,
+          lead.assignedSalespersonName,
+          lead.leadStatus,
+          activity.lastActivity.label,
+          activity.nextFollowUp.label,
+          lead.createdAt,
+        ]
+      }),
     ]
     const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
@@ -245,86 +248,88 @@ export default function LeadList() {
     setIsDeleting(false)
   }
 
-  const handleConvertLead = async (formData) => {
-    if (!convertTarget) return
-
-    setIsConverting(true)
-    setConvertError('')
-
-    const result = await convertLeadToCustomer(convertTarget.id, formData)
-
-    if (!result.success) {
-      setConvertError(result.error)
-      setIsConverting(false)
-      return
-    }
-
-    setIsConverting(false)
-    setConvertTarget(null)
+  const handleLeadConverted = async ({ customerId }) => {
     await loadLeads()
-    navigate(`/admin/customers/${result.customerId}`)
+    if (customerId) navigate(`/admin/customers/${customerId}`)
   }
 
   return (
     <div className="space-y-4">
       <Card className="p-0">
-        <div className="relative border-b border-neutral-100 px-5 py-3">
-          <div className="flex gap-4">
-            <div className="grid w-full grid-cols-2 gap-2">
-              <div>
-                <div className="flex flex-col gap-2 py-1 sm:flex-row sm:items-center">
-                  <div className="relative sm:w-64">
-                    <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                    <input
-                      type="search"
-                      value={searchTerm}
-                      onChange={(event) => setSearchTerm(event.target.value)}
-                      placeholder="Search leads..."
-                      className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                    />
-                  </div>
-                  <Select className="sm:w-40" options={[{ value: 'all', label: 'All Status' }, ...LEAD_STATUS_OPTIONS]} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} triggerClassName="h-9 bg-white py-1.5" />
-                  <Select className="sm:w-40" options={[{ value: 'all', label: 'All Sources' }, ...LEAD_SOURCE_OPTIONS]} value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} triggerClassName="h-9 bg-white py-1.5" />
-                </div>
-                <div className="flex flex-wrap items-center gap-2 py-1">
-                  <Select className="sm:w-40" options={[{ value: 'all', label: 'All Team' }, ...salespersonOptions]} value={teamFilter} onChange={(event) => setTeamFilter(event.target.value)} triggerClassName="h-9 bg-white py-1.5" />
-                  <button type="button" onClick={resetFilters} className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-neutral-100 bg-white text-neutral-500 shadow-(--shadow-xs) transition-colors hover:text-primary-700" aria-label="Reset filters">
-                    <RefreshCw className="size-4" />
-                  </button>
-                </div>
-                <div className="flex flex-col gap-2 pt-1 text-sm text-neutral-500 sm:flex-row sm:items-center py-1">
-                  <span>
-                    Showing <span className="font-semibold text-neutral-900">{visibleLeads.length}</span> of{' '}
-                    <span className="font-semibold text-neutral-900">{filteredLeads.length}</span> leads
-                  </span>
-                  <Select
-                    options={[
-                      { value: '10', label: '10 / page' },
-                      { value: '25', label: '25 / page' },
-                      { value: '50', label: '50 / page' },
-                    ]}
-                    value={pageSize}
-                    onChange={(event) => setPageSize(event.target.value)}
-                    className="w-32"
-                    triggerClassName="h-8 bg-white py-1"
-                  />
-                  {selectedIds.length > 0 && (
-                    <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
-                      {selectedIds.length} selected
-                    </span>
-                  )}
-                </div>
+        <div className="border-b border-neutral-100 px-4 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-full sm:w-60">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search leads..."
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
               </div>
-              <div className="flex w-full flex-wrap items-center justify-end gap-2 md:absolute md:right-5 md:top-[1.1rem] md:w-auto md:min-w-fit">
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={exportCsv}>
-                  <Download className="size-4" aria-hidden="true" />
-                  Export
-                </Button>
-                <Button onClick={() => navigate(`${leadBasePath}/new`)} size="sm" className="h-9 rounded-2xl px-3.5">
-                  <Plus className="size-4" aria-hidden="true" />
-                  Add Lead
-                </Button>
-              </div>
+              <Select className="w-[calc(50%-0.25rem)] sm:w-36" options={[{ value: 'all', label: 'All Status' }, ...LEAD_STATUS_OPTIONS]} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} triggerClassName="h-9 bg-white py-1.5" />
+              <Select className="w-[calc(50%-0.25rem)] sm:w-36" options={[{ value: 'all', label: 'All Sources' }, ...LEAD_SOURCE_OPTIONS]} value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} triggerClassName="h-9 bg-white py-1.5" />
+              {isSalesOfficer ? (
+                <span className="flex h-9 items-center rounded-xl border border-neutral-100 bg-neutral-50 px-3 text-sm font-medium text-neutral-500">
+                  My Leads
+                </span>
+              ) : (
+                <Select
+                  className="w-[calc(50%-0.25rem)] sm:w-44"
+                  options={[
+                    { value: 'all', label: 'All Salespersons' },
+                    { value: 'unassigned', label: 'Unassigned' },
+                    ...salespersonOptions,
+                  ]}
+                  value={teamFilter}
+                  onChange={(event) => setTeamFilter(event.target.value)}
+                  triggerClassName="h-9 bg-white py-1.5"
+                />
+              )}
+              <button type="button" onClick={resetFilters} className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-neutral-100 bg-white text-neutral-500 shadow-(--shadow-xs) transition-colors hover:text-primary-700" aria-label="Reset filters">
+                <RefreshCw className="size-4" />
+              </button>
+            </div>
+
+            {/* Actions */}
+            <div className="flex shrink-0 items-center gap-2">
+              <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={exportCsv}>
+                <Download className="size-4" aria-hidden="true" />
+                Export
+              </Button>
+              <Button onClick={() => navigate(`${leadBasePath}/new`)} size="sm" className="h-9 rounded-2xl px-3.5">
+                <Plus className="size-4" aria-hidden="true" />
+                Add Lead
+              </Button>
+            </div>
+          </div>
+
+          {/* Result count + page size */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-50 pt-2.5 text-sm text-neutral-500">
+            <span>
+              Showing <span className="font-semibold text-neutral-900">{visibleLeads.length}</span> of{' '}
+              <span className="font-semibold text-neutral-900">{filteredLeads.length}</span> leads
+            </span>
+            <div className="flex items-center gap-2">
+              {selectedIds.length > 0 && (
+                <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
+                  {selectedIds.length} selected
+                </span>
+              )}
+              <Select
+                options={[
+                  { value: '10', label: '10 / page' },
+                  { value: '25', label: '25 / page' },
+                  { value: '50', label: '50 / page' },
+                ]}
+                value={pageSize}
+                onChange={(event) => setPageSize(event.target.value)}
+                className="w-28"
+                triggerClassName="h-8 bg-white py-1"
+              />
             </div>
           </div>
         </div>
@@ -341,17 +346,19 @@ export default function LeadList() {
           ) : isLoading ? (
             <LoadingSpinner label="Loading leads..." />
           ) : (
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-280 text-left text-sm">
               <thead>
                 <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
                   <th className="w-10 px-4 py-3">
                     <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all leads" />
                   </th>
                   <th className="whitespace-nowrap px-4 py-3">Lead</th>
-                  <th className="whitespace-nowrap px-4 py-3">Phone</th>
+                  <th className="whitespace-nowrap px-4 py-3">Contact</th>
                   <th className="whitespace-nowrap px-4 py-3">Source</th>
-                  <th className="whitespace-nowrap px-4 py-3">Assigned</th>
+                  <th className="whitespace-nowrap px-4 py-3">Assigned To</th>
                   <th className="whitespace-nowrap px-4 py-3">Status</th>
+                  <th className="whitespace-nowrap px-4 py-3">Last Activity</th>
+                  <th className="whitespace-nowrap px-4 py-3">Next Follow-up</th>
                   <th className="whitespace-nowrap px-4 py-3">Created</th>
                   <th className="w-16 whitespace-nowrap px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -359,7 +366,7 @@ export default function LeadList() {
               <tbody className="divide-y divide-neutral-100">
                 {visibleLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-5 py-10 text-center">
+                    <td colSpan={10} className="px-5 py-10 text-center">
                       <p className="text-sm font-medium text-neutral-900">No leads found</p>
                       <p className="mt-1 text-sm text-neutral-500">Add a lead to start tracking the sales life cycle.</p>
                       <Button type="button" className="mt-4" onClick={() => navigate(`${leadBasePath}/new`)}>
@@ -369,7 +376,9 @@ export default function LeadList() {
                     </td>
                   </tr>
                 ) : (
-                  visibleLeads.map((lead, index) => (
+                  visibleLeads.map((lead, index) => {
+                    const activity = getLeadActivity(lead)
+                    return (
                     <tr
                       key={lead.id}
                       onClick={() => navigate(`${leadBasePath}/${lead.id}`)}
@@ -389,14 +398,15 @@ export default function LeadList() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4" onClick={(event) => event.stopPropagation()}>
                         <a href={`tel:${lead.mobileNumber}`} className="font-semibold text-primary-600 hover:text-primary-700">
-                          {lead.mobileNumber}
+                          {lead.mobileNumber || '—'}
                         </a>
+                        {lead.email && <p className="mt-0.5 max-w-40 truncate text-xs text-neutral-400" title={lead.email}>{lead.email}</p>}
                       </td>
                       <td className="px-4 py-4">
                         <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-600">
-                          {lead.leadSource}
+                          {lead.leadSource || '—'}
                         </span>
                       </td>
                       <td className="px-4 py-4">
@@ -410,7 +420,11 @@ export default function LeadList() {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{lead.leadStatus}</Badge>
+                        <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLeadStatus(lead.leadStatus)}</Badge>
+                      </td>
+                      <td className="px-4 py-4 text-neutral-500">{activity.lastActivity.label}</td>
+                      <td className={`px-4 py-4 ${activity.nextFollowUp.tone === 'danger' ? 'font-medium text-red-600' : activity.nextFollowUp.tone === 'warning' ? 'font-medium text-amber-600' : 'text-neutral-500'}`}>
+                        {activity.nextFollowUp.label}
                       </td>
                       <td className="px-4 py-4 text-neutral-500">{formatDate(lead.createdAt)}</td>
                       <td className="px-4 py-4 text-right" onClick={(event) => event.stopPropagation()}>
@@ -418,15 +432,18 @@ export default function LeadList() {
                           items={[
                             { label: 'View Details', icon: Eye, onClick: () => navigate(`${leadBasePath}/${lead.id}`) },
                             { label: 'Edit', icon: Edit, onClick: () => setEditingLead(lead) },
-                            lead.convertedCustomerId
-                              ? { label: 'View Customer', icon: ArrowRightCircle, onClick: () => navigate(`/admin/customers/${lead.convertedCustomerId}`) }
-                              : { label: 'Convert to Customer', icon: ArrowRightCircle, onClick: () => { setConvertError(''); setConvertTarget(lead) } },
+                            ...(lead.convertedCustomerId
+                              ? [{ label: 'View Customer', icon: ArrowRightCircle, onClick: () => navigate(`/admin/customers/${lead.convertedCustomerId}`) }]
+                              : lead.leadStatus === 'won' || lead.leadStatus === 'lost'
+                                ? []
+                                : [{ label: 'Convert to Customer', icon: ArrowRightCircle, onClick: () => setConvertTarget(lead) }]),
                             { label: 'Delete', icon: Trash2, danger: true, onClick: () => setDeleteTarget(lead) },
                           ]}
                         />
                       </td>
                     </tr>
-                  ))
+                    )
+                  })
                 )}
               </tbody>
             </table>
@@ -441,6 +458,7 @@ export default function LeadList() {
           salespersonOptions={salespersonOptions}
           saving={isSaving}
           formError={formError}
+          lockAssignee={isSalesOfficer}
           onClose={() => setEditingLead(null)}
           onSave={handleSaveLead}
         />
@@ -469,28 +487,13 @@ export default function LeadList() {
         </div>
       </Modal>
 
-      <Modal
+      <ConvertLeadModal
         isOpen={Boolean(convertTarget)}
-        onClose={() => {
-          if (isConverting) return
-          setConvertError('')
-          setConvertTarget(null)
-        }}
-        title="Convert to Customer"
-        className="max-w-2xl"
-      >
-        <ConvertLeadForm
-          lead={convertTarget}
-          salespersonOptions={salespersonOptions}
-          saving={isConverting}
-          formError={convertError}
-          onClose={() => {
-            setConvertError('')
-            setConvertTarget(null)
-          }}
-          onSave={handleConvertLead}
-        />
-      </Modal>
+        onClose={() => setConvertTarget(null)}
+        lead={convertTarget}
+        salespersonOptions={salespersonOptions}
+        onConverted={handleLeadConverted}
+      />
     </div>
   )
 }

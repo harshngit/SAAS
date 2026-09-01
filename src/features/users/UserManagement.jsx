@@ -925,7 +925,7 @@ export default function UserManagement() {
         <div>
           <form
             onSubmit={handleSubmit}
-            className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-[1.75rem] border border-neutral-100 bg-white shadow-(--shadow-card)"
+            className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)"
           >
             <div className="grid flex-1 lg:grid-cols-[17rem_minmax(0,1fr)]">
               <aside className="border-b border-neutral-100 p-6 lg:border-b-0 lg:border-r">
@@ -1336,7 +1336,7 @@ export default function UserManagement() {
         </div>
       </Modal>
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-5 py-4">
+        <div className="border-b border-neutral-100 px-4 py-4">
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[12rem_1fr_auto] lg:items-center">
             <div className="w-full">
               <Select
@@ -1373,7 +1373,7 @@ export default function UserManagement() {
           </div>
         </div>
 
-        <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">
+        <div className="overflow-x-auto bg-neutral-50/35 py-4">
           {isLoadingUsers ? (
             <LoadingSpinner label="Loading staff..." />
           ) : listError ? (

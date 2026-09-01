@@ -148,7 +148,7 @@ export default function OrderList() {
       </div>
 
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-5 py-4">
+        <div className="border-b border-neutral-100 px-4 py-4">
           <div className="flex flex-wrap gap-5">
             {statusTabs.map((tab) => {
               const isActive = statusFilter === tab.value
@@ -169,7 +169,7 @@ export default function OrderList() {
           </div>
         </div>
 
-        <div className="border-b border-neutral-100 px-5 py-3">
+        <div className="border-b border-neutral-100 px-4 py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
             <div className="relative w-full sm:w-72">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
@@ -185,7 +185,7 @@ export default function OrderList() {
           </div>
         </div>
 
-        <div className="overflow-x-auto bg-neutral-50/35 px-5 py-4">
+        <div className="overflow-x-auto bg-neutral-50/35 py-4">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -252,7 +252,7 @@ export default function OrderList() {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-4 py-3.5">
           <p className="text-xs text-neutral-400">
             Showing {rangeStart} to {rangeEnd} of {orders.length} orders
           </p>

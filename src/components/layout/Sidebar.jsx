@@ -191,7 +191,7 @@ export default function Sidebar({
 
       <aside
         id={id}
-        className={`fixed inset-y-3 left-3 z-50 flex w-[16rem] flex-col overflow-visible rounded-[1.5rem] bg-[#eef6eb] shadow-(--shadow-card) transition-transform duration-300 md:static md:inset-auto md:h-full md:translate-x-0 md:rounded-none md:shadow-none md:transition-[width] md:duration-300 md:ease-in-out ${
+        className={`fixed inset-y-3 left-3 z-50 flex w-[16rem] flex-col overflow-visible rounded-2xl bg-[#eef6eb] shadow-(--shadow-card) transition-transform duration-300 md:static md:inset-auto md:h-full md:translate-x-0 md:rounded-none md:shadow-none md:transition-[width] md:duration-300 md:ease-in-out ${
           isExpanded ? 'md:w-[16rem]' : 'md:w-[4.75rem]'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'}`}
       >
@@ -261,7 +261,7 @@ export default function Sidebar({
                     onClick={() => handleCollapsedSectionClick(group.section)}
                     aria-label={group.section}
                     title={group.section}
-                    className={`group relative hidden items-center justify-center rounded-[0.9rem] py-2.5 text-sm font-medium transition-all duration-150 md:flex ${
+                    className={`group relative hidden items-center justify-center rounded-2xl py-2.5 text-sm font-medium transition-all duration-150 md:flex ${
                       isSectionActive
                         ? 'bg-[#bdeaa5] text-primary-700 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
                         : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
@@ -346,13 +346,13 @@ export default function Sidebar({
                         aria-label={!isExpanded ? item.label : undefined}
                         title={!isExpanded ? item.label : undefined}
                           className={({ isActive }) =>
-                          `group relative flex items-center rounded-[0.9rem] py-2 text-sm font-medium transition-all duration-150 ${
+                          `group relative flex items-center rounded-l-lg rounded-r-2xl py-2 text-sm font-medium transition-all duration-150 ${
                             isExpanded
                               ? 'gap-3 px-3.5 md:justify-start'
-                              : 'gap-3 px-3.5 md:gap-0 md:px-0 md:justify-center'
+                              : 'gap-3 px-3.5 md:gap-0 md:rounded-2xl md:px-0 md:justify-center'
                           } ${
                             isActive
-                              ? 'bg-[#c4eba9] text-neutral-900 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
+                              ? 'bg-[#c4eba9] text-neutral-900 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.12)]'
                               : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
                           }`
                         }
@@ -360,9 +360,9 @@ export default function Sidebar({
                         {({ isActive }) => (
                           <>
                             <span
-                              className={`absolute left-1 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-primary-900 transition-opacity ${
+                              className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary-800 transition-opacity ${
                                 isActive ? 'opacity-100' : 'opacity-0'
-                              }`}
+                              } ${isExpanded ? '' : 'md:hidden'}`}
                               aria-hidden="true"
                             />
                             <span className="relative shrink-0">
@@ -400,7 +400,7 @@ export default function Sidebar({
         {showDeliveryCheckInCard && !isLoadingAttendance && (
           <div className="px-3 pb-3">
             {isExpanded ? (
-              <div className="max-w-[11rem] rounded-[1rem] bg-white px-4 py-4 shadow-[0_12px_26px_-20px_rgb(15_23_42/0.22)]">
+              <div className="max-w-[11rem] rounded-2xl bg-white px-4 py-4 shadow-[0_12px_26px_-20px_rgb(15_23_42/0.22)]">
                 <div className="flex items-start gap-3">
                   <span
                     className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-white ${
@@ -435,7 +435,7 @@ export default function Sidebar({
                 onClick={() => navigate('/delivery/attendance')}
                 aria-label={todaysAttendance?.checkIn ? `Checked in since ${formatTimeLabel(todaysAttendance.checkIn)}` : 'Not checked in yet'}
                 title={todaysAttendance?.checkIn ? `Checked in since ${formatTimeLabel(todaysAttendance.checkIn)}` : 'Not checked in yet'}
-                className={`hidden size-9 w-full items-center justify-center rounded-[0.85rem] ring-1 transition-colors md:flex ${
+                className={`hidden size-9 w-full items-center justify-center rounded-2xl ring-1 transition-colors md:flex ${
                   todaysAttendance?.checkIn
                     ? 'bg-primary-50 text-primary-700 ring-primary-100 hover:bg-primary-100'
                     : 'bg-neutral-100 text-neutral-500 ring-neutral-200 hover:bg-neutral-200'
@@ -451,7 +451,7 @@ export default function Sidebar({
         <div className="border-t border-neutral-100 p-3">
           <div className="hidden md:block">
             {isExpanded ? (
-              <div className="overflow-hidden rounded-[0.85rem] bg-linear-to-br from-primary-500 to-primary-700 px-2.5 py-2.5 text-center text-white shadow-(--shadow-glow-primary)">
+              <div className="overflow-hidden rounded-2xl bg-linear-to-br from-primary-500 to-primary-700 px-2.5 py-2.5 text-center text-white shadow-(--shadow-glow-primary)">
                 <div className="mx-auto flex size-6 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/20">
                   <Sparkles className="size-3" aria-hidden="true" />
                 </div>
@@ -474,13 +474,13 @@ export default function Sidebar({
                 onClick={onCloseMobile}
                 aria-label="Upgrade plan"
                 title="Upgrade plan"
-                className="flex size-9 w-full items-center justify-center rounded-[0.85rem] bg-primary-50 text-primary-700 ring-1 ring-primary-100 transition-colors hover:bg-primary-100"
+                className="flex size-9 w-full items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100 transition-colors hover:bg-primary-100"
               >
                 <Crown className="size-4.5" aria-hidden="true" />
               </NavLink>
             )}
           </div>
-          <div className="overflow-hidden rounded-[0.85rem] bg-linear-to-br from-primary-500 to-primary-700 px-2.5 py-2.5 text-center text-white shadow-(--shadow-glow-primary) md:hidden">
+          <div className="overflow-hidden rounded-2xl bg-linear-to-br from-primary-500 to-primary-700 px-2.5 py-2.5 text-center text-white shadow-(--shadow-glow-primary) md:hidden">
             <div className="mx-auto flex size-6 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/20">
               <Sparkles className="size-3" aria-hidden="true" />
             </div>

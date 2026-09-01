@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
   CreditCard,
@@ -72,6 +72,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
+  const [searchParams] = useSearchParams()
+  // Pre-selected customer when arriving from the Customer Detail page ("Create Order" button).
+  const preselectedCustomerId = searchParams.get('customerId') || searchParams.get('customer_id') || ''
 
   const [availableProducts, setAvailableProducts] = useState([])
   const [customerRecords, setCustomerRecords] = useState([])
@@ -80,7 +83,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const [isLoadingOptions, setIsLoadingOptions] = useState(true)
 
   // Customer / Company
-  const [customerSearch, setCustomerSearch] = useState('')
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
   const [showQuickAddCustomer, setShowQuickAddCustomer] = useState(false)
 
@@ -91,11 +93,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
   // Products
   const [orderItems, setOrderItems] = useState([])
-  const [isProductPickerOpen, setIsProductPickerOpen] = useState(false)
   const [productSearch, setProductSearch] = useState('')
   const [orderNotes, setOrderNotes] = useState('')
   const [internalNotes, setInternalNotes] = useState('')
-  const productPickerRef = useRef(null)
 
   // Discount
   const [discountType, setDiscountType] = useState('percentage')
@@ -127,7 +127,12 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       if (!isMounted) return
 
       if (productsResult.success) setAvailableProducts(productsResult.products)
-      if (customersResult.success) setCustomerRecords(customersResult.customers)
+      if (customersResult.success) {
+        setCustomerRecords(customersResult.customers)
+        if (preselectedCustomerId && customersResult.customers.some((customer) => customer.id === preselectedCustomerId)) {
+          setSelectedCustomerId(preselectedCustomerId)
+        }
+      }
       if (partnersResult.success) setDeliveryBoys(partnersResult.partners)
       if (warehousesResult.success) {
         setWarehouses(warehousesResult.warehouses)
@@ -142,7 +147,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [preselectedCustomerId])
 
   useEffect(() => {
     if (!restrictToVehicleStock || !currentUser?.id) return
@@ -150,42 +155,32 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     setDeliveryBoyId(currentUser.id)
   }, [restrictToVehicleStock, currentUser?.id])
 
-  useEffect(() => {
-    if (!isProductPickerOpen) return
-
-    const handleClickOutside = (event) => {
-      if (productPickerRef.current && !productPickerRef.current.contains(event.target)) {
-        setIsProductPickerOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isProductPickerOpen])
 
   const selectedCustomer = useMemo(
     () => customerRecords.find((customer) => customer.id === selectedCustomerId) || null,
     [customerRecords, selectedCustomerId],
   )
 
-  const customerOptions = useMemo(() => {
-    const search = customerSearch.trim().toLowerCase()
-    const filtered = search
-      ? customerRecords.filter((customer) => {
-          const matchesName = customer.name?.toLowerCase().includes(search)
-          const matchesPhone = customer.phone?.replace(/\D/g, '').includes(search.replace(/\D/g, ''))
-          const matchesEmail = customer.email?.toLowerCase().includes(search)
-          return matchesName || matchesPhone || matchesEmail
-        })
-      : customerRecords
-
-    return filtered.map((customer) => ({ value: customer.id, label: customer.name }))
-  }, [customerRecords, customerSearch])
+  const customerOptions = useMemo(
+    () =>
+      customerRecords.map((customer) => ({
+        value: customer.id,
+        label: customer.name,
+        // Lets the searchable Select match on phone / email / city too, not just the name.
+        searchText: [customer.phone, customer.phone?.replace(/\D/g, ''), customer.email, customer.city]
+          .filter(Boolean)
+          .join(' '),
+      })),
+    [customerRecords],
+  )
 
   const filteredPickerProducts = useMemo(() => {
     const search = productSearch.trim().toLowerCase()
     if (!search) return availableProducts
-    return availableProducts.filter((product) => product.name?.toLowerCase().includes(search))
+    return availableProducts.filter(
+      (product) =>
+        product.name?.toLowerCase().includes(search) || product.sku?.toLowerCase().includes(search),
+    )
   }, [availableProducts, productSearch])
 
   const handleCustomerCreated = (createdCustomer) => {
@@ -195,19 +190,27 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     setErrors((current) => ({ ...current, customer: '' }))
   }
 
-  const addProductToOrder = (product) => {
+  const orderItemQuantity = (productId) => {
+    const item = orderItems.find((entry) => entry.productId === productId)
+    return item ? Number(item.quantity) || 0 : 0
+  }
+
+  // The product picker sets a quantity directly (Amazon-style stepper). 0 removes the line;
+  // a first non-zero value creates it carrying the product's price / tax defaults.
+  const setPickerQuantity = (product, nextQuantity) => {
+    const quantity = Math.max(0, Math.floor(Number(nextQuantity) || 0))
     setOrderItems((current) => {
       const existingIndex = current.findIndex((item) => item.productId === product.id)
+      if (quantity === 0) return current.filter((item) => item.productId !== product.id)
       if (existingIndex >= 0) {
-        return current.map((item, index) =>
-          index === existingIndex ? { ...item, quantity: item.quantity + 1 } : item,
-        )
+        return current.map((item, index) => (index === existingIndex ? { ...item, quantity } : item))
       }
-      return [...current, { productId: product.id, unitPrice: product.price || 0, taxRate: product.tax_rate || 0, quantity: 1, discountPercent: 0 }]
+      return [
+        ...current,
+        { productId: product.id, unitPrice: product.price || 0, taxRate: product.tax_rate || 0, quantity, discountPercent: 0 },
+      ]
     })
     setErrors((current) => ({ ...current, items: '' }))
-    setIsProductPickerOpen(false)
-    setProductSearch('')
   }
 
   // Quantity, per-item Discount %, Unit Price, and the order-level Discount are all
@@ -392,24 +395,21 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               </div>
 
               <div className="space-y-2">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                  <input
-                    type="search"
-                    value={customerSearch}
-                    onChange={(event) => setCustomerSearch(event.target.value)}
-                    placeholder="Search by name, phone or email..."
-                    className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 pl-10 pr-4 text-sm text-neutral-900 transition-all focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                  />
-                </div>
                 <Select
+                  searchable
                   options={customerOptions}
                   value={selectedCustomerId}
                   onChange={(event) => {
                     setSelectedCustomerId(event.target.value)
                     setErrors((current) => ({ ...current, customer: '' }))
                   }}
-                  placeholder={isLoadingOptions ? 'Loading customers...' : customerOptions.length ? 'Select a customer' : 'No matching customer found'}
+                  placeholder={
+                    isLoadingOptions
+                      ? 'Loading customers...'
+                      : customerOptions.length
+                        ? 'Search or select a customer by name, phone or email...'
+                        : 'No customers yet'
+                  }
                   disabled={isLoadingOptions}
                 />
                 {errors.customer && <p className="text-sm text-red-600">{errors.customer}</p>}
@@ -485,61 +485,120 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
           {/* Products */}
           <div className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
-            <div className="flex items-center justify-between gap-4 border-b border-neutral-100 p-5">
-              <div className="flex items-center gap-2.5">
-                <SectionBadge number={3} />
-                <div>
-                  <h3 className="text-base font-semibold text-neutral-900">Products / Order Items</h3>
-                  <p className="mt-0.5 text-sm text-neutral-500">Add products, set selling price and quantity.</p>
-                </div>
+            <div className="flex items-center gap-2.5 border-b border-neutral-100 p-5">
+              <SectionBadge number={3} />
+              <div>
+                <h3 className="text-base font-semibold text-neutral-900">Products / Order Items</h3>
+                <p className="mt-0.5 text-sm text-neutral-500">Search a product below, then set its quantity.</p>
               </div>
-              <div className="relative" ref={productPickerRef}>
-                <Button type="button" variant="outline" size="sm" onClick={() => setIsProductPickerOpen((current) => !current)} disabled={isLoadingOptions}>
-                  <Plus className="size-4" aria-hidden="true" />
-                  Add Product
-                </Button>
-                {isProductPickerOpen && (
-                  <div className="absolute right-0 z-20 mt-2 w-80 rounded-2xl border border-neutral-100 bg-white p-3 shadow-(--shadow-popover)">
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                      <input
-                        type="search"
-                        autoFocus
-                        value={productSearch}
-                        onChange={(event) => setProductSearch(event.target.value)}
-                        placeholder="Search products..."
-                        className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                      />
-                    </div>
-                    <div className="mt-2 max-h-64 overflow-y-auto">
-                      {filteredPickerProducts.length === 0 ? (
-                        <p className="px-2 py-4 text-center text-sm text-neutral-400">No products found.</p>
-                      ) : (
-                        filteredPickerProducts.map((product) => (
-                          <button
-                            key={product.id}
-                            type="button"
-                            onClick={() => addProductToOrder(product)}
-                            className="flex w-full items-center justify-between gap-3 rounded-xl px-2.5 py-2 text-left text-sm transition-colors hover:bg-primary-50/60"
+            </div>
+
+            {/* Inline product picker - always visible, ~5 rows then scroll (deliberately not a full marketplace grid) */}
+            <div className="border-b border-neutral-100 p-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="search"
+                  value={productSearch}
+                  onChange={(event) => setProductSearch(event.target.value)}
+                  placeholder="Search products by name or SKU..."
+                  disabled={isLoadingOptions}
+                  className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12 disabled:opacity-60"
+                />
+              </div>
+              <div className="mt-2 max-h-96 divide-y divide-neutral-50 overflow-y-auto rounded-xl border border-neutral-100">
+                {isLoadingOptions ? (
+                  <p className="px-3 py-6 text-center text-sm text-neutral-400">Loading products…</p>
+                ) : filteredPickerProducts.length === 0 ? (
+                  <p className="px-3 py-6 text-center text-sm text-neutral-400">No products found.</p>
+                ) : (
+                  filteredPickerProducts.map((product) => {
+                    const quantity = orderItemQuantity(product.id)
+                    const unit = product.sales_unit || product.uom || 'unit'
+                    const stock = product.total_stock ?? product.total_inventory ?? null
+                    const threshold = product.minimum_stock_level ?? product.reorder_level ?? 0
+                    const isOutOfStock = stock !== null && stock <= 0
+                    const isLowStock = stock !== null && stock > 0 && stock <= threshold
+
+                    return (
+                      <div key={product.id} className="flex items-center gap-3 px-3 py-2.5">
+                        {product.cover_image ? (
+                          <img src={product.cover_image} alt="" className="size-11 shrink-0 rounded-lg border border-neutral-100 object-cover" />
+                        ) : (
+                          <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
+                            <Package className="size-5" aria-hidden="true" />
+                          </span>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-neutral-900">{product.name}</p>
+                          <p className="truncate text-[0.7rem] text-neutral-400">SKU: {product.sku || '—'}</p>
+                          <p
+                            className={`text-[0.7rem] font-medium ${
+                              isOutOfStock ? 'text-red-600' : isLowStock ? 'text-amber-600' : 'text-neutral-500'
+                            }`}
                           >
-                            <span className="min-w-0">
-                              <span className="block truncate font-medium text-neutral-900">{product.name}</span>
-                              <span className="block text-xs text-neutral-400">In Stock: {product.total_stock ?? '-'}</span>
-                            </span>
-                            <span className="shrink-0 text-xs font-semibold text-primary-700">{formatCurrency(product.price || 0)}</span>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                            {isOutOfStock
+                              ? 'Out of stock'
+                              : stock === null
+                                ? 'Stock not tracked'
+                                : `${isLowStock ? 'Low stock · ' : ''}${stock} ${unit}${isLowStock ? '' : ' available'}`}
+                          </p>
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                          <p className="text-sm font-semibold text-neutral-900">{formatCurrency(product.price || 0)}</p>
+                          <p className="text-[0.64rem] text-neutral-400">/ {unit}</p>
+                        </div>
+
+                        <div className="w-24 shrink-0">
+                          {quantity === 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => setPickerQuantity(product, 1)}
+                              disabled={isOutOfStock}
+                              className="w-full rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              Add
+                            </button>
+                          ) : (
+                            <div className="flex items-center justify-between rounded-lg bg-primary-600 p-0.5 text-white">
+                              <button
+                                type="button"
+                                onClick={() => setPickerQuantity(product, quantity - 1)}
+                                className="flex size-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-white/20"
+                                aria-label={`Reduce ${product.name}`}
+                              >
+                                <Minus className="size-3.5" aria-hidden="true" />
+                              </button>
+                              <input
+                                value={quantity}
+                                onChange={(event) => setPickerQuantity(product, event.target.value)}
+                                inputMode="numeric"
+                                className="w-8 min-w-0 bg-transparent text-center text-xs font-semibold focus:outline-none"
+                                aria-label={`${product.name} quantity`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setPickerQuantity(product, quantity + 1)}
+                                className="flex size-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-white/20"
+                                aria-label={`Add ${product.name}`}
+                              >
+                                <Plus className="size-3.5" aria-hidden="true" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
                 )}
               </div>
             </div>
 
             {orderItems.length === 0 ? (
-              <div className="p-8 text-center">
-                <p className="text-sm font-medium text-neutral-700">No products added yet</p>
-                <p className="mt-1 text-sm text-neutral-500">Click "Add Product" to start building this order.</p>
+              <div className="px-5 py-6 text-center">
+                <p className="text-sm text-neutral-400">No products added yet — use the search above to add items.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">

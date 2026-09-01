@@ -215,10 +215,10 @@ export default function AdminPlans() {
         )}
       </Modal>
 
-      <section className="rounded-[1.75rem] border border-neutral-100 bg-linear-to-br from-white via-white to-[#eef6eb] p-5 shadow-(--shadow-card)">
+      <section className="rounded-2xl border border-neutral-100 bg-linear-to-br from-white via-white to-[#eef6eb] p-5 shadow-(--shadow-card)">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-4">
-            <div className="flex size-13 shrink-0 items-center justify-center rounded-[1.1rem] bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+            <div className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
               <Crown className="size-6" aria-hidden="true" />
             </div>
             <div className="min-w-0">
@@ -281,7 +281,7 @@ export default function AdminPlans() {
               return (
                 <div
                   key={plan.id}
-                  className={`group flex min-h-[39rem] rounded-[1.75rem] border shadow-(--shadow-card) transition-all duration-300 hover:-translate-y-2 hover:shadow-(--shadow-card-hover) ${
+                  className={`group flex min-h-[39rem] rounded-2xl border shadow-(--shadow-card) transition-all duration-300 hover:-translate-y-2 hover:shadow-(--shadow-card-hover) ${
                     isFeatured
                       ? 'xl:min-h-[43rem] border-primary-700 bg-[#063B00] ring-1 ring-primary-700 xl:shadow-[0_10px_22px_-12px_rgb(6_59_0/0.22),0_34px_70px_-40px_rgb(6_59_0/0.42)]'
                     : isCurrent
