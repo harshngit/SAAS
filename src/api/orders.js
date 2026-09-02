@@ -63,15 +63,18 @@ function extractShortages(errorData) {
   return null
 }
 
+// Finalized Order Status vocabulary. The backend still returns `placed` for the
+// unconfirmed state - the UI maps it to "Draft" (see orderHelpers.formatOrderStatus).
+// Legacy internal values (awaiting_approval / processing) are intentionally gone from
+// the user-facing options; they are never produced by the finalized Draft -> Confirm flow.
 export const ORDER_STATUS_OPTIONS = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'placed', label: 'Placed' },
-  { value: 'awaiting_approval', label: 'Awaiting Approval' },
-  { value: 'processing', label: 'Processing' },
+  { value: 'placed', label: 'Draft' },
+  { value: 'confirmed', label: 'Confirmed' },
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
+// Operational fulfilment states - NOT order statuses. Kept separate on purpose.
 export const FULFILMENT_STATUS_OPTIONS = [
   { value: 'not_started', label: 'Not Started' },
   { value: 'reserved', label: 'Reserved' },
@@ -199,6 +202,7 @@ function normalizeOrder(order) {
     assignedDeliveryPartnerId: order.assigned_delivery_partner_id || order.delivery_partner?.id || '',
     assignedDeliveryPartnerName: order.delivery_partner?.name || '',
     quotationId: order.quotation_id || null,
+    quotationNumber: order.quotation_number || order.quotation?.quotation_number || null,
     deliveryId: order.delivery_id || null,
     deliveryNumber: order.delivery_number || null,
     invoiceId: order.invoice_id || null,
@@ -356,41 +360,10 @@ export async function confirmOrder(orderId) {
   }
 }
 
-export async function approveOrder(orderId) {
-  try {
-    const { data } = await apiClient.patch(`/orders/${orderId}/approve`, {}, {
-      headers: authHeader(),
-    })
-
-    return { success: true, order: normalizeOrder(data) }
-  } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to approve order. Please try again.',
-    )
-
-    return { success: false, error: message }
-  }
-}
-
-export async function rejectOrder(orderId, reason) {
-  try {
-    const { data } = await apiClient.patch(`/orders/${orderId}/reject`, { reason: reason || undefined }, {
-      headers: authHeader(),
-    })
-
-    return { success: true, order: normalizeOrder(data) }
-  } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to reject order. Please try again.',
-    )
-
-    return { success: false, error: message }
-  }
-}
+// The finalized flow has no pre-confirmation approval/rejection step - a Draft is either
+// Confirmed or Cancelled. `approveOrder` / `rejectOrder` wrappers were removed with the old
+// approval workflow. A `rejected` status may still arrive from legacy records; the UI only
+// maps it for display (orderHelpers), it is never produced from the app.
 
 export async function assignDeliveryPartner(orderId, deliveryPartnerId) {
   try {

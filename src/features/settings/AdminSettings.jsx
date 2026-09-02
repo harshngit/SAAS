@@ -47,7 +47,17 @@ export default function AdminSettings() {
         setIsLoading(false)
         return
       }
-      setSettings(result.settings)
+      // Finalized order flow — these are fixed business rules, not optional toggles:
+      //  - no pre-confirmation approval step        -> orderRequiresApproval forced false
+      //  - every order starts as a Draft            -> draftOrdersEnabled forced true
+      //  - confirming an order reserves stock       -> reserveStockOnOrder forced true
+      // They are kept out of the UI so the workflow can't be made inconsistent from Settings.
+      setSettings({
+        ...result.settings,
+        orderRequiresApproval: false,
+        draftOrdersEnabled: true,
+        reserveStockOnOrder: true,
+      })
       setIsLoading(false)
     })
   }, [])
@@ -67,7 +77,7 @@ export default function AdminSettings() {
 
     setSettings(result.settings)
     setIsSaving(false)
-    showToast({ title: 'Settings saved', message: 'Sales workflow settings updated. Applies to the next order placed.' })
+    showToast({ title: 'Settings saved', message: 'Sales workflow settings updated. Applies to the next order created.' })
   }
 
   if (isLoading) {
@@ -91,7 +101,7 @@ export default function AdminSettings() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900">Sales Workflow Settings</h1>
-          <p className="mt-1 text-sm text-neutral-500">Order approval, stock reservation, backorders, invoicing, and credit-limit behavior</p>
+          <p className="mt-1 text-sm text-neutral-500">Stock reservation, backorders, invoicing, and credit-limit behavior</p>
         </div>
         <Button onClick={handleSave} loading={isSaving}>
           <Save className="size-4" />
@@ -100,19 +110,11 @@ export default function AdminSettings() {
       </div>
 
       <Card title="Order Processing" subtitle="Controls how new sales orders are handled">
-        <div className="divide-y divide-neutral-50">
-          <Toggle
-            label="Require approval before placing orders"
-            description="Orders start as Awaiting Approval until an admin approves them"
-            checked={settings.orderRequiresApproval}
-            onChange={updateField('orderRequiresApproval')}
-          />
-          <Toggle
-            label="Reserve stock on order"
-            description="Stock is reserved as soon as an order is placed, before delivery"
-            checked={settings.reserveStockOnOrder}
-            onChange={updateField('reserveStockOnOrder')}
-          />
+        <div className="rounded-xl bg-neutral-50 px-4 py-3 text-xs leading-5 text-neutral-500">
+          Every order starts as a <span className="font-medium text-neutral-700">Draft</span>. Confirming an order
+          checks and reserves available stock. These are fixed steps in the order workflow and cannot be turned off.
+        </div>
+        <div className="mt-2 divide-y divide-neutral-50">
           <Toggle
             label="Allow partial delivery"
             description="Orders can be delivered in multiple shipments"
@@ -121,7 +123,7 @@ export default function AdminSettings() {
           />
           <Toggle
             label="Allow backorders"
-            description="Orders can be placed even when stock is insufficient"
+            description="Orders can be confirmed even when stock is insufficient"
             checked={settings.allowBackorder}
             onChange={updateField('allowBackorder')}
           />
@@ -130,12 +132,6 @@ export default function AdminSettings() {
             description="Delivery partners can collect payment at the time of delivery"
             checked={settings.deliveryCollectionAllowed}
             onChange={updateField('deliveryCollectionAllowed')}
-          />
-          <Toggle
-            label="Allow draft orders"
-            description="Sales staff can save an order as a draft before it reserves stock, then confirm it later"
-            checked={settings.draftOrdersEnabled}
-            onChange={updateField('draftOrdersEnabled')}
           />
         </div>
       </Card>

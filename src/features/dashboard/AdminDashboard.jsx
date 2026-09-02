@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { formatCompactCurrency, formatCurrency } from '../../utils/format'
 import { getAdminDashboard } from '../../api/dashboard'
 import { listOrders } from '../../api/orders'
+import { ORDER_STATUS_VARIANT, formatOrderStatus } from '../orders/orderHelpers'
 import {
   Ban,
   BarChart3,
@@ -50,16 +51,6 @@ const paymentVariant = {
   unpaid: 'danger',
 }
 
-const statusVariant = {
-  draft: 'neutral',
-  confirmed: 'info',
-  processing: 'primary',
-  out_for_delivery: 'warning',
-  delivered: 'success',
-  partially_delivered: 'warning',
-  cancelled: 'danger',
-  returned: 'danger',
-}
 
 const dateRangePresets = [
   { value: 'this_month', label: 'This Month' },
@@ -905,7 +896,7 @@ export default function AdminDashboard() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[0.78rem] font-medium leading-4 text-neutral-800">{order.customerName}</p>
                     <p className="mt-0.5 text-[0.68rem] leading-3.5 text-neutral-400">
-                      {order.orderNumber} · {formatStatusLabel(order.status)}
+                      {order.orderNumber} · {formatOrderStatus(order.status)}
                     </p>
                   </div>
                   <span className="text-[0.65rem] text-neutral-400">{order.orderDate}</span>
@@ -1262,7 +1253,7 @@ export default function AdminDashboard() {
                     key: 'status',
                     header: 'Status',
                     sortable: true,
-                    render: (row) => <Badge variant={statusVariant[row.status] || 'neutral'}>{formatStatusLabel(row.status)}</Badge>,
+                    render: (row) => <Badge variant={ORDER_STATUS_VARIANT[row.status] || 'neutral'}>{formatOrderStatus(row.status)}</Badge>,
                   },
                   {
                     key: 'paymentStatus',

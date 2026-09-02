@@ -49,6 +49,7 @@ import {
 } from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { listOrders } from '../../api/orders'
+import { ORDER_STATUS_VARIANT, formatOrderStatus, getDeliveryStatus } from '../orders/orderHelpers'
 import { getCustomerFollowUps, getCustomerVisits } from '../../api/visits'
 import { useAuthStore } from '../../store/authStore'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
@@ -56,15 +57,6 @@ import { formatCurrency } from '../../utils/format'
 import CustomerForm from './CustomerForm'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
 import { customerBasePathByRole } from './customerConstants'
-
-const orderStatusVariant = {
-  draft: 'neutral',
-  placed: 'info',
-  awaiting_approval: 'warning',
-  processing: 'primary',
-  completed: 'success',
-  cancelled: 'danger',
-}
 
 const ledgerTransactionVariant = {
   invoice: 'primary',
@@ -1068,8 +1060,8 @@ export default function CustomerDetail() {
                     <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
                       <th className="whitespace-nowrap px-4 py-2.5">Order #</th>
                       <th className="whitespace-nowrap px-4 py-2.5">Date</th>
-                      <th className="whitespace-nowrap px-4 py-2.5">Status</th>
-                      <th className="whitespace-nowrap px-4 py-2.5">Fulfilment</th>
+                      <th className="whitespace-nowrap px-4 py-2.5">Order Status</th>
+                      <th className="whitespace-nowrap px-4 py-2.5">Delivery Status</th>
                       <th className="whitespace-nowrap px-4 py-2.5 text-right">Total</th>
                     </tr>
                   </thead>
@@ -1083,9 +1075,9 @@ export default function CustomerDetail() {
                         <td className="whitespace-nowrap px-4 py-3 font-medium text-neutral-800">{order.orderNumber}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{order.orderDate ? order.orderDate.slice(0, 10) : '—'}</td>
                         <td className="whitespace-nowrap px-4 py-3">
-                          <Badge variant={orderStatusVariant[order.status] || 'neutral'}>{order.status?.replace(/_/g, ' ')}</Badge>
+                          <Badge variant={ORDER_STATUS_VARIANT[order.status] || 'neutral'}>{formatOrderStatus(order.status)}</Badge>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{order.fulfilmentStatus?.replace(/_/g, ' ')}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{getDeliveryStatus(order).label}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(order.total)}</td>
                       </tr>
                     ))}

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
+  AlertTriangle,
   Banknote,
   CreditCard,
   FileCheck2,
+  FileText,
   Info,
   Minus,
   Package,
@@ -22,9 +24,10 @@ import Select from '../../components/ui/Select'
 import { ROLES, roleHomePath } from '../../auth/roles'
 import { listProducts } from '../../api/products'
 import { listCustomers } from '../../api/customers'
-import { listDeliveryPartners } from '../../api/deliveries'
 import { listWarehouses } from '../../api/warehouses'
-import { createOrder, assignDeliveryPartner } from '../../api/orders'
+import { createOrder, assignDeliveryPartner, getOrder, updateOrder } from '../../api/orders'
+import { getQuotation } from '../../api/quotations'
+import { duplicateDemoOrder, getDemoOrder, isDemoOrder, patchDemoOrder } from './orderDemoData'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
@@ -73,12 +76,20 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
   const [searchParams] = useSearchParams()
+  const { id: editOrderId } = useParams()
+  const isEditMode = Boolean(editOrderId)
   // Pre-selected customer when arriving from the Customer Detail page ("Create Order" button).
   const preselectedCustomerId = searchParams.get('customerId') || searchParams.get('customer_id') || ''
+  // Order source: a quotation this order is being created from (read-only banner + createOrder link).
+  const sourceQuotationId = searchParams.get('quotationId') || searchParams.get('quotation_id') || ''
+  // Duplicate: prefill from an existing order but save a brand new draft.
+  const duplicateFromId = searchParams.get('from') || ''
+
+  const [sourceQuotation, setSourceQuotation] = useState(null)
+  const [prefillNotice, setPrefillNotice] = useState('')
 
   const [availableProducts, setAvailableProducts] = useState([])
   const [customerRecords, setCustomerRecords] = useState([])
-  const [deliveryBoys, setDeliveryBoys] = useState([])
   const [warehouses, setWarehouses] = useState([])
   const [isLoadingOptions, setIsLoadingOptions] = useState(true)
 
@@ -105,7 +116,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const [paymentMethod, setPaymentMethod] = useState('')
   const [paymentTerms, setPaymentTerms] = useState('15')
   const [deliveryType, setDeliveryType] = useState('')
-  const [deliveryBoyId, setDeliveryBoyId] = useState('')
   const [deliveryAddress, setDeliveryAddress] = useState('')
 
   const [errors, setErrors] = useState({})
@@ -117,10 +127,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     let isMounted = true
 
     async function loadOptions() {
-      const [productsResult, customersResult, partnersResult, warehousesResult] = await Promise.all([
+      const [productsResult, customersResult, warehousesResult] = await Promise.all([
         listProducts(),
         listCustomers(),
-        listDeliveryPartners(),
         listWarehouses(),
       ])
 
@@ -133,7 +142,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
           setSelectedCustomerId(preselectedCustomerId)
         }
       }
-      if (partnersResult.success) setDeliveryBoys(partnersResult.partners)
       if (warehousesResult.success) {
         setWarehouses(warehousesResult.warehouses)
         const defaultWarehouse = warehousesResult.warehouses.find((warehouse) => warehouse.isDefault)
@@ -152,14 +160,167 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   useEffect(() => {
     if (!restrictToVehicleStock || !currentUser?.id) return
     setDeliveryType('delivery_boy')
-    setDeliveryBoyId(currentUser.id)
   }, [restrictToVehicleStock, currentUser?.id])
+
+  // Prefill from an edit target, a duplicate source order, or a source quotation.
+  // Runs once options are loaded so product / customer ids resolve.
+  useEffect(() => {
+    if (isLoadingOptions) return
+    if (!editOrderId && !duplicateFromId && !sourceQuotationId) return
+
+    let isMounted = true
+
+    const applyItems = (items) =>
+      items.map((item) => {
+        const gross = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+        const discountPercent =
+          item.discountPercent != null
+            ? Number(item.discountPercent) || 0
+            : gross > 0 && item.discount
+              ? Math.round((Number(item.discount) / gross) * 100)
+              : 0
+        return {
+          productId: item.productId,
+          unitPrice: Number(item.unitPrice) || 0,
+          taxRate: Number(item.taxRate) || 0,
+          quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
+          discountPercent,
+        }
+      })
+
+    const applyCommonPrefill = (src, { isDemo } = {}) => {
+      // Demo orders carry synthetic product / customer / warehouse ids that aren't in the
+      // real option lists - inject stand-ins so the real form renders the rows.
+      if (isDemo) {
+        setAvailableProducts((current) => {
+          const have = new Set(current.map((p) => p.id))
+          const extra = (src.items || [])
+            .filter((it) => !have.has(it.productId))
+            .map((it) => ({
+              id: it.productId,
+              name: it.productName,
+              sku: 'DEMO',
+              price: it.unitPrice,
+              tax_rate: it.taxRate,
+              sales_unit: it.uom,
+              total_stock: it.availableStock ?? 999,
+            }))
+          return extra.length ? [...current, ...extra] : current
+        })
+        setCustomerRecords((current) =>
+          current.some((c) => c.id === src.customerId)
+            ? current
+            : [{ id: src.customerId, name: src.customerName, billingAddress: src.billingAddress, shippingAddress: src.deliveryAddress }, ...current],
+        )
+        setWarehouses((current) =>
+          current.some((w) => w.id === src.warehouseId)
+            ? current
+            : [...current, { id: src.warehouseId || 'demo-wh', name: src.warehouseName || 'Main Warehouse' }],
+        )
+      }
+      setSelectedCustomerId(src.customerId || '')
+      setOrderItems(applyItems(src.items))
+      if (src.warehouseId) setWarehouseId(src.warehouseId)
+      if (src.deliveryDate) setDeliveryDate(src.deliveryDate.slice(0, 10))
+      setDeliveryAddress(src.deliveryAddress || '')
+      setDeliveryType(src.fulfilmentMethod === 'pickup' ? 'pickup' : 'delivery_boy')
+      if (src.paymentType) setPaymentMethod(src.paymentType)
+      if (src.paymentTermsDays) setPaymentTerms(String(src.paymentTermsDays))
+      setOrderNotes(duplicateFromId ? '' : src.notes || '')
+      if (src.discount) {
+        setDiscountType('amount')
+        setDiscountValue(String(Math.round(Number(src.discount))))
+      }
+    }
+
+    async function prefill() {
+      const targetId = editOrderId || duplicateFromId
+
+      if (targetId && isDemoOrder(targetId)) {
+        const src = getDemoOrder(targetId)
+        if (!isMounted) return
+        if (!src) {
+          setPrefillNotice('Demo order not found.')
+          return
+        }
+        if (editOrderId && src.status !== 'placed') {
+          navigate(window.location.pathname.replace(/\/edit$/, ''), { replace: true })
+          return
+        }
+        // Duplicating a demo order -> make the local copy now and jump to its detail page.
+        if (duplicateFromId && !editOrderId) {
+          const newId = duplicateDemoOrder(src)
+          navigate(`${window.location.pathname.replace(/\/create$/, '')}/${newId}`, { replace: true })
+          return
+        }
+        applyCommonPrefill(src, { isDemo: true })
+        setPrefillNotice(
+          editOrderId
+            ? `Editing ${src.orderNumber} — this is a demo order, changes stay local.`
+            : `Duplicating ${src.orderNumber}. This will be saved as a new draft order.`,
+        )
+        return
+      }
+
+      if (editOrderId || duplicateFromId) {
+        const result = await getOrder(editOrderId || duplicateFromId)
+        if (!isMounted) return
+        if (!result.success) {
+          setPrefillNotice(result.error)
+          return
+        }
+        const src = result.order
+        if (editOrderId && src.status !== 'placed') {
+          navigate(`${window.location.pathname.replace(/\/edit$/, '')}`, { replace: true })
+          return
+        }
+        applyCommonPrefill(src)
+        setPrefillNotice(
+          editOrderId
+            ? `Editing ${src.orderNumber}. Only draft orders can be edited.`
+            : `Duplicating ${src.orderNumber}. This will be saved as a new draft order.`,
+        )
+        return
+      }
+
+      const result = await getQuotation(sourceQuotationId)
+      if (!isMounted) return
+      if (!result.success) {
+        setPrefillNotice(result.error)
+        return
+      }
+      const q = result.quotation
+      setSourceQuotation(q)
+      setSelectedCustomerId(q.customerId || '')
+      setOrderItems(applyItems(q.items))
+      setDeliveryAddress(q.shippingAddress || q.billingAddress || '')
+      setOrderNotes(q.notes || '')
+    }
+
+    prefill()
+    return () => {
+      isMounted = false
+    }
+  }, [isLoadingOptions, editOrderId, duplicateFromId, sourceQuotationId, navigate])
 
 
   const selectedCustomer = useMemo(
     () => customerRecords.find((customer) => customer.id === selectedCustomerId) || null,
     [customerRecords, selectedCustomerId],
   )
+
+  // Auto-fill the delivery address from the selected customer (editable, only when still blank).
+  useEffect(() => {
+    if (!selectedCustomer) return
+    const addr =
+      selectedCustomer.deliveryAddress ||
+      selectedCustomer.shippingAddress ||
+      selectedCustomer.shipping_address ||
+      selectedCustomer.billingAddress ||
+      selectedCustomer.billing_address ||
+      ''
+    setDeliveryAddress((current) => current || addr)
+  }, [selectedCustomer])
 
   const customerOptions = useMemo(
     () =>
@@ -213,8 +374,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     setErrors((current) => ({ ...current, items: '' }))
   }
 
-  // Quantity, per-item Discount %, Unit Price, and the order-level Discount are all
-  // whole-number fields here (no paise, no fractional %). Rounding is applied on blur, not on
+  // Quantity, Unit Price, and the order-level Discount are all whole-number fields here (no
+  // paise, no fractional %). There is no per-item discount field - only one order-level
+  // discount in the summary; any item-level discount carried in from a quotation or a legacy
+  // order is kept in state for the maths but is not editable. Rounding is applied on blur, not on
   // every keystroke - a controlled <input type="number"> jumps its cursor to the end after any
   // programmatic value change, so rounding while a "10." is still being typed turns the next
   // keystroke into "1007" instead of "10" (the decimal point silently vanishes and later digits
@@ -266,7 +429,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     return { subtotal, discountAmount, gstAmount, effectiveGstPercent, total, totalQuantity }
   }, [orderItems, availableProducts, discountType, discountValue])
 
-  const canCreateOrder = restrictToVehicleStock || Boolean(deliveryType && (deliveryType !== 'delivery_boy' || deliveryBoyId))
+  // A delivery partner is NOT required at creation - it is assigned later via Plan Delivery.
+  const canCreateOrder = restrictToVehicleStock || Boolean(deliveryType)
 
   const validateForm = () => {
     const nextErrors = {}
@@ -281,7 +445,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     }
     if (!paymentMethod) nextErrors.paymentMethod = 'Select a payment type.'
     if (!restrictToVehicleStock && !deliveryType) nextErrors.deliveryType = 'Select a delivery method.'
-    if (deliveryType === 'delivery_boy' && !restrictToVehicleStock && !deliveryBoyId) nextErrors.deliveryBoyId = 'Choose a delivery partner.'
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -295,23 +458,108 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     setSubmitError('')
     setStockShortages(null)
 
+    const combinedNotes =
+      orderNotes.trim() || internalNotes.trim()
+        ? `${orderNotes.trim()}${internalNotes.trim() ? `\n[Internal] ${internalNotes.trim()}` : ''}`
+        : undefined
+    const itemsPayload = orderItems.map((item) => ({
+      productId: item.productId,
+      quantity: Number(item.quantity) || 0,
+      unitPrice: Number(item.unitPrice) || 0,
+      taxRate: Number(item.taxRate) || 0,
+      discountPercent: Number(item.discountPercent) || 0,
+    }))
+
+    // Demo edit: patch local demo state only, never touch the backend.
+    if (isEditMode && isDemoOrder(editOrderId)) {
+      const items = orderItems.map((item, index) => {
+        const product = availableProducts.find((p) => p.id === item.productId)
+        const qty = Number(item.quantity) || 0
+        const price = Number(item.unitPrice) || 0
+        const discPct = Number(item.discountPercent) || 0
+        const taxRate = Number(item.taxRate) || 0
+        const net = qty * price * (1 - discPct / 100)
+        return {
+          id: `i${index + 1}`,
+          productId: item.productId,
+          variantId: '',
+          productName: product?.name || 'Item',
+          quantity: qty,
+          orderedQuantity: qty,
+          unitPrice: price,
+          discount: 0,
+          discountPercent: discPct,
+          costPrice: null,
+          uom: product?.sales_unit || 'unit',
+          taxRate,
+          reservedQuantity: qty,
+          deliveredQuantity: 0,
+          remainingQuantity: qty,
+          availableStock: product?.total_stock ?? null,
+          lineTotal: net + net * (taxRate / 100),
+        }
+      })
+      const subtotal = items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0)
+      const total = items.reduce((sum, it) => sum + it.lineTotal, 0)
+      patchDemoOrder(editOrderId, {
+        customerId: selectedCustomer?.id || '',
+        customerName: selectedCustomer?.name || '',
+        warehouseId,
+        warehouseName: warehouses.find((w) => w.id === warehouseId)?.name || '',
+        deliveryDate,
+        deliveryAddress: deliveryType === 'pickup' ? '' : deliveryAddress,
+        fulfilmentMethod: deliveryType === 'pickup' ? 'pickup' : 'delivery',
+        paymentType: paymentMethod,
+        paymentTermsDays: paymentMethod === 'credit' ? Number(paymentTerms) : 0,
+        notes: combinedNotes || '',
+        discount: totals.discountAmount,
+        items,
+        subtotal,
+        tax: total - subtotal > 0 ? total - subtotal : 0,
+        total,
+        updatedAt: new Date().toISOString(),
+      })
+      showToast({ title: 'Demo order updated', message: 'Your changes have been saved locally.' })
+      setIsSubmitting(false)
+      navigate(`${currentUser?.role === ROLES.ADMIN ? '/admin' : '/sales'}/orders/${editOrderId}`)
+      return
+    }
+
+    if (isEditMode) {
+      const updateResult = await updateOrder(editOrderId, {
+        customerId: selectedCustomer.id,
+        warehouseId,
+        deliveryAddress: deliveryType === 'pickup' ? '' : deliveryAddress,
+        discount: totals.discountAmount,
+        notes: combinedNotes,
+        items: itemsPayload,
+      })
+
+      if (!updateResult.success) {
+        setSubmitError(updateResult.error)
+        setStockShortages(updateResult.shortages || null)
+        setIsSubmitting(false)
+        return
+      }
+
+      showToast({ title: 'Order updated', message: `${updateResult.order.orderNumber} has been updated.` })
+      setIsSubmitting(false)
+      navigate(`${currentUser?.role === ROLES.ADMIN ? '/admin' : '/sales'}/orders/${editOrderId}`)
+      return
+    }
+
     const result = await createOrder({
       customerId: selectedCustomer.id,
       warehouseId,
       deliveryDate,
+      quotationId: sourceQuotationId || undefined,
       fulfilmentMethod: restrictToVehicleStock ? 'delivery' : deliveryType === 'delivery_boy' ? 'delivery' : 'pickup',
       paymentType: paymentMethod,
       paymentTermsDays: paymentMethod === 'credit' ? Number(paymentTerms) : 0,
       discount: totals.discountAmount,
-      source: restrictToVehicleStock ? 'delivery_vehicle' : 'office',
-      notes: orderNotes.trim() || internalNotes.trim() ? `${orderNotes.trim()}${internalNotes.trim() ? `\n[Internal] ${internalNotes.trim()}` : ''}` : undefined,
-      items: orderItems.map((item) => ({
-        productId: item.productId,
-        quantity: Number(item.quantity) || 0,
-        unitPrice: Number(item.unitPrice) || 0,
-        taxRate: Number(item.taxRate) || 0,
-        discountPercent: Number(item.discountPercent) || 0,
-      })),
+      source: restrictToVehicleStock ? 'delivery_vehicle' : sourceQuotationId ? 'quotation' : 'office',
+      notes: combinedNotes,
+      items: itemsPayload,
     })
 
     if (!result.success) {
@@ -321,9 +569,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       return
     }
 
-    const partnerId = restrictToVehicleStock ? currentUser?.id : deliveryType === 'delivery_boy' ? deliveryBoyId : null
-    if (partnerId) {
-      await assignDeliveryPartner(result.order.id, partnerId)
+    // Vehicle-stock flow still self-assigns; the office flow assigns a partner later via Plan Delivery.
+    if (restrictToVehicleStock && currentUser?.id) {
+      await assignDeliveryPartner(result.order.id, currentUser.id)
     }
 
     showToast({
@@ -334,16 +582,40 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     navigate(currentUser?.role === ROLES.ADMIN ? '/admin/orders' : roleHomePath[currentUser?.role] || '/')
   }
 
-  const assignedDeliveryBoyName = restrictToVehicleStock
-    ? currentUser?.name
-    : deliveryBoys.find((user) => user.id === deliveryBoyId)?.name
+  const assignedDeliveryBoyName = restrictToVehicleStock ? currentUser?.name : null
+  const outstandingBalance = Number(
+    selectedCustomer?.outstandingBalance ?? selectedCustomer?.outstanding_balance ?? 0,
+  )
+  const customerDefaultAddress =
+    selectedCustomer?.deliveryAddress ||
+    selectedCustomer?.shippingAddress ||
+    selectedCustomer?.shipping_address ||
+    selectedCustomer?.billingAddress ||
+    selectedCustomer?.billing_address ||
+    ''
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-neutral-900">Create Order</h1>
-        <p className="text-sm text-neutral-500">Add order details and confirm to create a new order.</p>
+        <h1 className="text-2xl font-bold text-neutral-900">{isEditMode ? 'Edit Order' : 'Create Order'}</h1>
+        <p className="text-sm text-neutral-500">
+          {isEditMode ? 'Update this draft order and save your changes.' : 'Add order details and confirm to create a new order.'}
+        </p>
       </div>
+
+      {prefillNotice && (
+        <div className="flex items-center gap-2.5 rounded-2xl border border-primary-100 bg-primary-50/60 px-4 py-3 text-sm text-primary-800">
+          <Info className="size-4 shrink-0" aria-hidden="true" />
+          {prefillNotice}
+        </div>
+      )}
+
+      {sourceQuotation && (
+        <div className="flex items-center gap-2.5 rounded-2xl border border-primary-100 bg-primary-50/60 px-4 py-3 text-sm text-primary-800">
+          <FileText className="size-4 shrink-0" aria-hidden="true" />
+          Source: Quotation · {sourceQuotation.quotationNumber} — customer and items have been prefilled.
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="space-y-5">
@@ -427,6 +699,13 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     </a>
                   </div>
                 )}
+
+                {selectedCustomer && outstandingBalance > 0 && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800">
+                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                    <span>Outstanding balance: {formatCurrency(outstandingBalance)}. This is for your information only and does not block the order.</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -445,7 +724,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-neutral-700">
-                    Delivery Date<span className="text-red-500"> *</span>
+                    {deliveryType === 'pickup' ? 'Pickup Date' : 'Delivery Date'}
+                    {deliveryType !== 'pickup' && <span className="text-red-500"> *</span>}
                   </label>
                   <DatePicker value={deliveryDate} onChange={setDeliveryDate} error={errors.deliveryDate} />
                 </div>
@@ -608,7 +888,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       <th className="px-5 py-3">Product</th>
                       <th className="px-3 py-3">Unit Price (₹)</th>
                       <th className="px-3 py-3 text-center">Qty</th>
-                      <th className="px-3 py-3">Disc (%)</th>
                       <th className="px-3 py-3">Tax (%)</th>
                       <th className="px-3 py-3 text-right">Line Total (₹)</th>
                       <th className="w-10 px-3 py-3" />
@@ -621,7 +900,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
                       const quantity = Number(item.quantity) || 0
                       const unitPrice = Number(item.unitPrice) || 0
-                      const isLowStock = product.total_stock !== undefined && quantity > product.total_stock
+                      const availableStock = product.total_stock ?? product.total_inventory ?? null
+                      const isLowStock = availableStock !== null && quantity > availableStock
 
                       return (
                         <tr key={item.productId}>
@@ -636,10 +916,16 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               )}
                               <div className="min-w-0">
                                 <p className="truncate font-medium text-neutral-900">{product.name}</p>
-                                {product.total_stock !== undefined && (
+                                {availableStock !== null && (
                                   <p className={`text-xs ${isLowStock ? 'text-red-600' : 'text-neutral-400'}`}>
-                                    In Stock: {product.total_stock}
+                                    Required {quantity} · Available {availableStock}
                                   </p>
+                                )}
+                                {isLowStock && (
+                                  <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold text-amber-700">
+                                    <AlertTriangle className="size-3" aria-hidden="true" />
+                                    Insufficient Stock
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -684,21 +970,12 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               </button>
                             </div>
                           </td>
-                          <td className="px-3 py-3.5">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="1"
-                              value={item.discountPercent ?? 0}
-                              onChange={(event) => updateOrderItem(item.productId, 'discountPercent', event.target.value)}
-                              onBlur={roundToWholeNumberOnBlur(item.productId, 'discountPercent', { min: 0, max: 100 })}
-                              className="h-9 w-20 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
-                            />
-                          </td>
                           <td className="px-3 py-3.5 text-neutral-500">{formatGstPercent(item.taxRate || 0)}%</td>
                           <td className="px-3 py-3.5 text-right font-semibold text-neutral-900">
                             {formatCurrency(unitPrice * quantity * (1 - Math.min(Math.max(Number(item.discountPercent) || 0, 0), 100) / 100))}
+                            {Number(item.discountPercent) > 0 && (
+                              <p className="text-[0.7rem] font-normal text-neutral-400">incl. {Math.round(Number(item.discountPercent))}% item disc</p>
+                            )}
                           </td>
                           <td className="px-3 py-3.5 text-right">
                             <button
@@ -764,8 +1041,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                         type="button"
                         onClick={() => {
                           setDeliveryType(option.value)
-                          if (option.value === 'pickup') setDeliveryBoyId('')
-                          setErrors((current) => ({ ...current, deliveryType: '', deliveryBoyId: '' }))
+                          setErrors((current) => ({ ...current, deliveryType: '' }))
                         }}
                         className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition-all focus:outline-none focus:ring-4 focus:ring-primary-500/12 ${
                           isSelected ? 'border-primary-500 bg-primary-50' : 'border-neutral-200 bg-white hover:border-primary-200 hover:bg-primary-50/50'
@@ -783,39 +1059,29 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 </div>
                 {errors.deliveryType && <p className="mt-3 text-sm text-red-600">{errors.deliveryType}</p>}
 
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-neutral-700">
-                      Assign Delivery Partner <span className="text-red-500">*</span>
-                    </label>
-                    <Select
-                      options={deliveryBoys.map((user) => ({ value: user.id, label: user.name }))}
-                      value={deliveryBoyId}
-                      onChange={(event) => {
-                        if (event.target.value) {
-                          setDeliveryType('delivery_boy')
-                        }
-                        setDeliveryBoyId(event.target.value)
-                        setErrors((current) => ({ ...current, deliveryBoyId: '' }))
-                      }}
-                      placeholder={deliveryBoys.length ? 'Choose delivery partner' : 'No delivery partners available'}
-                      error={errors.deliveryBoyId}
-                      disabled={deliveryBoys.length === 0}
-                    />
-                    {!deliveryBoys.length && !isLoadingOptions && (
-                      <p className="text-xs text-neutral-400">Add an active delivery partner in staff before assigning one here.</p>
-                    )}
+                {deliveryType === 'delivery_boy' && (
+                  <div className="mt-4 space-y-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium text-neutral-700">Delivery Address</label>
+                      <textarea
+                        value={deliveryAddress}
+                        onChange={(event) => setDeliveryAddress(event.target.value)}
+                        placeholder={customerDefaultAddress || 'Delivery address'}
+                        disabled={!selectedCustomer}
+                        maxLength={500}
+                        className="h-20 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12 disabled:opacity-60"
+                      />
+                      <p className="text-xs text-neutral-400">Auto-filled from the customer. A delivery partner is assigned later from the order via Plan Delivery.</p>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-neutral-700">Delivery Address (Optional)</label>
-                    <Input
-                      value={deliveryAddress}
-                      onChange={(event) => setDeliveryAddress(event.target.value)}
-                      placeholder={selectedCustomer?.billingAddress || 'Delivery address'}
-                      disabled={!selectedCustomer}
-                    />
+                )}
+
+                {deliveryType === 'pickup' && (
+                  <div className="mt-4 flex items-center gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3 text-sm text-neutral-700">
+                    <Store className="size-5 shrink-0 text-primary-700" aria-hidden="true" />
+                    The customer collects this order from the store. Set the expected collection date above — no address or delivery partner is needed.
                   </div>
-                </div>
+                )}
               </>
             )}
           </div>
@@ -863,7 +1129,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
             <div className="mt-5 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-neutral-700">Discount</label>
+                <label className="text-sm font-medium text-neutral-700">Order Discount</label>
+                <p className="text-xs text-neutral-400">Applies to the whole order. There is no per-product discount.</p>
                 <div className="grid grid-cols-[9rem_minmax(0,1fr)] gap-2">
                   <Select
                     options={discountTypeOptions}
@@ -886,15 +1153,19 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <span className="text-sm font-medium text-neutral-500">{discountType === 'percentage' ? '%' : '₹'}</span>
                   </div>
                 </div>
-                {totals.discountAmount > 0 && (
-                  <p className="text-right text-sm font-medium text-red-600">-{formatCurrency(totals.discountAmount)}</p>
-                )}
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="text-sm text-neutral-600">Subtotal</span>
-                <span className="text-sm font-medium text-neutral-900">{formatCurrency(totals.subtotal - totals.discountAmount)}</span>
+                <span className="text-sm font-medium text-neutral-900">{formatCurrency(totals.subtotal)}</span>
               </div>
+
+              {totals.discountAmount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-600">Order Discount</span>
+                  <span className="text-sm font-medium text-red-600">-{formatCurrency(totals.discountAmount)}</span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <span className="text-sm text-neutral-600">GST ({formatGstPercent(totals.effectiveGstPercent)}%)</span>
@@ -921,11 +1192,19 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-neutral-600">Delivery Partner</span>
-                  <span className="text-sm font-medium text-neutral-900">{assignedDeliveryBoyName || 'Takeaway / Not assigned'}</span>
+                  <span className="text-sm text-neutral-600">Delivery Method</span>
+                  <span className="text-sm font-medium text-neutral-900">
+                    {restrictToVehicleStock
+                      ? `Delivered by ${assignedDeliveryBoyName || 'you'}`
+                      : deliveryType === 'pickup'
+                        ? 'Self Pickup'
+                        : deliveryType === 'delivery_boy'
+                          ? 'Home Delivery (partner assigned later)'
+                          : 'Not selected'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-neutral-600">Delivery Date</span>
+                  <span className="text-sm text-neutral-600">{deliveryType === 'pickup' ? 'Pickup Date' : 'Delivery Date'}</span>
                   <span className="text-sm font-medium text-neutral-900">
                     {deliveryDate ? new Date(deliveryDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                   </span>
@@ -943,9 +1222,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
             <Button type="submit" className="mt-5 w-full" disabled={!canCreateOrder} loading={isSubmitting}>
               <FileCheck2 className="size-4" aria-hidden="true" />
-              Create Order
+              {isEditMode ? 'Save Changes' : 'Create Order'}
             </Button>
-            <p className="mt-3 text-center text-xs text-neutral-400">You can review and edit the order before confirmation.</p>
+            <p className="mt-3 text-center text-xs text-neutral-400">
+              {isEditMode ? 'Changes apply to this draft order immediately.' : 'The order is created as a draft — confirm it from the order page.'}
+            </p>
           </div>
         </div>
       </form>

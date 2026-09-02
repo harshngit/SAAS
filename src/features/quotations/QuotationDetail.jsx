@@ -1,6 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Ban, Check, Download, FileText, IndianRupee, Printer, Send, ShoppingCart, Trash2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRightCircle,
+  Ban,
+  Check,
+  Clock,
+  Copy,
+  Download,
+  FileText,
+  Pencil,
+  Send,
+  ShoppingCart,
+  Trash2,
+} from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -9,25 +22,30 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import Input from '../../components/ui/Input'
-import StatCard from '../../components/ui/StatCard'
+import { useToast } from '../../components/ui/toastContext'
 import { formatCurrency } from '../../utils/format'
 import {
   convertQuotationToOrder,
   deleteQuotation,
   downloadQuotationPdf,
   getQuotation,
+  linkQuotationCustomer,
   updateQuotationStatus,
 } from '../../api/quotations'
 import { listWarehouses } from '../../api/warehouses'
-
-const statusVariant = {
-  draft: 'neutral',
-  sent: 'info',
-  accepted: 'success',
-  rejected: 'danger',
-  expired: 'danger',
-  converted: 'purple',
-}
+import ConvertLeadModal from '../leads/ConvertLeadModal'
+import {
+  QUOTATION_STATUS_VARIANT,
+  buildQuotationTimeline,
+  deriveQuotationStatus,
+  describeExpiry,
+  formatQuotationStatus,
+  getQuotationActions,
+  getQuotationMeta,
+  patchQuotationMeta,
+  quotationTotals,
+} from './quotationHelpers'
+import { demoQuotationMeta, getDemoQuotation, isDemoQuotation, patchDemoQuotation } from './quotationDemoData'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -36,13 +54,45 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
+function formatDateTime(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return `${formatDate(value)}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+}
+
+function TimelineItem({ icon: Icon, iconClass, title, subtitle, timestamp, isLast }) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex flex-col items-center">
+        <div className={`flex size-8 shrink-0 items-center justify-center rounded-full ${iconClass}`}>
+          <Icon className="size-4" aria-hidden="true" />
+        </div>
+        {!isLast && <div className="mt-1 w-px flex-1 bg-neutral-100" />}
+      </div>
+      <div className={`min-w-0 flex-1 ${isLast ? '' : 'pb-4'}`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <p className="text-sm font-semibold text-neutral-900">{title}</p>
+          <p className="text-xs text-neutral-400">{formatDateTime(timestamp)}</p>
+        </div>
+        {subtitle && <p className="mt-0.5 text-xs text-neutral-500">{subtitle}</p>}
+      </div>
+    </div>
+  )
+}
+
 export default function QuotationDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const basePath = window.location.pathname.startsWith('/sales') ? '/sales/quotations' : '/admin/quotations'
-  const ordersBasePath = window.location.pathname.startsWith('/sales') ? '/sales/orders' : '/admin/orders'
+  const { showToast } = useToast()
+  const isSalesPath = window.location.pathname.startsWith('/sales')
+  const basePath = isSalesPath ? '/sales/quotations' : '/admin/quotations'
+  const ordersBasePath = isSalesPath ? '/sales/orders' : '/admin/orders'
+  const customersBasePath = isSalesPath ? '/sales/customers' : '/admin/customers'
+  const isDemo = isDemoQuotation(id)
 
   const [quotation, setQuotation] = useState(null)
+  const [meta, setMetaState] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
@@ -57,20 +107,29 @@ export default function QuotationDetail() {
   const [convertForm, setConvertForm] = useState({ warehouseId: '', deliveryDate: '', fulfilmentMethod: 'delivery' })
   const [isConverting, setIsConverting] = useState(false)
   const [convertError, setConvertError] = useState('')
+  const [convertLeadOpen, setConvertLeadOpen] = useState(false)
 
   const loadQuotation = async () => {
     setIsLoading(true)
     setLoadError('')
 
-    const result = await getQuotation(id)
+    if (isDemo) {
+      const demo = getDemoQuotation(id)
+      setQuotation(demo)
+      setMetaState({ ...(demoQuotationMeta[id] || {}), ...(getQuotationMeta(id) || {}) })
+      setLoadError(demo ? '' : 'Demo quotation not found.')
+      setIsLoading(false)
+      return
+    }
 
+    const result = await getQuotation(id)
     if (!result.success) {
       setLoadError(result.error)
       setIsLoading(false)
       return
     }
-
     setQuotation(result.quotation)
+    setMetaState(getQuotationMeta(id) || {})
     setIsLoading(false)
   }
 
@@ -78,6 +137,9 @@ export default function QuotationDetail() {
     loadQuotation()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  const timeline = useMemo(() => buildQuotationTimeline(quotation, meta), [quotation, meta])
+  const totals = useMemo(() => quotationTotals(quotation?.items || []), [quotation])
 
   if (isLoading) {
     return (
@@ -100,36 +162,67 @@ export default function QuotationDetail() {
     )
   }
 
+  const displayStatus = deriveQuotationStatus(quotation)
+  const actions = getQuotationActions(quotation, meta)
+  const expiry = describeExpiry(quotation.validUntil)
+  const hasCustomer = Boolean(quotation.customerId)
+  const entityLabel = hasCustomer ? 'Customer' : meta?.leadName ? 'Lead' : ''
+  const entityName = quotation.customerName || meta?.leadName || '—'
+
+  const applyMetaPatch = (partial) => {
+    if (!isDemo) patchQuotationMeta(id, partial)
+    setMetaState((current) => ({ ...current, ...partial }))
+  }
+
   const updateStatus = async (nextStatus) => {
     setIsUpdatingStatus(true)
     setActionError('')
 
-    const result = await updateQuotationStatus(quotation.id, nextStatus)
+    // Sending a quote that was edited after a previous send counts as "sent again".
+    const isResend = nextStatus === 'sent' && meta?.updatedAfterSend
 
+    if (isDemo) {
+      patchDemoQuotation(id, { status: nextStatus })
+      if (isResend) applyMetaPatch({ resent: true })
+      setQuotation((current) => ({ ...current, status: nextStatus, updatedAt: new Date().toISOString() }))
+      setIsUpdatingStatus(false)
+      showToast({ title: 'Quotation updated', message: isResend ? 'Quotation sent again.' : `Status set to ${formatQuotationStatus(nextStatus)}.` })
+      return
+    }
+
+    const result = await updateQuotationStatus(quotation.id, nextStatus)
     if (!result.success) {
       setActionError(result.error)
       setIsUpdatingStatus(false)
       return
     }
-
+    if (isResend) applyMetaPatch({ resent: true })
     setQuotation(result.quotation)
     setIsUpdatingStatus(false)
   }
 
   const handlePrint = async () => {
+    if (isDemo) {
+      showToast({ title: 'Demo quotation', message: 'PDF download is disabled for demo rows.' })
+      return
+    }
     setIsDownloading(true)
     setActionError('')
-
     const result = await downloadQuotationPdf(quotation.id, quotation.quotationNumber)
-
     if (!result.success) setActionError(result.error)
     setIsDownloading(false)
   }
 
   const openConvertModal = async () => {
+    if (!hasCustomer) {
+      setActionError('Customer required before creating an order. Convert the lead to a customer first.')
+      return
+    }
     setConvertError('')
+    setActionError('')
     setConvertOpen(true)
 
+    if (isDemo) return
     const result = await listWarehouses()
     if (result.success) {
       setWarehouses(result.warehouses)
@@ -142,39 +235,65 @@ export default function QuotationDetail() {
     setIsConverting(true)
     setConvertError('')
 
-    const result = await convertQuotationToOrder(quotation.id, convertForm)
+    if (isDemo) {
+      setIsConverting(false)
+      setConvertOpen(false)
+      patchDemoQuotation(id, { status: 'converted', convertedOrderId: 'demo-order' })
+      setQuotation((current) => ({ ...current, status: 'converted', convertedOrderId: 'demo-order', convertedAt: new Date().toISOString() }))
+      showToast({ title: 'Converted to Order', message: 'A sales order would be created (simulated for demo).' })
+      return
+    }
 
+    const result = await convertQuotationToOrder(quotation.id, convertForm)
     if (!result.success) {
       setConvertError(result.error)
       setIsConverting(false)
       return
     }
-
     setIsConverting(false)
     setConvertOpen(false)
     const orderId = result.conversion?.order?.id
     navigate(orderId ? `${ordersBasePath}/${orderId}` : ordersBasePath)
   }
 
+  const handleLeadConverted = async ({ customerId, customer }) => {
+    applyMetaPatch({ convertedCustomerId: customerId })
+    setQuotation((current) => ({
+      ...current,
+      customerId,
+      customerName: customer?.name || meta?.leadName || 'New customer',
+    }))
+    // Link the new customer on the backend quotation too, so Convert to Order works.
+    if (!isDemo) {
+      const result = await linkQuotationCustomer(quotation.id, customerId)
+      if (result.success) setQuotation(result.quotation)
+      else setActionError(`Customer created, but linking it to the quotation failed: ${result.error}`)
+    }
+    showToast({ title: 'Lead converted', message: 'The customer is now linked to this quotation.' })
+  }
+
   const handleDelete = async () => {
+    if (isDemo) {
+      navigate(basePath)
+      return
+    }
     setIsDeleting(true)
     setDeleteError('')
-
     const result = await deleteQuotation(quotation.id)
-
     if (!result.success) {
       setDeleteError(result.error)
       setIsDeleting(false)
       return
     }
-
     navigate(basePath)
   }
 
+  const has = (key) => actions.includes(key)
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-4">
           <Button variant="secondary" size="sm" onClick={() => navigate(basePath)}>
             <ArrowLeft className="size-4" aria-hidden="true" />
             Back
@@ -182,42 +301,106 @@ export default function QuotationDetail() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold text-neutral-900">{quotation.quotationNumber}</h1>
-              <Badge variant={statusVariant[quotation.status] || 'neutral'}>{quotation.status}</Badge>
+              {isDemo && (
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
+              )}
+              <Badge variant={QUOTATION_STATUS_VARIANT[displayStatus] || 'neutral'}>{formatQuotationStatus(displayStatus)}</Badge>
             </div>
-            <p className="mt-1.5 text-xs text-neutral-400">{quotation.customerName || 'Unlinked customer'}</p>
+            <p className="mt-1.5 text-sm text-neutral-500">
+              {entityLabel ? (
+                <>
+                  <span className="font-medium text-neutral-700">{entityLabel}:</span> {entityName}
+                  <span className={`ml-2 rounded px-1.5 py-0.5 text-[0.62rem] font-medium ${hasCustomer ? 'bg-neutral-100 text-neutral-500' : 'bg-blue-50 text-blue-600'}`}>
+                    {entityLabel}
+                  </span>
+                </>
+              ) : (
+                'No customer or lead linked'
+              )}
+            </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" loading={isDownloading} onClick={handlePrint}>
-            {isDownloading ? <Printer className="size-4" aria-hidden="true" /> : <Download className="size-4" aria-hidden="true" />}
-            Download PDF
-          </Button>
-          {quotation.status === 'draft' && (
-            <Button variant="primary" size="sm" loading={isUpdatingStatus} onClick={() => updateStatus('sent')}>
-              <Send className="size-4" aria-hidden="true" />
-              Mark as Sent
+          {has('edit') && (
+            <Button variant="outline" size="sm" onClick={() => navigate(`${basePath}/${encodeURIComponent(id)}/edit`)}>
+              <Pencil className="size-4" aria-hidden="true" />
+              Edit
             </Button>
           )}
-          {quotation.status === 'sent' && (
-            <>
-              <Button variant="danger" size="sm" loading={isUpdatingStatus} onClick={() => updateStatus('rejected')}>
-                <Ban className="size-4" aria-hidden="true" />
-                Reject
-              </Button>
-              <Button variant="primary" size="sm" loading={isUpdatingStatus} onClick={() => updateStatus('accepted')}>
-                <Check className="size-4" aria-hidden="true" />
-                Mark as Accepted
-              </Button>
-            </>
+          {has('editResend') && (
+            <Button variant="primary" size="sm" onClick={() => navigate(`${basePath}/${encodeURIComponent(id)}/edit`)}>
+              <Pencil className="size-4" aria-hidden="true" />
+              Edit &amp; Resend
+            </Button>
           )}
-          {quotation.status === 'accepted' && (
+          {has('download') && (
+            <Button variant="outline" size="sm" loading={isDownloading} onClick={handlePrint}>
+              <Download className="size-4" aria-hidden="true" />
+              Download PDF
+            </Button>
+          )}
+          {has('send') && (
+            <Button variant="primary" size="sm" loading={isUpdatingStatus} onClick={() => updateStatus('sent')}>
+              <Send className="size-4" aria-hidden="true" />
+              Send
+            </Button>
+          )}
+          {has('reject') && (
+            <Button variant="danger" size="sm" loading={isUpdatingStatus} onClick={() => updateStatus('rejected')}>
+              <Ban className="size-4" aria-hidden="true" />
+              Reject
+            </Button>
+          )}
+          {has('accept') && (
+            <Button variant="primary" size="sm" loading={isUpdatingStatus} onClick={() => updateStatus('accepted')}>
+              <Check className="size-4" aria-hidden="true" />
+              Accept
+            </Button>
+          )}
+          {has('convertToCustomer') && (
+            <Button variant="primary" size="sm" onClick={() => setConvertLeadOpen(true)}>
+              <ArrowRightCircle className="size-4" aria-hidden="true" />
+              Convert to Customer
+            </Button>
+          )}
+          {has('viewCustomer') && meta?.convertedCustomerId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => (isDemo || String(meta.convertedCustomerId).startsWith('demo-')
+                ? showToast({ title: 'Demo quotation', message: 'On a real quotation this opens the linked customer.' })
+                : navigate(`${customersBasePath}/${meta.convertedCustomerId}`))}
+            >
+              <ArrowRightCircle className="size-4" aria-hidden="true" />
+              View Customer
+            </Button>
+          )}
+          {has('convertToOrder') && (
             <Button variant="primary" size="sm" onClick={openConvertModal}>
               <ShoppingCart className="size-4" aria-hidden="true" />
               Convert to Order
             </Button>
           )}
-          {quotation.status !== 'converted' && (
+          {has('viewOrder') && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => (isDemo
+                ? showToast({ title: 'Demo quotation', message: 'On a real quotation this opens the sales order.' })
+                : navigate(quotation.convertedOrderId ? `${ordersBasePath}/${quotation.convertedOrderId}` : ordersBasePath))}
+            >
+              <ShoppingCart className="size-4" aria-hidden="true" />
+              View Order
+            </Button>
+          )}
+          {has('duplicate') && (
+            <Button variant="ghost" size="sm" onClick={() => navigate(`${basePath}/new?from=${encodeURIComponent(id)}`)}>
+              <Copy className="size-4" aria-hidden="true" />
+              Duplicate
+            </Button>
+          )}
+          {has('delete') && (
             <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>
               <Trash2 className="size-4" aria-hidden="true" />
               Delete
@@ -230,11 +413,24 @@ export default function QuotationDetail() {
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={IndianRupee} iconVariant="neutral" label="Subtotal" value={formatCurrency(quotation.subtotal)} />
-        <StatCard icon={IndianRupee} iconVariant="info" label="Tax" value={formatCurrency(quotation.taxTotal)} />
-        <StatCard icon={IndianRupee} iconVariant="primary" label="Total" value={formatCurrency(quotation.total)} />
-        <StatCard icon={IndianRupee} iconVariant="warning" label="Items" value={String(quotation.itemCount)} />
+      {expiry.label && displayStatus !== 'converted' && displayStatus !== 'rejected' && (
+        <div className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm ${expiry.tone === 'danger' ? 'border-red-100 bg-red-50 text-red-700' : 'border-amber-100 bg-amber-50 text-amber-800'}`}>
+          <Clock className="size-4 shrink-0" aria-hidden="true" />
+          {expiry.label}
+        </div>
+      )}
+
+      {displayStatus === 'accepted' && !hasCustomer && (
+        <div className="flex flex-col gap-2 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+          <span>An order needs a customer. Convert this lead to a customer to continue.</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <SummaryTile label="Subtotal" value={formatCurrency(totals.subtotal)} />
+        <SummaryTile label="Discount" value={`− ${formatCurrency(totals.discount)}`} />
+        <SummaryTile label="Tax" value={formatCurrency(totals.tax)} />
+        <SummaryTile label="Grand Total" value={formatCurrency(totals.grandTotal)} strong />
       </div>
 
       <Card title="Quotation Items" subtitle="Products included in this estimate" className="p-0" bodyClassName="p-0">
@@ -254,9 +450,7 @@ export default function QuotationDetail() {
             <tbody className="divide-y divide-neutral-50">
               {quotation.items.map((item) => (
                 <tr key={item.id} className="transition-colors hover:bg-primary-50/35">
-                  <td className="px-5 py-3.5">
-                    <p className="font-medium text-neutral-800">{item.productName}</p>
-                  </td>
+                  <td className="px-5 py-3.5"><p className="font-medium text-neutral-800">{item.productName}</p></td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.quantity}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{item.uom || '—'}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{formatCurrency(item.unitPrice)}</td>
@@ -274,8 +468,8 @@ export default function QuotationDetail() {
         <Card title="Customer & Delivery">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Customer</p>
-              <p className="mt-1 text-sm font-medium text-neutral-800">{quotation.customerName || '—'}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">{entityLabel || 'Customer / Prospect'}</p>
+              <p className="mt-1 text-sm font-medium text-neutral-800">{entityName}</p>
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Billing Address</p>
@@ -290,54 +484,56 @@ export default function QuotationDetail() {
 
         <Card title="Quotation Information">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Quotation Date</p>
-              <p className="mt-1 text-sm text-neutral-800">{formatDate(quotation.quotationDate)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Valid Until</p>
-              <p className="mt-1 text-sm text-neutral-800">{formatDate(quotation.validUntil)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Salesperson</p>
-              <p className="mt-1 text-sm text-neutral-800">{quotation.salespersonName || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Currency</p>
-              <p className="mt-1 text-sm text-neutral-800">{quotation.currency || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Payment Terms</p>
-              <p className="mt-1 text-sm text-neutral-800">{quotation.paymentTerms || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Delivery Terms</p>
-              <p className="mt-1 text-sm text-neutral-800">{quotation.deliveryTerms || '—'}</p>
-            </div>
+            <Info label="Quotation Date" value={formatDate(quotation.quotationDate)} />
+            <Info label="Valid Until" value={formatDate(quotation.validUntil)} />
+            <Info label="Salesperson" value={quotation.salespersonName || '—'} />
+            <Info label="Currency" value={quotation.currency || '—'} />
+            <Info label="Payment Terms" value={quotation.paymentTerms || '—'} />
+            <Info label="Delivery Terms" value={quotation.deliveryTerms || '—'} />
           </div>
         </Card>
       </div>
 
-      {(quotation.notes || quotation.termsConditions) && (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          {quotation.notes && (
-            <Card title="Notes" subtitle="Internal remarks, not printed on the quotation">
-              <p className="text-sm leading-6 text-neutral-700">{quotation.notes}</p>
-            </Card>
-          )}
-          {quotation.termsConditions && (
-            <Card title="Terms & Conditions" subtitle="Printed on the quotation">
-              <p className="text-sm leading-6 text-neutral-700">{quotation.termsConditions}</p>
-            </Card>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="space-y-5">
+          {(quotation.notes || quotation.termsConditions) && (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              {quotation.notes && (
+                <Card title="Notes" subtitle="Internal — not printed on the customer quotation">
+                  <p className="text-sm leading-6 text-neutral-700">{quotation.notes}</p>
+                </Card>
+              )}
+              {quotation.termsConditions && (
+                <Card title="Terms & Conditions" subtitle="Printed on the customer quotation PDF">
+                  <p className="text-sm leading-6 text-neutral-700">{quotation.termsConditions}</p>
+                </Card>
+              )}
+            </div>
           )}
         </div>
-      )}
+
+        <Card title="Activity">
+          {timeline.length === 0 ? (
+            <p className="text-sm text-neutral-400">No activity yet.</p>
+          ) : (
+            <div>
+              {timeline.map((event, index) => (
+                <TimelineItem key={event.id} {...event} isLast={index === timeline.length - 1} />
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
       <Modal isOpen={convertOpen} onClose={() => !isConverting && setConvertOpen(false)} title="Convert to Sales Order">
         <div className="space-y-4">
           {convertError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{convertError}</div>
           )}
+          <p className="text-sm text-neutral-500">
+            The order inherits this quotation's customer, products, quantities, pricing, discounts, taxes,
+            salesperson, addresses and reference — you only set the fields below.
+          </p>
           <Select
             label="Warehouse"
             options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
@@ -364,6 +560,13 @@ export default function QuotationDetail() {
         </div>
       </Modal>
 
+      <ConvertLeadModal
+        isOpen={convertLeadOpen}
+        onClose={() => setConvertLeadOpen(false)}
+        leadId={meta?.leadId || ''}
+        onConverted={handleLeadConverted}
+      />
+
       <Modal isOpen={deleteOpen} onClose={() => !isDeleting && setDeleteOpen(false)} title="Delete Quotation">
         <div className="space-y-5">
           <p className="text-sm leading-6 text-neutral-600">Delete {quotation.quotationNumber}? This cannot be undone.</p>
@@ -376,6 +579,24 @@ export default function QuotationDetail() {
           </div>
         </div>
       </Modal>
+    </div>
+  )
+}
+
+function SummaryTile({ label, value, strong }) {
+  return (
+    <div className={`rounded-2xl border p-4 shadow-(--shadow-card) ${strong ? 'border-primary-100 bg-primary-50/60' : 'border-neutral-100 bg-white'}`}>
+      <p className="text-xs font-medium text-neutral-400">{label}</p>
+      <p className={`mt-1.5 font-semibold ${strong ? 'text-lg text-primary-900' : 'text-base text-neutral-900'}`}>{value}</p>
+    </div>
+  )
+}
+
+function Info({ label, value }) {
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">{label}</p>
+      <p className="mt-1 text-sm text-neutral-800">{value}</p>
     </div>
   )
 }

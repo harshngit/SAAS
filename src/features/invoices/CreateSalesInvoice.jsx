@@ -12,20 +12,12 @@ import { createInvoice, invoiceOrder, listInvoices } from '../../api/invoices'
 import { listCustomers } from '../../api/customers'
 import { getDelivery, listDeliveries } from '../../api/deliveries'
 import { listOrders, getOrder } from '../../api/orders'
+import { ORDER_STATUS_VARIANT, formatOrderStatus, getDeliveryStatus } from '../orders/orderHelpers'
 import { listProducts } from '../../api/products'
 import { listWarehouses } from '../../api/warehouses'
 import { getSalesWorkflowSettings } from '../../api/settings'
 import { formatCurrency } from '../../utils/format'
 import { getPaymentMethodFlags, sanitizePaymentDetails } from '../payments/paymentMethodUtils'
-
-const orderStatusBadgeVariant = {
-  draft: 'neutral',
-  placed: 'info',
-  awaiting_approval: 'warning',
-  processing: 'primary',
-  completed: 'success',
-  cancelled: 'danger',
-}
 
 function formatOrderDate(value) {
   if (!value) return '—'
@@ -538,10 +530,8 @@ function FromOrderFlow({ onBack }) {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold text-neutral-900">{order.orderNumber}</p>
-                      <Badge variant={orderStatusBadgeVariant[order.status] || 'neutral'}>{order.status.replace(/_/g, ' ')}</Badge>
-                      <Badge variant={order.fulfilmentStatus === 'delivered' ? 'success' : 'warning'}>
-                        {order.fulfilmentStatus.replace(/_/g, ' ')}
-                      </Badge>
+                      <Badge variant={ORDER_STATUS_VARIANT[order.status] || 'neutral'}>{formatOrderStatus(order.status)}</Badge>
+                      <Badge variant={getDeliveryStatus(order).variant}>{getDeliveryStatus(order).label}</Badge>
                     </div>
                     <p className="mt-1 text-xs text-neutral-400">
                       {formatOrderDate(order.orderDate)} · Total {formatCurrency(order.total)} · Delivered {deliveredQty}

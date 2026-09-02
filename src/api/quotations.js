@@ -228,6 +228,27 @@ export async function updateQuotationStatus(quotationId, status) {
   }
 }
 
+// Minimal PATCH that only links a customer to a quotation (used after a lead quotation's
+// lead is converted to a customer, so the quote can then become an order). Sends just
+// customer_id - the QuotationUpdate schema is all-optional, so items/status are untouched.
+export async function linkQuotationCustomer(quotationId, customerId) {
+  try {
+    const { data } = await apiClient.patch(`/quotations/${quotationId}`, { customer_id: customerId }, {
+      headers: authHeader(),
+    })
+
+    return { success: true, quotation: normalizeQuotation(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to link the customer to this quotation. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function convertQuotationToOrder(quotationId, payload = {}) {
   try {
     const requestBody = {}

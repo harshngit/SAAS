@@ -153,6 +153,14 @@ export default function AppRoutes() {
               </RequirePermissionRoute>
             }
           />
+          <Route
+            path="/admin/orders/:id/edit"
+            element={
+              <RequirePermissionRoute module="sales_orders" action="create">
+                <CreateSalesOrder />
+              </RequirePermissionRoute>
+            }
+          />
           <Route path="/admin/orders/:id" element={<OrderDetail />} />
           <Route path="/admin/company-settings" element={<CompanySettings />} />
           <Route path="/admin/plans" element={<AdminPlans />} />
@@ -207,6 +215,7 @@ export default function AppRoutes() {
           <Route path="/admin/leads/:id" element={<LeadDetail />} />
           <Route path="/admin/quotations" element={<QuotationList />} />
           <Route path="/admin/quotations/new" element={<QuotationFormPage />} />
+          <Route path="/admin/quotations/:id/edit" element={<QuotationFormPage />} />
           <Route path="/admin/quotations/:id" element={<QuotationDetail />} />
           <Route path="/admin/suppliers" element={<SupplierList />} />
           <Route path="/admin/suppliers/:id" element={<SupplierDetail />} />
@@ -254,10 +263,19 @@ export default function AppRoutes() {
           <Route path="/sales/leads/:id" element={<LeadDetail />} />
           <Route path="/sales/quotations" element={<QuotationList />} />
           <Route path="/sales/quotations/new" element={<QuotationFormPage />} />
+          <Route path="/sales/quotations/:id/edit" element={<QuotationFormPage />} />
           <Route path="/sales/quotations/:id" element={<QuotationDetail />} />
           <Route path="/sales/orders" element={<OrderList />} />
           <Route
             path="/sales/orders/create"
+            element={
+              <RequirePermissionRoute module="sales_orders" action="create">
+                <CreateSalesOrder />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
+            path="/sales/orders/:id/edit"
             element={
               <RequirePermissionRoute module="sales_orders" action="create">
                 <CreateSalesOrder />

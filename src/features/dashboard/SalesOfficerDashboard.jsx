@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  Ban,
   BellRing,
   Box,
   CalendarPlus,
@@ -23,6 +24,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useAuthStore } from '../../store/authStore'
 import { listCustomers } from '../../api/customers'
 import { listOrders } from '../../api/orders'
+import { ORDER_STATUS_VARIANT, formatOrderStatus } from '../orders/orderHelpers'
 import { listQuotations } from '../../api/quotations'
 import { getMyAttendance } from '../../api/attendance'
 import { visits } from '../../mockData/visits'
@@ -40,15 +42,6 @@ const visitStatusVariant = {
   Missed: 'danger',
 }
 
-const orderStatusVariant = {
-  draft: 'neutral',
-  placed: 'info',
-  awaiting_approval: 'warning',
-  processing: 'primary',
-  completed: 'success',
-  cancelled: 'danger',
-}
-
 const myVisits = visits.filter((visit) => visit.salesOfficerId === MOCK_VISITS_OFFICER_ID)
 
 function getGreeting() {
@@ -56,10 +49,6 @@ function getGreeting() {
   if (hour < 12) return 'Good Morning'
   if (hour < 17) return 'Good Afternoon'
   return 'Good Evening'
-}
-
-function formatStatusLabel(value = '') {
-  return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 function formatCheckInTime(value) {
@@ -246,15 +235,13 @@ export default function SalesOfficerDashboard() {
     (order) => (order.deliveryDate || '').slice(0, 10) === today && order.status !== 'cancelled',
   ).length
 
-  // order.status is the backend's normalized public value: placed/confirmed/completed/
-  // cancelled only (draft/awaiting_approval collapse into "placed", the old "processing" now
-  // shows as "confirmed") - "Draft" is no longer separable from "Placed", so that tile now
-  // tracks Cancelled instead, the one other real bucket the API still distinguishes.
+  // Finalized Order Status: Draft / Confirmed / Completed / Cancelled. The backend still
+  // returns `placed` for the unconfirmed state - shown as "Draft" in the UI.
   const orderStatusCounts = {
-    cancelled: orders.filter((order) => order.status === 'cancelled').length,
-    placed: orders.filter((order) => order.status === 'placed').length,
-    processing: orders.filter((order) => order.status === 'confirmed').length,
+    draft: orders.filter((order) => order.status === 'placed' || order.status === 'draft').length,
+    confirmed: orders.filter((order) => order.status === 'confirmed').length,
     completed: orders.filter((order) => order.status === 'completed').length,
+    cancelled: orders.filter((order) => order.status === 'cancelled').length,
   }
 
   const upcomingVisits = [...myVisits].sort((a, b) => (a.date < b.date ? -1 : 1)).slice(0, 3)
@@ -355,10 +342,10 @@ export default function SalesOfficerDashboard() {
 
         <SectionCard icon={ShoppingCart} title="Order Status">
           <div className="flex gap-3">
-            <OrderStatusTile icon={FileText} iconClassName="bg-neutral-100 text-neutral-500" label="Cancelled" count={orderStatusCounts.cancelled} />
-            <OrderStatusTile icon={CheckCircle2} iconClassName="bg-green-50 text-green-600" label="Placed" count={orderStatusCounts.placed} />
-            <OrderStatusTile icon={Truck} iconClassName="bg-blue-50 text-blue-600" label="Confirmed" count={orderStatusCounts.processing} />
+            <OrderStatusTile icon={FileText} iconClassName="bg-neutral-100 text-neutral-500" label="Draft" count={orderStatusCounts.draft} />
+            <OrderStatusTile icon={CheckCircle2} iconClassName="bg-blue-50 text-blue-600" label="Confirmed" count={orderStatusCounts.confirmed} />
             <OrderStatusTile icon={Box} iconClassName="bg-emerald-50 text-emerald-600" label="Completed" count={orderStatusCounts.completed} />
+            <OrderStatusTile icon={Ban} iconClassName="bg-red-50 text-red-600" label="Cancelled" count={orderStatusCounts.cancelled} />
           </div>
           <button
             type="button"
@@ -436,7 +423,7 @@ export default function SalesOfficerDashboard() {
                     <td className="py-3 pr-3 text-neutral-500">{order.customerName}</td>
                     <td className="whitespace-nowrap py-3 pr-3 text-right font-medium text-neutral-900">{formatCurrency(order.total)}</td>
                     <td className="whitespace-nowrap py-3 pr-3">
-                      <Badge variant={orderStatusVariant[order.status] || 'neutral'} dot>{formatStatusLabel(order.status)}</Badge>
+                      <Badge variant={ORDER_STATUS_VARIANT[order.status] || 'neutral'} dot>{formatOrderStatus(order.status)}</Badge>
                     </td>
                     <td className="whitespace-nowrap py-3 text-right">
                       <button type="button" className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700" aria-label="More actions">

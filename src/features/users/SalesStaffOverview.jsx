@@ -2,6 +2,7 @@ import { Box, Clock, IndianRupee, MapPin, RefreshCw, Timer, Users } from 'lucide
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link } from 'react-router-dom'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import { formatOrderStatus } from '../orders/orderHelpers'
 import { formatTimeLabel } from '../attendance/attendanceUtils'
 import {
   CurrentLocationPanel,
@@ -152,7 +153,7 @@ export function SalesStaffOverviewPanels({
                   className="flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3.5 py-2.5 text-sm transition-colors hover:border-primary-200 hover:bg-primary-50/40"
                 >
                   <span className="min-w-0 truncate font-medium text-neutral-800">{order.order_number || order.id}</span>
-                  <span className="shrink-0 text-xs text-neutral-400">{order.status || '—'}</span>
+                  <span className="shrink-0 text-xs text-neutral-400">{order.status ? formatOrderStatus(order.status) : '—'}</span>
                 </Link>
               ))}
             </div>
