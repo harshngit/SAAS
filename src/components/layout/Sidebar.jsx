@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowRight,
+  ClipboardCheck,
   Crown,
   Droplet,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
   Receipt,
   Settings,
   Sparkles,
+  Truck,
   UserCog,
   Warehouse,
   X,
@@ -23,7 +25,7 @@ import { roleMenus, roleLabels, ROLES } from '../../auth/roles'
 import { usePermission } from '../../auth/usePermission'
 import { listSuperAdminOrganizations } from '../../api/superadmin'
 import { getMyAttendance } from '../../api/attendance'
-import { formatTimeLabel, normalizeAttendanceRecord } from '../../features/attendance/attendanceUtils'
+import { durationLabel, formatTimeLabel, normalizeAttendanceRecord } from '../../features/attendance/attendanceUtils'
 
 const NAV_BADGE_COUNTS = {
   '/superadmin/upgrade-requests': 'pendingUpgrades',
@@ -33,7 +35,9 @@ const sectionIcons = {
   Overview: LayoutDashboard,
   'Sales Operation': Package,
   Operations: Warehouse,
+  'Delivery Operations': Truck,
   Finance: Receipt,
+  'My Work': ClipboardCheck,
   Administration: UserCog,
   System: Settings,
   'Main menu': BarChart3,
@@ -290,16 +294,14 @@ export default function Sidebar({
                       {keepMenuAlwaysOpen ? (
                         <>
                           <div
-                            className={`hidden items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 md:flex ${
+                            className={`hidden items-center overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 md:flex ${
                               isExpanded ? sectionLabelVisibilityClass : 'invisible h-0 max-w-0 pb-0 opacity-0'
                             }`}
                           >
-                            <span className="truncate">MAIN MENU</span>
-                            <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
+                            <span className="truncate">{group.section}</span>
                           </div>
-                          <div className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 md:hidden">
-                            <span>MAIN MENU</span>
-                            <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
+                          <div className="flex w-full items-center rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 md:hidden">
+                            <span>{group.section}</span>
                           </div>
                         </>
                       ) : (
@@ -397,25 +399,34 @@ export default function Sidebar({
           })}
         </nav>
 
-        {showDeliveryCheckInCard && !isLoadingAttendance && (
+        {showDeliveryCheckInCard && !isLoadingAttendance && (() => {
+          const lifecycle = todaysAttendance?.lifecycle || 'not_checked_in'
+          const isCheckedOut = lifecycle === 'checked_out'
+          const isCheckedIn = lifecycle === 'checked_in'
+          const cardTitle = isCheckedOut ? 'Checked out for today' : isCheckedIn ? "You're checked in" : 'Not checked in yet'
+          const cardSub = isCheckedOut
+            ? durationLabel(todaysAttendance.checkIn, todaysAttendance.checkOut)
+              ? `Worked ${durationLabel(todaysAttendance.checkIn, todaysAttendance.checkOut)}`
+              : 'Attendance complete'
+            : isCheckedIn
+              ? `Since ${formatTimeLabel(todaysAttendance.checkIn)}`
+              : 'No check-in recorded today'
+          const activeState = isCheckedIn || isCheckedOut
+          return (
           <div className="px-3 pb-3">
             {isExpanded ? (
-              <div className="max-w-[11rem] rounded-2xl bg-white px-4 py-4 shadow-[0_12px_26px_-20px_rgb(15_23_42/0.22)]">
+              <div className="max-w-full rounded-2xl bg-white px-4 py-4 shadow-[0_12px_26px_-20px_rgb(15_23_42/0.22)]">
                 <div className="flex items-start gap-3">
                   <span
                     className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-white ${
-                      todaysAttendance?.checkIn ? 'bg-primary-700' : 'bg-neutral-300'
+                      isCheckedIn ? 'bg-primary-700' : activeState ? 'bg-neutral-400' : 'bg-neutral-300'
                     }`}
                   >
                     <CheckCircle2 className="size-4" aria-hidden="true" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold leading-tight text-neutral-900">
-                      {todaysAttendance?.checkIn ? "You're checked in" : 'Not checked in yet'}
-                    </p>
-                    <p className="mt-0.5 text-xs text-neutral-500">
-                      {todaysAttendance?.checkIn ? `Since ${formatTimeLabel(todaysAttendance.checkIn)}` : 'No check-in recorded today'}
-                    </p>
+                    <p className="text-sm font-semibold leading-tight text-neutral-900">{cardTitle}</p>
+                    <p className="mt-0.5 text-xs text-neutral-500">{cardSub}</p>
                   </div>
                 </div>
                 <button
@@ -433,10 +444,10 @@ export default function Sidebar({
               <button
                 type="button"
                 onClick={() => navigate('/delivery/attendance')}
-                aria-label={todaysAttendance?.checkIn ? `Checked in since ${formatTimeLabel(todaysAttendance.checkIn)}` : 'Not checked in yet'}
-                title={todaysAttendance?.checkIn ? `Checked in since ${formatTimeLabel(todaysAttendance.checkIn)}` : 'Not checked in yet'}
+                aria-label={`${cardTitle}${cardSub ? ` — ${cardSub}` : ''}`}
+                title={`${cardTitle}${cardSub ? ` — ${cardSub}` : ''}`}
                 className={`hidden size-9 w-full items-center justify-center rounded-2xl ring-1 transition-colors md:flex ${
-                  todaysAttendance?.checkIn
+                  isCheckedIn
                     ? 'bg-primary-50 text-primary-700 ring-primary-100 hover:bg-primary-100'
                     : 'bg-neutral-100 text-neutral-500 ring-neutral-200 hover:bg-neutral-200'
                 }`}
@@ -445,7 +456,8 @@ export default function Sidebar({
               </button>
             )}
           </div>
-        )}
+          )
+        })()}
 
         {showUpgradeCard && (
         <div className="border-t border-neutral-100 p-3">

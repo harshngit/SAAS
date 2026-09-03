@@ -54,13 +54,20 @@ const OIL = { productId: 'demo-p-oil', productName: 'Sunflower Oil 1L', uom: 'bo
 const FLOUR = { productId: 'demo-p-flour', productName: 'Wheat Flour 5kg', uom: 'bag', unitPrice: 335, taxRate: 5 }
 const SUGAR = { productId: 'demo-p-sugar', productName: 'Sugar 5kg', uom: 'bag', unitPrice: 260, taxRate: 5 }
 
-// Honest demo vehicle stock for the Delivery-Partner "+ Add Product" picker (§10).
-// Only referenced for demo delivery ids - real deliveries always use the real API.
+// Honest demo vehicle stock for the Delivery-Partner "+ Add Product" picker (§10) and the
+// read-only Vehicle Stock page. Represents a mid-day session: some units already delivered,
+// Wheat Flour fully consumed (Out of Stock). Only referenced for demo delivery ids -
+// real deliveries always use the real API.
 export const DEMO_VEHICLE_STOCK = [
-  { productId: RICE.productId, productName: RICE.productName, loadedQuantity: 20, extraQuantity: 0, deliveredQuantity: 0, returnedQuantity: 0, remainingQuantity: 20 },
-  { productId: OIL.productId, productName: OIL.productName, loadedQuantity: 12, extraQuantity: 0, deliveredQuantity: 0, returnedQuantity: 0, remainingQuantity: 12 },
-  { productId: FLOUR.productId, productName: FLOUR.productName, loadedQuantity: 0, extraQuantity: 0, deliveredQuantity: 0, returnedQuantity: 0, remainingQuantity: 0 },
+  { productId: RICE.productId, productName: RICE.productName, sku: 'RICE-10KG', variantId: '', uom: RICE.uom, loadedQuantity: 20, extraQuantity: 0, deliveredQuantity: 8, returnedQuantity: 0, remainingQuantity: 12 },
+  { productId: OIL.productId, productName: OIL.productName, sku: 'OIL-1L', variantId: '', uom: OIL.uom, loadedQuantity: 12, extraQuantity: 0, deliveredQuantity: 5, returnedQuantity: 0, remainingQuantity: 7 },
+  { productId: SUGAR.productId, productName: SUGAR.productName, sku: 'SUGAR-5KG', variantId: '', uom: SUGAR.uom, loadedQuantity: 10, extraQuantity: 0, deliveredQuantity: 6, returnedQuantity: 2, remainingQuantity: 2 },
+  { productId: FLOUR.productId, productName: FLOUR.productName, sku: 'FLOUR-5KG', variantId: '', uom: FLOUR.uom, loadedQuantity: 5, extraQuantity: 0, deliveredQuantity: 5, returnedQuantity: 0, remainingQuantity: 0 },
 ]
+
+// A stand-in POD photo (inline SVG data URI - no network). Used only by demo deliveries.
+export const DEMO_POD_PHOTO =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Crect width='240' height='240' fill='%23d1d5db'/%3E%3Ctext x='120' y='124' font-family='sans-serif' font-size='15' fill='%23374151' text-anchor='middle'%3EDemo POD photo%3C/text%3E%3C/svg%3E"
 
 const DAY_MS = 86_400_000
 const iso = (days, hour = 10) => {
@@ -100,8 +107,11 @@ function line(overrides) {
 
 function order({
   key, number, customer, status, fulfilmentStatus = 'not_started', method = 'delivery',
-  pickupStatus = 'not_started', partnerId, deliveryPickingStatus, deliveryVehicle, quotation,
+  pickupStatus = 'not_started', partnerId, deliveryPickingStatus, deliveryAccepted = false,
+  deliveryFailed = false, deliveryRejected = false, deliveryRejectReason = '',
+  deliveryVehicle, quotation,
   deliveryId, invoiceId, rejectReason, notes, items, previousBalance = 0,
+  collectedAmount = 0, collectedFull = false, deliveryPod = null,
 }) {
   const c = CUSTOMERS[customer]
   const partner = DEMO_DELIVERY_PARTNERS.find((p) => p.id === partnerId) || null
@@ -112,8 +122,15 @@ function order({
     orderNumber: number,
     status,
     fulfilmentStatus,
-    // demo-only hint consumed by getOrderProgress / buildOrderTimeline
+    // demo-only hints consumed by getOrderProgress / buildOrderTimeline / the demo delivery builder
     deliveryPickingStatus: deliveryPickingStatus || null,
+    deliveryAccepted,
+    deliveryFailed,
+    deliveryRejected,
+    deliveryRejectReason,
+    collectedAmount,
+    collectedFull,
+    deliveryPod,
     customerId: `demo-customer-${customer}`,
     customerName: c.name,
     customerPhone: c.phone,
@@ -175,19 +192,33 @@ export const demoOrders = [
     key: 'reserved', number: 'SO-DEMO-02', customer: 'metro', status: 'confirmed', fulfilmentStatus: 'reserved',
     items: [line({ id: 'i1', ...RICE, quantity: 18 }), line({ id: 'i2', ...SUGAR, quantity: 12 })],
   }),
-  // C. Delivery Assigned - partner assigned, delivery not yet picking. From a customer quotation.
+  // C. Delivery Assigned - partner assigned, delivery not yet accepted. From a customer quotation.
   order({
     key: 'assigned', number: 'SO-DEMO-03', customer: 'aarav', status: 'confirmed', fulfilmentStatus: 'planned',
     partnerId: 'demo-dp-ravi', deliveryId: 'demo-dlv-assigned', deliveryVehicle: 'MH-12-AB-4521',
     quotation: { id: 'demo-qt-accepted-customer', number: 'QT-DEMO-A1' },
     items: [line({ id: 'i1', ...FLOUR, quantity: 40 })],
   }),
+  // C2. Accepted - partner accepted the delivery, picking not started (dashboard "Accepted" tile).
+  order({
+    key: 'accepted-only', number: 'SO-DEMO-17', customer: 'royal', status: 'confirmed', fulfilmentStatus: 'planned',
+    partnerId: 'demo-dp-ravi', deliveryId: 'demo-dlv-accepted-only', deliveryVehicle: 'MH-12-AB-4521',
+    deliveryAccepted: true,
+    items: [line({ id: 'i1', ...FLOUR, quantity: 8 })],
+  }),
+  // C3. Picked, waiting to be loaded - second loadable group for the Vehicle Loading page.
+  order({
+    key: 'accepted', number: 'SO-DEMO-15', customer: 'metro', status: 'confirmed', fulfilmentStatus: 'planned',
+    partnerId: 'demo-dp-ravi', deliveryId: 'demo-dlv-accepted', deliveryVehicle: 'MH-12-AB-4521',
+    deliveryPickingStatus: 'picked',
+    items: [line({ id: 'i1', ...SUGAR, quantity: 16 })],
+  }),
   // D. Picking - delivery assigned and currently picking (§6 D, drives the new "Picking" step).
   order({
     key: 'picking', number: 'SO-DEMO-04', customer: 'green', status: 'confirmed', fulfilmentStatus: 'planned',
     partnerId: 'demo-dp-ravi', deliveryId: 'demo-dlv-picking', deliveryVehicle: 'MH-12-AB-4521',
     deliveryPickingStatus: 'picking',
-    items: [line({ id: 'i1', ...RICE, quantity: 12 }), line({ id: 'i2', ...OIL, quantity: 24 })],
+    items: [line({ id: 'i1', ...RICE, quantity: 12, availableStock: 8 }), line({ id: 'i2', ...OIL, quantity: 24 })],
   }),
   // E. Vehicle Loaded.
   order({
@@ -196,26 +227,31 @@ export const demoOrders = [
     deliveryPickingStatus: 'picked',
     items: [line({ id: 'i1', ...RICE, quantity: 50 })],
   }),
-  // F. In Transit.
+  // F. In Transit — also the delivery-adjustment demo: Aarav Distributors ordered Rice 10kg x 10,
+  // the van carries Rice 20 / Oil 12, so the partner can bump Rice 10 -> 15 and add Sunflower Oil.
   order({
-    key: 'transit', number: 'SO-DEMO-06', customer: 'balaji', status: 'confirmed', fulfilmentStatus: 'in_transit',
+    key: 'transit', number: 'SO-DEMO-06', customer: 'aarav', status: 'confirmed', fulfilmentStatus: 'in_transit',
     partnerId: 'demo-dp-sunil', deliveryId: 'demo-dlv-transit', deliveryVehicle: 'MH-14-CD-7824',
     deliveryPickingStatus: 'picked',
     items: [line({ id: 'i1', ...RICE, quantity: 10 })],
     notes: 'Adjustment demo: partner carries extra Rice + Oil on the van.',
   }),
-  // G. Delivered - final delivered quantities visible, no invoice yet (tests Create Invoice).
+  // G. Delivered - no invoice yet (tests Create Invoice) + a previous pending balance so the
+  // Collection section shows Order Amount / Previous Pending / Total Due and the partner can
+  // record a part-collection against an outstanding receivable (§10: Delivered != fully paid).
   order({
     key: 'delivered', number: 'SO-DEMO-07', customer: 'metro', status: 'confirmed', fulfilmentStatus: 'delivered',
     partnerId: 'demo-dp-sunil', deliveryId: 'demo-dlv-delivered', deliveryVehicle: 'MH-14-CD-7824',
-    deliveryPickingStatus: 'picked',
-    items: [line({ id: 'i1', ...RICE, quantity: 30, deliveredQuantity: 30 })],
+    deliveryPickingStatus: 'picked', previousBalance: 3000,
+    items: [line({ id: 'i1', ...RICE, quantity: 20, deliveredQuantity: 20 })],
   }),
-  // H. Completed - delivered + invoice created + order completed.
+  // H. Completed - delivered + invoice created + order completed. Fully collected + POD photos
+  // uploaded (POD "uploaded" + "fully collected" demo).
   order({
     key: 'completed', number: 'SO-DEMO-08', customer: 'aarav', status: 'completed', fulfilmentStatus: 'delivered',
     partnerId: 'demo-dp-ravi', deliveryId: 'demo-dlv-completed', invoiceId: 'demo-inv-completed',
-    deliveryPickingStatus: 'picked',
+    deliveryPickingStatus: 'picked', collectedFull: true,
+    deliveryPod: { photo_file_ids: [DEMO_POD_PHOTO, DEMO_POD_PHOTO], signature_file_id: '' },
     items: [line({ id: 'i1', ...FLOUR, quantity: 75, deliveredQuantity: 75 })],
   }),
   // I. Cancelled before delivery - no active fulfilment.
@@ -251,12 +287,31 @@ export const demoOrders = [
     items: [line({ id: 'i1', ...RICE, quantity: 10, reservedQuantity: 0, availableStock: 6 })],
     notes: 'Internal: only 6 of the 10 units required are in stock.',
   }),
-  // N. Partial Delivery (exception outcome, not a primary stage).
+  // N. Partial Delivery (exception outcome, not a primary stage). Part-collected against the
+  // delivered value (Collection = "Partially Collected" demo).
   order({
     key: 'partial', number: 'SO-DEMO-14', customer: 'green', status: 'confirmed', fulfilmentStatus: 'partially_delivered',
     partnerId: 'demo-dp-sunil', deliveryId: 'demo-dlv-partial', deliveryVehicle: 'MH-14-CD-7824',
-    deliveryPickingStatus: 'picked',
+    deliveryPickingStatus: 'picked', collectedAmount: 1500,
     items: [line({ id: 'i1', ...FLOUR, quantity: 10, deliveredQuantity: 6, reservedQuantity: 10 })],
+  }),
+  // O. Failed delivery attempt (exception - needs a re-attempt). Order stays Confirmed,
+  // fulfilment is back to planned pending the next attempt.
+  order({
+    key: 'failed', number: 'SO-DEMO-16', customer: 'royal', status: 'confirmed', fulfilmentStatus: 'planned',
+    partnerId: 'demo-dp-sunil', deliveryId: 'demo-dlv-failed', deliveryVehicle: 'MH-14-CD-7824',
+    deliveryFailed: true,
+    items: [line({ id: 'i1', ...OIL, quantity: 30 })],
+    notes: 'Customer unavailable at the address — needs a re-attempt.',
+  }),
+  // P. Rejected delivery - the partner declined the assignment (order stays Confirmed so the
+  // office can reassign). Off-flow: no operational progression.
+  order({
+    key: 'rejected', number: 'SO-DEMO-18', customer: 'royal', status: 'confirmed', fulfilmentStatus: 'planned',
+    partnerId: 'demo-dp-ravi', deliveryId: 'demo-dlv-rejected', deliveryVehicle: 'MH-12-AB-4521',
+    deliveryRejected: true, deliveryRejectReason: 'Vehicle breakdown — cannot run this route today.',
+    items: [line({ id: 'i1', ...OIL, quantity: 12 })],
+    notes: 'Partner rejected the assignment; awaiting reassignment by the office.',
   }),
 ]
 
@@ -469,12 +524,19 @@ export function buildDemoDelivery(order) {
 // consistent. Never hits the API - `getDemoDelivery` is used in place of it.
 // =============================================================================
 function publicDeliveryStatus(order) {
+  if (order.deliveryRejected) return 'rejected' // -> getDeliveryStage() => "Rejected"
+  if (order.deliveryFailed) return 'returned' // -> getDeliveryStage() => "Failed"
   const fs = order.fulfilmentStatus
   if (fs === 'delivered') return 'delivered'
   if (fs === 'partially_delivered') return 'partially_delivered'
   if (fs === 'in_transit') return 'in_transit'
   if (fs === 'loaded') return 'in_transit' // internal loaded surfaces as public in_transit
-  return 'accepted' // planned / picking
+  // planned: still awaiting the partner's Accept unless it is accepted / picking already.
+  // planned + not accepted -> public `pending` -> getDeliveryStage() => "Assigned" (Accept/Reject).
+  // planned + accepted     -> public `accepted` (+ pickingStatus not_started) => "Accepted".
+  // planned + picking       -> public `accepted` (+ pickingStatus picking) => "Picking".
+  if (order.deliveryAccepted || ['picking', 'picked'].includes(order.deliveryPickingStatus)) return 'accepted'
+  return 'pending'
 }
 
 function pickingStatusFor(order) {
@@ -502,6 +564,8 @@ export function buildDemoDeliveryRecord(deliveryId) {
       variantId: '',
       productName: it.productName,
       unitPrice: it.unitPrice,
+      uom: it.uom || 'unit',
+      warehouseAvailable: it.availableStock ?? null,
       plannedQuantity: planned,
       pickedQuantity: pickingStatusFor(order) === 'picked' ? planned : (pickingStatusFor(order) === 'picking' ? planned : 0),
       loadedQuantity: loadedLike ? planned : 0,
@@ -551,22 +615,48 @@ export function buildDemoDeliveryRecord(deliveryId) {
     dispatchedAt: dispatched ? iso(-1) : null,
     dispatchedById: dispatched ? partner.id : '',
     confirmedAt: done ? iso(0) : null,
-    failureReason: '',
+    failureReason: order.deliveryRejected
+      ? order.deliveryRejectReason || 'Delivery rejected by the partner.'
+      : order.deliveryFailed
+        ? 'Customer unavailable at the address — re-attempt required.'
+        : '',
     receiverName: done ? order.customerName : '',
     notes: order.notes || '',
     items,
     plannedTotal,
     loadedTotal,
     deliveredTotal,
-    amountDue: done ? Math.round(order.total) : 0,
+    // Collection is operationally relevant once the goods reach the customer (In Transit ->
+    // Delivered) and no invoice has settled the order yet. `amountDue` is the CURRENT
+    // outstanding (order total + previous pending, minus anything collected via patchDemoDelivery).
+    amountDue:
+      ['in_transit', 'partially_delivered', 'delivered'].includes(fs) && !order.invoiceId
+        ? Math.round(order.total) + (order.previousPendingBalance || 0)
+        : 0,
+    collectedAmount: order.collectedFull
+      ? Math.round((order.total + (order.previousPendingBalance || 0)) * 100) / 100
+      : Number(order.collectedAmount) || 0,
     previousPendingBalance: order.previousPendingBalance || 0,
-    pod: null,
+    pod: order.deliveryPod || null,
     createdAt: order.createdAt,
     updatedAt: new Date().toISOString(),
   }
 
   const ov = readDeliveryOverrides()[deliveryId]
-  return ov ? { ...base, ...ov } : base
+  if (!ov) return base
+
+  const merged = { ...base, ...ov }
+  // Reflect a simulated Vehicle-Loading confirm on the line items so the Delivery Items
+  // table shows the loaded quantities too (not just the override's loadedTotal).
+  if (Array.isArray(ov.loadedItems) && ov.loadedItems.length) {
+    const loadedByProduct = new Map(ov.loadedItems.map((li) => [li.productId, Number(li.qty) || 0]))
+    merged.items = merged.items.map((item) =>
+      loadedByProduct.has(item.productId)
+        ? { ...item, loadedQuantity: loadedByProduct.get(item.productId), pickedQuantity: Math.max(item.pickedQuantity, loadedByProduct.get(item.productId)) }
+        : item,
+    )
+  }
+  return merged
 }
 
 export function getDemoDelivery(deliveryId) {
@@ -584,6 +674,77 @@ export function demoDeliveriesResolved() {
 // The demo order that a demo delivery belongs to (used to resolve locked order prices).
 export function getDemoOrderForDelivery(deliveryId) {
   return demoOrderForDelivery(deliveryId)
+}
+
+// ---- Demo vehicle stock ----------------------------------------------------------------
+// The consolidated onboard stock = the baseline van load + everything the Vehicle Loading
+// page (or Delivery Detail's "Mark Vehicle Loaded") has moved onto the van from demo
+// deliveries. Keeps Vehicle Loading / Vehicle Stock / Dashboard / Delivery Detail in sync.
+export function demoVehicleStockResolved() {
+  const byProduct = new Map()
+  DEMO_VEHICLE_STOCK.forEach((entry) => byProduct.set(entry.productId, { ...entry }))
+
+  Object.values(readDeliveryOverrides()).forEach((override) => {
+    ;(override.loadedItems || []).forEach((li) => {
+      const qty = Number(li.qty) || 0
+      if (qty <= 0) return
+      const current = byProduct.get(li.productId) || {
+        productId: li.productId,
+        productName: li.productName || li.productId,
+        sku: '',
+        variantId: '',
+        uom: 'unit',
+        loadedQuantity: 0,
+        extraQuantity: 0,
+        deliveredQuantity: 0,
+        returnedQuantity: 0,
+        remainingQuantity: 0,
+      }
+      current.loadedQuantity = (Number(current.loadedQuantity) || 0) + qty
+      current.remainingQuantity = (Number(current.remainingQuantity) || 0) + qty
+      byProduct.set(li.productId, current)
+    })
+  })
+
+  return [...byProduct.values()]
+}
+
+// A full normalizeSession()-shaped demo vehicle-stock session for the read-only Vehicle
+// Stock page. Vehicle / driver / warehouse context matches the shared demo delivery records.
+export function demoVehicleSessionResolved() {
+  const partner = DEMO_DELIVERY_PARTNERS[0]
+  return {
+    id: 'demo-vss-1',
+    deliveryPartnerId: partner.id,
+    deliveryPartnerName: partner.name,
+    vehicleId: 'demo-veh-1',
+    vehicleNumber: 'MH-12-AB-4521',
+    vehicleType: 'Tempo',
+    vehicleCapacityKg: 1500,
+    warehouseId: 'demo-wh-main',
+    warehouseName: 'Main Warehouse',
+    date: iso(0),
+    lastLoadedAt: iso(0, 7),
+    status: 'active',
+    items: demoVehicleStockResolved(),
+    isDemo: true,
+  }
+}
+
+// Simulate the Vehicle Loading confirm for a demo delivery: it reaches "Vehicle Loaded" and
+// its picked items are added to the demo van stock. Local only - no API call.
+export function simulateDemoVehicleLoad(deliveryId, loadedItems = []) {
+  if (!isDemoDelivery(deliveryId)) return
+  const clean = loadedItems
+    .map((li) => ({ productId: li.productId, productName: li.productName || '', qty: Math.max(0, Math.round(Number(li.qty) || 0)) }))
+    .filter((li) => li.productId && li.qty > 0)
+  patchDemoDelivery(deliveryId, {
+    status: 'in_transit', // internal loaded -> public in_transit, no dispatchedAt -> stage "Vehicle Loaded"
+    pickingStatus: 'picked',
+    dispatchedAt: null,
+    loadedTotal: clean.reduce((sum, li) => sum + li.qty, 0),
+    loadedItems: clean,
+  })
 }
 
 // The locked order pricing map (productId -> {unitPrice, discountPercent, taxRate}) for a

@@ -27,6 +27,40 @@ const WORKSPACE_MODULES = {
 }
 const MAPPED_MODULE_KEYS = new Set(Object.values(WORKSPACE_MODULES).flat())
 
+// Some actions never make sense for a module inside a given workspace. The matrix renders
+// those cells as an inert "—" so an admin can't grant a permission the role should never
+// use (e.g. a Delivery role approving its own expense claims). This is a frontend guard
+// only - the backend permission catalog and role API are unchanged; the same module
+// (`expenses`, `leaves`, `attendance`) is still canonical, just with workspace-appropriate
+// actions. Finance keeps the full action set for these modules.
+const WORKSPACE_MODULE_ACTION_DENY = {
+  delivery: {
+    // Delivery Partner self-service: view + create, and cancel-own-pending via delete.
+    // `download` is denied because no expenses.download check exists in the app - receipts
+    // are viewed with a plain link - so the column would be a meaningless checkbox.
+    expenses: ['approve', 'export', 'edit', 'download'],
+    leaves: ['approve', 'export', 'edit', 'download'],
+    attendance: ['approve', 'export', 'edit', 'delete', 'download'],
+  },
+}
+
+function actionAllowed(workspace, moduleKey, actionKey) {
+  const denied = WORKSPACE_MODULE_ACTION_DENY[workspace]?.[moduleKey]
+  return !denied || !denied.includes(actionKey)
+}
+
+// The permission key stays canonical (`vehicle_stock`) but under Delivery it gates the whole
+// vehicle-operations family (Vehicle Stock + Vehicle Loading + End of Day Return), so the
+// matrix row is relabelled there to make the grant's real scope obvious.
+const workspaceModuleLabels = {
+  delivery: {
+    vehicle_stock: 'Vehicle Stock / Loading / Returns',
+  },
+}
+function moduleLabelFor(moduleKey, fallbackLabel, workspace) {
+  return workspaceModuleLabels[workspace]?.[moduleKey] || moduleLabelOverrides[moduleKey] || fallbackLabel
+}
+
 const DATA_SCOPES = [
   { value: 'own', label: 'Own Records', description: 'Only records assigned to this user.' },
   { value: 'team', label: 'Team Records', description: 'Records assigned to this user and their team.' },
@@ -112,13 +146,20 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
     [catalogModules, workspace],
   )
 
-  const isRowFullyChecked = (moduleKey) =>
-    catalogActions.length > 0 && catalogActions.every((action) => matrix[moduleKey]?.[action.key])
+  const allowedActionsFor = (moduleKey) => catalogActions.filter((action) => actionAllowed(workspace, moduleKey, action.key))
 
-  const isColumnFullyChecked = (actionKey) =>
-    visibleModules.length > 0 && visibleModules.every((module) => matrix[module.key]?.[actionKey])
+  const isRowFullyChecked = (moduleKey) => {
+    const allowed = allowedActionsFor(moduleKey)
+    return allowed.length > 0 && allowed.every((action) => matrix[moduleKey]?.[action.key])
+  }
+
+  const isColumnFullyChecked = (actionKey) => {
+    const applicable = visibleModules.filter((module) => actionAllowed(workspace, module.key, actionKey))
+    return applicable.length > 0 && applicable.every((module) => matrix[module.key]?.[actionKey])
+  }
 
   const toggleAction = (moduleKey, actionKey) => {
+    if (!actionAllowed(workspace, moduleKey, actionKey)) return
     setMatrix((current) => ({
       ...current,
       [moduleKey]: {
@@ -133,7 +174,7 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
     setMatrix((current) => ({
       ...current,
       [moduleKey]: catalogActions.reduce((actionsMap, action) => {
-        actionsMap[action.key] = nextValue
+        actionsMap[action.key] = actionAllowed(workspace, moduleKey, action.key) ? nextValue : false
         return actionsMap
       }, {}),
     }))
@@ -144,6 +185,7 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
     setMatrix((current) => {
       const next = { ...current }
       visibleModules.forEach((module) => {
+        if (!actionAllowed(workspace, module.key, actionKey)) return
         next[module.key] = { ...next[module.key], [actionKey]: nextValue }
       })
       return next
@@ -191,11 +233,14 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
     // Persist permissions for modules shown in the selected workspace.
     const permissions = visibleModules.reduce((result, module) => {
       const moduleActions = matrix[module.key] || {}
-      const hasAnyAction = catalogActions.some((action) => moduleActions[action.key])
+      const hasAnyAction = catalogActions.some(
+        (action) => actionAllowed(workspace, module.key, action.key) && moduleActions[action.key],
+      )
 
       if (hasAnyAction) {
         result[module.key] = catalogActions.reduce((actionsMap, action) => {
-          actionsMap[action.key] = Boolean(moduleActions[action.key])
+          actionsMap[action.key] =
+            actionAllowed(workspace, module.key, action.key) && Boolean(moduleActions[action.key])
           return actionsMap
         }, {})
       }
@@ -349,7 +394,7 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
               </thead>
               <tbody>
                 {visibleModules.map((module) => {
-                  const moduleLabel = moduleLabelOverrides[module.key] || module.label
+                  const moduleLabel = moduleLabelFor(module.key, module.label, workspace)
                   return (
                     <tr key={module.key} className="border-b border-neutral-50 last:border-b-0">
                       <td className="sticky left-0 z-10 bg-white px-4 py-3 font-medium text-neutral-900">{moduleLabel}</td>
@@ -364,13 +409,19 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
                       </td>
                       {catalogActions.map((action) => (
                         <td key={action.key} className="px-3 py-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(matrix[module.key]?.[action.key])}
-                            onChange={() => toggleAction(module.key, action.key)}
-                            aria-label={`${action.label} - ${moduleLabel}`}
-                            className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-                          />
+                          {actionAllowed(workspace, module.key, action.key) ? (
+                            <input
+                              type="checkbox"
+                              checked={Boolean(matrix[module.key]?.[action.key])}
+                              onChange={() => toggleAction(module.key, action.key)}
+                              aria-label={`${action.label} - ${moduleLabel}`}
+                              className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                            />
+                          ) : (
+                            <span className="text-neutral-300" title={`${action.label} does not apply to ${moduleLabel} in this workspace`} aria-hidden="true">
+                              —
+                            </span>
+                          )}
                         </td>
                       ))}
                     </tr>

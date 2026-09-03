@@ -20,7 +20,9 @@ import {
   ORDER_TABS,
   formatOrderStatus,
   getDeliveryStatus,
+  getFulfilmentLabel,
   getOrderActions,
+  isTakeawayOrder,
 } from './orderHelpers'
 import { DEMO_ORDERS_ENABLED, demoOrdersResolved, duplicateDemoOrder, isDemoOrder } from './orderDemoData'
 
@@ -190,7 +192,7 @@ export default function OrderList() {
           ) : paginatedOrders.length === 0 ? (
             <EmptyState icon={ShoppingCart} title="No orders match these filters" description="Try a different tab, source, or delivery partner." />
           ) : (
-            <table className="w-full min-w-280 text-left text-sm">
+            <table className="w-full min-w-7xl text-left text-sm">
               <thead>
                 <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
                   <th className="whitespace-nowrap px-4 py-3">Order #</th>
@@ -199,6 +201,7 @@ export default function OrderList() {
                   <th className="whitespace-nowrap px-4 py-3">Items</th>
                   <th className="whitespace-nowrap px-4 py-3">Total</th>
                   <th className="whitespace-nowrap px-4 py-3">Order Status</th>
+                  <th className="whitespace-nowrap px-4 py-3">Fulfilment</th>
                   <th className="whitespace-nowrap px-4 py-3">Delivery Status</th>
                   <th className="whitespace-nowrap px-4 py-3">Delivery Partner</th>
                   <th className="whitespace-nowrap px-4 py-3">Source</th>
@@ -208,6 +211,7 @@ export default function OrderList() {
               <tbody>
                 {paginatedOrders.map((order) => {
                   const delivery = getDeliveryStatus(order)
+                  const takeaway = isTakeawayOrder(order)
                   const actions = getOrderActions(order, { invoices: order.invoiceId ? [{ id: order.invoiceId }] : [] })
                   return (
                     <tr
@@ -229,13 +233,20 @@ export default function OrderList() {
                         <Badge variant={ORDER_STATUS_VARIANT[order.status] || 'neutral'}>{formatOrderStatus(order.status)}</Badge>
                       </td>
                       <td className="px-4 py-3.5">
-                        <Badge variant={delivery.variant}>{delivery.label}</Badge>
+                        <Badge variant={takeaway ? 'neutral' : 'info'}>{getFulfilmentLabel(order)}</Badge>
                       </td>
                       <td className="px-4 py-3.5">
-                        {order.assignedDeliveryPartnerName ? (
+                        {takeaway ? (
+                          <span className="text-neutral-400">—</span>
+                        ) : (
+                          <Badge variant={delivery.variant}>{delivery.label}</Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {takeaway ? (
+                          <span className="text-neutral-400">—</span>
+                        ) : order.assignedDeliveryPartnerName ? (
                           <span className="text-neutral-700">{order.assignedDeliveryPartnerName}</span>
-                        ) : order.fulfilmentMethod === 'pickup' ? (
-                          <span className="text-neutral-400">Self pickup</span>
                         ) : (
                           <span className="text-neutral-400">Unassigned</span>
                         )}

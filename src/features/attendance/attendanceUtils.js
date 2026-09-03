@@ -62,13 +62,40 @@ export function normalizeAttendanceRecord(record) {
     // Backend only records checkpoint timestamps, not an explicit status - a row only
     // exists once office_check_in has been recorded, so it always represents presence.
     status: checkIn ? 'Present' : 'Absent',
+    // Simplified attendance lifecycle used by the self-service screen + dashboard chip.
+    lifecycle: !checkIn ? 'not_checked_in' : checkOut ? 'checked_out' : 'checked_in',
     checkIn,
     checkOut,
     departure: record.departure || null,
     returnToOffice: record.return_to_office || null,
+    // Location is optional - only surfaced when the backend genuinely sends it. Never faked.
+    checkInLocation: record.check_in_location || record.office_check_in_location || record.checkInLocation || '',
+    checkOutLocation: record.check_out_location || record.final_check_out_location || record.checkOutLocation || '',
+    notes: record.notes || '',
     name: record.name || '',
     role: record.role || '',
+    isDemo: Boolean(record.isDemo),
   }
+}
+
+const LIFECYCLE_LABEL = {
+  not_checked_in: 'Not Checked In',
+  checked_in: 'Checked In',
+  checked_out: 'Checked Out',
+}
+export function attendanceLifecycleLabel(lifecycle) {
+  return LIFECYCLE_LABEL[lifecycle] || 'Not Checked In'
+}
+
+// Duration between check-in and an explicit end (check-out, or "now" for an active day).
+// Returns a "3h 25m" label, or null when either side is missing - a past day with no
+// check-out has no known duration and must NOT be measured against the current time.
+export function durationLabel(checkIn, endValue) {
+  if (!checkIn || !endValue) return null
+  const start = new Date(checkIn).getTime()
+  const end = new Date(endValue).getTime()
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null
+  return formatMinutes(Math.round((end - start) / 60000))
 }
 
 export function formatDateLabel(value) {

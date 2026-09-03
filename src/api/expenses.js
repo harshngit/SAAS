@@ -70,7 +70,9 @@ function normalizeExpense(expense) {
     submittedBy: expense.submitted_by || '',
     submittedByName: expense.submitted_by_user?.name || '',
     approvedBy: expense.approved_by || null,
-    clarificationNote: expense.clarification_note || '',
+    approverName: expense.approved_by_user?.name || expense.approver?.name || '',
+    reviewedAt: expense.reviewed_at || expense.approved_at || null,
+    clarificationNote: expense.clarification_note || expense.rejection_reason || '',
     createdAt: expense.created_at,
     updatedAt: expense.updated_at,
   }

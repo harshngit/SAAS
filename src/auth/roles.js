@@ -201,16 +201,26 @@ export const roleMenus = {
   ],
   [ROLES.DELIVERY_PARTNER]: [
     {
-      section: 'Main menu',
+      section: 'Overview',
       items: [
         { label: 'Dashboard', path: '/delivery/dashboard', icon: LayoutDashboard, module: 'dashboard' },
+      ],
+    },
+    {
+      section: 'Delivery Operations',
+      items: [
         { label: 'My Deliveries', path: '/delivery/deliveries', icon: Truck, module: 'deliveries' },
+        { label: 'Vehicle Loading', path: '/delivery/vehicle-loading', icon: PackageCheck, module: 'vehicle_stock' },
         { label: 'Vehicle Stock', path: '/delivery/vehicle-stock', icon: Warehouse, module: 'vehicle_stock' },
+        { label: 'End of Day Return', path: '/delivery/end-of-day', icon: PackageX, module: 'vehicle_stock' },
+      ],
+    },
+    {
+      section: 'My Work',
+      items: [
         { label: 'Attendance', path: '/delivery/attendance', icon: Calendar, module: 'attendance' },
         { label: 'Leaves', path: '/delivery/leaves', icon: CalendarClock, module: 'leaves' },
         { label: 'Expenses', path: '/delivery/expenses', icon: Receipt, module: 'expenses' },
-        { label: 'End of Day Return', path: '/delivery/end-of-day', icon: PackageX, module: 'vehicle_stock' },
-        { label: 'Vehicle Loading', path: '/delivery/vehicle-loading', icon: PackageCheck, module: 'vehicle_stock' },
       ],
     },
   ],

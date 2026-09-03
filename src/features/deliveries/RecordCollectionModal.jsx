@@ -10,7 +10,7 @@ const METHOD_OPTIONS = [
   { value: 'cash', label: 'Cash' },
   { value: 'upi', label: 'UPI' },
   { value: 'card', label: 'Card' },
-  { value: 'cod', label: 'COD' },
+  { value: 'cod', label: 'COD / Other' },
 ]
 
 const CARD_TYPE_OPTIONS = [
@@ -33,11 +33,13 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
   const [instructions, setInstructions] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
+  const [permissionGap, setPermissionGap] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   const close = () => {
     if (isSaving) return
     setError('')
+    setPermissionGap(false)
     onClose()
   }
 
@@ -60,10 +62,13 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
 
     setIsSaving(true)
     setError('')
+    setPermissionGap(false)
 
+    // Demo delivery: hand the collected amount + method back so the parent can simulate it
+    // locally. No payment API is ever called for a demo id.
     if (isDemoDelivery(delivery?.id)) {
       setIsSaving(false)
-      onRecorded?.()
+      onRecorded?.({ amount: Number(amount), method })
       return
     }
 
@@ -80,7 +85,11 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
     })
 
     if (!result.success) {
+      // Show the real backend error - never pretend the collection was saved. A permission /
+      // 403 failure means the Delivery Partner collection endpoint isn't live yet; the amount
+      // stays as due for the accounts team. Clearly isolated integration point.
       setError(result.error)
+      setPermissionGap(/permission|forbidden|not allowed|403|access denied|unauthori/i.test(result.error || ''))
       setIsSaving(false)
       return
     }
@@ -152,6 +161,12 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
 
         {error && (
           <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
+        {permissionGap && (
+          <p className="text-xs text-neutral-500">
+            Recording collections from the delivery app isn&apos;t enabled for your account yet. Nothing was saved —
+            the amount stays as due for the accounts team to reconcile.
+          </p>
         )}
       </div>
     </Modal>

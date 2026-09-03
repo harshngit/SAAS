@@ -48,6 +48,22 @@ export const ORDER_SOURCE_OPTIONS = [
 ]
 
 // -----------------------------------------------------------------------------
+// Fulfilment method - Takeaway vs Home Delivery. Reuses the existing
+// `order.fulfilmentMethod` (normalizeOrder maps `fulfilment_method`); this only
+// normalizes the raw value for display, it never changes it.
+// -----------------------------------------------------------------------------
+const TAKEAWAY_VALUES = ['pickup', 'takeaway', 'self_pickup', 'self-pickup', 'selfpickup', 'store_pickup']
+
+export function isTakeawayOrder(order) {
+  const raw = String(order?.fulfilmentMethod || order?.fulfilment_method || order?.deliveryMethod || '').toLowerCase().trim()
+  return TAKEAWAY_VALUES.includes(raw)
+}
+
+export function getFulfilmentLabel(order) {
+  return isTakeawayOrder(order) ? 'Takeaway' : 'Home Delivery'
+}
+
+// -----------------------------------------------------------------------------
 // Delivery status - derived from method + fulfilment/pickup status + partner.
 // This is NEVER an order status.
 // -----------------------------------------------------------------------------

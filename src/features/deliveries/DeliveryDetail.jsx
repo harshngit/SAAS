@@ -7,11 +7,13 @@ import {
   Check,
   Download,
   Info,
+  MapPin,
   Minus,
   Package,
   PackageCheck,
   PackageSearch,
   Pencil,
+  Phone,
   Plus,
   Trash2,
   Truck,
@@ -52,7 +54,7 @@ import { listProducts } from '../../api/products'
 import { getOrder } from '../../api/orders'
 import { getCurrentVehicleStock } from '../../api/vehicleStock'
 import {
-  DEMO_VEHICLE_STOCK,
+  demoVehicleStockResolved,
   getDemoDelivery,
   getDemoOrderPricing,
   isDemoDelivery,
@@ -304,7 +306,6 @@ export default function DeliveryDetail() {
   // Collection (financial action, gated by the firm's delivery_collection_allowed setting)
   const [collectionAllowed, setCollectionAllowed] = useState(true)
   const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false)
-  const [collectionRecorded, setCollectionRecorded] = useState(false)
 
   // Admin: reassignment
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false)
@@ -386,12 +387,13 @@ export default function DeliveryDetail() {
     if (isAdminView || !delivery?.orderId) return
     let isMounted = true
 
-    // Demo delivery: locked prices + van stock come from the demo order, never the API.
+    // Demo delivery: locked prices + van stock come from the demo layer, never the API.
     if (isDemoDelivery(id)) {
+      const demoVanStock = demoVehicleStockResolved()
       setOrderPricing(getDemoOrderPricing(id))
-      setVehicleStockItems(DEMO_VEHICLE_STOCK)
+      setVehicleStockItems(demoVanStock)
       setCatalogProducts(
-        DEMO_VEHICLE_STOCK.map((entry) => ({
+        demoVanStock.map((entry) => ({
           id: entry.productId,
           name: entry.productName,
           sku: entry.productId.replace('demo-p-', '').toUpperCase(),
@@ -464,15 +466,50 @@ export default function DeliveryDetail() {
   const canReassign = isAdminView && ['assigned', 'rejected'].includes(stageKey)
   const canEdit = isAdminView && ['assigned', 'rejected'].includes(stageKey)
   const canCancel = isAdminView && ['assigned', 'accepted', 'picking'].includes(stageKey)
+  // ---- Collection (operational money handling, NOT a delivery status) ----
+  // The Delivery Partner records the money actually collected at the customer; the Accountant
+  // reconciles it later. Values come straight from the delivery/order response - nothing is
+  // fabricated (unavailable -> shown as "—").
   const amountDue = Number(delivery.amountDue) || 0
-  // Recording a receipt is a back-office action; the delivery partner sees a hand-off note.
-  const canRecordCollection = isAdminView && isDeliveredStage && collectionAllowed && amountDue > 0
-  const showCollectionHandoff = !isAdminView && isDeliveredStage && amountDue > 0
-  const warehouseName = delivery.warehouseName || warehouses.find((warehouse) => warehouse.id === delivery.warehouseId)?.name || delivery.warehouseId
+  const orderAmount = Number(delivery.orderTotal) || 0
+  const previousPending = delivery.previousPendingBalance != null ? Number(delivery.previousPendingBalance) : null
+  const totalAmountDue = orderAmount > 0 && previousPending != null ? orderAmount + previousPending : amountDue
+  const remainingReceivable = amountDue
+  const collectedAmount = Number.isFinite(Number(delivery.collectedAmount))
+    ? Number(delivery.collectedAmount)
+    : Math.max(totalAmountDue - remainingReceivable, 0)
+  const collectionStatus =
+    totalAmountDue <= 0 && collectedAmount <= 0
+      ? '—'
+      : collectedAmount <= 0
+        ? 'Not Collected'
+        : collectedAmount >= totalAmountDue
+          ? 'Collected'
+          : 'Partially Collected'
+  const COLLECTION_STAGES = ['in_transit', 'delivered', 'partially_delivered']
+  const showCollectionSection =
+    !parentOrderCancelled && COLLECTION_STAGES.includes(stageKey) && (totalAmountDue > 0 || collectedAmount > 0)
+  // The button shows for both the DP and the admin - if the DP's account can't yet persist a
+  // receipt the real backend error is surfaced (never faked). Admin also respects the firm's
+  // delivery_collection_allowed setting.
+  const canRecordCollection = showCollectionSection && remainingReceivable > 0 && (!isAdminView || collectionAllowed)
+  // Never surface a raw UUID as the visible value - show the name, or nothing.
+  const looksLikeUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''))
+  const friendlyId = (value) => (value && !looksLikeUuid(value) ? value : '')
+  const warehouseName = delivery.warehouseName || warehouses.find((warehouse) => warehouse.id === delivery.warehouseId)?.name || ''
   const podPhotoFileIds = Array.isArray(delivery.pod?.photo_file_ids) ? delivery.pod.photo_file_ids.filter(Boolean) : []
   const podSignatureFileId = delivery.pod?.signature_file_id || ''
-  const podPreviewFiles = podPhotoFileIds.map((fileId, index) => ({ url: getFileUrl(fileId), name: `Delivery Photo ${index + 1}` }))
+  const podPreviewFiles = podPhotoFileIds.map((fileId, index) => ({
+    // Demo deliveries carry an inline data-URI photo - use it as-is; real ones resolve a file id.
+    url: isDemoDelivery(id) ? fileId : getFileUrl(fileId),
+    name: `Delivery Photo ${index + 1}`,
+  }))
   const customerLabel = delivery.customerBusinessName || delivery.customerName || 'No customer'
+  const customerPhone = delivery.customerPhone || ''
+  const customerMapAddress = delivery.customerDeliveryAddress || delivery.deliveryAddress || ''
+  const mapsHref = customerMapAddress
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customerMapAddress)}`
+    : ''
   const orderStatusLabel = delivery.order?.status || delivery.orderStatus || 'N/A'
   const fulfilmentStatusLabel = delivery.order?.fulfilmentStatus || delivery.fulfilmentStatus || 'N/A'
   const hasBatchTracking = delivery.items.some((item) => item.batchNumber || item.expiryDate)
@@ -517,6 +554,7 @@ export default function DeliveryDetail() {
 
   const addableVehicleProducts = vehicleStockItems.filter(
     (item) =>
+      (Number(item.remainingQuantity ?? item.loadedQuantity ?? 0) || 0) > 0 &&
       !delivery.items.some((line) => line.productId === item.productId) &&
       !addedProducts.some((entry) => entry.productId === item.productId),
   )
@@ -630,8 +668,19 @@ export default function DeliveryDetail() {
     setActionError('')
 
     if (isDemoDelivery(delivery.id)) {
+      const loadedItems = delivery.items.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        qty: item.pickedQuantity || item.plannedQuantity || 0,
+      }))
       return simulateDemoDelivery(
-        { status: 'in_transit', pickingStatus: 'picked', dispatchedAt: null, loadedTotal: 1 },
+        {
+          status: 'in_transit',
+          pickingStatus: 'picked',
+          dispatchedAt: null,
+          loadedTotal: loadedItems.reduce((sum, li) => sum + li.qty, 0),
+          loadedItems,
+        },
         { title: 'Vehicle loaded', message: 'Start the delivery when you leave the warehouse.' },
       )
     }
@@ -948,6 +997,38 @@ export default function DeliveryDetail() {
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
       )}
 
+      {/* Field quick actions - kept near the top so Call / Maps stay reachable in transit. */}
+      {(customerPhone || mapsHref) && (
+        <div className="flex flex-col gap-3 rounded-xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card) sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-neutral-900">{customerLabel}</p>
+            {customerMapAddress && <p className="truncate text-xs text-neutral-500" title={customerMapAddress}>{customerMapAddress}</p>}
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {customerPhone && (
+              <a
+                href={`tel:${customerPhone}`}
+                className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3.5 py-2 text-sm font-medium text-neutral-700 transition-colors hover:border-primary-300 hover:text-primary-700"
+              >
+                <Phone className="size-4" aria-hidden="true" />
+                Call Customer
+              </a>
+            )}
+            {mapsHref && (
+              <a
+                href={mapsHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3.5 py-2 text-sm font-medium text-neutral-700 transition-colors hover:border-primary-300 hover:text-primary-700"
+              >
+                <MapPin className="size-4" aria-hidden="true" />
+                Open Maps
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       <Card title="Delivery Progress">
         <WorkflowTimeline delivery={delivery} />
       </Card>
@@ -1142,7 +1223,7 @@ export default function DeliveryDetail() {
                       <td className="px-4 py-3">
                         <p className="font-medium text-neutral-900">
                           {entry.productName}
-                          <span className="ml-1.5 rounded-md bg-primary-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase text-primary-700">Added</span>
+                          <span className="ml-1.5 rounded-md bg-primary-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-primary-700">Added During Delivery</span>
                         </p>
                         {entry.sku && <p className="text-[0.7rem] text-neutral-400">SKU: {entry.sku}</p>}
                       </td>
@@ -1243,7 +1324,7 @@ export default function DeliveryDetail() {
                   </span>
                 </div>
               )}
-              <p className="mt-2 text-[0.7rem] text-neutral-400">Preview only — final amounts are confirmed by the office.</p>
+              <p className="mt-2 text-[0.7rem] text-neutral-400">Preview only — final commercial amounts are confirmed by the office.</p>
             </div>
           </div>
         </Card>
@@ -1369,7 +1450,42 @@ export default function DeliveryDetail() {
         </Card>
       )}
 
-      {/* ---- After delivery: information & the separate collection action (not a status) ---- */}
+      {/* ---- Collection (money handling - separate from the delivery status) ---- */}
+      {showCollectionSection && (
+        <Card title="Collection">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+              <InfoField label="Order Amount" value={orderAmount > 0 ? formatCurrency(orderAmount) : '—'} />
+              <InfoField label="Previous Pending Balance" value={previousPending != null ? formatCurrency(previousPending) : '—'} />
+              <InfoField label="Total Amount Due" value={totalAmountDue > 0 ? formatCurrency(totalAmountDue) : '—'} />
+              <InfoField label="Amount Collected" value={formatCurrency(collectedAmount)} />
+              <InfoField label="Remaining Receivable" value={formatCurrency(remainingReceivable)} />
+              <div>
+                <p className="text-xs text-neutral-400">Collection Status</p>
+                <div className="mt-1">
+                  <Badge variant={collectionStatus === 'Collected' ? 'success' : collectionStatus === 'Partially Collected' ? 'warning' : 'neutral'}>
+                    {collectionStatus}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {canRecordCollection && (
+                <Button type="button" onClick={() => setIsCollectionModalOpen(true)}>
+                  <Wallet className="size-4" aria-hidden="true" />
+                  Record Collection
+                </Button>
+              )}
+              {remainingReceivable <= 0 && collectedAmount > 0 && <Badge variant="success" dot>Fully collected</Badge>}
+            </div>
+            <p className="text-xs text-neutral-400">
+              Final commercial amounts are confirmed and reconciled by the accounts team.
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {/* ---- After delivery: delivery outcome + return-stock hand-off ---- */}
       {isDeliveredStage && (
         <Card title="After Delivery">
           <div className="space-y-4">
@@ -1377,16 +1493,9 @@ export default function DeliveryDetail() {
               <InfoField label="Delivery Summary" value={`${delivery.deliveredTotal ?? 0} delivered of ${delivery.plannedTotal ?? 0} planned`} />
               <InfoField label="Received By" value={delivery.receiverName || '—'} />
               <InfoField label="Proof of Delivery" value={(podPhotoFileIds.length > 0 || podSignatureFileId) ? 'Uploaded' : 'Not uploaded'} />
-              <InfoField label="Amount Due" value={formatCurrency(amountDue)} />
+              <InfoField label="Collection Status" value={collectionStatus} />
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              {canRecordCollection && !collectionRecorded && (
-                <Button type="button" onClick={() => setIsCollectionModalOpen(true)}>
-                  <Wallet className="size-4" aria-hidden="true" />
-                  Record Collection
-                </Button>
-              )}
-              {collectionRecorded && <Badge variant="success" dot>Collection recorded</Badge>}
               {!isAdminView && (
                 <Button type="button" variant="outline" onClick={() => navigate('/delivery/vehicle-stock')}>
                   <WarehouseIcon className="size-4" aria-hidden="true" />
@@ -1394,11 +1503,6 @@ export default function DeliveryDetail() {
                 </Button>
               )}
             </div>
-            {showCollectionHandoff && !collectionRecorded && (
-              <p className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-                {formatCurrency(amountDue)} is still due on this order. Payment collection is recorded by the accounts team.
-              </p>
-            )}
             {stageKey === 'partially_delivered' && (
               <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
                 Some quantity is still pending. The sales team will plan the remaining delivery.
@@ -1415,11 +1519,11 @@ export default function DeliveryDetail() {
           value={delivery.orderNumber || 'N/A'}
           subtitle={`${orderStatusLabel.replace(/_/g, ' ')} | ${fulfilmentStatusLabel.replace(/_/g, ' ')}`}
         />
-        <DetailCard title="Customer" value={customerLabel} subtitle={delivery.customerId || 'Customer ID unavailable'} />
+        <DetailCard title="Customer" value={customerLabel} subtitle={customerPhone || undefined} />
         <DetailCard
           title="Delivery Partner"
           value={delivery.deliveryPartnerName || 'Unassigned'}
-          subtitle={delivery.deliveryPartnerEmployeeId || delivery.deliveryPartnerId || 'Partner ID unavailable'}
+          subtitle={friendlyId(delivery.deliveryPartnerEmployeeId) || undefined}
         />
       </div>
 
@@ -1443,7 +1547,17 @@ export default function DeliveryDetail() {
 
       <Card title="Contacts">
         <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-          <InfoField label="Customer Phone" value={delivery.customerPhone || 'N/A'} />
+          <div>
+            <p className="text-xs text-neutral-400">Customer Phone</p>
+            {customerPhone ? (
+              <a href={`tel:${customerPhone}`} className="mt-1 inline-flex items-center gap-1.5 font-medium text-primary-700 hover:underline">
+                <Phone className="size-3.5" aria-hidden="true" />
+                {customerPhone}
+              </a>
+            ) : (
+              <p className="mt-1 font-medium text-neutral-900">N/A</p>
+            )}
+          </div>
           <InfoField label="Customer Email" value={delivery.customerEmail || 'N/A'} />
           <InfoField label="Partner Phone" value={delivery.deliveryPartnerPhone || 'N/A'} />
           <InfoField label="Partner Email" value={delivery.deliveryPartnerEmail || 'N/A'} />
@@ -1671,8 +1785,21 @@ export default function DeliveryDetail() {
         delivery={delivery}
         isOpen={isCollectionModalOpen}
         onClose={() => setIsCollectionModalOpen(false)}
-        onRecorded={() => {
-          setCollectionRecorded(true)
+        onRecorded={(payload) => {
+          // Demo delivery: simulate locally (never a real payment API call).
+          if (isDemoDelivery(delivery.id) && payload && typeof payload.amount === 'number') {
+            const prevCollected = Number(delivery.collectedAmount) || 0
+            const prevDue = Number(delivery.amountDue) || 0
+            patchDemoDelivery(delivery.id, {
+              collectedAmount: prevCollected + payload.amount,
+              amountDue: Math.max(prevDue - payload.amount, 0),
+            })
+            setDelivery(getDemoDelivery(delivery.id))
+            setIsCollectionModalOpen(false)
+            showToast({ title: 'Collection recorded (demo)', message: `${formatCurrency(payload.amount)} collected.` })
+            return
+          }
+          setIsCollectionModalOpen(false)
           showToast({ title: 'Collection recorded', message: 'Payment receipt created.' })
           loadDetail()
         }}

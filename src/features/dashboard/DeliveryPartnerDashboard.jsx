@@ -6,15 +6,17 @@ import {
   Box,
   CheckCircle2,
   Clock,
+  Eye,
   MapPin,
-  MoreVertical,
   Package,
+  PackageCheck,
   PackageX,
+  Phone,
   RotateCw,
+  ThumbsUp,
   Truck,
   Undo2,
   Wallet,
-  XCircle,
 } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -24,12 +26,15 @@ import EmptyState from '../../components/ui/EmptyState'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
 import { listDeliveries } from '../../api/deliveries'
-import { demoDeliveriesResolved } from '../orders/orderDemoData'
+import { demoDeliveriesResolved, demoVehicleStockResolved, isDemoDelivery } from '../orders/orderDemoData'
 import { getDeliveryStage } from '../deliveries/deliveryStage'
 import { getCurrentVehicleStock } from '../../api/vehicleStock'
 import { getMyAttendance } from '../../api/attendance'
+import { attendanceDemoResolved } from '../attendance/attendanceDemo'
+import { durationLabel, normalizeAttendanceRecord } from '../attendance/attendanceUtils'
+import { formatTime } from '../attendance/attendanceConstants'
 import { postLocationPing } from '../../api/users'
-import { formatCurrency } from '../../utils/format'
+import { formatCurrency, formatDate } from '../../utils/format'
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -177,10 +182,14 @@ export default function DeliveryPartnerDashboard() {
       }
 
       const attendanceResult = await getMyAttendance()
-      if (isMounted && attendanceResult.success) {
+      if (isMounted) {
         const today = todayIso()
-        const record = attendanceResult.records.find((entry) => entry.date === today)
-        setTodaysAttendance(record || null)
+        const rawRows =
+          attendanceResult.success && attendanceResult.records.length > 0
+            ? attendanceResult.records
+            : attendanceDemoResolved().history
+        const raw = rawRows.find((entry) => (entry.date || '').slice(0, 10) === today)
+        setTodaysAttendance(raw ? normalizeAttendanceRecord(raw) : null)
       }
     }
 
@@ -208,20 +217,36 @@ export default function DeliveryPartnerDashboard() {
   }
 
   const today = todayIso()
-  const todaysDeliveries = deliveries.filter((delivery) => (delivery.scheduledDate || '').slice(0, 10) === today)
+  // "Today's" scope = real deliveries scheduled today + every demo delivery (the demo layer IS
+  // the partner's working set). Every summary / status / priority count below is derived from
+  // this one collection, so the dashboard numbers always match the My Deliveries table.
+  const todaysDeliveries = deliveries.filter(
+    (delivery) => isDemoDelivery(delivery.id) || (delivery.scheduledDate || '').slice(0, 10) === today,
+  )
 
-  // Display stages are derived from the backend's collapsed status - see features/deliveries/deliveryStage.
+  // deliveryStage.js is parent-cancelled aware, so a cancelled-parent delivery already reads
+  // as "Cancelled" here - no separate mapping needed.
   const stageOf = (delivery) => getDeliveryStage(delivery).key
   const countStage = (...keys) => todaysDeliveries.filter((delivery) => keys.includes(stageOf(delivery))).length
-  const completedToday = countStage('delivered')
+  const collectionPending = todaysDeliveries.filter(
+    (delivery) => (delivery.amountDue || 0) > 0 && stageOf(delivery) !== 'cancelled',
+  ).length
+
+  // Primary lifecycle counts (Assigned -> Accepted -> Picking -> Vehicle Loaded -> In Transit -> Delivered).
+  const assignedCount = countStage('assigned')
+  const acceptedCount = countStage('accepted')
+  const pickingCount = countStage('picking')
+  const loadedCount = countStage('loaded')
+  const inTransitCount = countStage('in_transit')
+  const deliveredCount = countStage('delivered')
+
+  // Exception counts - shown only through Today's Priorities, never the primary grid.
+  const failedCount = countStage('failed')
+  const partialCount = countStage('partially_delivered')
+  const needsResponseCount = countStage('assigned', 'rejected')
+
+  const completedToday = deliveredCount
   const pendingToday = countStage('assigned', 'accepted', 'picking', 'loaded', 'in_transit')
-  const paymentPendingToday = todaysDeliveries.filter((delivery) => (delivery.amountDue || 0) > 0).length
-  const failedToday = countStage('failed')
-  const partialToday = countStage('partially_delivered')
-  const awaitingAcceptanceToday = countStage('assigned', 'rejected')
-  const pickingToday = countStage('accepted', 'picking')
-  const loadedToday = countStage('loaded')
-  const inTransitToday = countStage('in_transit')
   const completedPercent = todaysDeliveries.length > 0 ? Math.round((completedToday / todaysDeliveries.length) * 100) : 0
 
   const stats = [
@@ -252,8 +277,8 @@ export default function DeliveryPartnerDashboard() {
       onClick: () => navigate('/delivery/deliveries'),
     },
     {
-      label: 'Payment Pending Deliveries',
-      value: paymentPendingToday,
+      label: 'Collection Pending',
+      value: collectionPending,
       footer: 'View deliveries',
       footerClassName: 'text-blue-600',
       icon: Wallet,
@@ -266,51 +291,57 @@ export default function DeliveryPartnerDashboard() {
     {
       label: 'Needs your response',
       description: 'Accept or reject before loading can start',
-      count: awaitingAcceptanceToday,
+      count: needsResponseCount,
       icon: AlertTriangle,
       iconClassName: 'bg-red-50 text-red-500',
     },
     {
       label: 'Pending deliveries',
-      description: 'Deliveries yet to be completed',
+      description: 'Active deliveries not yet completed',
       count: pendingToday,
       icon: Clock,
       iconClassName: 'bg-red-50 text-red-500',
     },
     {
-      label: 'Failed reattempts',
-      description: 'Require immediate attention',
-      count: failedToday,
+      label: 'Failed / retry attention',
+      description: 'Failed attempts that need a re-plan',
+      count: failedCount,
       icon: AlertTriangle,
       iconClassName: 'bg-red-50 text-red-500',
     },
     {
-      label: 'Payment pending',
-      description: 'Cash to collect from customers',
-      count: paymentPendingToday,
+      label: 'Collection pending',
+      description: 'Amount still to collect from customers',
+      count: collectionPending,
       icon: Wallet,
       iconClassName: 'bg-orange-50 text-orange-500',
     },
     {
       label: 'Partial deliveries pending',
-      description: 'Awaiting remaining items',
-      count: partialToday,
+      description: 'Awaiting remaining items / return',
+      count: partialCount,
       icon: PackageX,
       iconClassName: 'bg-orange-50 text-orange-500',
     },
   ]
 
+  // Primary delivery lifecycle only - exceptions (Failed / Partial / Cancelled) live in
+  // Today's Priorities, not here.
   const deliveryStatusTiles = [
-    { label: 'Assigned', value: awaitingAcceptanceToday, icon: Clock, iconClassName: 'bg-red-50 text-red-500' },
-    { label: 'Picking', value: pickingToday, icon: Package, iconClassName: 'bg-amber-50 text-amber-600' },
-    { label: 'Vehicle Loaded', value: loadedToday, icon: Truck, iconClassName: 'bg-neutral-50 text-neutral-500' },
-    { label: 'In Transit', value: inTransitToday, icon: Truck, iconClassName: 'bg-blue-50 text-blue-600' },
-    { label: 'Delivered', value: completedToday, icon: CheckCircle2, iconClassName: 'bg-green-50 text-green-600' },
-    { label: 'Failed', value: failedToday, icon: XCircle, iconClassName: 'bg-red-50 text-red-600' },
-    { label: 'Partial', value: partialToday, icon: Clock, iconClassName: 'bg-orange-50 text-orange-600' },
+    { label: 'Assigned', value: assignedCount, icon: Clock, iconClassName: 'bg-red-50 text-red-500' },
+    { label: 'Accepted', value: acceptedCount, icon: ThumbsUp, iconClassName: 'bg-primary-50 text-primary-600' },
+    { label: 'Picking', value: pickingCount, icon: Package, iconClassName: 'bg-amber-50 text-amber-600' },
+    { label: 'Vehicle Loaded', value: loadedCount, icon: PackageCheck, iconClassName: 'bg-neutral-50 text-neutral-500' },
+    { label: 'In Transit', value: inTransitCount, icon: Truck, iconClassName: 'bg-blue-50 text-blue-600' },
+    { label: 'Delivered', value: deliveredCount, icon: CheckCircle2, iconClassName: 'bg-green-50 text-green-600' },
   ]
 
-  const vehicleLoadItems = vehicleSession?.items || []
+  // Fall back to the demo van load when there is no real loading session but demo deliveries
+  // are in scope, so the Current Vehicle Load card stays meaningful for demo testing.
+  const hasDemoDeliveries = deliveries.some((delivery) => isDemoDelivery(delivery.id))
+  const effectiveVehicleSession =
+    vehicleSession || (hasDemoDeliveries ? { vehicleNumber: 'MH-12-AB-4521', items: demoVehicleStockResolved() } : null)
+  const vehicleLoadItems = (effectiveVehicleSession?.items || []).filter((item) => (item.loadedQuantity || 0) > 0)
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -325,20 +356,33 @@ export default function DeliveryPartnerDashboard() {
                 Good Morning, {firstName} <span aria-hidden="true">👋</span>
               </h1>
               <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/88">
-                {todaysAttendance?.checkIn && (
-                  <span className="flex items-center gap-2">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-emerald-300">
-                      <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                    </span>
-                    Checked In <span className="font-semibold text-white">{todaysAttendance.checkIn}</span>
+                <span className="flex items-center gap-2">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-emerald-300">
+                    <CheckCircle2 className="size-3.5" aria-hidden="true" />
                   </span>
-                )}
-                {vehicleSession?.vehicleNumber && (
+                  {todaysAttendance?.lifecycle === 'checked_out' ? (
+                    <>
+                      Checked out
+                      <span className="font-semibold text-white">
+                        {durationLabel(todaysAttendance.checkIn, todaysAttendance.checkOut)
+                          ? `worked ${durationLabel(todaysAttendance.checkIn, todaysAttendance.checkOut)}`
+                          : ''}
+                      </span>
+                    </>
+                  ) : todaysAttendance?.lifecycle === 'checked_in' ? (
+                    <>
+                      Checked in <span className="font-semibold text-white">since {formatTime(todaysAttendance.checkIn)}</span>
+                    </>
+                  ) : (
+                    <>Not checked in yet</>
+                  )}
+                </span>
+                {effectiveVehicleSession?.vehicleNumber && (
                   <span className="flex items-center gap-2">
                     <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-white/80">
                       <Truck className="size-3.5" aria-hidden="true" />
                     </span>
-                    Vehicle <span className="font-semibold text-white">{vehicleSession.vehicleNumber}</span>
+                    Vehicle <span className="font-semibold text-white">{effectiveVehicleSession.vehicleNumber}</span>
                   </span>
                 )}
                 <span className="flex items-center gap-2">
@@ -414,7 +458,7 @@ export default function DeliveryPartnerDashboard() {
             />
           ) : (
             <>
-              <p className="text-xs text-neutral-400">{vehicleSession?.vehicleNumber || 'Vehicle'} · loaded stock</p>
+              <p className="text-xs text-neutral-400">{effectiveVehicleSession?.vehicleNumber || 'Vehicle'} · loaded stock</p>
               <div className="mt-3 space-y-2.5">
                 {vehicleLoadItems.map((item) => (
                   <div key={item.productId} className="flex items-center justify-between gap-3 text-sm">
@@ -451,9 +495,24 @@ export default function DeliveryPartnerDashboard() {
         <ShellCard title="My Deliveries">
           <DataTable
             columns={[
-              { key: 'orderNumber', header: 'Order #', sortable: true },
-              { key: 'customerName', header: 'Customer', sortable: true },
-              { key: 'scheduledDate', header: 'Scheduled Date', sortable: true },
+              {
+                key: 'deliveryNumber',
+                header: 'Delivery # / Order #',
+                sortable: true,
+                render: (row) => (
+                  <div className="min-w-0">
+                    <p className="font-medium text-neutral-900">{row.deliveryNumber || '—'}</p>
+                    <p className="text-xs text-neutral-400">{row.orderNumber || '—'}</p>
+                  </div>
+                ),
+              },
+              { key: 'customerName', header: 'Customer', sortable: true, render: (row) => row.customerName || '—' },
+              {
+                key: 'scheduledDate',
+                header: 'Scheduled Date',
+                sortable: true,
+                render: (row) => formatDate(row.scheduledDate),
+              },
               {
                 key: 'status',
                 header: 'Status',
@@ -463,16 +522,26 @@ export default function DeliveryPartnerDashboard() {
                   return <Badge variant={stage.variant} dot>{stage.label}</Badge>
                 },
               },
-              { key: 'amountDue', header: 'Amount Due', sortable: true, align: 'right', render: (row) => formatCurrency(row.amountDue) },
+              { key: 'amountDue', header: 'Amount Due', sortable: true, align: 'right', render: (row) => formatCurrency(row.amountDue || 0) },
             ]}
             data={deliveries}
-            searchKeys={['orderNumber', 'customerName', 'status']}
-            searchPlaceholder="Search deliveries…"
+            searchKeys={['deliveryNumber', 'orderNumber', 'customerName']}
+            searchPlaceholder="Search delivery #, order # or customer…"
             emptyTitle="No deliveries assigned"
             emptyDescription="Deliveries assigned to you will show up here."
-            actions={(row) => [
-              { label: 'View Details', icon: MoreVertical, onClick: () => navigate(`/delivery/deliveries/${row.id}`) },
-            ]}
+            actions={(row) => {
+              const phone = row.customerPhone || ''
+              const address = row.customerDeliveryAddress || row.deliveryAddress || ''
+              return [
+                { label: 'View Delivery', icon: Eye, onClick: () => navigate(`/delivery/deliveries/${row.id}`) },
+                ...(phone
+                  ? [{ label: 'Call Customer', icon: Phone, onClick: () => { window.location.href = `tel:${phone}` } }]
+                  : []),
+                ...(address
+                  ? [{ label: 'Open Maps', icon: MapPin, onClick: () => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank', 'noreferrer') }]
+                  : []),
+              ]
+            }}
           />
         </ShellCard>
       </div>

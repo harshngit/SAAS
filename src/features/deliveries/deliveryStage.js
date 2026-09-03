@@ -53,8 +53,12 @@ export function getDeliveryStage(delivery) {
   const status = delivery.status || 'pending'
   const pickingStatus = delivery.pickingStatus || 'not_started'
   const dispatched = Boolean(delivery.dispatchedAt)
+  // A delivery whose parent Sales Order was cancelled has left the workflow, regardless of
+  // its own (now stale) operational status. This keeps the client-approved cancelled-order
+  // guard consistent everywhere the stage is read (list / dashboard / detail).
+  const parentCancelled = String(delivery.order?.status || delivery.orderStatus || '').toLowerCase() === 'cancelled'
 
-  if (status === 'cancelled') return OFF_FLOW.cancelled
+  if (status === 'cancelled' || parentCancelled) return OFF_FLOW.cancelled
   if (status === 'returned') return OFF_FLOW.failed
   if (status === 'rejected') return OFF_FLOW.rejected
   if (status === 'partially_delivered') return OFF_FLOW.partially_delivered
