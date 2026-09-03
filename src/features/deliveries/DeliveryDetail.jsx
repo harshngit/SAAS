@@ -6,9 +6,14 @@ import {
   Camera,
   Check,
   Download,
+  Info,
+  Minus,
+  Package,
   PackageCheck,
   PackageSearch,
   Pencil,
+  Plus,
+  Trash2,
   Truck,
   UserCog,
   Wallet,
@@ -43,7 +48,18 @@ import { getSalesWorkflowSettings } from '../../api/settings'
 import { getFileUrl, uploadFiles } from '../../api/files'
 import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
+import { listProducts } from '../../api/products'
+import { getOrder } from '../../api/orders'
+import { getCurrentVehicleStock } from '../../api/vehicleStock'
+import {
+  DEMO_VEHICLE_STOCK,
+  getDemoDelivery,
+  getDemoOrderPricing,
+  isDemoDelivery,
+  patchDemoDelivery,
+} from '../orders/orderDemoData'
 import { formatCurrency } from '../../utils/format'
+import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
 
 // The 6-stage flow (Assigned -> Accepted -> Picking -> Vehicle Loaded -> In Transit ->
@@ -180,10 +196,78 @@ function InfoField({ label, value, subtitle }) {
   )
 }
 
+// Compact van-stock product picker for the delivery adjustment flow. Only lists products
+// actually available on the partner's vehicle (never full company stock). Unit price is
+// read-only, pulled from the product catalogue.
+function AddDeliveryProductModal({ isOpen, onClose, products, catalogProducts, onAdd }) {
+  const [search, setSearch] = useState('')
+  const [qty, setQty] = useState({})
+
+  const query = search.trim().toLowerCase()
+  const filtered = products.filter((item) => !query || (item.productName || '').toLowerCase().includes(query))
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Add Product to Delivery" className="max-w-lg">
+      <div className="space-y-3">
+        <p className="text-xs text-neutral-500">Only items currently loaded on your vehicle can be added. Price is set by the office.</p>
+        {products.length > 0 && (
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search van stock..."
+            className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+          />
+        )}
+        <div className="max-h-72 divide-y divide-neutral-50 overflow-y-auto rounded-xl border border-neutral-100">
+          {products.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-neutral-400">
+              No van stock available to add. Load your vehicle to add items from it.
+            </p>
+          ) : filtered.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-neutral-400">No products found.</p>
+          ) : (
+            filtered.map((item) => {
+              const catalog = catalogProducts.find((product) => product.id === item.productId)
+              const available = Number(item.remainingQuantity ?? item.loadedQuantity ?? 0) || 0
+              const value = qty[item.productId] ?? 1
+              return (
+                <div key={item.productId} className="flex items-center gap-3 px-3 py-2.5">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
+                    <Package className="size-4" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-neutral-900">{item.productName}</p>
+                    <p className="truncate text-[0.7rem] text-neutral-400">
+                      {catalog?.sku ? `SKU: ${catalog.sku} · ` : ''}On van: {available}
+                      {catalog?.price != null ? ` · ${formatCurrency(Number(catalog.price) || 0)}` : ''}
+                    </p>
+                  </div>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={value}
+                    onChange={(event) => setQty((current) => ({ ...current, [item.productId]: Math.max(1, Math.round(Number(event.target.value) || 1)) }))}
+                    className="h-9 w-16 shrink-0 rounded-lg border border-neutral-200 bg-white px-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                    aria-label={`Quantity for ${item.productName}`}
+                  />
+                  <Button type="button" size="sm" onClick={() => onAdd(item, value)}>Add</Button>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export default function DeliveryDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const currentUser = useAuthStore((state) => state.currentUser)
   const isAdminView = window.location.pathname.startsWith('/admin')
   const basePath = isAdminView ? '/admin/deliveries' : '/delivery/deliveries'
 
@@ -207,6 +291,15 @@ export default function DeliveryDetail() {
 
   // Delivery partner: picking
   const [pickedQuantities, setPickedQuantities] = useState({})
+
+  // Delivery partner: live delivery adjustment (actual delivered items during an active delivery).
+  // This is NOT order editing - price / discount / customer stay locked. `deliveredQuantities`
+  // above is the single source for the delivering qty of each existing line.
+  const [orderPricing, setOrderPricing] = useState({}) // productId -> { unitPrice, discountPercent, taxRate }
+  const [catalogProducts, setCatalogProducts] = useState([])
+  const [vehicleStockItems, setVehicleStockItems] = useState([])
+  const [addedProducts, setAddedProducts] = useState([]) // [{ productId, productName, sku, unitPrice, quantity, vehicleQty }]
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false)
 
   // Collection (financial action, gated by the firm's delivery_collection_allowed setting)
   const [collectionAllowed, setCollectionAllowed] = useState(true)
@@ -232,7 +325,10 @@ export default function DeliveryDetail() {
     setIsLoading(true)
     setLoadError('')
 
-    const result = await getDelivery(id)
+    // Demo deliveries never hit the API - the record is built locally from the demo order.
+    const result = isDemoDelivery(id)
+      ? { success: Boolean(getDemoDelivery(id)), delivery: getDemoDelivery(id), error: 'Demo delivery not found.' }
+      : await getDelivery(id)
 
     if (!result.success) {
       setLoadError(result.error)
@@ -241,9 +337,11 @@ export default function DeliveryDetail() {
     }
 
     setDelivery(result.delivery)
+    // "Delivering qty" starts at the ordered (planned) quantity - the partner adjusts down or
+    // up from there based on what the customer actually accepts.
     setDeliveredQuantities(
       Object.fromEntries(
-        result.delivery.items.map((item) => [item.id, item.loadedQuantity || item.plannedQuantity || 0]),
+        result.delivery.items.map((item) => [item.id, item.deliveredQuantity || item.plannedQuantity || 0]),
       ),
     )
     setPickedQuantities(
@@ -281,6 +379,56 @@ export default function DeliveryDetail() {
     }
   }, [isAdminView])
 
+  // Delivery-partner adjustment support: the locked order selling prices (read-only), the
+  // product catalogue (for "+ Add Product" prices) and the current vehicle stock (van
+  // availability). All best-effort - the adjustment UI degrades to quantity-only if any 403s.
+  useEffect(() => {
+    if (isAdminView || !delivery?.orderId) return
+    let isMounted = true
+
+    // Demo delivery: locked prices + van stock come from the demo order, never the API.
+    if (isDemoDelivery(id)) {
+      setOrderPricing(getDemoOrderPricing(id))
+      setVehicleStockItems(DEMO_VEHICLE_STOCK)
+      setCatalogProducts(
+        DEMO_VEHICLE_STOCK.map((entry) => ({
+          id: entry.productId,
+          name: entry.productName,
+          sku: entry.productId.replace('demo-p-', '').toUpperCase(),
+          price: getDemoOrderPricing(id)[entry.productId]?.unitPrice ?? null,
+        })),
+      )
+      return () => { isMounted = false }
+    }
+
+    getOrder(delivery.orderId).then((result) => {
+      if (!isMounted || !result.success) return
+      const map = {}
+      result.order.items.forEach((item) => {
+        map[item.productId] = {
+          unitPrice: Number(item.unitPrice) || 0,
+          discountPercent: Number(item.discountPercent) || 0,
+          taxRate: Number(item.taxRate) || 0,
+        }
+      })
+      setOrderPricing(map)
+    })
+
+    listProducts().then((result) => {
+      if (isMounted && result.success) setCatalogProducts(result.products)
+    })
+
+    if (currentUser?.id) {
+      getCurrentVehicleStock(currentUser.id).then((result) => {
+        if (isMounted && result.success) setVehicleStockItems(result.session?.items || [])
+      })
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, [isAdminView, id, delivery?.orderId, currentUser?.id])
+
   if (isLoading) {
     return (
       <Card>
@@ -307,8 +455,12 @@ export default function DeliveryDetail() {
 
   // The delivery partner sees exactly ONE next action for the current stage; the admin sees
   // no workflow buttons, only reassign / edit / cancel overrides. See ./deliveryStage.
-  const nextAction = getNextDeliveryAction(delivery, { isAdmin: isAdminView })
   const isDeliveredStage = ['delivered', 'partially_delivered'].includes(stageKey)
+  // Frontend safety guard: a delivery can still read as active (Picking, etc.) while its parent
+  // Sales Order was cancelled. When that happens, every operational delivery action is hidden.
+  // Backend enforcement is separate; this only stops the partner acting on a dead order.
+  const parentOrderCancelled = String(delivery.order?.status || delivery.orderStatus || '').toLowerCase() === 'cancelled'
+  const nextAction = parentOrderCancelled ? null : getNextDeliveryAction(delivery, { isAdmin: isAdminView })
   const canReassign = isAdminView && ['assigned', 'rejected'].includes(stageKey)
   const canEdit = isAdminView && ['assigned', 'rejected'].includes(stageKey)
   const canCancel = isAdminView && ['assigned', 'accepted', 'picking'].includes(stageKey)
@@ -326,10 +478,102 @@ export default function DeliveryDetail() {
   const hasBatchTracking = delivery.items.some((item) => item.batchNumber || item.expiryDate)
   const hasSerialTracking = delivery.items.some((item) => item.serialNumbers.length > 0)
 
+  // ---- Delivery adjustment (partner, active delivery only) ----
+  const ADJUSTABLE_STAGES = ['accepted', 'picking', 'loaded', 'in_transit']
+  const canAdjustDelivery = !isAdminView && !parentOrderCancelled && ADJUSTABLE_STAGES.includes(stageKey)
+  const showAdjustmentSection = !isAdminView && !parentOrderCancelled && (canAdjustDelivery || isDeliveredStage)
+  const adjustmentLocked = !canAdjustDelivery // delivered / any non-active stage -> read-only recap
+
+  const unitPriceForProduct = (productId, fallback = null) =>
+    orderPricing[productId]?.unitPrice ??
+    (fallback != null ? Number(fallback) || 0 : catalogProducts.find((product) => product.id === productId)?.price ?? null)
+
+  const netLineTotal = (unitPrice, quantity, productId) => {
+    if (unitPrice == null) return null
+    const discountPercent = orderPricing[productId]?.discountPercent || 0
+    return unitPrice * (Number(quantity) || 0) * (1 - Math.min(Math.max(discountPercent, 0), 100) / 100)
+  }
+
+  const vehicleQtyFor = (productId) => {
+    const entry = vehicleStockItems.find((item) => item.productId === productId)
+    return entry ? Number(entry.remainingQuantity ?? entry.loadedQuantity ?? 0) || 0 : null
+  }
+
+  const hasAnyPricing = Object.keys(orderPricing).length > 0 || catalogProducts.length > 0
+  const originalOrderAmount = delivery.items.reduce((sum, item) => {
+    const line = netLineTotal(unitPriceForProduct(item.productId, item.unitPrice), item.plannedQuantity, item.productId)
+    return sum + (line || 0)
+  }, 0)
+  const adjustedExistingAmount = delivery.items.reduce((sum, item) => {
+    const line = netLineTotal(unitPriceForProduct(item.productId, item.unitPrice), deliveredQuantities[item.id] ?? 0, item.productId)
+    return sum + (line || 0)
+  }, 0)
+  const addedProductsAmount = addedProducts.reduce(
+    (sum, entry) => sum + (entry.unitPrice != null ? entry.unitPrice * (Number(entry.quantity) || 0) : 0),
+    0,
+  )
+  const adjustedDeliveryAmount = adjustedExistingAmount + addedProductsAmount
+  const adjustmentDifference = adjustedDeliveryAmount - originalOrderAmount
+
+  const addableVehicleProducts = vehicleStockItems.filter(
+    (item) =>
+      !delivery.items.some((line) => line.productId === item.productId) &&
+      !addedProducts.some((entry) => entry.productId === item.productId),
+  )
+
+  const setDeliveringQty = (itemId, value) => {
+    const rounded = Math.round(Number(value))
+    setDeliveredQuantities((current) => ({
+      ...current,
+      [itemId]: Math.max(0, Number.isFinite(rounded) ? rounded : 0),
+    }))
+  }
+
+  const addAdjustmentProduct = (stockItem, quantity) => {
+    const qty = Math.max(1, Math.round(Number(quantity) || 1))
+    const catalog = catalogProducts.find((product) => product.id === stockItem.productId)
+    setAddedProducts((current) => [
+      ...current,
+      {
+        productId: stockItem.productId,
+        productName: stockItem.productName || catalog?.name || 'Product',
+        sku: catalog?.sku || '',
+        unitPrice: catalog ? Number(catalog.price) || 0 : null,
+        quantity: qty,
+        vehicleQty: Number(stockItem.remainingQuantity ?? stockItem.loadedQuantity ?? 0) || 0,
+      },
+    ])
+    setIsAddProductOpen(false)
+  }
+
+  // Backend gap: POST /deliveries/{id}/confirm only accepts existing delivery_item_id +
+  // delivered_quantity. Added products can't be persisted as delivery lines yet, so they are
+  // written into the delivery notes for the office to reconcile (never silently dropped).
+  const addedProductsNote = addedProducts.length
+    ? `Extra items delivered (not on the original order — office to reconcile):\n${addedProducts
+        .map((entry) => `- ${entry.productName}${entry.sku ? ` (${entry.sku})` : ''} x ${entry.quantity}`)
+        .join('\n')}`
+    : ''
+
+  // Demo deliveries advance through a local override - never an API call.
+  const simulateDemoDelivery = (patch, toast) => {
+    patchDemoDelivery(delivery.id, patch)
+    setDelivery(getDemoDelivery(delivery.id))
+    setIsActing(false)
+    if (toast) showToast(toast)
+  }
+
   const handleAccept = async () => {
     if (isActing) return
     setIsActing(true)
     setActionError('')
+
+    if (isDemoDelivery(delivery.id)) {
+      return simulateDemoDelivery(
+        { status: 'accepted', pickingStatus: 'not_started' },
+        { title: 'Delivery accepted', message: 'Start picking when you are ready to load.' },
+      )
+    }
 
     const result = await acceptDelivery(delivery.id)
 
@@ -355,6 +599,13 @@ export default function DeliveryDetail() {
     setIsActing(true)
     setActionError('')
 
+    if (isDemoDelivery(delivery.id)) {
+      return simulateDemoDelivery(
+        { status: 'accepted', pickingStatus: 'picked' },
+        { title: 'Items picked', message: 'Load the vehicle when picking is complete.' },
+      )
+    }
+
     const result = await pickDeliveryItems(
       delivery.id,
       delivery.items.map((item) => ({ deliveryItemId: item.id, pickedQuantity: pickedQuantities[item.id] ?? 0 })),
@@ -377,6 +628,13 @@ export default function DeliveryDetail() {
     if (isActing) return
     setIsActing(true)
     setActionError('')
+
+    if (isDemoDelivery(delivery.id)) {
+      return simulateDemoDelivery(
+        { status: 'in_transit', pickingStatus: 'picked', dispatchedAt: null, loadedTotal: 1 },
+        { title: 'Vehicle loaded', message: 'Start the delivery when you leave the warehouse.' },
+      )
+    }
 
     if (delivery.pickingStatus === 'picked' || delivery.pickingStatus === 'not_started') {
       const readyResult = await markDeliveryReady(delivery.id)
@@ -406,6 +664,13 @@ export default function DeliveryDetail() {
     setIsActing(true)
     setActionError('')
 
+    if (isDemoDelivery(delivery.id)) {
+      return simulateDemoDelivery(
+        { status: 'in_transit', dispatchedAt: new Date().toISOString() },
+        { title: 'Delivery started', message: 'Delivery is now in transit.' },
+      )
+    }
+
     const result = await dispatchDelivery(delivery.id)
 
     if (!result.success) {
@@ -428,6 +693,12 @@ export default function DeliveryDetail() {
 
     setIsActing(true)
     setActionError('')
+
+    if (isDemoDelivery(delivery.id)) {
+      setIsActing(false)
+      setActionError('Demo deliveries are driven from the delivery-partner view only.')
+      return
+    }
 
     const result = await reassignDelivery(delivery.id, {
       deliveryPartnerId: reassignPartnerId,
@@ -467,6 +738,12 @@ export default function DeliveryDetail() {
     setIsActing(true)
     setActionError('')
 
+    if (isDemoDelivery(delivery.id)) {
+      setIsActing(false)
+      setActionError('Demo deliveries are driven from the delivery-partner view only.')
+      return
+    }
+
     const result = await updateDeliveryPlan(delivery.id, {
       deliveryPartnerId: editForm.deliveryPartnerId || undefined,
       vehicleId: editForm.vehicleId || undefined,
@@ -491,6 +768,13 @@ export default function DeliveryDetail() {
     if (isActing) return
     setIsActing(true)
     setActionError('')
+
+    if (isDemoDelivery(delivery.id)) {
+      setIsActing(false)
+      setIsCancelModalOpen(false)
+      setActionError('Demo deliveries are driven from the delivery-partner view only.')
+      return
+    }
 
     const result = await updateDeliveryPlan(delivery.id, {
       status: 'cancelled',
@@ -532,6 +816,23 @@ export default function DeliveryDetail() {
     setIsActing(true)
     setActionError('')
 
+    const combinedNotes = [notes.trim(), addedProductsNote].filter(Boolean).join('\n\n')
+
+    if (isDemoDelivery(delivery.id)) {
+      const deliveredItems = delivery.items.map((item) => ({ ...item, deliveredQuantity: deliveredQuantities[item.id] ?? 0 }))
+      const anyShort = deliveredItems.some((item) => item.deliveredQuantity < item.plannedQuantity)
+      return simulateDemoDelivery(
+        {
+          status: anyShort ? 'partially_delivered' : 'delivered',
+          confirmedAt: new Date().toISOString(),
+          receiverName: receiverName.trim() || delivery.customerName,
+          notes: combinedNotes,
+          items: deliveredItems,
+        },
+        { title: 'Delivery confirmed', message: 'Delivery outcome recorded.' },
+      )
+    }
+
     const result = await confirmDelivery(delivery.id, {
       failed: false,
       items: delivery.items.map((item) => ({
@@ -540,7 +841,7 @@ export default function DeliveryDetail() {
       })),
       podPhotoFileIds: podFiles.map((file) => file.file_id).filter(Boolean),
       receiverName: receiverName.trim() || undefined,
-      notes: notes.trim() || undefined,
+      notes: combinedNotes || undefined,
     })
 
     if (!result.success) {
@@ -564,6 +865,14 @@ export default function DeliveryDetail() {
     setIsActing(true)
     setActionError('')
 
+    if (isDemoDelivery(delivery.id)) {
+      setShowFailForm(false)
+      return simulateDemoDelivery(
+        { status: 'returned', failureReason: failureReason.trim(), notes: notes.trim() },
+        { title: 'Delivery marked failed', message: failureReason.trim() },
+      )
+    }
+
     const result = await confirmDelivery(delivery.id, {
       failed: true,
       failureReason: failureReason.trim(),
@@ -583,6 +892,10 @@ export default function DeliveryDetail() {
   }
 
   const handleDownloadChallan = async () => {
+    if (isDemoDelivery(delivery.id)) {
+      showToast({ title: 'Demo delivery', message: 'The challan PDF is not available for demo records.' })
+      return
+    }
     const result = await downloadDeliveryChallan(delivery.id)
     if (!result.success) setActionError(result.error)
   }
@@ -638,6 +951,13 @@ export default function DeliveryDetail() {
       <Card title="Delivery Progress">
         <WorkflowTimeline delivery={delivery} />
       </Card>
+
+      {parentOrderCancelled && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <Ban className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden="true" />
+          <p className="text-sm font-medium text-amber-800">Order is cancelled. Delivery actions are unavailable.</p>
+        </div>
+      )}
 
       {/* ---- Current action - the delivery partner sees exactly one per stage ---- */}
       {nextAction?.type === 'accept_reject' && (
@@ -717,36 +1037,238 @@ export default function DeliveryDetail() {
         </Card>
       )}
 
+      {showAdjustmentSection && (
+        <Card title="Order / Delivery Items">
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="text-sm text-neutral-500">
+                {adjustmentLocked
+                  ? 'Final quantities delivered against this order.'
+                  : 'Adjust the quantity you are actually delivering. Unit price, discount and customer stay locked to the order.'}
+              </p>
+              {!adjustmentLocked && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsAddProductOpen(true)}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  Add Product
+                </Button>
+              )}
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-neutral-100">
+              <table className="w-full min-w-2xl text-left text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-3 py-3 text-right">Ordered</th>
+                    <th className="px-3 py-3 text-center">Delivering</th>
+                    <th className="px-3 py-3 text-right">Unit Price</th>
+                    <th className="px-3 py-3 text-right">Line Total</th>
+                    {!adjustmentLocked && <th className="w-10 px-3 py-3" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-50">
+                  {delivery.items.map((item) => {
+                    const delivering = deliveredQuantities[item.id] ?? 0
+                    const price = unitPriceForProduct(item.productId, item.unitPrice)
+                    const lineTotal = netLineTotal(price, delivering, item.productId)
+                    const vanQty = vehicleQtyFor(item.productId)
+                    const overVan = vanQty != null && delivering > vanQty
+                    return (
+                      <tr key={item.id}>
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-neutral-900">{item.productName}</p>
+                          {vanQty != null && (
+                            <p className="text-[0.7rem] text-neutral-400">On van: {vanQty}</p>
+                          )}
+                          {overVan && (
+                            <p className="text-[0.7rem] font-medium text-amber-600">More than van stock — check availability</p>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right text-neutral-500">{item.plannedQuantity}</td>
+                        <td className="px-3 py-3">
+                          {adjustmentLocked ? (
+                            <p className="text-center font-semibold text-neutral-900">{item.deliveredQuantity}</p>
+                          ) : (
+                            <div className="mx-auto flex w-fit items-center rounded-lg border border-neutral-200 p-0.5 text-neutral-500">
+                              <button
+                                type="button"
+                                onClick={() => setDeliveringQty(item.id, delivering - 1)}
+                                disabled={delivering <= 0}
+                                className="flex size-7 items-center justify-center rounded-md transition-colors hover:bg-neutral-50 disabled:opacity-30"
+                                aria-label={`Reduce ${item.productName}`}
+                              >
+                                <Minus className="size-3.5" aria-hidden="true" />
+                              </button>
+                              <input
+                                value={delivering}
+                                onChange={(event) => setDeliveringQty(item.id, event.target.value)}
+                                inputMode="numeric"
+                                className="w-10 min-w-0 bg-transparent text-center text-sm font-semibold text-neutral-900 focus:outline-none"
+                                aria-label={`${item.productName} delivering quantity`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setDeliveringQty(item.id, delivering + 1)}
+                                className="flex size-7 items-center justify-center rounded-md transition-colors hover:bg-neutral-50"
+                                aria-label={`Add ${item.productName}`}
+                              >
+                                <Plus className="size-3.5" aria-hidden="true" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right text-neutral-600">{price == null ? '—' : formatCurrency(price)}</td>
+                        <td className="px-3 py-3 text-right font-semibold text-neutral-900">{lineTotal == null ? '—' : formatCurrency(lineTotal)}</td>
+                        {!adjustmentLocked && (
+                          <td className="px-3 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setDeliveringQty(item.id, 0)}
+                              disabled={delivering === 0}
+                              className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                              aria-label={`Set ${item.productName} to zero`}
+                              title="Not delivering this item"
+                            >
+                              <Trash2 className="size-4" aria-hidden="true" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
+
+                  {addedProducts.map((entry, index) => (
+                    <tr key={`added-${entry.productId}`} className="bg-primary-50/30">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-neutral-900">
+                          {entry.productName}
+                          <span className="ml-1.5 rounded-md bg-primary-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase text-primary-700">Added</span>
+                        </p>
+                        {entry.sku && <p className="text-[0.7rem] text-neutral-400">SKU: {entry.sku}</p>}
+                      </td>
+                      <td className="px-3 py-3 text-right text-neutral-400">—</td>
+                      <td className="px-3 py-3">
+                        {adjustmentLocked ? (
+                          <p className="text-center font-semibold text-neutral-900">{entry.quantity}</p>
+                        ) : (
+                          <div className="mx-auto flex w-fit items-center rounded-lg border border-neutral-200 p-0.5 text-neutral-500">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAddedProducts((current) =>
+                                  current.map((row, i) => (i === index ? { ...row, quantity: Math.max(1, row.quantity - 1) } : row)),
+                                )
+                              }
+                              className="flex size-7 items-center justify-center rounded-md transition-colors hover:bg-neutral-50"
+                              aria-label={`Reduce ${entry.productName}`}
+                            >
+                              <Minus className="size-3.5" aria-hidden="true" />
+                            </button>
+                            <input
+                              value={entry.quantity}
+                              onChange={(event) => {
+                                const rounded = Math.max(1, Math.round(Number(event.target.value) || 1))
+                                setAddedProducts((current) => current.map((row, i) => (i === index ? { ...row, quantity: rounded } : row)))
+                              }}
+                              inputMode="numeric"
+                              className="w-10 min-w-0 bg-transparent text-center text-sm font-semibold text-neutral-900 focus:outline-none"
+                              aria-label={`${entry.productName} delivering quantity`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAddedProducts((current) =>
+                                  current.map((row, i) => (i === index ? { ...row, quantity: row.quantity + 1 } : row)),
+                                )
+                              }
+                              className="flex size-7 items-center justify-center rounded-md transition-colors hover:bg-neutral-50"
+                              aria-label={`Add ${entry.productName}`}
+                            >
+                              <Plus className="size-3.5" aria-hidden="true" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right text-neutral-600">{entry.unitPrice == null ? '—' : formatCurrency(entry.unitPrice)}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-neutral-900">
+                        {entry.unitPrice == null ? '—' : formatCurrency(entry.unitPrice * entry.quantity)}
+                      </td>
+                      {!adjustmentLocked && (
+                        <td className="px-3 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setAddedProducts((current) => current.filter((_, i) => i !== index))}
+                            className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
+                            aria-label={`Remove ${entry.productName}`}
+                          >
+                            <Trash2 className="size-4" aria-hidden="true" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {!hasAnyPricing && (
+              <p className="flex items-start gap-2 rounded-xl bg-neutral-50 px-3.5 py-2.5 text-xs text-neutral-500">
+                <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                Pricing is managed by the office and is not shown here — adjust quantities only.
+              </p>
+            )}
+            {addedProducts.length > 0 && (
+              <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-xs text-amber-700">
+                <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                Added products are recorded in the delivery notes for the office to add to the order — the delivery
+                system cannot save new lines yet.
+              </p>
+            )}
+
+            {/* Adjusted Delivery Summary */}
+            <div className="rounded-xl border border-neutral-100 bg-neutral-50/70 p-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-neutral-500">Original Order Amount</span>
+                <span className="font-medium text-neutral-900">{hasAnyPricing ? formatCurrency(originalOrderAmount) : '—'}</span>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between">
+                <span className="text-neutral-500">Adjusted Delivery Amount</span>
+                <span className="font-semibold text-neutral-900">{hasAnyPricing ? formatCurrency(adjustedDeliveryAmount) : '—'}</span>
+              </div>
+              {hasAnyPricing && (
+                <div className="mt-1.5 flex items-center justify-between border-t border-neutral-200 pt-1.5">
+                  <span className="text-neutral-500">Difference</span>
+                  <span className={`font-bold ${adjustmentDifference > 0 ? 'text-primary-700' : adjustmentDifference < 0 ? 'text-red-600' : 'text-neutral-900'}`}>
+                    {adjustmentDifference > 0 ? '+' : ''}{formatCurrency(adjustmentDifference)}
+                  </span>
+                </div>
+              )}
+              <p className="mt-2 text-[0.7rem] text-neutral-400">Preview only — final amounts are confirmed by the office.</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {nextAction?.type === 'complete' && !showFailForm && (
         <Card title="Complete Delivery">
           <div className="space-y-4">
-            <div className="space-y-3">
+            <div className="space-y-2 rounded-lg bg-neutral-50 p-3 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Final quantities</p>
               {delivery.items.map((item) => (
-                <div key={item.id} className="grid grid-cols-1 items-center gap-3 rounded-lg bg-neutral-50 p-3 sm:grid-cols-[1fr_auto]">
-                  <div>
-                    <p className="font-medium text-neutral-900">{item.productName}</p>
-                    <p className="text-sm text-neutral-500">Loaded: {item.loadedQuantity}</p>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-neutral-500">Delivered Qty</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max={item.loadedQuantity || undefined}
-                      step="1"
-                      value={deliveredQuantities[item.id] ?? 0}
-                      onChange={(event) => setDeliveredQuantities((current) => ({ ...current, [item.id]: Number(event.target.value) }))}
-                      onBlur={(event) => {
-                        const rounded = Math.round(Number(event.target.value))
-                        const cap = item.loadedQuantity || Number.MAX_SAFE_INTEGER
-                        const clamped = Math.min(Math.max(Number.isFinite(rounded) ? rounded : 0, 0), cap)
-                        setDeliveredQuantities((current) => ({ ...current, [item.id]: clamped }))
-                      }}
-                      className="h-10 w-32 rounded-lg border border-neutral-200 bg-white px-3 text-sm"
-                    />
-                  </div>
+                <div key={item.id} className="flex items-center justify-between gap-3">
+                  <span className="text-neutral-700">{item.productName}</span>
+                  <span className="shrink-0 text-neutral-500">
+                    Ordered {item.plannedQuantity} → <span className="font-semibold text-neutral-900">Delivering {deliveredQuantities[item.id] ?? 0}</span>
+                  </span>
                 </div>
               ))}
+              {addedProducts.map((entry) => (
+                <div key={`recap-${entry.productId}`} className="flex items-center justify-between gap-3">
+                  <span className="text-neutral-700">{entry.productName} <span className="text-primary-700">(added)</span></span>
+                  <span className="shrink-0 font-semibold text-neutral-900">Delivering {entry.quantity}</span>
+                </div>
+              ))}
+              <p className="pt-1 text-[0.7rem] text-neutral-400">Change these in “Order / Delivery Items” above.</p>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -824,7 +1346,7 @@ export default function DeliveryDetail() {
         </Card>
       )}
 
-      {!isAdminView && showFailForm && (
+      {!isAdminView && showFailForm && !parentOrderCancelled && (
         <Card title="Mark Delivery as Failed">
           <div className="space-y-4">
             <textarea
@@ -1129,6 +1651,14 @@ export default function DeliveryDetail() {
           />
         </div>
       </Modal>
+
+      <AddDeliveryProductModal
+        isOpen={isAddProductOpen}
+        onClose={() => setIsAddProductOpen(false)}
+        products={addableVehicleProducts}
+        catalogProducts={catalogProducts}
+        onAdd={addAdjustmentProduct}
+      />
 
       <RejectDeliveryModal
         delivery={delivery}

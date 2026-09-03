@@ -24,6 +24,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
 import { listDeliveries } from '../../api/deliveries'
+import { demoDeliveriesResolved } from '../orders/orderDemoData'
 import { getDeliveryStage } from '../deliveries/deliveryStage'
 import { getCurrentVehicleStock } from '../../api/vehicleStock'
 import { getMyAttendance } from '../../api/attendance'
@@ -146,16 +147,17 @@ export default function DeliveryPartnerDashboard() {
     setLoadError('')
 
     const result = await listDeliveries({ delivery_partner_id: currentUser.id })
+    const demoRows = demoDeliveriesResolved()
 
     setIsLoading(false)
 
     if (!result.success) {
-      setDeliveries([])
-      setLoadError(result.error)
+      setDeliveries(demoRows)
+      setLoadError(demoRows.length ? '' : result.error)
       return
     }
 
-    setDeliveries(result.deliveries)
+    setDeliveries([...result.deliveries, ...demoRows])
   }, [currentUser?.id])
 
   useEffect(() => {

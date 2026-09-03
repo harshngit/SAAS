@@ -185,16 +185,19 @@ export default function ObjectFieldsSettings() {
         <div className="space-y-4">
           {(currentModuleFields.mandatory || []).length > 0 && (
             <div className="rounded-xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-400">Always visible</p>
-              <div className="flex flex-wrap gap-2">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                Mandatory fields · always visible
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {currentModuleFields.mandatory.map((fieldKey) => (
-                  <span
+                  <div
                     key={fieldKey}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-600"
+                    className="flex items-center gap-2 rounded-lg border border-neutral-100 bg-neutral-50/60 px-3 py-2 text-sm text-neutral-600"
+                    title={humanizeFieldKey(fieldKey)}
                   >
-                    <Lock className="size-3" />
-                    {humanizeFieldKey(fieldKey)}
-                  </span>
+                    <Lock className="size-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
+                    <span className="truncate">{humanizeFieldKey(fieldKey)}</span>
+                  </div>
                 ))}
               </div>
             </div>

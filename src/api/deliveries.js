@@ -61,9 +61,13 @@ function normalizeDeliveryItem(item) {
 
   return {
     id: item.id,
+    orderItemId: item.order_item_id || '',
     productId: item.product_id,
     variantId: item.variant_id,
     productName: item.product_name || item.name || '',
+    // Not in the current DeliveryLineOut schema - read defensively so it works if the backend
+    // starts returning line pricing later. Falls back to the order lookup in the UI.
+    unitPrice: item.unit_price ?? item.unitPrice ?? null,
     plannedQuantity: item.planned_quantity ?? item.quantity ?? 0,
     pickedQuantity: item.picked_quantity ?? 0,
     loadedQuantity: item.loaded_quantity ?? 0,

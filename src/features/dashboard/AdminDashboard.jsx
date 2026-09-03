@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatCompactCurrency, formatCurrency } from '../../utils/format'
 import { getAdminDashboard } from '../../api/dashboard'
+import { getExpenseCategories } from '../../api/expenses'
 import { listOrders } from '../../api/orders'
 import { ORDER_STATUS_VARIANT, formatOrderStatus } from '../orders/orderHelpers'
 import {
@@ -60,8 +61,46 @@ const dateRangePresets = [
   { value: 'custom', label: 'Custom Range' },
 ]
 
+// Format a Date as a LOCAL "YYYY-MM-DD". `date.toISOString()` is UTC, so `new Date(y, m, 1)`
+// (local midnight) rolls back to the previous day in +offset timezones like IST — which made
+// "This Month" send date_from = the 31st of last month and the chart show a single "31" bar.
 function toIsoDate(date) {
-  return date.toISOString().slice(0, 10)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+const localIso = toIsoDate
+
+// Parse "YYYY-MM-DD" as a LOCAL date (plain `new Date('2026-09-01')` parses as UTC and shifts).
+function parseLocalDate(value) {
+  if (typeof value === 'string') {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  }
+  return new Date(value)
+}
+
+// Expand the API's (possibly sparse) day rows into one continuous point per day across
+// [fromIso, toIso]. Missing days become 0 so the chart spans the whole selected period.
+function buildDailySeries(rows, fromIso, toIso, keys) {
+  const byDate = new Map()
+  ;(rows || []).forEach((row) => {
+    const key = String(row?.date || '').slice(0, 10)
+    if (key) byDate.set(key, row)
+  })
+
+  const cursor = parseLocalDate(fromIso)
+  const end = parseLocalDate(toIso)
+  const out = []
+  for (let guard = 0; cursor <= end && guard < 400; guard += 1) {
+    const key = localIso(cursor)
+    const src = byDate.get(key) || {}
+    const entry = { date: key }
+    keys.forEach((k) => {
+      entry[k] = Number(src[k]) || 0
+    })
+    out.push(entry)
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return out
 }
 
 function resolveDateRange(preset, customRange) {
@@ -110,13 +149,13 @@ function formatRangeLabel(value) {
 }
 
 function formatChartDateLabel(value) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+  const date = parseLocalDate(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
 function formatCashflowDateLabel(value) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN', { day: '2-digit' })
+  const date = parseLocalDate(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
 function formatOrderDate(value) {
@@ -425,6 +464,13 @@ const MONTHLY_SALES_TARGET = 80000
 
 const EXPENSE_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8', '#ec4899', '#14b8a6']
 
+// Grey placeholder ring drawn when a donut card has no data.
+const EMPTY_DONUT = [{ name: 'No data', value: 1, color: '#e5e7eb' }]
+
+// Shown in the Expense Breakdown legend when the org hasn't set up categories yet,
+// so the card still lists rows (at ₹0) instead of looking empty.
+const DEFAULT_EXPENSE_CATEGORIES = ['Salaries', 'Rent & Utilities', 'Purchase Returns', 'Transport', 'Miscellaneous']
+
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const [datePreset, setDatePreset] = useState('this_month')
@@ -433,6 +479,7 @@ export default function AdminDashboard() {
   const [topProductsMetric, setTopProductsMetric] = useState('amount')
   const [dashboard, setDashboard] = useState(null)
   const [orders, setOrders] = useState([])
+  const [expenseCategoryNames, setExpenseCategoryNames] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(() => {
@@ -464,6 +511,19 @@ export default function AdminDashboard() {
     loadDashboard(datePreset, customRange)
     // Only refetch when the user explicitly applies a new preset (Apply button) - not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Category names for the Expense Breakdown legend — so it lists rows even at ₹0 spend.
+  useEffect(() => {
+    getExpenseCategories().then((result) => {
+      if (result.success && Array.isArray(result.categories)) {
+        setExpenseCategoryNames(
+          result.categories
+            .map((c) => (typeof c === 'string' ? c : c?.name || c?.label || c?.category || ''))
+            .filter(Boolean),
+        )
+      }
+    })
   }, [])
 
   useEffect(() => {
@@ -539,9 +599,7 @@ export default function AdminDashboard() {
     ...bucket,
     pct: arHasData ? Math.round((bucket.value / arTotal) * 100) : 0,
   }))
-  const arPieData = arHasData
-    ? arSegments.filter((segment) => segment.value >= 1)
-    : [{ name: 'No data', value: 1, color: '#e5e7eb' }]
+  const arPieData = arHasData ? arSegments.filter((segment) => segment.value >= 1) : EMPTY_DONUT
 
   // Business Health Score - a composite of five operational signals.
   const periodExpenses = summary.expenses ?? 0
@@ -561,14 +619,36 @@ export default function AdminDashboard() {
   const periodSales = summary.period_sales ?? summary.month_sales ?? 0
   const targetProgress = MONTHLY_SALES_TARGET > 0 ? Math.min(100, Math.round((periodSales / MONTHLY_SALES_TARGET) * 100)) : 0
 
-  const cashflowData = cashflowRows.map((row) => ({
+  // For This Month / Last Month, expand the API's (sparse) day rows to one point per day
+  // across the whole calendar month — otherwise a fresh month shows just 2-3 points. Longer
+  // ranges (quarter/year/custom) keep the API's own bucketing untouched.
+  const isDailyMonthChart = datePreset === 'this_month' || datePreset === 'last_month'
+  const monthChartRange = isDailyMonthChart
+    ? (() => {
+        const { date_from } = resolveDateRange(datePreset, customRange)
+        const start = parseLocalDate(date_from)
+        return { from: date_from, to: localIso(new Date(start.getFullYear(), start.getMonth() + 1, 0)) }
+      })()
+    : null
+  const buildChart = (rows, keys) => {
+    if (monthChartRange) return buildDailySeries(rows, monthChartRange.from, monthChartRange.to, keys)
+    return (rows || []).map((row) => {
+      const entry = { date: String(row?.date || '').slice(0, 10) }
+      keys.forEach((k) => {
+        entry[k] = Number(row?.[k]) || 0
+      })
+      return entry
+    })
+  }
+
+  const cashflowData = buildChart(cashflowRows, ['inflow', 'outflow']).map((row) => ({
     label: formatCashflowDateLabel(row.date),
-    value: row.inflow || 0,
-    outflow: row.outflow || 0,
+    value: row.inflow,
+    outflow: row.outflow,
   }))
-  const salesTrendData = salesTrendRows.map((row) => ({
+  const salesTrendData = buildChart(salesTrendRows, ['sales']).map((row) => ({
     label: formatChartDateLabel(row.date),
-    value: row.sales || 0,
+    value: row.sales,
   }))
   const healthTrendData = salesTrendData.length >= 2 ? salesTrendData : cashflowData
   const topCustomers = topCustomersRows.map((row) => ({ name: row.customer_name, value: row.sales || 0 }))
@@ -581,18 +661,30 @@ export default function AdminDashboard() {
   const topProductsValueKey = topProductsMetric === 'quantity' ? 'quantity' : 'amount'
   const topProductsSorted = [...topProducts].sort((a, b) => (b[topProductsValueKey] || 0) - (a[topProductsValueKey] || 0))
   const topProductsPeak = topProductsSorted[0]?.[topProductsValueKey] || 1
-  const expenseBreakdownRaw = expenseBreakdownRows.map((row) => ({ name: row.category, value: row.amount || 0 }))
-  const expenseTotal = expenseBreakdownRaw.reduce((sum, entry) => sum + entry.value, 0)
+  const expenseByCategory = new Map()
+  expenseBreakdownRows.forEach((row) => {
+    if (row.category) expenseByCategory.set(row.category, (expenseByCategory.get(row.category) || 0) + (Number(row.amount) || 0))
+  })
+  const expenseTotal = [...expenseByCategory.values()].reduce((sum, value) => sum + value, 0)
   const expenseHasData = expenseTotal >= 1
-  const expenseBreakdown = expenseBreakdownRaw
-    .filter((entry) => entry.value >= 1)
-    .sort((a, b) => b.value - a.value)
-    .map((entry, index) => ({
-      ...entry,
+  // The legend always lists category rows (real spend first, then the org's other categories
+  // — or sensible defaults — at ₹0), just like the Receivables card shows its buckets at ₹0.
+  const fallbackCategories = expenseCategoryNames.length ? expenseCategoryNames : DEFAULT_EXPENSE_CATEGORIES
+  const legendCategoryNames = [
+    ...[...expenseByCategory.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name),
+    ...fallbackCategories.filter((name) => !expenseByCategory.has(name)),
+  ]
+  const expenseBreakdown = legendCategoryNames.slice(0, 6).map((name, index) => {
+    const value = expenseByCategory.get(name) || 0
+    return {
+      name,
+      value,
       color: EXPENSE_COLORS[index % EXPENSE_COLORS.length],
-      pct: expenseHasData ? Math.round((entry.value / expenseTotal) * 100) : 0,
-    }))
-  const expensePieData = expenseHasData ? expenseBreakdown : [{ name: 'No data', value: 1, color: '#e5e7eb' }]
+      pct: expenseTotal > 0 ? Math.round((value / expenseTotal) * 100) : 0,
+    }
+  })
+  // Donut slices are only the categories that actually have spend.
+  const expensePieData = expenseBreakdown.filter((entry) => entry.value >= 1)
   const recentOrders = recentOrdersRows.map((row) => ({
     id: row.id,
     orderNumber: row.order_number,
@@ -916,13 +1008,14 @@ export default function AdminDashboard() {
               title="Cashflow"
               subtitle={`Net for period ${formatCurrency(summary.period_sales ?? summary.month_sales)}`}
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{rangeLabel}</span>}
-              className="h-full min-h-[280px]"
+              className="flex h-full min-h-[280px] flex-col"
+              bodyClassName="flex flex-1 flex-col"
             >
-              <div className="-mr-2">
-                <ResponsiveContainer width="100%" height={230}>
+              <div className="-mr-2 min-h-50 flex-1">
+                <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={cashflowData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid vertical={false} stroke="#edf1f5" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval={4} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
                     <YAxis
                       tick={{ fontSize: 11, fill: '#9aa1ac' }}
                       tickLine={false}
@@ -939,8 +1032,8 @@ export default function AdminDashboard() {
                       iconSize={8}
                       formatter={(value) => <span className="text-[0.7rem] text-neutral-500">{value}</span>}
                     />
-                    <Bar name="Inflow" dataKey="value" fill="#14532d" radius={[6, 6, 0, 0]} barSize={16} />
-                    <Bar name="Outflow" dataKey="outflow" fill="#c9ced6" radius={[6, 6, 0, 0]} barSize={16} />
+                    <Bar name="Inflow" dataKey="value" fill="#14532d" radius={[4, 4, 0, 0]} maxBarSize={14} />
+                    <Bar name="Outflow" dataKey="outflow" fill="#c9ced6" radius={[4, 4, 0, 0]} maxBarSize={14} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -950,11 +1043,12 @@ export default function AdminDashboard() {
               title="Receivables vs Payables"
               subtitle={rangeLabel}
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{rangeLabel}</span>}
-              className="h-full min-h-[280px] [&>div:first-child]:mb-3"
+              className="flex h-full min-h-[280px] flex-col [&>div:first-child]:mb-3"
+              bodyClassName="flex flex-1 flex-col"
             >
-              <div className="flex h-full flex-col">
-                <div className="flex flex-col items-center gap-4 sm:flex-row">
-                  <div className="relative h-[160px] w-full max-w-[188px] shrink-0">
+              <div className="@container flex flex-1 flex-col justify-center">
+                <div className="flex flex-col items-center gap-4 @[18rem]:flex-row @[18rem]:items-center @[18rem]:gap-3">
+                  <div className="relative size-32 shrink-0">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -974,39 +1068,39 @@ export default function AdminDashboard() {
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                      <p className="font-(--font-display) text-[1.35rem] font-semibold leading-none tracking-tight text-neutral-900">
+                      <p className="font-(--font-display) text-[1.25rem] font-semibold leading-none tracking-tight text-neutral-900">
                         {formatCompactCurrency(netOutstanding)}
                       </p>
-                      <p className="mt-1 text-[0.66rem] text-neutral-400">Net Outstanding</p>
+                      <p className="mt-1 text-[0.62rem] text-neutral-400">Net Outstanding</p>
                     </div>
                   </div>
 
-                  <div className="w-full space-y-2.5">
+                  <div className="w-full flex-1 space-y-2">
                     {arSegments.map((segment) => (
-                      <div key={segment.name} className="flex items-start justify-between gap-3">
-                        <span className="flex min-w-0 items-center gap-2 text-[0.74rem] text-neutral-600">
-                          <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} aria-hidden="true" />
-                          <span className="truncate">{segment.name}</span>
+                      <div key={segment.name} className="flex items-start justify-between gap-2">
+                        <span className="flex min-w-0 flex-1 items-start gap-2 text-[0.72rem] leading-tight text-neutral-600">
+                          <span className="mt-0.5 size-2 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} aria-hidden="true" />
+                          <span className="min-w-0">{segment.name}</span>
                         </span>
-                        <span className="shrink-0 whitespace-nowrap text-right text-[0.74rem]">
+                        <span className="shrink-0 whitespace-nowrap text-right text-[0.72rem]">
                           <span className="font-semibold text-neutral-900">{formatCompactCurrency(segment.value)}</span>
-                          {arHasData && <span className="ml-1 text-[0.66rem] text-neutral-400">({segment.pct}%)</span>}
+                          {arHasData && <span className="ml-1 text-[0.6rem] text-neutral-400">({segment.pct}%)</span>}
                         </span>
                       </div>
                     ))}
                   </div>
                 </div>
+              </div>
 
-                <div className="mt-auto flex items-center justify-center pt-4 text-[0.72rem]">
-                  <button
-                    type="button"
-                    onClick={() => navigate('/admin/reports')}
-                    className="inline-flex items-center gap-1.5 font-semibold text-primary-600 hover:text-primary-700"
-                  >
-                    View A/R Report
-                    <ChevronRight className="size-4" aria-hidden="true" />
-                  </button>
-                </div>
+              <div className="mt-auto flex items-center justify-center pt-4 text-[0.72rem]">
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/reports')}
+                  className="inline-flex items-center gap-1.5 font-semibold text-primary-600 hover:text-primary-700"
+                >
+                  View A/R Report
+                  <ChevronRight className="size-4" aria-hidden="true" />
+                </button>
               </div>
             </DashboardCard>
           </div>
@@ -1016,11 +1110,12 @@ export default function AdminDashboard() {
               title="Sales Trend"
               subtitle={rangeLabel}
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{rangeLabel}</span>}
-              className="h-full min-h-[264px]"
+              className="flex h-full min-h-[264px] flex-col"
+              bodyClassName="flex flex-1 flex-col"
             >
-              <div className="flex h-full flex-col">
-                <div className="-mr-2">
-                  <ResponsiveContainer width="100%" height={190}>
+              <div className="flex flex-1 flex-col">
+                <div className="-mr-2 min-h-42.5 flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={salesTrendData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid vertical={false} stroke="#edf1f5" />
                       <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} />
@@ -1061,15 +1156,16 @@ export default function AdminDashboard() {
               title="Expense Breakdown"
               subtitle={rangeLabel}
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{rangeLabel}</span>}
-              className="h-full min-h-[264px] [&>div:first-child]:mb-3"
+              className="flex h-full min-h-[264px] flex-col [&>div:first-child]:mb-3"
+              bodyClassName="flex flex-1 flex-col"
             >
-              <div className="flex h-full flex-col">
-                <div className="flex flex-col items-center gap-4 sm:flex-row">
-                  <div className="relative h-[150px] w-full max-w-[172px] shrink-0">
+              <div className="@container flex flex-1 flex-col justify-center">
+                <div className="flex flex-col items-center gap-4 @[18rem]:flex-row @[18rem]:items-center @[18rem]:gap-3">
+                  <div className="relative size-32 shrink-0">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={expensePieData}
+                          data={expenseHasData ? expensePieData : EMPTY_DONUT}
                           dataKey="value"
                           nameKey="name"
                           innerRadius="64%"
@@ -1077,7 +1173,7 @@ export default function AdminDashboard() {
                           paddingAngle={expenseHasData ? 2 : 0}
                           stroke="none"
                         >
-                          {expensePieData.map((entry) => (
+                          {(expenseHasData ? expensePieData : EMPTY_DONUT).map((entry) => (
                             <Cell key={entry.name} fill={entry.color} />
                           ))}
                         </Pie>
@@ -1085,42 +1181,39 @@ export default function AdminDashboard() {
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                      <p className="font-(--font-display) text-[1.35rem] font-semibold leading-none tracking-tight text-neutral-900">
+                      <p className="font-(--font-display) text-[1.25rem] font-semibold leading-none tracking-tight text-neutral-900">
                         {formatCompactCurrency(expenseTotal)}
                       </p>
-                      <p className="mt-1 text-[0.66rem] text-neutral-400">Total Expenses</p>
+                      <p className="mt-1 text-[0.62rem] text-neutral-400">Total Expenses</p>
                     </div>
                   </div>
 
-                  <div className="w-full space-y-2">
-                    {expenseBreakdown.slice(0, 6).map((entry) => (
-                      <div key={entry.name} className="flex items-start justify-between gap-3">
-                        <span className="flex min-w-0 items-center gap-2 text-[0.74rem] text-neutral-600">
-                          <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} aria-hidden="true" />
-                          <span className="truncate">{entry.name}</span>
+                  <div className="w-full flex-1 space-y-2">
+                    {expenseBreakdown.map((entry) => (
+                      <div key={entry.name} className="flex items-start justify-between gap-2">
+                        <span className="flex min-w-0 flex-1 items-start gap-2 text-[0.72rem] leading-tight text-neutral-600">
+                          <span className="mt-0.5 size-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} aria-hidden="true" />
+                          <span className="min-w-0">{entry.name}</span>
                         </span>
-                        <span className="shrink-0 whitespace-nowrap text-right text-[0.74rem]">
+                        <span className="shrink-0 whitespace-nowrap text-right text-[0.72rem]">
                           <span className="font-semibold text-neutral-900">{formatCompactCurrency(entry.value)}</span>
-                          <span className="ml-1 text-[0.66rem] text-neutral-400">({entry.pct}%)</span>
+                          {expenseHasData && <span className="ml-1 text-[0.6rem] text-neutral-400">({entry.pct}%)</span>}
                         </span>
                       </div>
                     ))}
-                    {expenseBreakdown.length === 0 && (
-                      <p className="text-[0.72rem] text-neutral-400">No expenses recorded in this period.</p>
-                    )}
                   </div>
                 </div>
+              </div>
 
-                <div className="mt-auto flex items-center justify-center pt-4 text-[0.72rem]">
-                  <button
-                    type="button"
-                    onClick={() => navigate('/admin/reports')}
-                    className="inline-flex items-center gap-1.5 font-semibold text-primary-600 hover:text-primary-700"
-                  >
-                    View Expense Report
-                    <ChevronRight className="size-4" aria-hidden="true" />
-                  </button>
-                </div>
+              <div className="mt-auto flex items-center justify-center pt-4 text-[0.72rem]">
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/reports')}
+                  className="inline-flex items-center gap-1.5 font-semibold text-primary-600 hover:text-primary-700"
+                >
+                  View Expense Report
+                  <ChevronRight className="size-4" aria-hidden="true" />
+                </button>
               </div>
             </DashboardCard>
           </div>

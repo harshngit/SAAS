@@ -3,6 +3,7 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { createPaymentReceipt } from '../../api/paymentReceipts'
+import { isDemoDelivery } from '../orders/orderDemoData'
 import { formatCurrency } from '../../utils/format'
 
 const METHOD_OPTIONS = [
@@ -59,6 +60,12 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
 
     setIsSaving(true)
     setError('')
+
+    if (isDemoDelivery(delivery?.id)) {
+      setIsSaving(false)
+      onRecorded?.()
+      return
+    }
 
     const result = await createPaymentReceipt({
       customerId: delivery.customerId,

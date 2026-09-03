@@ -125,6 +125,8 @@ function buildOrderBody(payload) {
   if (payload.warehouseId || payload.warehouse_id) body.warehouse_id = payload.warehouseId || payload.warehouse_id
   if (payload.quotationId || payload.quotation_id) body.quotation_id = payload.quotationId || payload.quotation_id
   if (payload.deliveryDate || payload.delivery_date) body.delivery_date = payload.deliveryDate || payload.delivery_date
+  const deliveryAddress = payload.deliveryAddress ?? payload.delivery_address
+  if (deliveryAddress) body.delivery_address = deliveryAddress
   if (payload.paymentType || payload.payment_type) body.payment_type = payload.paymentType || payload.payment_type
   if (payload.paymentTermsDays !== undefined || payload.payment_terms_days !== undefined) {
     body.payment_terms_days = Number(payload.paymentTermsDays ?? payload.payment_terms_days) || 0
@@ -220,6 +222,11 @@ function normalizeOrder(order) {
     warnings: order.warnings || [],
     approvedAt: order.approved_at || null,
     rejectReason: order.reject_reason || '',
+    // Who created the order. `created_by` is a user id; name/role are resolved in the UI.
+    // The `*_name` / `*_role` reads are for when the backend later expands the creator.
+    createdById: order.created_by || order.created_by_id || order.creator?.id || null,
+    createdByName: order.created_by_name || order.creator?.name || order.created_by_user?.name || '',
+    createdByRole: order.created_by_role || order.creator?.role || order.creator?.system_role || '',
     createdAt: order.created_at,
     updatedAt: order.updated_at,
   }

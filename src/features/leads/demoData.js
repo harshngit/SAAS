@@ -26,19 +26,81 @@ function offsetIso(days, hour = 10) {
 }
 
 // -----------------------------------------------------------------------------
-// Demo leads - only their status matters (feeds leadIndex for eligibility rules).
-// Not injected into any lead picker, only into the status lookup maps.
+// Demo leads - feed the leadIndex lookup (name / status / eligibility) and the
+// Create-Quotation lead picker. Enriched to match the current Lead frontend:
+// Lead Type, Segment, multiple Interested Products (comma text, per the current
+// backend shape - rendered as chips), contact person, source, notes.
 // -----------------------------------------------------------------------------
+function buildDemoLead(overrides) {
+  return {
+    id: '',
+    name: '',
+    contactPerson: '',
+    mobileNumber: '',
+    email: '',
+    leadSource: 'Field Visit',
+    leadStatus: 'new',
+    leadType: 'Retailer',
+    segment: 'Small',
+    interestedProduct: 'Rice 10kg',
+    assignedSalespersonId: 'demo-user-rahul',
+    assignedSalespersonName: 'Rahul Sharma',
+    notes: '',
+    convertedCustomerId: '',
+    createdAt: offsetIso(-8),
+    ...overrides,
+  }
+}
+
 export const demoLeads = [
-  { id: 'demo-lead-vikram', name: 'Vikram Joshi', leadStatus: 'new', convertedCustomerId: '' },
-  { id: 'demo-lead-arjun', name: 'Arjun Mehta', leadStatus: 'contacted', convertedCustomerId: '' },
-  { id: 'demo-lead-neeraj', name: 'Neeraj Shah', leadStatus: 'contacted', convertedCustomerId: '' },
-  { id: 'demo-lead-rohit', name: 'Rohit Verma', leadStatus: 'qualified', convertedCustomerId: '' },
-  { id: 'demo-lead-aman', name: 'Aman Kapoor', leadStatus: 'qualified', convertedCustomerId: '' },
-  { id: 'demo-lead-priya', name: 'Priya Nair', leadStatus: 'won', convertedCustomerId: 'demo-customer-priya' },
-  { id: 'demo-lead-kunal', name: 'Kunal Sharma', leadStatus: 'lost', convertedCustomerId: '' },
-  { id: 'demo-lead-sneha', name: 'Sneha Iyer', leadStatus: 'contacted', convertedCustomerId: '' },
-  { id: 'demo-lead-manish', name: 'Manish Rao', leadStatus: 'new', convertedCustomerId: '' },
+  buildDemoLead({
+    id: 'demo-lead-vikram', name: 'Vikram Traders', contactPerson: 'Vikram Joshi',
+    mobileNumber: '+91 98110 20001', email: 'vikram.traders@demo.in', leadStatus: 'new',
+    leadType: 'Retailer', segment: 'Small', interestedProduct: 'Rice 10kg, Sugar 5kg',
+  }),
+  buildDemoLead({
+    id: 'demo-lead-arjun', name: 'Arjun Kirana Store', contactPerson: 'Arjun Mehta',
+    mobileNumber: '+91 98110 20002', email: 'arjun.kirana@demo.in', leadStatus: 'contacted',
+    leadType: 'Retailer', segment: 'Small', interestedProduct: 'Wheat Flour 5kg',
+  }),
+  buildDemoLead({
+    id: 'demo-lead-neeraj', name: 'Neeraj Wholesale', contactPerson: 'Neeraj Shah',
+    mobileNumber: '+91 98110 20003', email: 'neeraj.wholesale@demo.in', leadStatus: 'contacted',
+    leadType: 'Wholesaler', segment: 'Medium', interestedProduct: 'Rice 10kg, Wheat Flour 5kg, Sunflower Oil 1L',
+  }),
+  buildDemoLead({
+    id: 'demo-lead-rohit', name: 'Rohit Provision Store', contactPerson: 'Rohit Verma',
+    mobileNumber: '+91 98110 20004', email: 'rohit.provision@demo.in', leadStatus: 'qualified',
+    leadType: 'Retailer', segment: 'Medium', interestedProduct: 'Sunflower Oil 1L, Sugar 5kg',
+  }),
+  buildDemoLead({
+    id: 'demo-lead-aman', name: 'Aman Distributors', contactPerson: 'Aman Kapoor',
+    mobileNumber: '+91 98110 20005', email: 'aman.dist@demo.in', leadStatus: 'qualified',
+    leadType: 'Distributor', segment: 'Large', interestedProduct: 'Rice 10kg, Wheat Flour 5kg',
+    notes: 'Bulk buyer — negotiating on freight and credit period.',
+  }),
+  buildDemoLead({
+    id: 'demo-lead-priya', name: 'Priya Retail', contactPerson: 'Priya Nair',
+    mobileNumber: '+91 98110 20006', email: 'priya.retail@demo.in', leadStatus: 'won',
+    leadType: 'Retailer', segment: 'Key Account', interestedProduct: 'Rice 10kg',
+    convertedCustomerId: 'demo-customer-priya', notes: 'Converted to customer from the accepted quotation.',
+  }),
+  buildDemoLead({
+    id: 'demo-lead-kunal', name: 'Kunal Enterprises', contactPerson: 'Kunal Sharma',
+    mobileNumber: '+91 98110 20007', email: 'kunal.ent@demo.in', leadStatus: 'lost',
+    leadType: 'Private Company', segment: 'Large', interestedProduct: 'Sugar 5kg, Sunflower Oil 1L',
+    notes: 'Went with a competitor on price. Marked Lost.',
+  }),
+  buildDemoLead({
+    id: 'demo-lead-sneha', name: 'Sneha Foods', contactPerson: 'Sneha Iyer',
+    mobileNumber: '+91 98110 20008', email: 'sneha.foods@demo.in', leadStatus: 'contacted',
+    leadType: 'Restaurant', segment: 'Medium', interestedProduct: 'Sunflower Oil 1L, Wheat Flour 5kg',
+  }),
+  buildDemoLead({
+    id: 'demo-lead-manish', name: 'Manish Super Bazaar', contactPerson: 'Manish Rao',
+    mobileNumber: '+91 98110 20009', email: 'manish.bazaar@demo.in', leadStatus: 'new',
+    leadType: 'Retailer', segment: 'Small', interestedProduct: 'Rice 10kg, Sugar 5kg',
+  }),
 ]
 
 function demoFollowUp(overrides) {

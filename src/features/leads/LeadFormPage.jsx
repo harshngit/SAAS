@@ -16,11 +16,12 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
-import { LEAD_SOURCE_OPTIONS, createLead } from '../../api/leads'
+import { LEAD_SEGMENT_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_TYPE_OPTIONS, createLead } from '../../api/leads'
 import { listCustomers } from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
+import InterestedProductsField from './InterestedProductsField'
 
 // Every new lead starts as "New" - the status is never chosen at creation time
 // (a user must not be able to create a lead directly as Won/Lost).
@@ -29,6 +30,8 @@ const emptyForm = {
   contactPerson: '',
   email: '',
   interestedProduct: '',
+  leadType: '',
+  segment: '',
   notes: '',
   leadSource: '',
   customerId: '',
@@ -299,11 +302,23 @@ export default function LeadFormPage() {
                 error={errors.assignedSalespersonId}
                 disabled={isLoadingOptions || isSalesOfficer}
               />
-              <Input
-                label="Interested Product"
+              <Select
+                label="Lead Type"
+                options={LEAD_TYPE_OPTIONS}
+                value={formData.leadType}
+                onChange={(event) => updateField('leadType', event.target.value)}
+                placeholder="Select a type"
+              />
+              <Select
+                label="Segment"
+                options={LEAD_SEGMENT_OPTIONS}
+                value={formData.segment}
+                onChange={(event) => updateField('segment', event.target.value)}
+                placeholder="Select a segment"
+              />
+              <InterestedProductsField
                 value={formData.interestedProduct}
-                onChange={(event) => updateField('interestedProduct', event.target.value)}
-                placeholder="What are they interested in?"
+                onChange={(next) => updateField('interestedProduct', next)}
                 className="sm:col-span-2"
               />
               <Input

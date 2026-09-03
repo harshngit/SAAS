@@ -373,6 +373,9 @@ export default function LeadDetail() {
   )
 
   const isConverted = Boolean(lead?.convertedCustomerId)
+  // A Lost lead cannot convert straight to a customer - the rep must first re-open it
+  // (Edit Lead -> status Contacted / Qualified). Recovery activity stays available.
+  const isLost = lead?.leadStatus === 'lost'
 
   const journeyState = useMemo(() => getLeadJourneyState(lead), [lead])
 
@@ -382,6 +385,17 @@ export default function LeadDetail() {
   )
 
   const noteEntries = useMemo(() => parseNoteEntries(lead?.notes), [lead?.notes])
+
+  // The backend stores interested products as one free-text field; reps enter several separated
+  // by comma / newline / bullet, so split it into a list for display.
+  const interestedProducts = useMemo(
+    () =>
+      String(lead?.interestedProduct || '')
+        .split(/\s*(?:,|;|\n|\||•)\s*/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    [lead?.interestedProduct],
+  )
 
   const handleSaveLead = async (formData) => {
     setIsSaving(true)
@@ -637,7 +651,7 @@ export default function LeadDetail() {
     )
     const outcome = completeOutcome
     setCompletingFollowUp(null)
-    if (isReadyToConvertOutcome(outcome) && !isConverted) {
+    if (isReadyToConvertOutcome(outcome) && !isConverted && !isLost) {
       setReadyToConvertNudge(true)
     }
     showToast({ title: 'Follow-up completed', message: `Outcome: ${formatLabel(outcome)}.` })
@@ -702,7 +716,7 @@ export default function LeadDetail() {
               <ArrowRightCircle className="size-4" aria-hidden="true" />
               View Customer
             </Button>
-          ) : (
+          ) : isLost ? null : (
             <Button size="sm" onClick={() => setIsConvertOpen(true)}>
               <ArrowRightCircle className="size-4" aria-hidden="true" />
               Convert to Customer
@@ -728,12 +742,12 @@ export default function LeadDetail() {
           </SummaryItem>
           <SummaryItem label="Source">{lead.leadSource || '—'}</SummaryItem>
           <SummaryItem label="Assigned To">{lead.assignedSalespersonName || 'Unassigned'}</SummaryItem>
-          <SummaryItem label="Interested Product">{lead.interestedProduct || '—'}</SummaryItem>
+          <SummaryItem label="Interested Products">{interestedProducts.length ? interestedProducts.join(', ') : '—'}</SummaryItem>
           <SummaryItem label="Created Date">{formatDate(lead.createdAt)}</SummaryItem>
         </div>
       </div>
 
-      {readyToConvertNudge && !isConverted && (
+      {readyToConvertNudge && !isConverted && !isLost && (
         <div className="flex flex-col gap-3 rounded-2xl border border-primary-100 bg-primary-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2 text-sm font-medium text-primary-900">
             <CheckCircle2 className="size-4 shrink-0 text-primary-700" aria-hidden="true" />
@@ -748,6 +762,21 @@ export default function LeadDetail() {
           </div>
         </div>
       )}
+
+      <Section title="Lead Journey" icon={Calendar}>
+        <div className="flex items-start px-1">
+          <LeadJourneyNode index={1} label="New" state={journeyState.isLost ? 'done' : journeyState.index > 0 ? 'done' : 'current'} />
+          <LeadJourneyNode index={2} label="Contacted" state={journeyState.index > 1 ? 'done' : journeyState.index === 1 ? 'current' : 'pending'} />
+          <LeadJourneyNode index={3} label="Qualified" state={journeyState.index > 2 ? 'done' : journeyState.index === 2 ? 'current' : 'pending'} />
+          <LeadJourneyNode index={4} label="Converted" state={journeyState.index >= 3 ? 'done' : 'pending'} isLast />
+        </div>
+        {journeyState.isLost && (
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3.5 py-2.5">
+            <X className="size-4 shrink-0 text-red-600" aria-hidden="true" />
+            <p className="text-sm font-medium text-red-700">This lead was marked Lost.</p>
+          </div>
+        )}
+      </Section>
 
       <Section title="Contact Information" icon={UserRound}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -768,8 +797,26 @@ export default function LeadDetail() {
               <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLeadStatus(lead.leadStatus)}</Badge>
             </div>
           </div>
-          <Field label="Interested Product" value={lead.interestedProduct} />
+          <Field label="Lead Type" value={lead.leadType} />
+          <Field label="Segment" value={lead.segment} />
           <Field label="Created Date" value={formatDateTime(lead.createdAt)} />
+          <div className="sm:col-span-2 lg:col-span-3">
+            <p className="text-xs text-neutral-400">Interested Products</p>
+            {interestedProducts.length === 0 ? (
+              <p className="mt-1 text-sm font-medium text-neutral-900">—</p>
+            ) : (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {interestedProducts.map((product) => (
+                  <span
+                    key={product}
+                    className="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700"
+                  >
+                    {product}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </Section>
 
@@ -802,21 +849,6 @@ export default function LeadDetail() {
                 </p>
               </div>
             ))}
-          </div>
-        )}
-      </Section>
-
-      <Section title="Lead Journey" icon={Calendar}>
-        <div className="flex items-start px-1">
-          <LeadJourneyNode index={1} label="New" state={journeyState.isLost ? 'done' : journeyState.index > 0 ? 'done' : 'current'} />
-          <LeadJourneyNode index={2} label="Contacted" state={journeyState.index > 1 ? 'done' : journeyState.index === 1 ? 'current' : 'pending'} />
-          <LeadJourneyNode index={3} label="Qualified" state={journeyState.index > 2 ? 'done' : journeyState.index === 2 ? 'current' : 'pending'} />
-          <LeadJourneyNode index={4} label="Converted" state={journeyState.index >= 3 ? 'done' : 'pending'} isLast />
-        </div>
-        {journeyState.isLost && (
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3.5 py-2.5">
-            <X className="size-4 shrink-0 text-red-600" aria-hidden="true" />
-            <p className="text-sm font-medium text-red-700">This lead was marked Lost.</p>
           </div>
         )}
       </Section>

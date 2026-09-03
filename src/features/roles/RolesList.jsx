@@ -10,6 +10,9 @@ import Modal from '../../components/ui/Modal'
 import { deleteRole, getRolesCatalog, listRoles } from '../../api/roles'
 import { RequirePermission } from '../../auth/RequirePermission'
 
+const WORKSPACE_LABELS = { sales: 'Sales', delivery: 'Delivery', accounts: 'Finance', admin: 'Admin' }
+const DATA_SCOPE_LABELS = { own: 'Own Records', team: 'Team Records', all: 'All Workspace Records' }
+
 function getModuleSummary(role, catalogModuleCount, catalogActionKeys) {
   const permissions = role.permissions || {}
   const moduleKeys = Object.keys(permissions)
@@ -144,7 +147,10 @@ export default function RolesList() {
               <thead>
                 <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
                   <th className="whitespace-nowrap px-4 py-3">Role</th>
-                  <th className="whitespace-nowrap px-4 py-3">Access</th>
+                  <th className="whitespace-nowrap px-4 py-3">Workspace</th>
+                  <th className="whitespace-nowrap px-4 py-3">Data Scope</th>
+                  <th className="whitespace-nowrap px-4 py-3">Users</th>
+                  <th className="whitespace-nowrap px-4 py-3">Status</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
@@ -160,15 +166,24 @@ export default function RolesList() {
                           <ShieldCheck className="size-4" aria-hidden="true" />
                         </div>
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-neutral-900">{role.name}</span>
-                            {role.is_default && <Badge variant="primary">Default</Badge>}
-                          </div>
+                          <span className="font-medium text-neutral-900">{role.name}</span>
+                          <p className="text-xs text-neutral-400">
+                            {getModuleSummary(role, catalogModuleCount, catalogActionKeys)}
+                          </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-neutral-600">
-                      {getModuleSummary(role, catalogModuleCount, catalogActionKeys)}
+                      {WORKSPACE_LABELS[role.workspace] || role.workspace || '—'}
+                    </td>
+                    <td className="px-4 py-3.5 text-neutral-600">
+                      {DATA_SCOPE_LABELS[role.data_scope] || role.data_scope || '—'}
+                    </td>
+                    <td className="px-4 py-3.5 text-neutral-600">{role.assigned_users ?? 0}</td>
+                    <td className="px-4 py-3.5">
+                      <Badge variant={role.is_default ? 'primary' : 'success'}>
+                        {role.is_default ? 'Default' : 'Active'}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <ActionMenu

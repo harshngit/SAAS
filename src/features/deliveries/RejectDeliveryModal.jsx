@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import { rejectDelivery } from '../../api/deliveries'
+import { getDemoDelivery, isDemoDelivery, patchDemoDelivery } from '../orders/orderDemoData'
 
 // Shared reject flow used by the delivery list and the delivery detail page.
 // On success the parent gets the updated delivery (or just a signal) via onRejected.
@@ -26,6 +27,15 @@ export default function RejectDeliveryModal({ delivery, isOpen, onClose, onRejec
 
     setIsRejecting(true)
     setError('')
+
+    if (isDemoDelivery(delivery.id)) {
+      patchDemoDelivery(delivery.id, { status: 'rejected', failureReason: reason.trim() })
+      setIsRejecting(false)
+      setReason('')
+      onRejected?.(getDemoDelivery(delivery.id))
+      onClose()
+      return
+    }
 
     const result = await rejectDelivery(delivery.id, reason.trim())
 

@@ -7,6 +7,11 @@ import { quotationTotals } from './quotationHelpers'
 // hand-creating each scenario. Appended to the list AFTER the real API load and
 // never sent to any backend endpoint (no call carries a `demo-qt-` id).
 //
+// The demo quotation object now carries the Lead relationship directly
+// (`leadId` + `lead`), matching the shape real API data is moving toward.
+// `demoQuotationMeta` is kept as a THIN compatibility adapter derived from these
+// objects - components that still read the localStorage-style meta keep working.
+//
 // TODO: remove quotation demo data when the backend provides test fixtures.
 // =============================================================================
 
@@ -30,7 +35,7 @@ function item(overrides) {
     uom: overrides.uom || 'unit',
     unitPrice: overrides.unitPrice,
     discount: overrides.discount || 0,
-    taxRate: overrides.taxRate ?? 18,
+    taxRate: overrides.taxRate ?? 5,
     taxAmount: 0,
     lineTotal: 0,
   }
@@ -41,32 +46,39 @@ function item(overrides) {
   return base
 }
 
-function quotation({ id, number, status, customerId, customerName, validDays, items, notes, terms }) {
+// `lead` (optional): { id, name, leadStatus, convertedCustomerId }.
+// If a lead has a convertedCustomerId, the quotation also carries that customer.
+function quotation({ id, number, status, customerId, customerName, lead, validDays, items, notes, terms }) {
   const totals = quotationTotals(items)
+  const linkedCustomerId = customerId || lead?.convertedCustomerId || ''
+  const linkedCustomerName = customerName || (lead?.convertedCustomerId ? lead.name : '')
   return {
     id,
     quotationNumber: number,
     quotationDate: isoDate(-4),
     validUntil: isoDate(validDays ?? 10),
-    customerId: customerId || '',
-    customerName: customerName || '',
-    billingAddress: customerName ? `${customerName}, 4th Cross, Industrial Area, Bengaluru 560058` : '',
-    shippingAddress: customerName ? `${customerName} Warehouse, Peenya, Bengaluru 560058` : '',
-    salespersonId: '',
-    salespersonName: 'sales',
+    customerId: linkedCustomerId,
+    customerName: linkedCustomerName,
+    // Real-API-shaped lead relationship (not browser-only metadata).
+    leadId: lead?.id || '',
+    lead: lead ? { id: lead.id, name: lead.name, leadStatus: lead.leadStatus || 'qualified' } : null,
+    billingAddress: linkedCustomerName ? `${linkedCustomerName}, 4th Cross, Industrial Area` : '',
+    shippingAddress: linkedCustomerName ? `${linkedCustomerName} Warehouse, Bhiwandi` : '',
+    salespersonId: 'demo-user-rahul',
+    salespersonName: 'Rahul Sharma',
     currency: 'INR',
     paymentTerms: 'Net 30',
     deliveryTerms: 'Standard delivery',
     notes: notes || 'Internal: customer negotiating on freight.',
-    termsConditions: terms || 'Prices valid for 15 days. GST extra as applicable. Delivery within 5 working days of confirmed order.',
+    termsConditions: terms || 'Prices valid for 15 days. GST extra as applicable. Delivery within 5 working days of a confirmed order.',
     status,
     items,
     itemCount: items.length,
     subtotal: totals.subtotal,
     taxTotal: totals.tax,
     total: totals.grandTotal,
-    convertedOrderId: null,
-    convertedAt: null,
+    convertedOrderId: status === 'converted' ? 'demo-so-completed' : null,
+    convertedAt: status === 'converted' ? iso(-1) : null,
     createdAt: iso(-4),
     updatedAt: iso(-1),
   }
@@ -75,70 +87,87 @@ function quotation({ id, number, status, customerId, customerName, validDays, it
 const RICE = { productName: 'Rice 10kg', productId: 'demo-p-rice', uom: 'bag', unitPrice: 620, taxRate: 5 }
 const OIL = { productName: 'Sunflower Oil 1L', productId: 'demo-p-oil', uom: 'bottle', unitPrice: 180, taxRate: 5 }
 const FLOUR = { productName: 'Wheat Flour 5kg', productId: 'demo-p-flour', uom: 'bag', unitPrice: 335, taxRate: 5 }
+const SUGAR = { productName: 'Sugar 5kg', productId: 'demo-p-sugar', uom: 'bag', unitPrice: 260, taxRate: 5 }
+
+// Leads referenced by the demo lead-quotations (ids match src/features/leads/demoData.js).
+const LEAD_AMAN = { id: 'demo-lead-aman', name: 'Aman Distributors', leadStatus: 'qualified', convertedCustomerId: '' }
+const LEAD_PRIYA = { id: 'demo-lead-priya', name: 'Priya Retail', leadStatus: 'won', convertedCustomerId: 'demo-customer-priya' }
 
 export const demoQuotations = [
-  // 1. Draft + customer -> Edit / Send / Delete
+  // 1. Draft + customer -> Edit / Send / Download / Delete
   quotation({
     id: 'demo-qt-draft-customer', number: 'QT-DEMO-D1', status: 'draft',
-    customerId: 'demo-customer-abc', customerName: 'ABC Traders', validDays: 12,
+    customerId: 'demo-customer-metro', customerName: 'Metro Mart', validDays: 12,
     items: [item({ id: 'i1', ...RICE, quantity: 40 }), item({ id: 'i2', ...OIL, quantity: 100 })],
   }),
-  // 2. Sent + customer -> Accept / Reject
+  // 2. Sent + customer -> Edit / Accept / Reject / Download
   quotation({
     id: 'demo-qt-sent-customer', number: 'QT-DEMO-S1', status: 'sent',
-    customerId: 'demo-customer-rohan', customerName: 'Rohan Patil', validDays: 6,
-    items: [item({ id: 'i1', ...FLOUR, quantity: 60 }), item({ id: 'i2', ...RICE, quantity: 20 })],
+    customerId: 'demo-customer-green', customerName: 'Green Basket Stores', validDays: 6,
+    items: [item({ id: 'i1', ...FLOUR, quantity: 60 }), item({ id: 'i2', ...SUGAR, quantity: 20 })],
   }),
-  // 3. Accepted + customer -> Convert to Order
+  // 3. Accepted + customer -> Convert to Order / Download / Duplicate
   quotation({
     id: 'demo-qt-accepted-customer', number: 'QT-DEMO-A1', status: 'accepted',
-    customerId: 'demo-customer-neha', customerName: 'Neha Sharma', validDays: 8,
+    customerId: 'demo-customer-aarav', customerName: 'Aarav Distributors', validDays: 8,
     items: [item({ id: 'i1', ...RICE, quantity: 80 }), item({ id: 'i2', ...OIL, quantity: 150, discount: 5 })],
   }),
-  // 4. Accepted + LEAD (no customer) -> Convert to Customer, NO Convert to Order
+  // 4. Accepted + LEAD only, NO customer -> Convert to Customer (NOT Convert to Order) (§20 A)
   quotation({
     id: 'demo-qt-accepted-lead', number: 'QT-DEMO-A2', status: 'accepted',
-    customerId: '', customerName: '', validDays: 9,
+    lead: LEAD_AMAN, validDays: 9,
     items: [item({ id: 'i1', ...FLOUR, quantity: 120, discount: 8 })],
     notes: 'Internal: prospect wants a quote before onboarding.',
   }),
-  // 5. Accepted LEAD that has ALREADY been converted -> View Customer + Convert to Order
+  // 5. Accepted, LEAD reference + customer already created -> View Customer + Convert to Order (§20 B)
   quotation({
     id: 'demo-qt-lead-converted', number: 'QT-DEMO-A2C', status: 'accepted',
-    customerId: 'demo-customer-aman', customerName: 'Aman Kapoor', validDays: 11,
+    lead: LEAD_PRIYA, validDays: 11,
     items: [item({ id: 'i1', ...RICE, quantity: 90, discount: 6 })],
     notes: 'Internal: lead was converted to a customer from this quotation.',
   }),
-  // 6. Rejected -> Duplicate only
+  // 6. Rejected -> Edit & Resend / Download / Duplicate
   quotation({
     id: 'demo-qt-rejected', number: 'QT-DEMO-R1', status: 'rejected',
-    customerId: 'demo-customer-priya', customerName: 'Priya Nair', validDays: 3,
+    customerId: 'demo-customer-metro', customerName: 'Metro Mart', validDays: 3,
     items: [item({ id: 'i1', ...RICE, quantity: 30 })],
   }),
-  // 7. Expired (sent + valid-until in the past) -> Edit & Resend
+  // 7. Expired = sent + valid-until in the past (frontend-derived, never a stored status) (§21)
   quotation({
     id: 'demo-qt-expired', number: 'QT-DEMO-E1', status: 'sent',
-    customerId: 'demo-customer-aman', customerName: 'Aman Kapoor', validDays: -3,
+    customerId: 'demo-customer-green', customerName: 'Green Basket Stores', validDays: -3,
     items: [item({ id: 'i1', ...OIL, quantity: 200 }), item({ id: 'i2', ...FLOUR, quantity: 40 })],
   }),
-  // Terminal: already converted to an order
+  // 8. Converted to an order -> View Order / Download / Duplicate
   quotation({
     id: 'demo-qt-converted', number: 'QT-DEMO-C1', status: 'converted',
-    customerId: 'demo-customer-manish', customerName: 'Manish Rao', validDays: 20,
+    customerId: 'demo-customer-aarav', customerName: 'Aarav Distributors', validDays: 20,
     items: [item({ id: 'i1', ...FLOUR, quantity: 75 })],
   }),
 ]
 
-// Lead links for the demo lead quotations (mirrors what getQuotationMeta would return).
-export const demoQuotationMeta = {
-  'demo-qt-accepted-lead': { leadId: 'demo-lead-vikram', leadName: 'Vikram Joshi', leadStatus: 'qualified', convertedCustomerId: '' },
-  // Already-converted lead quotation: has a customer + records the source lead.
-  'demo-qt-lead-converted': { leadId: 'demo-lead-aman', leadName: 'Aman Kapoor', leadStatus: 'qualified', convertedCustomerId: 'demo-customer-aman' },
-}
+// Thin compatibility adapter - derived from the quotation objects above, not the
+// other way round. Components that still read getQuotationMeta()-style data get it here.
+export const demoQuotationMeta = demoQuotations.reduce((map, q) => {
+  if (q.leadId) {
+    map[q.id] = {
+      leadId: q.leadId,
+      leadName: q.lead?.name || '',
+      leadStatus: q.lead?.leadStatus || '',
+      convertedCustomerId: q.customerId && q.leadId ? q.customerId : '',
+    }
+  }
+  return map
+}, {})
 
-// Local overrides for demo quotations (e.g. status flips from the Edit & Resend / Send
-// flow). Kept in localStorage so the change survives navigation - demo only, never sent.
-const OVERRIDE_KEY = 'saas.quotationDemoOverride'
+// Local overrides for demo quotations (status flips from Edit & Resend / Send).
+// Versioned key so a rebuild never inherits stale rows; old key cleaned up once.
+const OVERRIDE_KEY = 'saas.quotationDemoOverride.v2'
+try {
+  window.localStorage.removeItem('saas.quotationDemoOverride')
+} catch {
+  /* storage disabled */
+}
 
 function readOverrides() {
   try {

@@ -3,8 +3,9 @@ import { LocateFixed } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
-import { LEAD_MANUAL_STATUS_OPTIONS, LEAD_SOURCE_OPTIONS } from '../../api/leads'
+import { LEAD_MANUAL_STATUS_OPTIONS, LEAD_SEGMENT_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_TYPE_OPTIONS } from '../../api/leads'
 import { formatLeadStatus } from './leadActivity'
+import InterestedProductsField from './InterestedProductsField'
 
 export const customerCategoryOptions = ['Retail', 'Wholesale', 'Corporate', 'VIP', 'Dealer', 'Distributor'].map((value) => ({
   value,
@@ -114,10 +115,23 @@ export function LeadEditForm({ lead, customerOptions, salespersonOptions, saving
             onChange={(event) => updateField('leadStatus', event.target.value)}
           />
         )}
-        <Input
-          label="Interested Product"
+        <Select
+          label="Lead Type"
+          options={LEAD_TYPE_OPTIONS}
+          value={formData.leadType || ''}
+          onChange={(event) => updateField('leadType', event.target.value)}
+          placeholder="Select a type"
+        />
+        <Select
+          label="Segment"
+          options={LEAD_SEGMENT_OPTIONS}
+          value={formData.segment || ''}
+          onChange={(event) => updateField('segment', event.target.value)}
+          placeholder="Select a segment"
+        />
+        <InterestedProductsField
           value={formData.interestedProduct}
-          onChange={(event) => updateField('interestedProduct', event.target.value)}
+          onChange={(next) => updateField('interestedProduct', next)}
           className="sm:col-span-2"
         />
         <Input

@@ -299,14 +299,11 @@ export default function AppRoutes() {
           }
         >
           <Route path="/delivery/dashboard" element={<DeliveryPartnerDashboard />} />
-          <Route
-            path="/delivery/orders/create"
-            element={
-              <RequirePermissionRoute module="sales_orders" action="create">
-                <CreateSalesOrder restrictToVehicleStock />
-              </RequirePermissionRoute>
-            }
-          />
+          {/* Delivery Partners do not create sales orders. Any old bookmark/manual URL
+              lands on their Assigned Deliveries page. (CreateSalesOrder stays available
+              to Sales Officer / Admin — see the /sales and /admin routes.) */}
+          <Route path="/delivery/orders/create" element={<Navigate to="/delivery/deliveries" replace />} />
+          <Route path="/delivery/orders/*" element={<Navigate to="/delivery/deliveries" replace />} />
           <Route path="/delivery/vehicle-loading" element={<VehicleLoading />} />
           <Route path="/delivery/deliveries" element={<AssignedDeliveries />} />
           <Route path="/delivery/deliveries/:id" element={<DeliveryDetail />} />

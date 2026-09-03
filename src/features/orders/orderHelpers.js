@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock, FileText, PackageCheck, ShoppingCart, Sparkles, Truck, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock, FileText, PackageCheck, PackageSearch, ShoppingCart, Sparkles, Truck, XCircle } from 'lucide-react'
 
 // =============================================================================
 // Order module helpers
@@ -95,14 +95,22 @@ export function isStockReserved(order) {
   return RESERVED_STATES.includes(order?.fulfilmentStatus) || ['picking', 'ready', 'collected'].includes(order?.pickupStatus)
 }
 
-// Method-aware stepper. First step is "Order Confirmed" (confirmation is required,
-// so "Order Placed" is not an operational milestone).
+// Method-aware business progress stepper shown on Order Detail. First step is
+// "Order Confirmed" (confirmation is required, so "Order Placed" is not an operational
+// milestone). Home delivery milestones (approved 2026-09-03):
+//   Order Confirmed -> Stock Reserved -> Delivery Assigned -> Picking -> Vehicle Loaded
+//   -> In Transit -> Delivered
+// (no "Accepted" here - that is a Delivery Detail operational step, not an order milestone).
+// `order.deliveryPickingStatus` is an OPTIONAL hint ('picking' | 'picked') that lets a
+// delivery snapshot pin the stepper precisely at Picking vs Vehicle Loaded; real orders
+// without it fall back to deriving both from `fulfilmentStatus`.
 export function getOrderProgress(order) {
   if (!order) return []
   const isConfirmed = ['confirmed', 'completed'].includes(order.status)
   const reserved = isStockReserved(order)
   const fs = order.fulfilmentStatus
   const ps = order.pickupStatus
+  const dps = order.deliveryPickingStatus || null
 
   const node = (label, done, current) => ({ label, status: done ? 'done' : current ? 'current' : 'pending' })
 
@@ -119,12 +127,16 @@ export function getOrderProgress(order) {
   const inTransit = ['in_transit', 'partially_delivered', 'delivered'].includes(fs)
   const delivered = ['delivered', 'partially_delivered'].includes(fs)
   const assigned = Boolean(order.assignedDeliveryPartnerId) || ['planned', ...RESERVED_STATES.slice(1)].includes(fs)
+  const pickingDone = loaded || dps === 'picked'
+  const pickingCurrent = assigned && !pickingDone && (dps ? dps === 'picking' : true)
+  const loadedCurrent = assigned && !loaded && dps === 'picked'
 
   return [
     node('Order Confirmed', isConfirmed, !isConfirmed),
     node('Stock Reserved', reserved, isConfirmed && !reserved),
     node('Delivery Assigned', assigned, reserved && !assigned),
-    node('Loaded', loaded, assigned && !loaded),
+    node('Picking', pickingDone, pickingCurrent),
+    node('Vehicle Loaded', loaded, loadedCurrent),
     node('In Transit', inTransit, loaded && !inTransit),
     node('Delivered', delivered, inTransit && !delivered),
   ]
@@ -231,6 +243,9 @@ export function buildOrderTimeline(order, { invoices = [] } = {}) {
   if (order.fulfilmentMethod !== 'pickup') {
     if (order.assignedDeliveryPartnerId) {
       events.push({ id: 'assigned', icon: Truck, iconClass: 'bg-indigo-50 text-indigo-600', title: `Delivery assigned${order.assignedDeliveryPartnerName ? ` to ${order.assignedDeliveryPartnerName}` : ''}`, subtitle: order.deliveryNumber || 'Delivery planned', timestamp: stamp })
+    }
+    if (['picking', 'picked'].includes(order.deliveryPickingStatus) || ['loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)) {
+      events.push({ id: 'picking', icon: PackageSearch, iconClass: 'bg-amber-50 text-amber-600', title: 'Picking started', subtitle: 'Items being picked for dispatch', timestamp: stamp })
     }
     if (['loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)) {
       events.push({ id: 'loaded', icon: PackageCheck, iconClass: 'bg-amber-50 text-amber-600', title: 'Vehicle loaded', subtitle: 'Stock loaded for dispatch', timestamp: stamp })

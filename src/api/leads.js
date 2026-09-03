@@ -67,6 +67,27 @@ export const LEAD_SOURCE_OPTIONS = [
   { value: 'Data Calling', label: 'Data Calling' },
 ]
 
+// What kind of business the lead is (carries over as the customer type on conversion).
+export const LEAD_TYPE_OPTIONS = [
+  'Retailer',
+  'Distributor',
+  'Wholesaler',
+  'Restaurant',
+  'Private Company',
+  'Business',
+  'Individual',
+  'Other',
+].map((value) => ({ value, label: value }))
+
+// Commercial size / importance of the lead - kept separate from Lead Type.
+export const LEAD_SEGMENT_OPTIONS = [
+  'Small',
+  'Medium',
+  'Large',
+  'Key / High Value',
+  'Group Company',
+].map((value) => ({ value, label: value }))
+
 function buildLeadBody(payload) {
   const body = {
     lead_source: payload.leadSource || payload.lead_source || '',
@@ -88,6 +109,10 @@ function buildLeadBody(payload) {
   if (payload.interestedProduct !== undefined || payload.interested_product !== undefined) {
     body.interested_product = (payload.interestedProduct ?? payload.interested_product)?.trim() || ''
   }
+  if (payload.leadType !== undefined || payload.lead_type !== undefined) {
+    body.lead_type = (payload.leadType ?? payload.lead_type) || ''
+  }
+  if (payload.segment !== undefined) body.segment = payload.segment || ''
   if (payload.notes !== undefined) body.notes = payload.notes?.trim() || ''
 
   return body
@@ -107,6 +132,8 @@ function normalizeLead(lead) {
     contactPerson: lead.contact_person || '',
     email: lead.email || '',
     interestedProduct: lead.interested_product || '',
+    leadType: lead.lead_type || lead.type || '',
+    segment: lead.segment || lead.customer_segment || '',
     notes: lead.notes || '',
     leadSource: lead.lead_source || '',
     leadStatus: lead.lead_status || 'new',

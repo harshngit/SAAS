@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  AlertTriangle,
   ArrowLeft,
   Banknote,
   Building2,
@@ -187,6 +188,12 @@ function formatLabel(value = '') {
     .replace(/\b\w/g, (character) => character.toUpperCase())
 }
 
+// Date-only values (e.g. a follow-up due date) show just the date; datetimes show date + time.
+function formatWhen(value) {
+  if (!value) return ''
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value).trim()) ? formatDate(value) : formatDateTime(value)
+}
+
 function TopInfoItem({ icon: Icon, label, value }) {
   return (
     <div className="flex items-start gap-2.5">
@@ -201,16 +208,28 @@ function TopInfoItem({ icon: Icon, label, value }) {
   )
 }
 
-function MetricCard({ icon: Icon, label, value, valueClassName = '', action }) {
+// Soft pastel accents for the overview metric cards - kept faint so the page still reads calm.
+const METRIC_TONES = {
+  neutral: { card: 'border-neutral-100 bg-white', chip: 'bg-primary-50 text-primary-700' },
+  emerald: { card: 'border-emerald-100 bg-emerald-50/70', chip: 'bg-emerald-100 text-emerald-700' },
+  sky: { card: 'border-sky-100 bg-sky-50/70', chip: 'bg-sky-100 text-sky-700' },
+  amber: { card: 'border-amber-100 bg-amber-50/70', chip: 'bg-amber-100 text-amber-700' },
+  violet: { card: 'border-violet-100 bg-violet-50/70', chip: 'bg-violet-100 text-violet-700' },
+  rose: { card: 'border-rose-100 bg-rose-50/70', chip: 'bg-rose-100 text-rose-700' },
+}
+
+function MetricCard({ icon: Icon, label, value, subValue, valueClassName = '', action, tone = 'neutral' }) {
+  const toneStyle = METRIC_TONES[tone] || METRIC_TONES.neutral
   return (
-    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+    <div className={`rounded-2xl border p-4 shadow-(--shadow-card) ${toneStyle.card}`}>
       <div className="flex items-center justify-between gap-2">
         <p className="truncate text-sm font-medium text-neutral-500">{label}</p>
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
+        <div className={`flex size-8 shrink-0 items-center justify-center rounded-full ${toneStyle.chip}`}>
           <Icon className="size-4" aria-hidden="true" />
         </div>
       </div>
       <p className={`mt-3 truncate text-xl font-semibold tracking-tight text-neutral-900 ${valueClassName}`}>{value}</p>
+      {subValue && <p className="mt-0.5 truncate text-xs font-medium text-neutral-400">{subValue}</p>}
       {action && (
         <button
           type="button"
@@ -286,7 +305,7 @@ const CUSTOMER_TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'contact', label: 'Contact Information' },
   { key: 'orders', label: 'Orders' },
-  { key: 'visits', label: 'Visits / Follow-ups' },
+  { key: 'activities', label: 'Activities' },
   { key: 'payments', label: 'Payments' },
   { key: 'documents', label: 'Documents' },
   { key: 'notes', label: 'Notes & Preferences' },
@@ -524,7 +543,8 @@ export default function CustomerDetail() {
   }
 
   useEffect(() => {
-    if (activeTab === 'visits' && !visitsLoaded && !isLoadingVisits) {
+    // Overview shows an "Upcoming Activities" widget, and the Activities tab shows the full list.
+    if ((activeTab === 'overview' || activeTab === 'activities') && !visitsLoaded && !isLoadingVisits) {
       loadVisits()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -563,7 +583,36 @@ export default function CustomerDetail() {
   }
 
   const totalOrdersCount = customer.totalOrders || customerOrders.length
-  const avgOrderValue = totalOrdersCount > 0 ? (customer.totalPurchases || customer.totalBilled || 0) / totalOrdersCount : 0
+  const lifetimeSales = customer.totalPurchases || customer.totalBilled || 0
+  const avgOrderValue = totalOrdersCount > 0 ? lifetimeSales / totalOrdersCount : 0
+
+  // Next few open follow-ups + scheduled visits, soonest first — for the Overview widget.
+  const doneStatuses = ['completed', 'done', 'closed', 'cancelled']
+  const upcomingActivities = [
+    ...standaloneFollowUps,
+    ...visits.flatMap((visit) => visit.followUps || []),
+  ]
+    .filter((task) => task.dueDate && !doneStatuses.includes(String(task.status || '').toLowerCase()))
+    .map((task) => ({
+      id: `followup-${task.id}`,
+      icon: Phone,
+      title: task.title || 'Follow-up',
+      subtitle: task.priority ? `${formatLabel(task.priority)} priority` : 'Follow-up task',
+      date: task.dueDate,
+    }))
+    .concat(
+      visits
+        .filter((visit) => visit.visitDate && ['scheduled', 'planned', 'pending', 'upcoming'].includes(String(visit.status || '').toLowerCase()))
+        .map((visit) => ({
+          id: `visit-${visit.id}`,
+          icon: CalendarCheck2,
+          title: `Visit${visit.visitType ? ` · ${formatLabel(visit.visitType)}` : ''}`,
+          subtitle: visit.purpose || 'Scheduled visit',
+          date: visit.visitDate,
+        })),
+    )
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .slice(0, 4)
 
   const handleSaveCustomer = async (customerData) => {
     setIsSaving(true)
@@ -713,7 +762,7 @@ export default function CustomerDetail() {
         <button
           type="button"
           onClick={goToCreateOrder}
-          className="fixed right-4 top-19 z-30 inline-flex items-center gap-2 rounded-full bg-primary-600 px-3 py-2 text-xs font-semibold text-white shadow-(--shadow-glow-primary) transition-transform hover:-translate-y-0.5 hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-500/25 sm:right-40 sm:top-34"
+          className="fixed bottom-6 right-10 z-30 inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-(--shadow-glow-primary) transition-transform hover:-translate-y-0.5 hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-500/25"
           aria-label={`Create an order for ${customer.name}`}
         >
           <ShoppingBag className="size-4" aria-hidden="true" />
@@ -845,11 +894,23 @@ export default function CustomerDetail() {
 
       {activeTab === 'overview' && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
-          <MetricCard icon={ShoppingBag} label="Total Orders" value={totalOrdersCount} action={{ label: 'View Orders', onClick: () => setActiveTab('orders') }} />
-          <MetricCard icon={Wallet} label="Total Received" value={formatCurrency(customer.totalReceived || 0)} action={{ label: 'View Payments', onClick: () => setActiveTab('payments') }} />
-          <MetricCard icon={Wallet} label="Outstanding Balance" value={formatCurrency(customer.outstandingBalance)} valueClassName={customer.outstandingBalance > 0 ? 'text-amber-600' : ''} action={{ label: 'View Payments', onClick: () => setActiveTab('payments') }} />
-          <MetricCard icon={Calendar} label="Last Order Date" value={formatDate(customer.lastPurchaseDate) || '-'} action={{ label: 'View Orders', onClick: () => setActiveTab('orders') }} />
-          <MetricCard icon={TrendingUp} label="Avg. Order Value" value={formatCurrency(avgOrderValue)} />
+          <MetricCard
+            tone="emerald"
+            icon={TrendingUp}
+            label="Lifetime Sales"
+            value={
+              <>
+                {formatCurrency(lifetimeSales)}
+                <span className="text-base font-medium text-neutral-400"> / {totalOrdersCount}</span>
+              </>
+            }
+            subValue="Sales / Orders"
+            action={{ label: 'View Orders', onClick: () => setActiveTab('orders') }}
+          />
+          <MetricCard tone="sky" icon={Wallet} label="Total Received" value={formatCurrency(customer.totalReceived || 0)} action={{ label: 'View Payments', onClick: () => setActiveTab('payments') }} />
+          <MetricCard tone="amber" icon={Wallet} label="Outstanding Balance" value={formatCurrency(customer.outstandingBalance)} valueClassName={customer.outstandingBalance > 0 ? 'text-amber-600' : ''} action={{ label: 'View Payments', onClick: () => setActiveTab('payments') }} />
+          <MetricCard tone="violet" icon={Calendar} label="Last Order Date" value={formatDate(customer.lastPurchaseDate) || '-'} action={{ label: 'View Orders', onClick: () => setActiveTab('orders') }} />
+          <MetricCard tone="rose" icon={Banknote} label="Avg. Order Value" value={formatCurrency(avgOrderValue)} />
         </div>
       )}
 
@@ -932,7 +993,7 @@ export default function CustomerDetail() {
       )}
 
       {activeTab === 'overview' && (
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         <Section title="Financial Summary" icon={Banknote}>
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
             <Field label="Outstanding Balance" value={formatCurrency(customer.outstandingBalance)} />
@@ -957,6 +1018,130 @@ export default function CustomerDetail() {
             <Field label="Customer Tags" value={customer.customerTags} />
           </div>
         </Section>
+
+        <div className="space-y-4">
+          <Section
+            title="Upcoming Activities"
+            icon={Calendar}
+            actions={
+              <button
+                type="button"
+                onClick={() => setActiveTab('activities')}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:underline"
+              >
+                View All →
+              </button>
+            }
+          >
+            {isLoadingVisits && !visitsLoaded ? (
+              <p className="py-4 text-sm text-neutral-400">Loading activities…</p>
+            ) : upcomingActivities.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <span className="flex size-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-400">
+                  <CalendarCheck2 className="size-5" aria-hidden="true" />
+                </span>
+                <p className="text-sm text-neutral-400">No follow-ups or visits scheduled.</p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('activities')}
+                  className="text-sm font-semibold text-primary-700 hover:underline"
+                >
+                  Add an activity →
+                </button>
+              </div>
+            ) : (
+              <ul className="divide-y divide-neutral-100">
+                {upcomingActivities.map((activity) => {
+                  const ActivityIcon = activity.icon
+                  return (
+                    <li key={activity.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
+                        <ActivityIcon className="size-4" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-neutral-800">{activity.title}</p>
+                        <p className="truncate text-xs text-neutral-400">{activity.subtitle}</p>
+                      </div>
+                      <p className="shrink-0 text-right text-xs text-neutral-500">{formatWhen(activity.date)}</p>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </Section>
+
+          <Section
+            title="Recent Orders"
+            icon={ShoppingBag}
+            actions={
+              <button
+                type="button"
+                onClick={() => setActiveTab('orders')}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:underline"
+              >
+                View All →
+              </button>
+            }
+          >
+            {isLoadingOrders ? (
+              <p className="py-4 text-sm text-neutral-400">Loading orders…</p>
+            ) : customerOrders.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <span className="flex size-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-400">
+                  <ShoppingBag className="size-5" aria-hidden="true" />
+                </span>
+                <p className="text-sm text-neutral-400">No orders yet.</p>
+                {customer.status === 'active' && (
+                  <button
+                    type="button"
+                    onClick={goToCreateOrder}
+                    className="text-sm font-semibold text-primary-700 hover:underline"
+                  >
+                    Create the first order →
+                  </button>
+                )}
+              </div>
+            ) : (
+              <ul className="divide-y divide-neutral-100">
+                {customerOrders.slice(0, 4).map((order) => (
+                  <li
+                    key={order.id}
+                    onClick={() => setActiveTab('orders')}
+                    className="-mx-2 flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors first:pt-0 last:pb-0 hover:bg-primary-50/40"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-neutral-800">{order.orderNumber}</p>
+                      <p className="text-xs text-neutral-400">{order.orderDate ? order.orderDate.slice(0, 10) : '—'}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge variant={ORDER_STATUS_VARIANT[order.status] || 'neutral'}>{formatOrderStatus(order.status)}</Badge>
+                      <span className="text-sm font-medium text-neutral-900">{formatCurrency(order.total)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          {customer.outstandingBalance > 0 && (
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-(--shadow-card)">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-500" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-neutral-900">Action Required</p>
+                <p className="mt-0.5 text-sm text-neutral-600">
+                  This customer has an outstanding balance of {formatCurrency(customer.outstandingBalance)}.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('payments')}
+                  className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary-700 hover:underline"
+                >
+                  View Payments →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       )}
 
@@ -1089,56 +1274,67 @@ export default function CustomerDetail() {
         </Section>
       )}
 
-      {activeTab === 'visits' && (
-        <Section title="Visits & Follow-ups" icon={ClipboardList}>
-          {visitsError ? (
+      {activeTab === 'activities' && (
+        visitsError ? (
+          <Section title="Activities" icon={ClipboardList}>
             <div className="py-6 text-center">
               <p className="text-sm text-red-600">{visitsError}</p>
               <Button type="button" variant="outline" size="sm" className="mt-3" onClick={loadVisits}>Retry</Button>
             </div>
-          ) : isLoadingVisits || !visitsLoaded ? (
-            <LoadingSpinner label="Loading visits..." />
-          ) : visits.length === 0 && standaloneFollowUps.length === 0 ? (
-            <p className="py-6 text-center text-sm text-neutral-400">No visits or follow-ups recorded for this customer yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {visits.map((visit) => (
-                <div key={visit.id} className="rounded-2xl border border-neutral-100 bg-neutral-50/60 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-neutral-900">
-                        {formatLabel(visit.visitType)}{visit.purpose ? ` · ${visit.purpose}` : ''}
-                      </p>
-                      <p className="text-xs text-neutral-400">
-                        {formatDateTime(visit.visitDate)}{visit.userName ? ` · ${visit.userName}` : ''}
-                      </p>
+          </Section>
+        ) : isLoadingVisits || !visitsLoaded ? (
+          <Section title="Activities" icon={ClipboardList}>
+            <LoadingSpinner label="Loading activities..." />
+          </Section>
+        ) : (
+          <div className="space-y-4">
+            <Section title="Visits" icon={MapPin}>
+              {visits.length === 0 ? (
+                <p className="py-6 text-center text-sm text-neutral-400">No visits recorded for this customer yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {visits.map((visit) => (
+                    <div key={visit.id} className="rounded-2xl border border-neutral-100 bg-neutral-50/60 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-neutral-900">
+                            {formatLabel(visit.visitType)}{visit.purpose ? ` · ${visit.purpose}` : ''}
+                          </p>
+                          <p className="text-xs text-neutral-400">
+                            {formatDateTime(visit.visitDate)}{visit.userName ? ` · ${visit.userName}` : ''}
+                          </p>
+                        </div>
+                        <Badge variant={visitStatusVariant[visit.status] || 'neutral'}>{formatLabel(visit.status)}</Badge>
+                      </div>
+                      {visit.notes && (
+                        <p className="mt-2 whitespace-pre-line border-t border-neutral-100 pt-2 text-sm text-neutral-700">{visit.notes}</p>
+                      )}
+                      {visit.outcome && (
+                        <p className="mt-2 text-sm text-neutral-600"><span className="font-medium text-neutral-800">Outcome:</span> {visit.outcome}</p>
+                      )}
+                      {visit.followUps.length > 0 && (
+                        <div className="mt-3 space-y-1.5 border-t border-neutral-100 pt-3">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Follow-ups from this visit</p>
+                          {visit.followUps.map((task) => <FollowUpRow key={task.id} task={task} />)}
+                        </div>
+                      )}
                     </div>
-                    <Badge variant={visitStatusVariant[visit.status] || 'neutral'}>{formatLabel(visit.status)}</Badge>
-                  </div>
-                  {visit.notes && (
-                    <p className="mt-2 whitespace-pre-line border-t border-neutral-100 pt-2 text-sm text-neutral-700">{visit.notes}</p>
-                  )}
-                  {visit.outcome && (
-                    <p className="mt-2 text-sm text-neutral-600"><span className="font-medium text-neutral-800">Outcome:</span> {visit.outcome}</p>
-                  )}
-                  {visit.followUps.length > 0 && (
-                    <div className="mt-3 space-y-1.5 border-t border-neutral-100 pt-3">
-                      {visit.followUps.map((task) => <FollowUpRow key={task.id} task={task} />)}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {standaloneFollowUps.length > 0 && (
-                <div className="rounded-2xl border border-neutral-100 bg-neutral-50/60 p-4">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Other Follow-ups</p>
-                  <div className="space-y-1.5">
-                    {standaloneFollowUps.map((task) => <FollowUpRow key={task.id} task={task} />)}
-                  </div>
+                  ))}
                 </div>
               )}
-            </div>
-          )}
-        </Section>
+            </Section>
+
+            <Section title="Follow-ups" icon={ClipboardList}>
+              {standaloneFollowUps.length === 0 ? (
+                <p className="py-6 text-center text-sm text-neutral-400">No standalone follow-ups for this customer.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {standaloneFollowUps.map((task) => <FollowUpRow key={task.id} task={task} />)}
+                </div>
+              )}
+            </Section>
+          </div>
+        )
       )}
 
       {activeTab === 'notes' && (

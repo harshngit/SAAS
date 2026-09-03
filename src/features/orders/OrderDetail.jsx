@@ -37,6 +37,10 @@ import { listInvoices } from '../../api/invoices'
 import { getSalesWorkflowSettings } from '../../api/settings'
 import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
+import { getUser, listAssignableStaff } from '../../api/users'
+import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
+import { ROLES, roleLabels } from '../../auth/roles'
+import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import {
   CANCEL_REASONS,
@@ -72,9 +76,20 @@ const formatDate = (value) => {
   }
 }
 
+const formatDateTime = (value) => {
+  if (!value) return '—'
+  try {
+    return format(parseISO(value), 'dd MMM yyyy, h:mm a')
+  } catch {
+    return value
+  }
+}
+
+const roleName = (role) => roleLabels[role] || String(role || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+
 function StepperNode({ index, label, status, isLast }) {
   return (
-    <div className="flex flex-1 items-start gap-0">
+    <div className="flex min-w-24 flex-1 items-start gap-0">
       <div className="flex flex-col items-center">
         <div
           className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
@@ -100,6 +115,7 @@ export default function OrderDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const currentUser = useAuthStore((state) => state.currentUser)
   const isSalesPath = window.location.pathname.startsWith('/sales')
   const basePath = isSalesPath ? '/sales/orders' : window.location.pathname.startsWith('/delivery') ? '/delivery/orders' : '/admin/orders'
   const quotationsBasePath = isSalesPath ? '/sales/quotations' : '/admin/quotations'
@@ -133,6 +149,7 @@ export default function OrderDetail() {
   const [invoiceMode, setInvoiceMode] = useState('per_delivery')
   const [isViewDeliveryOpen, setIsViewDeliveryOpen] = useState(false)
   const [isViewInvoiceOpen, setIsViewInvoiceOpen] = useState(false)
+  const [creator, setCreator] = useState(null)
 
   const invoicedByProduct = useMemo(() => {
     const map = {}
@@ -219,6 +236,58 @@ export default function OrderDetail() {
       isMounted = false
     }
   }, [order?.id, order?.invoiceId, isDemo]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Resolve "Created By" - the order only carries a `created_by` user id.
+  useEffect(() => {
+    if (!order?.id) {
+      setCreator(null)
+      return
+    }
+    // Demo orders (and any future expanded API payload) carry the name/role inline.
+    if (order.createdByName) {
+      setCreator({ name: order.createdByName, role: order.createdByRole || '' })
+      return
+    }
+    const createdById = order.createdById
+    if (!createdById) {
+      setCreator(null)
+      return
+    }
+    // The creator is the person viewing the order.
+    if (currentUser?.id && createdById === currentUser.id) {
+      setCreator({ name: currentUser.name || 'You', role: currentUser.role || '' })
+      return
+    }
+
+    let isMounted = true
+    ;(async () => {
+      let name = ''
+      let role = order.createdByRole || ''
+
+      // Privacy-safe picker (id + name), callable by Admin and Sales Officer alike.
+      const staffResult = await listAssignableStaff()
+      if (staffResult.success) {
+        const match = staffResult.users.find((user) => user.id === createdById)
+        if (match) name = match.name || ''
+      }
+
+      // Admins can read the full user record for the role (and a name fallback).
+      if ((!name || !role) && currentUser?.role === ROLES.ADMIN) {
+        const userResult = await getUser(createdById)
+        const u = userResult.success ? userResult.user : null
+        if (u) {
+          name = name || u.display_name || u.name || ''
+          role = role || u.role || u.system_role || getSystemRoleFromRoleName(u.role_detail?.name || u.roleDetail?.name || '')
+        }
+      }
+
+      if (isMounted && (name || role)) setCreator({ name: name || '—', role })
+    })()
+
+    return () => {
+      isMounted = false
+    }
+  }, [order?.id, order?.createdById, order?.createdByName, order?.createdByRole, currentUser?.id, currentUser?.name, currentUser?.role])
 
   useEffect(() => {
     let isMounted = true
@@ -712,6 +781,22 @@ export default function OrderDetail() {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-x-8 gap-y-1.5 rounded-2xl border border-neutral-100 bg-white px-5 py-3.5 text-sm shadow-(--shadow-card)">
+        <span className="flex items-center gap-1.5">
+          <User className="size-3.5 text-neutral-400" aria-hidden="true" />
+          <span className="text-neutral-400">Created By</span>
+          <span className="font-medium text-neutral-900">{creator?.name || '—'}</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="text-neutral-400">Created Role</span>
+          <span className="font-medium text-neutral-900">{creator?.role ? roleName(creator.role) : '—'}</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="text-neutral-400">Created At</span>
+          <span className="font-medium text-neutral-900">{formatDateTime(order.createdAt)}</span>
+        </span>
+      </div>
+
       {order.warnings.length > 0 && (
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {order.warnings.map((warning, index) => (
@@ -722,7 +807,7 @@ export default function OrderDetail() {
 
       {progress.length > 0 && order.status !== 'cancelled' && order.status !== 'rejected' && (
         <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-          <div className="flex items-start">
+          <div className="flex items-start overflow-x-auto pb-1">
             {progress.map((step, index) => (
               <StepperNode key={step.label} index={index + 1} isLast={index === progress.length - 1} {...step} />
             ))}

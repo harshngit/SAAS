@@ -6,6 +6,7 @@ import Badge from '../../components/ui/Badge'
 import DataTable from '../../components/ui/DataTable'
 import Button from '../../components/ui/Button'
 import { acceptDelivery, listDeliveries } from '../../api/deliveries'
+import { demoDeliveriesResolved, getDemoDelivery, isDemoDelivery, patchDemoDelivery } from '../orders/orderDemoData'
 import { getDeliveryStage } from './deliveryStage'
 import RejectDeliveryModal from './RejectDeliveryModal'
 import { useAuthStore } from '../../store/authStore'
@@ -28,15 +29,16 @@ export default function AssignedDeliveries() {
     setError('')
 
     const result = await listDeliveries({ delivery_partner_id: currentUser.id })
+    const demoRows = demoDeliveriesResolved()
 
     if (!result.success) {
-      setDeliveries([])
-      setError(result.error)
+      setDeliveries(demoRows)
+      setError(demoRows.length ? '' : result.error)
       setIsLoading(false)
       return
     }
 
-    setDeliveries(result.deliveries)
+    setDeliveries([...result.deliveries, ...demoRows])
     setIsLoading(false)
   }, [currentUser?.id])
 
@@ -47,6 +49,14 @@ export default function AssignedDeliveries() {
   const handleAccept = async (delivery) => {
     if (acceptingId) return
     setAcceptingId(delivery.id)
+
+    if (isDemoDelivery(delivery.id)) {
+      patchDemoDelivery(delivery.id, { status: 'accepted', pickingStatus: 'not_started' })
+      setAcceptingId('')
+      setDeliveries((current) => current.map((item) => (item.id === delivery.id ? getDemoDelivery(delivery.id) : item)))
+      showToast({ title: 'Delivery accepted', message: `${delivery.deliveryNumber || delivery.orderNumber} — start picking next.` })
+      return
+    }
 
     const result = await acceptDelivery(delivery.id)
     setAcceptingId('')
