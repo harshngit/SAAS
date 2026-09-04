@@ -281,6 +281,11 @@ function demoVisit(overrides) {
     outcome: '',
     status: 'completed',
     location: '',
+    checkedInAt: null,
+    checkedOutAt: null,
+    completedAt: null,
+    cancelledAt: null,
+    cancellationReason: '',
     followUps: [],
     createdAt: offsetIso(-1),
     ...overrides,
@@ -288,7 +293,9 @@ function demoVisit(overrides) {
 }
 
 // -----------------------------------------------------------------------------
-// Demo visits - one per next-action rule. All Completed so they expand.
+// Demo visits - cover the next-action rules AND every Visit-Status / Follow-up-Status
+// combination: In Progress, Completed, Cancelled; follow-up Pending / Completed / Overdue;
+// and visits with no follow-up.
 // -----------------------------------------------------------------------------
 export const demoVisits = [
   demoVisit({
@@ -308,7 +315,7 @@ export const demoVisits = [
     visitType: 'site_visit',
     purpose: 'Requirement check',
     notes: 'Discussed volumes; needs a written quotation before deciding.',
-    outcome: 'followup_required',
+    outcome: 'follow_up_required',
     visitDate: offsetIso(-2, 14),
     followUps: [
       demoVisitFollowUp({
@@ -368,5 +375,87 @@ export const demoVisits = [
     notes: 'Chose a competitor on price. Lead marked Lost.',
     outcome: 'not_interested',
     visitDate: offsetIso(-6, 10),
+  }),
+  // Visit Status = Scheduled (planned, not started - action is "Start Visit").
+  demoVisit({
+    id: 'demo-visit-scheduled',
+    leadId: 'demo-lead-neeraj',
+    leadName: 'Neeraj Shah',
+    visitType: 'site_visit',
+    purpose: 'Warehouse walkthrough',
+    notes: 'Booked for tomorrow morning - not started yet.',
+    outcome: '',
+    status: 'planned',
+    visitDate: offsetIso(1, 10),
+    createdAt: offsetIso(0),
+  }),
+  // Visit Status = In Progress (checked in, not yet checked out).
+  demoVisit({
+    id: 'demo-visit-inprogress',
+    customerId: 'demo-customer-neha',
+    customerName: 'Neha Sharma',
+    visitType: 'site_visit',
+    purpose: 'Stock check at the store',
+    notes: 'Checked in - walking the aisles now.',
+    outcome: '',
+    status: 'in_progress',
+    checkedInAt: offsetIso(0, 9),
+    visitDate: offsetIso(0, 9),
+  }),
+  // Completed visit + follow-up that is itself Completed.
+  demoVisit({
+    id: 'demo-visit-followup-done',
+    customerId: 'demo-customer-rohan',
+    customerName: 'Rohan Patil',
+    visitType: 'meeting',
+    purpose: 'Quarterly review',
+    notes: 'Reviewed last quarter; agreed next order size.',
+    outcome: 'interested',
+    visitDate: offsetIso(-9, 14),
+    followUps: [
+      demoVisitFollowUp({
+        id: 'demo-vft-rohan-done',
+        title: 'Send revised rate card to Rohan Patil',
+        description: 'Emailed the updated pricing sheet.',
+        dueDate: offsetIso(-7, 10),
+        status: 'completed',
+        completedAt: offsetIso(-7, 16),
+      }),
+    ],
+  }),
+  // Completed visit + follow-up that is Overdue (still pending, due date in the past).
+  demoVisit({
+    id: 'demo-visit-followup-overdue',
+    leadId: 'demo-lead-vikram',
+    leadName: 'Vikram Joshi',
+    visitType: 'call',
+    purpose: 'Pricing negotiation',
+    notes: 'Agreed to share a formal proposal - not sent yet.',
+    outcome: 'follow_up_required',
+    visitDate: offsetIso(-12, 11),
+    followUps: [
+      demoVisitFollowUp({
+        id: 'demo-vft-vikram-overdue',
+        title: 'Share formal proposal with Vikram Joshi',
+        description: '200 units, 30-day credit.',
+        priority: 'high',
+        dueDate: offsetIso(-3, 10),
+        status: 'pending',
+      }),
+    ],
+  }),
+  // Visit Status = Cancelled (carries a cancellation_reason).
+  demoVisit({
+    id: 'demo-visit-cancelled',
+    customerId: 'demo-customer-rohan',
+    customerName: 'Rohan Patil',
+    visitType: 'meeting',
+    purpose: 'Contract signing',
+    notes: 'Customer rescheduled at the last minute - visit cancelled.',
+    outcome: '',
+    status: 'cancelled',
+    cancellationReason: 'Client rescheduled the contract signing to next week.',
+    cancelledAt: offsetIso(-1, 16),
+    visitDate: offsetIso(-1, 15),
   }),
 ]

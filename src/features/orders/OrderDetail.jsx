@@ -9,6 +9,7 @@ import {
   FileText,
   IndianRupee,
   PackageCheck,
+  PackageSearch,
   Pencil,
   Store,
   Truck,
@@ -30,6 +31,7 @@ import {
   confirmOrder,
   getOrder,
   pickupConfirm,
+  pickupPick,
   pickupReady,
 } from '../../api/orders'
 import { listDeliveries, listDeliveryPartners, planDelivery } from '../../api/deliveries'
@@ -48,9 +50,12 @@ import {
   buildOrderTimeline,
   formatOrderStatus,
   getDeliveryStatus,
+  getFulfilmentLabel,
   getOrderActions,
   getOrderProgress,
+  hasOrderStateMismatch,
   isStockReserved,
+  isTakeawayOrder,
   orderSourceLabel,
 } from './orderHelpers'
 import {
@@ -328,13 +333,15 @@ export default function OrderDetail() {
     )
   }
 
-  const isPickupOrder = order.fulfilmentMethod === 'pickup'
+  const isPickupOrder = isTakeawayOrder(order)
   const delivery = getDeliveryStatus(order)
   const progress = getOrderProgress(order)
   const timeline = buildOrderTimeline(order, { invoices: orderInvoices })
   const source = orderSourceLabel(order)
   const actions = getOrderActions(order, { invoices: orderInvoices })
   const stockReserved = isStockReserved(order)
+  const fulfilmentLabel = getFulfilmentLabel(order)
+  const stateMismatch = hasOrderStateMismatch(order)
   const isDelivered = order.fulfilmentStatus === 'delivered'
   const hasDeliveredQuantity = order.items.some((item) => (item.deliveredQuantity || 0) > 0)
 
@@ -377,9 +384,16 @@ export default function OrderDetail() {
 
   const handleConfirm = async () => {
     if (isDemo) {
-      // Confirmation does a stock check. If any line is short, the order still becomes
-      // Confirmed but stock is NOT reserved (mirrors the backend "confirmed, unfulfilled" state).
+      // Confirmation does a stock check.
       if (demoShortages.length > 0) {
+        if (order.blockConfirmOnShortage) {
+          // Confirmation is rejected outright - nothing advances (stays Draft, reserved 0).
+          setActionError(`Insufficient stock for one or more items — ${demoShortageText}. The order stays a Draft; restock and try again.`)
+          showToast({ title: 'Insufficient stock', message: 'Confirmation was blocked. The order is still a Draft.', variant: 'error' })
+          return
+        }
+        // Otherwise the order still becomes Confirmed but stock is NOT reserved
+        // (mirrors a backend "confirmed, unfulfilled" state).
         applyDemo({
           status: 'confirmed',
           fulfilmentStatus: 'not_started',
@@ -399,7 +413,10 @@ export default function OrderDetail() {
       showToast({ title: 'Order confirmed', message: 'Stock has been reserved for this order.' })
       return
     }
-    await runAction(() => confirmOrder(order.id))
+    const ok = await runAction(() => confirmOrder(order.id))
+    // Re-fetch so the badge / stepper / actions all reflect the authoritative post-confirm
+    // state (the confirm response can be partial), and any state mismatch resolves.
+    if (ok) await loadOrder()
   }
 
   const handleCancel = async () => {
@@ -493,6 +510,15 @@ export default function OrderDetail() {
 
     setIsPlanModalOpen(false)
     navigate(`/admin/deliveries/${result.delivery?.id || order.deliveryId}`)
+  }
+
+  const handlePickupPick = async () => {
+    if (isDemo) {
+      applyDemo({ pickupStatus: 'picking', fulfilmentStatus: 'reserved' })
+      showToast({ title: 'Pickup preparation started', message: 'Items are being picked for collection.' })
+      return
+    }
+    await runAction(() => pickupPick(order.id))
   }
 
   const handlePickupReady = async () => {
@@ -609,6 +635,9 @@ export default function OrderDetail() {
               {isDemo && (
                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
               )}
+              {order.demoErrorState && (
+                <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-red-700">Demo Error State</span>
+              )}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
               <span className="flex items-center gap-1.5 text-neutral-500">
@@ -616,20 +645,28 @@ export default function OrderDetail() {
                 <Badge variant={ORDER_STATUS_VARIANT[order.status] || 'neutral'}>{formatOrderStatus(order.status)}</Badge>
               </span>
               <span className="flex items-center gap-1.5 text-neutral-500">
-                Delivery Status
-                <Badge variant={delivery.variant}>{delivery.label}</Badge>
+                Fulfilment
+                <Badge variant={isPickupOrder ? 'neutral' : 'info'}>{fulfilmentLabel}</Badge>
               </span>
-              <span className="text-neutral-400">
+              {/* Delivery Status only applies to Home Delivery - a takeaway order has no delivery. */}
+              {!isPickupOrder && (
+                <span className="flex items-center gap-1.5 text-neutral-500">
+                  Delivery Status
+                  <Badge variant={delivery.variant}>{delivery.label}</Badge>
+                </span>
+              )}
+              <span className="flex items-center gap-1.5 text-neutral-500">
+                Order Source
                 {source.isQuotation ? (
                   <button
                     type="button"
                     onClick={() => !isDemo && order.quotationId && navigate(`${quotationsBasePath}/${order.quotationId}`)}
                     className="font-medium text-primary-600 hover:underline"
                   >
-                    Created from Quotation{order.quotationNumber ? ` ${order.quotationNumber}` : ''}
+                    Quotation{order.quotationNumber ? ` ${order.quotationNumber}` : ''}
                   </button>
                 ) : (
-                  'Direct Order'
+                  <span className="font-medium text-neutral-700">Direct</span>
                 )}
               </span>
             </div>
@@ -659,6 +696,12 @@ export default function OrderDetail() {
             <Button variant="outline" size="sm" onClick={goToDelivery}>
               <Truck className="size-4" aria-hidden="true" />
               View Delivery
+            </Button>
+          )}
+          {actions.includes('pickupPick') && (
+            <Button variant="outline" size="sm" loading={isActing} onClick={handlePickupPick}>
+              <PackageSearch className="size-4" aria-hidden="true" />
+              Start Pickup Preparation
             </Button>
           )}
           {actions.includes('pickupReady') && (
@@ -714,6 +757,20 @@ export default function OrderDetail() {
 
       {actionError && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
+      )}
+
+      {stateMismatch && (!isDemo || order.demoErrorState) && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-medium">Order state mismatch.</p>
+          <p className="mt-0.5 text-amber-700">
+            This order still reads <span className="font-medium">{formatOrderStatus(order.status)}</span>, but its
+            fulfilment has already advanced ({stockReserved ? 'stock reserved' : 'fulfilment in progress'}).{' '}
+            {order.demoErrorState
+              ? 'This is an intentional DEMO ERROR STATE record used to verify this banner — Refresh will not clear it.'
+              : 'The backend likely has it further along. Confirm Order is hidden because the backend would reject it. Refresh the page; if it stays inconsistent, report it to support.'}
+          </p>
+          <Button type="button" variant="outline" size="sm" className="mt-2" onClick={loadOrder}>Refresh</Button>
+        </div>
       )}
 
       {order.status === 'confirmed' && !stockReserved && (
@@ -874,9 +931,19 @@ export default function OrderDetail() {
             <div className="flex items-center justify-between"><span className="text-neutral-500">Discount</span><span className="font-medium text-red-500">-{formatCurrency(order.discount)}</span></div>
             <div className="flex items-center justify-between"><span className="text-neutral-500">Tax</span><span className="font-medium text-neutral-900">{formatCurrency(order.tax)}</span></div>
             <div className="flex items-center justify-between border-t border-neutral-100 pt-3"><span className="font-semibold text-neutral-900">Total Amount</span><span className="font-semibold text-neutral-900">{formatCurrency(order.total)}</span></div>
+            {order.demoPayment && (
+              <>
+                <div className="flex items-center justify-between"><span className="text-neutral-500">Previous Balance</span><span className="font-medium text-neutral-900">{formatCurrency(order.demoPayment.previousBalance)}</span></div>
+                <div className="flex items-center justify-between"><span className="text-neutral-500">Total Due</span><span className="font-medium text-neutral-900">{formatCurrency(order.demoPayment.totalDue)}</span></div>
+                <div className="flex items-center justify-between"><span className="text-neutral-500">Paid</span><span className="font-medium text-green-600">{formatCurrency(order.demoPayment.paid)}</span></div>
+                <div className="flex items-center justify-between border-t border-neutral-100 pt-3"><span className="font-semibold text-neutral-900">Remaining Balance</span><span className="font-semibold text-neutral-900">{formatCurrency(order.demoPayment.remaining)}</span></div>
+              </>
+            )}
           </div>
           <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
-            Receivables are created once this order is invoiced, not at placement.
+            {order.demoPayment
+              ? 'Demo payment figures for manual testing — not persisted. Receivables are created once this order is invoiced, not at placement.'
+              : 'Receivables are created once this order is invoiced, not at placement.'}
           </p>
         </Card>
       </div>

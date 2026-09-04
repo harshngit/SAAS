@@ -69,15 +69,25 @@ export const FOLLOWUP_OUTCOME_OPTIONS = [
   { value: 'ready_to_convert', label: 'Ready to Convert' },
 ]
 
+// Controlled vocabulary - MUST match the backend VISIT_OUTCOMES list exactly, or the
+// visit PATCH is rejected with 400.
 export const VISIT_OUTCOME_OPTIONS = [
   { value: 'interested', label: 'Interested' },
-  { value: 'not_interested', label: 'Not Interested' },
-  { value: 'followup_required', label: 'Follow-up Required' },
+  { value: 'follow_up_required', label: 'Follow-up Required' },
   { value: 'ready_to_convert', label: 'Ready to Convert' },
+  { value: 'not_interested', label: 'Not Interested' },
+  { value: 'meeting_completed', label: 'Meeting Completed' },
+  { value: 'other', label: 'Other' },
 ]
 
 export function isReadyToConvertOutcome(value) {
   return value === 'ready_to_convert'
+}
+
+// "Follow-up required" outcome - accepts the canonical `follow_up_required` and the
+// legacy `followup_required` value that older records may still carry.
+export function isFollowUpRequiredOutcome(value) {
+  return value === 'follow_up_required' || value === 'followup_required'
 }
 
 // ---------------------------------------------------------------------------
@@ -233,20 +243,9 @@ export function buildLeadTimeline({ lead, visits = [], localFollowUps = [] }) {
     })
   }
 
-  visits.forEach((visit) => {
+  const pushFollowUpEvents = (task, keyPrefix) => {
     events.push({
-      id: `visit-${visit.id}`,
-      icon: MapPin,
-      iconClass: visit.status === 'completed' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600',
-      title: visit.status === 'completed' ? 'Visit completed' : 'Visit scheduled',
-      subtitle: [formatLeadLabel(visit.visitType), visit.outcome && `Outcome: ${visit.outcome}`].filter(Boolean).join(' · '),
-      timestamp: visit.visitDate || visit.createdAt,
-    })
-  })
-
-  localFollowUps.forEach((task) => {
-    events.push({
-      id: `followup-${task.id}`,
+      id: `${keyPrefix}-${task.id}`,
       icon: ClipboardList,
       iconClass: 'bg-primary-50 text-primary-700',
       title: `Follow-up created: ${task.title}`,
@@ -255,15 +254,43 @@ export function buildLeadTimeline({ lead, visits = [], localFollowUps = [] }) {
     })
     if (task.status === 'completed') {
       events.push({
-        id: `followup-done-${task.id}`,
+        id: `${keyPrefix}-done-${task.id}`,
         icon: ClipboardCheck,
         iconClass: 'bg-green-50 text-green-600',
         title: `Follow-up completed: ${task.title}`,
-        subtitle: [task.outcome && formatLeadLabel(task.outcome), task.outcomeNotes].filter(Boolean).join(' · ') || 'Marked complete',
+        subtitle:
+          [task.outcome && formatLeadLabel(task.outcome), task.outcomeNotes].filter(Boolean).join(' · ') || 'Marked complete',
         timestamp: task.completedAt || task.createdAt,
       })
     }
+  }
+
+  visits.forEach((visit) => {
+    const visitTitle =
+      visit.status === 'completed'
+        ? 'Visit completed'
+        : visit.status === 'cancelled'
+          ? 'Visit cancelled'
+          : visit.status === 'in_progress'
+            ? 'Visit started'
+            : 'Visit scheduled'
+    events.push({
+      id: `visit-${visit.id}`,
+      icon: MapPin,
+      iconClass: visit.status === 'completed' ? 'bg-green-50 text-green-600' : visit.status === 'cancelled' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600',
+      title: visitTitle,
+      subtitle: [
+        formatLeadLabel(visit.visitType),
+        visit.outcome && `Outcome: ${formatLeadLabel(visit.outcome)}`,
+        visit.status === 'cancelled' && visit.cancellationReason && `Reason: ${visit.cancellationReason}`,
+      ].filter(Boolean).join(' · '),
+      timestamp: visit.visitDate || visit.createdAt,
+    })
+    // Follow-ups that originate from a visit are part of this lead's activity too.
+    ;(visit.followUps || []).forEach((task) => pushFollowUpEvents(task, `visit-fu-${visit.id}`))
   })
+
+  localFollowUps.forEach((task) => pushFollowUpEvents(task, 'followup'))
 
   if (lead.convertedAt || lead.convertedCustomerId || lead.leadStatus === 'won') {
     events.push({

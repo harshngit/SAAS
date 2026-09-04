@@ -437,7 +437,10 @@ export default function ProductDetail() {
               <Field label="Tax Category" value={product.taxCategory} />
               <Field label="GST/VAT Rate" value={product.gstVatRate !== '' ? `${product.gstVatRate}%` : ''} />
               <Field label="Tax Inclusive" value={product.taxInclusive ? 'Yes' : 'No'} />
-              <Field label="Preferred Supplier" value={product.supplierName} />
+              <Field
+                label="Suppliers"
+                value={product.suppliers?.map((supplier) => supplier.name || supplier).join(', ') || product.supplierName}
+              />
               <Field label="Supplier Code" value={product.supplierProductCode} />
               <Field label="Lead Time" value={product.leadTime} />
               <Field label="Min. Order Qty" value={product.minimumOrderQuantity} />

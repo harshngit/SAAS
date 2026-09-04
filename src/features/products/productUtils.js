@@ -47,6 +47,11 @@ export function normalizeApiProduct(product, fallback = {}) {
     subCategoryId: product.sub_category_id || fallback.subCategoryId || '',
     brandId: product.brand_id || fallback.brandId || '',
     supplierName: product.supplier?.name || fallback.supplierName || '',
+    suppliers: Array.isArray(product.suppliers)
+      ? product.suppliers
+      : product.supplier
+        ? [product.supplier]
+        : fallback.suppliers || [],
     unitOfMeasure: product.uom || fallback.unitOfMeasure || '',
     taxCategory: product.tax_category || fallback.taxCategory || '',
     hsnSacCode: product.hsn_code || fallback.hsnSacCode || '',

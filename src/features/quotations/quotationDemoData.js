@@ -7,10 +7,9 @@ import { quotationTotals } from './quotationHelpers'
 // hand-creating each scenario. Appended to the list AFTER the real API load and
 // never sent to any backend endpoint (no call carries a `demo-qt-` id).
 //
-// The demo quotation object now carries the Lead relationship directly
-// (`leadId` + `lead`), matching the shape real API data is moving toward.
-// `demoQuotationMeta` is kept as a THIN compatibility adapter derived from these
-// objects - components that still read the localStorage-style meta keep working.
+// The demo quotation object carries the Lead relationship directly (`leadId` + `lead`),
+// exactly matching the real `GET /quotations` shape (crm_changes Phase 2). No
+// localStorage-style meta adapter is needed any more.
 //
 // TODO: remove quotation demo data when the backend provides test fixtures.
 // =============================================================================
@@ -61,6 +60,7 @@ function quotation({ id, number, status, customerId, customerName, lead, validDa
     customerName: linkedCustomerName,
     // Real-API-shaped lead relationship (not browser-only metadata).
     leadId: lead?.id || '',
+    leadName: lead?.name || '',
     lead: lead ? { id: lead.id, name: lead.name, leadStatus: lead.leadStatus || 'qualified' } : null,
     billingAddress: linkedCustomerName ? `${linkedCustomerName}, 4th Cross, Industrial Area` : '',
     shippingAddress: linkedCustomerName ? `${linkedCustomerName} Warehouse, Bhiwandi` : '',
@@ -145,20 +145,6 @@ export const demoQuotations = [
     items: [item({ id: 'i1', ...FLOUR, quantity: 75 })],
   }),
 ]
-
-// Thin compatibility adapter - derived from the quotation objects above, not the
-// other way round. Components that still read getQuotationMeta()-style data get it here.
-export const demoQuotationMeta = demoQuotations.reduce((map, q) => {
-  if (q.leadId) {
-    map[q.id] = {
-      leadId: q.leadId,
-      leadName: q.lead?.name || '',
-      leadStatus: q.lead?.leadStatus || '',
-      convertedCustomerId: q.customerId && q.leadId ? q.customerId : '',
-    }
-  }
-  return map
-}, {})
 
 // Local overrides for demo quotations (status flips from Edit & Resend / Send).
 // Versioned key so a rebuild never inherits stale rows; old key cleaned up once.

@@ -60,6 +60,11 @@ function buildFollowUpBody(payload) {
 
   const customerId = payload.customerId || payload.customer_id
   if (customerId) body.customer_id = customerId
+  // A follow-up can now hang directly off an unconverted Lead (POST /follow-ups + lead_id) -
+  // no customer_id / visit_id required. The backend resolves assignment from the lead's
+  // assigned salesperson when assigned_to_id is omitted.
+  const leadId = payload.leadId || payload.lead_id
+  if (leadId) body.lead_id = leadId
   const visitId = payload.visitId || payload.visit_id
   if (visitId) body.visit_id = visitId
   if (payload.description !== undefined) body.description = payload.description || ''
@@ -94,6 +99,7 @@ export async function listFollowUps(params = {}) {
   try {
     const queryParams = {}
     if (params.customerId || params.customer_id) queryParams.customer_id = params.customerId || params.customer_id
+    if (params.leadId || params.lead_id) queryParams.lead_id = params.leadId || params.lead_id
     if (params.visitId || params.visit_id) queryParams.visit_id = params.visitId || params.visit_id
     if (params.assignedToId || params.assigned_to_id) queryParams.assigned_to_id = params.assignedToId || params.assigned_to_id
     if (params.status) queryParams.status = params.status
@@ -135,9 +141,13 @@ export async function updateFollowUp(followUpId, payload) {
   }
 }
 
-export async function completeFollowUp(followUpId) {
+export async function completeFollowUp(followUpId, payload = {}) {
   try {
-    const { data } = await apiClient.post(`/follow-ups/${followUpId}/complete`, {}, {
+    const body = {}
+    if (payload.outcome) body.outcome = payload.outcome
+    if (payload.outcomeNotes) body.outcome_notes = payload.outcomeNotes
+
+    const { data } = await apiClient.post(`/follow-ups/${followUpId}/complete`, body, {
       headers: authHeader(),
     })
 

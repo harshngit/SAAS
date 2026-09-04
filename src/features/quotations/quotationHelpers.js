@@ -4,10 +4,27 @@ import { dayDelta } from '../leads/leadActivity'
 // =============================================================================
 // Quotation frontend helpers
 // -----------------------------------------------------------------------------
-// The backend quotation contract has NO `lead_id` field and NO duplicate /
-// status endpoints. So lead linkage, the edit-flow flags and the expiry
-// *display* are kept here as isolated, API-ready frontend logic.
+// Lead linkage is now a REAL backend field (`quotation.lead_id` / `quotation.lead`,
+// crm_changes Phase 2) - the old `saas.quotationMeta` lead workaround is gone.
+// `saas.quotationMeta` is retained ONLY for two display-only edit-flow flags
+// (`updatedAfterSend`, `resent`) that the backend has no activity feed for yet.
+// BACKEND LATER: a quotation activity/timeline endpoint would replace that too.
+// The expiry *display* stays frontend-derived (backend never persists `expired`).
 // =============================================================================
+
+// The party a quotation is for - a lead (prospect) or a customer. Reads the real
+// backend fields; a converted lead quotation carries BOTH lead_id (history) and
+// customer_id, and is then treated as a customer quotation for actions.
+export function quotationParty(quotation) {
+  if (!quotation) return { type: 'customer', id: '', name: '' }
+  if (quotation.customerId) {
+    return { type: 'customer', id: quotation.customerId, name: quotation.customerName || quotation.lead?.name || 'Customer' }
+  }
+  if (quotation.leadId) {
+    return { type: 'lead', id: quotation.leadId, name: quotation.leadName || quotation.lead?.name || 'Lead' }
+  }
+  return { type: 'customer', id: '', name: '' }
+}
 
 export const QUOTATION_STATUS_LABEL = {
   draft: 'Draft',
@@ -42,10 +59,10 @@ export function formatQuotationStatus(status) {
 }
 
 // -----------------------------------------------------------------------------
-// Quotation meta (localStorage) - lead link + a couple of edit-flow flags.
-// TODO: replace with a real quotation.lead_id + activity feed once the backend
-// exposes them. Shape: { leadId, leadName, leadStatus, convertedCustomerId,
-//                        updatedAfterSend, resent }
+// Quotation meta (localStorage) - display-only edit-flow flags the backend has no
+// activity feed for yet. Shape: { updatedAfterSend, resent }.
+// The lead link is NO LONGER stored here - it's the real `quotation.lead_id`.
+// BACKEND LATER: a quotation activity/timeline endpoint removes this entirely.
 // -----------------------------------------------------------------------------
 const META_KEY = 'saas.quotationMeta'
 
@@ -121,11 +138,11 @@ export function deriveQuotationStatus(quotation) {
 // Action keys: edit | editResend | send | accept | reject | download | delete |
 //              convertToOrder | convertToCustomer | viewCustomer | viewOrder | duplicate
 // -----------------------------------------------------------------------------
-export function getQuotationActions(quotation, meta = getQuotationMeta(quotation?.id)) {
+export function getQuotationActions(quotation) {
   if (!quotation) return []
   const status = deriveQuotationStatus(quotation)
   const hasCustomer = Boolean(quotation.customerId)
-  const hasLead = Boolean(meta?.leadId)
+  const hasLead = Boolean(quotation.leadId)
 
   switch (status) {
     case 'draft':
@@ -134,8 +151,9 @@ export function getQuotationActions(quotation, meta = getQuotationMeta(quotation
       return ['edit', 'accept', 'reject', 'download']
     case 'accepted': {
       if (hasCustomer) {
+        // A lead quotation that has since gained a customer_id shows "View Customer" too.
         const acts = ['convertToOrder', 'download', 'duplicate']
-        if (meta?.convertedCustomerId) acts.unshift('viewCustomer')
+        if (hasLead) acts.unshift('viewCustomer')
         return acts
       }
       if (hasLead) return ['convertToCustomer', 'download', 'duplicate']
@@ -227,12 +245,12 @@ export function buildQuotationTimeline(quotation, meta) {
     timestamp: quotation.createdAt,
   })
 
-  if (meta?.leadName) {
+  if (quotation.leadId) {
     events.push({
       id: 'lead',
       icon: Sparkles,
       iconClass: 'bg-blue-50 text-blue-600',
-      title: `Linked to lead: ${meta.leadName}`,
+      title: quotation.leadName ? `Linked to lead: ${quotation.leadName}` : 'Linked to a lead',
       subtitle: 'Quotation raised for a prospect',
       timestamp: quotation.createdAt,
     })
@@ -257,8 +275,8 @@ export function buildQuotationTimeline(quotation, meta) {
   if (deriveQuotationStatus(quotation) === 'expired' && status !== 'converted') {
     events.push({ id: 'expired', icon: Clock, iconClass: 'bg-amber-50 text-amber-600', title: 'Quotation expired', subtitle: 'Past its valid-until date', timestamp: quotation.validUntil })
   }
-  if (meta?.convertedCustomerId) {
-    events.push({ id: 'customer', icon: UserPlus, iconClass: 'bg-green-50 text-green-600', title: 'Lead converted to Customer', subtitle: 'A customer record was created from the linked lead', timestamp: stamp })
+  if (quotation.leadId && quotation.customerId) {
+    events.push({ id: 'customer', icon: UserPlus, iconClass: 'bg-green-50 text-green-600', title: 'Lead converted to Customer', subtitle: 'The linked lead became a customer and was attached to this quotation', timestamp: stamp })
   }
   if (status === 'converted' || quotation.convertedOrderId) {
     events.push({ id: 'order', icon: ShoppingCart, iconClass: 'bg-green-50 text-green-600', title: 'Converted to Order', subtitle: 'A sales order was created from this quotation', timestamp: quotation.convertedAt || stamp })
@@ -275,6 +293,7 @@ export function buildQuotationTimeline(quotation, meta) {
 export function quotationToDraftForm(source) {
   return {
     customerId: source.customerId || '',
+    leadId: source.leadId || '',
     billingAddress: source.billingAddress || '',
     shippingAddress: source.shippingAddress || '',
     salespersonId: source.salespersonId || '',

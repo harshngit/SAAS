@@ -4,38 +4,62 @@ import { listProducts } from '../../api/products'
 
 const DELIMITERS = /\s*(?:,|;|\n|\||•)\s*/
 
-function splitInterestedProducts(value) {
+// Split a legacy comma/pipe-joined `interested_product` string into loose name entries.
+function splitInterestedProductNames(value) {
   return String(value || '')
     .split(DELIMITERS)
-    .map((item) => item.trim())
+    .map((name) => name.trim())
     .filter(Boolean)
 }
 
 // Multi-product picker for a lead's "Interested Products".
 //
-// BACKEND INTEGRATION POINT: the lead API only exposes a single `interested_product` text
-// field, so the selected list is persisted as a comma-joined string (it round-trips back into
-// chips on load - see splitInterestedProducts). When the backend adds `interested_product_ids`,
-// switch `onChange` to emit the id array instead of the joined string.
-export default function InterestedProductsField({ value, onChange, label = 'Interested Products', className = '' }) {
-  const [selected, setSelected] = useState(() => splitInterestedProducts(value))
+// Backend contract (crm_changes addendum §1): the lead now has a normalized
+// `interested_product_ids` relation plus `interested_products` briefs, and still keeps the
+// legacy `interested_product` text field. This field works in { id, name, sku } objects:
+//   - real catalog matches carry an `id` -> sent as `interested_product_ids`
+//   - free-text entries have `id: null` -> preserved only in the legacy text string
+// The parent derives both payload fields from the emitted list.
+export default function InterestedProductsField({
+  selected = [],
+  legacyText = '',
+  onChange,
+  label = 'Interested Products',
+  className = '',
+}) {
   const [products, setProducts] = useState([])
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const boxRef = useRef(null)
-
-  // Keep in sync when the parent form resets / loads a lead.
-  useEffect(() => {
-    setSelected(splitInterestedProducts(value))
-  }, [value])
+  const seededRef = useRef(false)
 
   useEffect(() => {
     let alive = true
     listProducts().then((result) => {
       if (alive && result.success) setProducts(result.products)
     })
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [])
+
+  // One-time seed from a legacy text string when the parent has no structured selection yet
+  // (editing a lead created before the normalized relation existed). Names are matched to the
+  // catalog where possible so a later save upgrades them to real ids.
+  useEffect(() => {
+    if (seededRef.current) return
+    if (selected.length > 0 || !legacyText) return
+    if (products.length === 0) return
+    seededRef.current = true
+    const byName = new Map(products.map((p) => [String(p.name || p.product_name || '').toLowerCase(), p]))
+    const seeded = splitInterestedProductNames(legacyText).map((name) => {
+      const match = byName.get(name.toLowerCase())
+      return match
+        ? { id: match.id, name: match.name || match.product_name || name, sku: match.sku || '' }
+        : { id: null, name, sku: '' }
+    })
+    if (seeded.length > 0) onChange(seeded)
+  }, [legacyText, selected.length, products, onChange])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -45,22 +69,20 @@ export default function InterestedProductsField({ value, onChange, label = 'Inte
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const commit = (next) => {
-    setSelected(next)
-    onChange(next.join(', '))
-  }
-
-  const addProduct = (name) => {
-    const clean = String(name || '').trim()
-    if (!clean) return
-    if (!selected.some((item) => item.toLowerCase() === clean.toLowerCase())) {
-      commit([...selected, clean])
+  const addEntry = (entry) => {
+    const name = String(entry.name || '').trim()
+    if (!name) return
+    if (selected.some((p) => (entry.id && p.id === entry.id) || p.name.toLowerCase() === name.toLowerCase())) {
+      setQuery('')
+      setOpen(false)
+      return
     }
+    onChange([...selected, { id: entry.id ?? null, name, sku: entry.sku || '' }])
     setQuery('')
     setOpen(false)
   }
 
-  const removeProduct = (name) => commit(selected.filter((item) => item !== name))
+  const removeEntry = (target) => onChange(selected.filter((p) => p !== target))
 
   const suggestions = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -68,7 +90,7 @@ export default function InterestedProductsField({ value, onChange, label = 'Inte
       .map((product) => ({ id: product.id, name: product.name || product.product_name || '', sku: product.sku || '' }))
       .filter((product) => {
         if (!product.name) return false
-        if (selected.some((item) => item.toLowerCase() === product.name.toLowerCase())) return false
+        if (selected.some((p) => p.id === product.id || p.name.toLowerCase() === product.name.toLowerCase())) return false
         if (!q) return true
         return product.name.toLowerCase().includes(q) || product.sku.toLowerCase().includes(q)
       })
@@ -84,17 +106,18 @@ export default function InterestedProductsField({ value, onChange, label = 'Inte
       <div className="relative rounded-xl border border-neutral-200 bg-neutral-50 p-2 transition-all focus-within:border-primary-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-primary-500/12">
         {selected.length > 0 && (
           <div className="mb-1.5 flex flex-wrap gap-1.5">
-            {selected.map((name) => (
+            {selected.map((product, index) => (
               <span
-                key={name}
+                key={product.id || `${product.name}-${index}`}
                 className="inline-flex items-center gap-1 rounded-full bg-primary-100 py-1 pl-2.5 pr-1 text-xs font-medium text-primary-700"
               >
-                {name}
+                {product.name}
+                {!product.id && <span className="text-[0.62rem] text-primary-500">(text)</span>}
                 <button
                   type="button"
-                  onClick={() => removeProduct(name)}
+                  onClick={() => removeEntry(product)}
                   className="rounded-full p-0.5 text-primary-600 transition-colors hover:bg-primary-200"
-                  aria-label={`Remove ${name}`}
+                  aria-label={`Remove ${product.name}`}
                 >
                   <X className="size-3" aria-hidden="true" />
                 </button>
@@ -107,12 +130,15 @@ export default function InterestedProductsField({ value, onChange, label = 'Inte
           <Search className="size-4 shrink-0 text-neutral-400" aria-hidden="true" />
           <input
             value={query}
-            onChange={(event) => { setQuery(event.target.value); setOpen(true) }}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              setOpen(true)
+            }}
             onFocus={() => setOpen(true)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault()
-                addProduct(query)
+                if (query.trim()) addEntry({ id: null, name: query })
               }
             }}
             placeholder={selected.length ? 'Add another product…' : 'Search or type a product…'}
@@ -126,7 +152,7 @@ export default function InterestedProductsField({ value, onChange, label = 'Inte
               <button
                 key={product.id || product.name}
                 type="button"
-                onClick={() => addProduct(product.name)}
+                onClick={() => addEntry(product)}
                 className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-primary-50/60"
               >
                 <span className="truncate text-neutral-800">{product.name}</span>
@@ -136,7 +162,7 @@ export default function InterestedProductsField({ value, onChange, label = 'Inte
             {canAddFreeText && (
               <button
                 type="button"
-                onClick={() => addProduct(query)}
+                onClick={() => addEntry({ id: null, name: query })}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-primary-700 hover:bg-primary-50/60"
               >
                 <Plus className="size-3.5" aria-hidden="true" />

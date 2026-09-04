@@ -67,12 +67,22 @@ function buildItemBody(item) {
 }
 
 function buildQuotationBody(payload) {
+  // A quotation has EXACTLY ONE party: customer_id XOR lead_id (crm_changes Phase 2 §3).
+  // Send whichever the caller supplied; never send both.
+  const customerId = payload.customerId || payload.customer_id || null
+  const leadId = payload.leadId || payload.lead_id || null
+
   const body = {
-    customer_id: payload.customerId || payload.customer_id,
     quotation_date: payload.quotationDate || payload.quotation_date || undefined,
     currency: payload.currency || 'INR',
     status: payload.status || 'draft',
     items: (payload.items || []).map(buildItemBody),
+  }
+
+  if (leadId && !customerId) {
+    body.lead_id = leadId
+  } else {
+    body.customer_id = customerId
   }
 
   if (payload.validUntil || payload.valid_until) body.valid_until = payload.validUntil || payload.valid_until
@@ -115,6 +125,21 @@ function normalizeQuotation(quotation) {
     validUntil: quotation.valid_until,
     customerId: quotation.customer_id || quotation.customer?.id || '',
     customerName: quotation.customer?.name || quotation.customer?.customer_name || '',
+    // Lead party (crm_changes Phase 2). A quotation is linked to a lead OR a customer.
+    // `lead_id` persists as a historical reference even after the lead becomes a customer.
+    leadId: quotation.lead_id || quotation.lead?.id || '',
+    leadName: quotation.lead?.name || '',
+    lead: quotation.lead
+      ? {
+          id: quotation.lead.id,
+          name: quotation.lead.name || '',
+          contactPerson: quotation.lead.contact_person || '',
+          mobileNumber: quotation.lead.mobile_number || '',
+          email: quotation.lead.email || '',
+          leadSource: quotation.lead.lead_source || '',
+          leadStatus: quotation.lead.lead_status || '',
+        }
+      : null,
     billingAddress: quotation.billing_address || '',
     shippingAddress: quotation.shipping_address || '',
     salespersonId: quotation.salesperson_id || quotation.salesperson?.id || '',
@@ -228,26 +253,9 @@ export async function updateQuotationStatus(quotationId, status) {
   }
 }
 
-// Minimal PATCH that only links a customer to a quotation (used after a lead quotation's
-// lead is converted to a customer, so the quote can then become an order). Sends just
-// customer_id - the QuotationUpdate schema is all-optional, so items/status are untouched.
-export async function linkQuotationCustomer(quotationId, customerId) {
-  try {
-    const { data } = await apiClient.patch(`/quotations/${quotationId}`, { customer_id: customerId }, {
-      headers: authHeader(),
-    })
-
-    return { success: true, quotation: normalizeQuotation(data) }
-  } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to link the customer to this quotation. Please try again.',
-    )
-
-    return { success: false, error: message }
-  }
-}
+// NOTE: the frontend does NOT manually link a customer to a lead quotation. When a lead is
+// converted to a customer the backend auto-attaches the new customer_id to that lead's
+// quotations (crm_changes Phase 3 §3); callers just refetch the quotation.
 
 export async function convertQuotationToOrder(quotationId, payload = {}) {
   try {

@@ -48,7 +48,7 @@ export const LEAD_STATUS_OPTIONS = [
   { value: 'lost', label: 'Lost' },
 ]
 
-// The only statuses a user may set by hand. "Converted" is applied automatically
+// The only statuses a user may set by hand. "Converted" (`won`) is applied automatically
 // by the Convert-to-Customer flow, never chosen manually.
 export const LEAD_MANUAL_STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
@@ -56,6 +56,25 @@ export const LEAD_MANUAL_STATUS_OPTIONS = [
   { value: 'qualified', label: 'Qualified' },
   { value: 'lost', label: 'Lost' },
 ]
+
+// Backend-enforced lead status workflow (crm_changes Phase 1 §3 + latest addendum §7):
+// forward moves only, `lost` may be reopened to contacted/qualified, `won` is terminal.
+export const LEAD_STATUS_TRANSITIONS = {
+  new: ['contacted', 'qualified', 'lost'],
+  contacted: ['qualified', 'lost'],
+  qualified: ['lost'],
+  lost: ['contacted', 'qualified'],
+  won: [],
+}
+
+// Manual status <Select> options for a lead in `currentStatus`: the current value plus every
+// transition the backend will accept. `won` returns just itself (locked).
+export function manualStatusOptionsFor(currentStatus) {
+  const status = currentStatus || 'new'
+  if (status === 'won') return [{ value: 'won', label: 'Converted' }]
+  const allowed = new Set([status, ...(LEAD_STATUS_TRANSITIONS[status] || [])])
+  return LEAD_MANUAL_STATUS_OPTIONS.filter((option) => allowed.has(option.value))
+}
 
 export const LEAD_SOURCE_OPTIONS = [
   { value: 'Website', label: 'Website' },
@@ -95,8 +114,9 @@ function buildLeadBody(payload) {
     lead_status: payload.leadStatus || payload.lead_status || 'new',
   }
 
-  const customerId = payload.customerId || payload.customer_id
-  if (customerId) body.customer_id = customerId
+  // Lead <-> Customer relationship fields (`customer_id`, `converted_customer_id`) are NEVER
+  // sent from the normal create/edit form (crm_changes Phase 1 §8/§14). That link is only
+  // created by POST /leads/{id}/convert-to-customer.
 
   const assignedSalespersonId = payload.assignedSalespersonId || payload.assigned_salesperson_id
   if (assignedSalespersonId) body.assigned_salesperson_id = assignedSalespersonId
@@ -106,8 +126,22 @@ function buildLeadBody(payload) {
     body.contact_person = (payload.contactPerson ?? payload.contact_person)?.trim() || ''
   }
   if (payload.email !== undefined) body.email = payload.email?.trim() || ''
-  if (payload.interestedProduct !== undefined || payload.interested_product !== undefined) {
-    body.interested_product = (payload.interestedProduct ?? payload.interested_product)?.trim() || ''
+  // Interested products (crm_changes addendum §1). The form works in { id, name } objects
+  // (`interestedProductList`); we derive BOTH payload fields from it - the normalized
+  // `interested_product_ids` (real catalog matches) and the legacy `interested_product`
+  // string (all names incl. free text). Backend prefers the ids and keeps the string.
+  const list = payload.interestedProductList
+  if (Array.isArray(list)) {
+    body.interested_product_ids = list.filter((product) => product && product.id).map((product) => product.id)
+    body.interested_product = list.map((product) => product && product.name).filter(Boolean).join(', ')
+  } else {
+    if (payload.interestedProduct !== undefined || payload.interested_product !== undefined) {
+      body.interested_product = (payload.interestedProduct ?? payload.interested_product)?.trim() || ''
+    }
+    const productIds = payload.interestedProductIds ?? payload.interested_product_ids
+    if (Array.isArray(productIds)) {
+      body.interested_product_ids = productIds.filter(Boolean)
+    }
   }
   if (payload.leadType !== undefined || payload.lead_type !== undefined) {
     body.lead_type = (payload.leadType ?? payload.lead_type) || ''
@@ -116,6 +150,24 @@ function buildLeadBody(payload) {
   if (payload.notes !== undefined) body.notes = payload.notes?.trim() || ''
 
   return body
+}
+
+// The initial InterestedProductsField selection for a normalized lead: prefer the
+// structured `interestedProducts` briefs, fall back to splitting the legacy text string.
+export function leadInterestedProductList(lead) {
+  if (!lead) return []
+  if (Array.isArray(lead.interestedProducts) && lead.interestedProducts.length > 0) {
+    return lead.interestedProducts.map((product) => ({
+      id: product.id || null,
+      name: product.name || '',
+      sku: product.sku || '',
+    }))
+  }
+  return String(lead.interestedProduct || '')
+    .split(/\s*(?:,|;|\n|\||•)\s*/)
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => ({ id: null, name, sku: '' }))
 }
 
 function normalizeLead(lead) {
@@ -132,6 +184,18 @@ function normalizeLead(lead) {
     contactPerson: lead.contact_person || '',
     email: lead.email || '',
     interestedProduct: lead.interested_product || '',
+    // Normalized multi-product relation (crm addendum §1). `interestedProducts` is a list of
+    // { id, name, sku } briefs; `interestedProductIds` is the id-only list for form payloads.
+    interestedProducts: Array.isArray(lead.interested_products)
+      ? lead.interested_products.map((product) => ({
+          id: product.id,
+          name: product.name || product.product_name || '',
+          sku: product.sku || '',
+        }))
+      : [],
+    interestedProductIds: Array.isArray(lead.interested_product_ids)
+      ? lead.interested_product_ids.filter(Boolean)
+      : (Array.isArray(lead.interested_products) ? lead.interested_products.map((p) => p.id).filter(Boolean) : []),
     leadType: lead.lead_type || lead.type || '',
     segment: lead.segment || lead.customer_segment || '',
     notes: lead.notes || '',
@@ -151,8 +215,19 @@ function normalizeLead(lead) {
 
 export async function listLeads(params = {}) {
   try {
+    // All filters are optional & additive (crm_changes Phase 1 §11-12). Existing callers
+    // that pass nothing keep working; the backend default limit is 100.
     const queryParams = {}
     if (params.status) queryParams.status = params.status
+    if (params.search) queryParams.search = params.search
+    if (params.leadSource || params.lead_source) queryParams.lead_source = params.leadSource || params.lead_source
+    if (params.assignedSalespersonId || params.assigned_salesperson_id) {
+      queryParams.assigned_salesperson_id = params.assignedSalespersonId || params.assigned_salesperson_id
+    }
+    if (params.createdFrom || params.created_from) queryParams.created_from = params.createdFrom || params.created_from
+    if (params.createdTo || params.created_to) queryParams.created_to = params.createdTo || params.created_to
+    if (params.limit != null) queryParams.limit = params.limit
+    if (params.offset != null) queryParams.offset = params.offset
 
     const { data } = await apiClient.get('/leads', {
       headers: authHeader(),

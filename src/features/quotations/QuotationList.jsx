@@ -16,19 +16,14 @@ import {
   deriveQuotationStatus,
   formatQuotationStatus,
   getQuotationActions,
-  getQuotationMeta,
 } from './quotationHelpers'
-import { DEMO_QUOTATIONS_ENABLED, demoQuotationMeta, demoQuotationsResolved, isDemoQuotation } from './quotationDemoData'
+import { DEMO_QUOTATIONS_ENABLED, demoQuotationsResolved, isDemoQuotation } from './quotationDemoData'
 
 function formatDate(value) {
   if (!value) return '-'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
-}
-
-function quotationMeta(id) {
-  return getQuotationMeta(id) || (isDemoQuotation(id) ? demoQuotationMeta[id] || null : null)
 }
 
 export default function QuotationList() {
@@ -78,10 +73,9 @@ export default function QuotationList() {
     const search = searchTerm.trim().toLowerCase()
 
     return quotations.filter((quotation) => {
-      const leadName = quotationMeta(quotation.id)?.leadName || ''
       const matchesSearch =
         !search ||
-        [quotation.quotationNumber, quotation.customerName, leadName, quotation.salespersonName]
+        [quotation.quotationNumber, quotation.customerName, quotation.leadName, quotation.salespersonName]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(search))
       const matchesStatus = statusFilter === 'all' || deriveQuotationStatus(quotation) === statusFilter
@@ -195,9 +189,8 @@ export default function QuotationList() {
               </thead>
               <tbody>
                 {filteredQuotations.map((quotation) => {
-                  const meta = quotationMeta(quotation.id)
                   const displayStatus = deriveQuotationStatus(quotation)
-                  const actions = getQuotationActions(quotation, meta)
+                  const actions = getQuotationActions(quotation)
                   return (
                   <tr
                     key={quotation.id}
@@ -214,14 +207,16 @@ export default function QuotationList() {
                       <p className="mt-0.5 text-xs text-neutral-400">{quotation.itemCount} item(s)</p>
                     </td>
                     <td className="px-4 py-3.5">
-                      {quotation.customerName ? (
+                      {quotation.customerId ? (
                         <>
-                          <p className="text-neutral-800">{quotation.customerName}</p>
-                          <span className="mt-0.5 inline-block rounded bg-neutral-100 px-1.5 py-0.5 text-[0.62rem] font-medium text-neutral-500">Customer</span>
+                          <p className="text-neutral-800">{quotation.customerName || quotation.leadName || 'Customer'}</p>
+                          <span className="mt-0.5 inline-block rounded bg-neutral-100 px-1.5 py-0.5 text-[0.62rem] font-medium text-neutral-500">
+                            Customer{quotation.leadId ? ' · from lead' : ''}
+                          </span>
                         </>
-                      ) : meta?.leadName ? (
+                      ) : quotation.leadId ? (
                         <>
-                          <p className="text-neutral-800">{meta.leadName}</p>
+                          <p className="text-neutral-800">{quotation.leadName || 'Lead'}</p>
                           <span className="mt-0.5 inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[0.62rem] font-medium text-blue-600">Lead</span>
                         </>
                       ) : (

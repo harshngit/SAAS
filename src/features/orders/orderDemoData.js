@@ -112,11 +112,17 @@ function order({
   deliveryVehicle, quotation,
   deliveryId, invoiceId, rejectReason, notes, items, previousBalance = 0,
   collectedAmount = 0, collectedFull = false, deliveryPod = null,
+  paidAmount = 0, demoErrorState = false, blockConfirmOnShortage = false,
 }) {
   const c = CUSTOMERS[customer]
   const partner = DEMO_DELIVERY_PARTNERS.find((p) => p.id === partnerId) || null
   const subtotal = items.reduce((s, it) => s + it.quantity * it.unitPrice, 0)
   const total = items.reduce((s, it) => s + it.lineTotal, 0)
+  // Demo-only payment figures for the Order Detail "Payment Summary" card (Previous Balance /
+  // Total Due / Paid / Remaining). Never persisted, never sent to any API.
+  const paid = Math.max(0, Number(paidAmount) || 0)
+  const totalDue = Math.round(total) + previousBalance
+  const showPay = status !== 'cancelled' && (method === 'pickup' || previousBalance > 0 || paid > 0)
   return {
     id: `demo-so-${key}`,
     orderNumber: number,
@@ -131,6 +137,14 @@ function order({
     collectedAmount,
     collectedFull,
     deliveryPod,
+    // Demo-only flags: `demoErrorState` tags an intentionally-invalid record (state-mismatch
+    // banner test); `blockConfirmOnShortage` makes a demo Confirm attempt fail without
+    // advancing the order (stays Draft) instead of the "confirmed-but-unreserved" simulation.
+    demoErrorState,
+    blockConfirmOnShortage,
+    demoPayment: showPay
+      ? { previousBalance, totalDue, paid, remaining: Math.max(totalDue - paid, 0) }
+      : null,
     customerId: `demo-customer-${customer}`,
     customerName: c.name,
     customerPhone: c.phone,
@@ -269,17 +283,73 @@ export const demoOrders = [
     items: [line({ id: 'i1', ...RICE, quantity: 15 })],
     notes: 'Guard test: delivery snapshot still shows Picking but the order is Cancelled.',
   }),
-  // K. Takeaway - Ready for Pickup.
+  // ---------------------------------------------------------------------------
+  // TAKEAWAY / SELF PICKUP demo set - one row per state of the pickup flow:
+  //   Draft -> Confirmed + Stock Reserved -> Ready for Pickup -> Picked Up
+  // plus Cancelled, Stock-blocked confirmation, and one intentionally-broken
+  // record for the state-mismatch banner. No takeaway order ever has a delivery
+  // record, a delivery partner, or a delivery status.
+  // ---------------------------------------------------------------------------
+  // K-A. Draft Takeaway - Edit / Confirm / Cancel; nothing reserved; payment fully unpaid.
   order({
-    key: 'pickup-ready', number: 'SO-DEMO-11', customer: 'metro', status: 'confirmed', fulfilmentStatus: 'reserved',
-    method: 'pickup', pickupStatus: 'ready', previousBalance: 2500,
-    items: [line({ id: 'i1', ...OIL, quantity: 24 }), line({ id: 'i2', ...SUGAR, quantity: 10 })],
+    key: 'takeaway-draft', number: 'SO-DEMO-11', customer: 'balaji', status: 'placed',
+    method: 'pickup',
+    items: [
+      line({ id: 'i1', ...RICE, quantity: 6, reservedQuantity: 0 }),
+      line({ id: 'i2', ...OIL, quantity: 4, reservedQuantity: 0 }),
+    ],
   }),
-  // L. Takeaway - Picked Up / Completed.
+  // K-B. Confirmed + Stock Reserved, pickup not started yet ("Awaiting Pickup").
+  //      Partially paid (Previous Balance ₹500, Paid ₹1,000).
   order({
-    key: 'pickup-done', number: 'SO-DEMO-12', customer: 'balaji', status: 'completed', fulfilmentStatus: 'delivered',
-    method: 'pickup', pickupStatus: 'collected', invoiceId: 'demo-inv-pickup',
-    items: [line({ id: 'i1', ...FLOUR, quantity: 15, deliveredQuantity: 15 })],
+    key: 'takeaway-confirmed', number: 'SO-DEMO-12', customer: 'metro', status: 'confirmed',
+    fulfilmentStatus: 'reserved', method: 'pickup', pickupStatus: 'not_started',
+    previousBalance: 500, paidAmount: 1000,
+    items: [
+      line({ id: 'i1', ...SUGAR, quantity: 8 }),
+      line({ id: 'i2', ...FLOUR, quantity: 5 }),
+    ],
+  }),
+  // K-C. Ready for Pickup - from a converted quotation. Fully paid.
+  order({
+    key: 'takeaway-ready', number: 'SO-DEMO-19', customer: 'aarav', status: 'confirmed',
+    fulfilmentStatus: 'reserved', method: 'pickup', pickupStatus: 'ready',
+    quotation: { id: 'demo-qt-takeaway', number: 'QT-DEMO-TK1' }, paidAmount: 3518,
+    items: [line({ id: 'i1', ...FLOUR, quantity: 10 })],
+  }),
+  // K-D. Picked Up / Completed - read-only. Invoice raised, fully paid.
+  order({
+    key: 'takeaway-picked', number: 'SO-DEMO-20', customer: 'balaji', status: 'completed',
+    fulfilmentStatus: 'delivered', method: 'pickup', pickupStatus: 'collected',
+    invoiceId: 'demo-inv-takeaway', paidAmount: 7812,
+    items: [line({ id: 'i1', ...RICE, quantity: 12, deliveredQuantity: 12 })],
+  }),
+  // K-E. Cancelled Takeaway - Duplicate only, no delivery, no pickup actions.
+  order({
+    key: 'takeaway-cancelled', number: 'SO-DEMO-21', customer: 'green', status: 'cancelled',
+    method: 'pickup',
+    rejectReason: 'Customer Cancelled — no longer needs the stock',
+    items: [line({ id: 'i1', ...SUGAR, quantity: 10 })],
+  }),
+  // K-F. Stock Unavailable - Draft; ordered qty exceeds available stock. A demo Confirm
+  //      attempt fails with a truthful stock error and DOES NOT advance the order
+  //      (`blockConfirmOnShortage`): stays Draft, reserved stays 0.
+  order({
+    key: 'takeaway-stock-blocked', number: 'SO-DEMO-22', customer: 'aarav', status: 'placed',
+    method: 'pickup', blockConfirmOnShortage: true,
+    items: [
+      line({ id: 'i1', ...RICE, quantity: 20, reservedQuantity: 0, availableStock: 8 }),
+      line({ id: 'i2', ...OIL, quantity: 10, reservedQuantity: 0, availableStock: 5 }),
+    ],
+    notes: 'Internal: only 8 of 20 Rice and 5 of 10 Oil are in stock — confirmation is blocked.',
+  }),
+  // K-G. DEMO ERROR STATE - intentionally invalid: Order Status = Draft but stock is already
+  //      reserved. Exists ONLY to exercise the "Order state mismatch" banner. Not a business flow.
+  order({
+    key: 'takeaway-mismatch', number: 'SO-DEMO-23', customer: 'royal', status: 'placed',
+    fulfilmentStatus: 'reserved', method: 'pickup', demoErrorState: true,
+    items: [line({ id: 'i1', ...RICE, quantity: 5 })],
+    notes: 'DEMO ERROR STATE — invalid on purpose (Draft + reserved stock) to test the mismatch banner.',
   }),
   // M. Insufficient Stock - Draft, so Confirm can be clicked and fail to reserve.
   order({

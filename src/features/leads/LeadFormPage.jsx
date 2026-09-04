@@ -17,7 +17,6 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
 import { LEAD_SEGMENT_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_TYPE_OPTIONS, createLead } from '../../api/leads'
-import { listCustomers } from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
@@ -29,12 +28,11 @@ const emptyForm = {
   name: '',
   contactPerson: '',
   email: '',
-  interestedProduct: '',
+  interestedProductList: [], // [{ id, name, sku }] - see InterestedProductsField
   leadType: '',
   segment: '',
   notes: '',
   leadSource: '',
-  customerId: '',
   mobileNumber: '',
   assignedSalespersonId: '',
   leadStatus: 'new',
@@ -51,7 +49,6 @@ export default function LeadFormPage() {
     assignedSalespersonId: isSalesOfficer ? currentUser.id : '',
   }))
   const [errors, setErrors] = useState({})
-  const [customers, setCustomers] = useState([])
   const [salespeople, setSalespeople] = useState([])
   const [isLoadingOptions, setIsLoadingOptions] = useState(true)
   const [submitError, setSubmitError] = useState('')
@@ -62,13 +59,10 @@ export default function LeadFormPage() {
     let isMounted = true
 
     async function loadOptions() {
-      const customersPromise = listCustomers()
-      const usersPromise = isSalesOfficer ? Promise.resolve({ success: true, users: [] }) : listUsers()
-      const [customersResult, usersResult] = await Promise.all([customersPromise, usersPromise])
+      const usersResult = isSalesOfficer ? { success: true, users: [] } : await listUsers()
 
       if (!isMounted) return
 
-      if (customersResult.success) setCustomers(customersResult.customers)
       if (isSalesOfficer) {
         setSalespeople(
           currentUser?.id
@@ -110,17 +104,6 @@ export default function LeadFormPage() {
     }
   }, [currentUser?.id, currentUser?.name, isSalesOfficer])
 
-  const customerOptions = useMemo(
-    () => [
-      { value: '', label: 'No existing customer (new prospect)' },
-      ...customers.map((customer) => ({
-        value: customer.id,
-        label: `${customer.name}${customer.phone ? ` - ${customer.phone}` : ''}`,
-      })),
-    ],
-    [customers],
-  )
-
   const salespersonOptions = useMemo(() => {
     const people = salespeople.map((user) => ({ value: user.id, label: user.name }))
     // Sales Officer picker is locked to self; Admin may leave a lead Unassigned.
@@ -130,11 +113,6 @@ export default function LeadFormPage() {
   const selectedSalesperson = useMemo(
     () => salespersonOptions.find((option) => option.value === formData.assignedSalespersonId),
     [formData.assignedSalespersonId, salespersonOptions],
-  )
-
-  const selectedCustomer = useMemo(
-    () => customerOptions.find((option) => option.value === formData.customerId),
-    [customerOptions, formData.customerId],
   )
 
   const updateField = (field, value) => {
@@ -269,14 +247,6 @@ export default function LeadFormPage() {
                 placeholder="Select lead source"
                 error={errors.leadSource}
               />
-              <Select
-                label="Existing Customer"
-                options={customerOptions}
-                value={formData.customerId}
-                onChange={(event) => updateField('customerId', event.target.value)}
-                placeholder={isLoadingOptions ? 'Loading customers...' : 'No existing customer (new prospect)'}
-                disabled={isLoadingOptions}
-              />
               <Input
                 label="Mobile Number"
                 required
@@ -317,8 +287,8 @@ export default function LeadFormPage() {
                 placeholder="Select a segment"
               />
               <InterestedProductsField
-                value={formData.interestedProduct}
-                onChange={(next) => updateField('interestedProduct', next)}
+                selected={formData.interestedProductList}
+                onChange={(list) => updateField('interestedProductList', list)}
                 className="sm:col-span-2"
               />
               <Input
@@ -393,10 +363,6 @@ export default function LeadFormPage() {
                 <div className="mt-2">
                   <Badge variant="info">New</Badge>
                 </div>
-              </div>
-              <div className="border-t border-dashed border-neutral-200 pt-4">
-                <p className="text-sm text-neutral-500">Existing Customer</p>
-                <p className="mt-1 font-medium text-neutral-900">{selectedCustomer?.label || 'No existing customer'}</p>
               </div>
               <div className="border-t border-dashed border-neutral-200 pt-4">
                 <p className="text-sm text-neutral-500">Created By</p>

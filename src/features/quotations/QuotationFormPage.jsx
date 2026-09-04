@@ -17,17 +17,15 @@ import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
 import { formatLeadStatus } from '../leads/leadActivity'
-import { demoLeads } from '../leads/demoData'
+import { demoLeads, isDemoRecord } from '../leads/demoData'
 import ProductPickerList from '../orders/ProductPickerList'
 import {
   canEditQuotation,
-  getQuotationMeta,
   patchQuotationMeta,
   quantityStepForUom,
   quotationToDraftForm,
-  setQuotationMeta,
 } from './quotationHelpers'
-import { demoQuotationMeta, getDemoQuotation, isDemoQuotation, patchDemoQuotation } from './quotationDemoData'
+import { getDemoQuotation, isDemoQuotation, patchDemoQuotation } from './quotationDemoData'
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -103,7 +101,6 @@ export default function QuotationFormPage() {
   const [salespeople, setSalespeople] = useState([])
   const [isLoadingOptions, setIsLoadingOptions] = useState(true)
   const [isLoadingSource, setIsLoadingSource] = useState(isEdit || Boolean(fromId))
-  const [sourceMeta, setSourceMeta] = useState(null)
   const [lockedMessage, setLockedMessage] = useState('')
   const [quickAddOpen, setQuickAddOpen] = useState(false)
 
@@ -150,8 +147,6 @@ export default function QuotationFormPage() {
         return
       }
       setSourceStatus(quote.status)
-      const meta = { ...(isDemoQuotation(sourceId) ? demoQuotationMeta[sourceId] || {} : {}), ...(getQuotationMeta(sourceId) || {}) }
-      setSourceMeta(meta)
 
       if (isEdit && !canEditQuotation(quote)) {
         setLockedMessage(`This quotation is ${quote.status} and is locked. Use Duplicate to start a new quotation from it.`)
@@ -180,8 +175,8 @@ export default function QuotationFormPage() {
       setFormData((current) => ({
         ...current,
         ...draft,
-        quotationFor: draft.customerId ? 'customer' : meta.leadId ? 'lead' : 'customer',
-        leadId: meta.leadId || '',
+        quotationFor: draft.customerId ? 'customer' : quote.leadId ? 'lead' : 'customer',
+        leadId: quote.leadId || '',
         quotationDate: isEdit ? quote.quotationDate?.slice(0, 10) || today : today,
         validUntil: isEdit ? quote.validUntil?.slice(0, 10) || '' : '',
         salespersonId: isSalesOfficer ? currentUser.id : draft.salespersonId,
@@ -351,15 +346,24 @@ export default function QuotationFormPage() {
       return
     }
 
+    // Demo leads are UI fixtures - they have no real backend id, so a real quotation can't
+    // reference one. Block the save instead of sending a demo id to /quotations.
+    if (formData.quotationFor === 'lead' && isDemoRecord(formData.leadId)) {
+      setSubmitError('This is a demo lead used for UI preview only. Pick a real lead, or create the lead first.')
+      return
+    }
+
     setIsSubmitting(true)
     setSubmitError('')
 
-    // A lead quotation carries no customer_id (backend has no lead_id field) - the link
-    // is stored in quotation meta after we have the new id.
+    // Exactly one party: a lead quotation sends lead_id (real backend field, crm Phase 2),
+    // a customer quotation sends customer_id. buildQuotationBody enforces the XOR.
+    const forLead = formData.quotationFor === 'lead'
     const payload = {
       ...formData,
       items: itemsPayload,
-      customerId: formData.quotationFor === 'lead' ? '' : formData.customerId,
+      customerId: forLead ? '' : formData.customerId,
+      leadId: forLead ? formData.leadId : '',
       ...(reopensAsDraft ? { status: 'draft' } : {}),
     }
 
@@ -374,14 +378,8 @@ export default function QuotationFormPage() {
     }
 
     const savedId = result.quotation?.id || editId
-    if (formData.quotationFor === 'lead' && formData.leadId && savedId) {
-      setQuotationMeta(savedId, {
-        leadId: formData.leadId,
-        leadName: selectedLead?.name || sourceMeta?.leadName || 'Prospect',
-        leadStatus: selectedLead?.leadStatus || sourceMeta?.leadStatus || '',
-        convertedCustomerId: '',
-      })
-    }
+    // The lead link now persists server-side - no localStorage write. Only the display-only
+    // "edited after send" flag stays local (BACKEND LATER: quotation activity feed).
     if (reopensAsDraft) patchQuotationMeta(editId, { updatedAfterSend: true })
 
     navigate(savedId ? `${basePath}/${encodeURIComponent(savedId)}` : basePath)

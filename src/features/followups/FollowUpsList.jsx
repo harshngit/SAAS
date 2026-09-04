@@ -24,6 +24,7 @@ import { listAssignableStaff } from '../../api/users'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
 import { FOLLOWUP_OUTCOME_OPTIONS, deriveFollowUpType, describeDueDate, dayDelta } from '../leads/leadActivity'
+import { deriveFollowUpStatus } from '../visits/visitStatus'
 import ConvertLeadModal from '../leads/ConvertLeadModal'
 import { DEMO_RECORDS_ENABLED, demoFollowUps, demoLeads, isDemoRecord } from '../leads/demoData'
 
@@ -74,10 +75,11 @@ function titleCase(value = '') {
   return String(value).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function FollowUpRow({ followUp, contact, actingId, onComplete, onEdit, onDelete }) {
+function FollowUpRow({ followUp, contact, visitOrigin, actingId, onComplete, onEdit, onDelete }) {
   const isDone = followUp.status === 'completed'
   const due = describeDueDate(followUp.dueDate)
   const type = deriveFollowUpType(followUp.title)
+  const fuStatus = deriveFollowUpStatus(followUp)
 
   return (
     <tr className={`transition-colors hover:bg-primary-50/30 ${isDone ? 'opacity-60' : ''}`}>
@@ -92,6 +94,14 @@ function FollowUpRow({ followUp, contact, actingId, onComplete, onEdit, onDelete
         {followUp.outcome && (
           <p className="mt-0.5 text-xs text-neutral-500">Outcome: {titleCase(followUp.outcome)}</p>
         )}
+        {followUp.outcomeNotes && (
+          <p className="mt-0.5 text-xs text-neutral-500">Notes: {followUp.outcomeNotes}</p>
+        )}
+        <p className="mt-0.5 text-[0.68rem] text-neutral-400">
+          {visitOrigin
+            ? `Origin: visit · ${titleCase(visitOrigin.visitType)}${visitOrigin.visitDate ? ` · ${formatDueDate(visitOrigin.visitDate)}` : ''}`
+            : 'Origin: direct follow-up'}
+        </p>
       </td>
       <td className="px-4 py-3.5">
         <p className="font-medium text-neutral-900">{contact.name}</p>
@@ -111,7 +121,7 @@ function FollowUpRow({ followUp, contact, actingId, onComplete, onEdit, onDelete
         <Badge variant={PRIORITY_VARIANT[followUp.priority] || 'neutral'}>{titleCase(followUp.priority)}</Badge>
       </td>
       <td className="px-4 py-3.5">
-        <Badge variant={isDone ? 'success' : 'warning'}>{isDone ? 'Completed' : 'Pending'}</Badge>
+        <Badge variant={fuStatus.variant}>{fuStatus.label}</Badge>
       </td>
       <td className="px-4 py-3.5 text-right">
         <div className="flex items-center justify-end gap-1">
@@ -143,7 +153,9 @@ function todayIso() {
 
 function emptyFormData() {
   return {
+    party: 'customer',
     customerId: '',
+    leadId: '',
     title: '',
     description: '',
     dueDate: todayIso(),
@@ -189,7 +201,7 @@ export default function FollowUpsList() {
   const [actingId, setActingId] = useState('')
   const [activeTab, setActiveTab] = useState('today')
   const [completingFollowUp, setCompletingFollowUp] = useState(null)
-  const [completeOutcome, setCompleteOutcome] = useState('interested')
+  const [completeOutcome, setCompleteOutcome] = useState('')
   const [completeNotes, setCompleteNotes] = useState('')
 
   const loadFollowUps = useCallback(async () => {
@@ -250,6 +262,8 @@ export default function FollowUpsList() {
         kind: visit.leadId ? 'Lead' : 'Customer',
         leadId: visit.leadId || '',
         customerId: visit.customerId || '',
+        visitType: visit.visitType || '',
+        visitDate: visit.visitDate || '',
       })
     })
     return map
@@ -287,6 +301,10 @@ export default function FollowUpsList() {
     () => staffMembers.map((user) => ({ value: user.id, label: user.name })),
     [staffMembers],
   )
+  const leadOptions = useMemo(
+    () => leads.map((lead) => ({ value: lead.id, label: lead.name || lead.customerName || 'New prospect' })),
+    [leads],
+  )
 
   const buckets = useMemo(() => {
     const grouped = { today: [], upcoming: [], overdue: [], completed: [] }
@@ -307,8 +325,13 @@ export default function FollowUpsList() {
     setEditingFollowUp(followUp)
     setFormError('')
     const dueDate = followUp.dueDate ? new Date(followUp.dueDate) : new Date()
+    const visitOrigin = followUp.visitId ? visitIndex.get(followUp.visitId) : null
+    const leadId = followUp.leadId || visitOrigin?.leadId || ''
+    const customerId = followUp.customerId || visitOrigin?.customerId || ''
     setFormData({
-      customerId: followUp.customerId,
+      party: leadId ? 'lead' : 'customer',
+      customerId,
+      leadId,
       title: followUp.title,
       description: followUp.description,
       dueDate: dueDate.toISOString().slice(0, 10),
@@ -345,13 +368,9 @@ export default function FollowUpsList() {
   const handleSaveFollowUp = async (event) => {
     event.preventDefault()
 
-    // Only new, standalone (no parent visit) follow-ups created from this page need a
-    // customer picked here. A lead-only follow-up (created from a lead's visit, so it has
-    // no customer_id) keeps that identity when edited here - forcing a customer pick would
-    // wrongly convert it into a customer follow-up just for e.g. changing its due date.
-    const requiresCustomer = !editingFollowUp?.visitId
-    if (requiresCustomer && !formData.customerId) {
-      setFormError('Select a customer for this follow-up.')
+    const selectedPartyId = formData.party === 'lead' ? formData.leadId : formData.customerId
+    if (!editingFollowUp?.visitId && !selectedPartyId) {
+      setFormError(`Select a ${formData.party} for this follow-up.`)
       return
     }
     if (!formData.title.trim()) {
@@ -378,12 +397,17 @@ export default function FollowUpsList() {
     setFormError('')
 
     const payload = {
-      customerId: formData.customerId,
       title: formData.title,
       description: formData.description,
       dueDate,
       priority: formData.priority,
       assigneeId: formData.assigneeId || undefined,
+    }
+    // Visit-linked tasks keep their existing relationship. Standalone tasks send exactly
+    // one direct party relationship selected in the form.
+    if (!editingFollowUp?.visitId) {
+      if (formData.party === 'lead') payload.leadId = formData.leadId
+      else payload.customerId = formData.customerId
     }
 
     const result = editingFollowUp
@@ -408,7 +432,7 @@ export default function FollowUpsList() {
   const openComplete = (followUp) => {
     if (followUp.status === 'completed') return
     setCompletingFollowUp(followUp)
-    setCompleteOutcome('interested')
+    setCompleteOutcome('')
     setCompleteNotes('')
   }
 
@@ -429,15 +453,17 @@ export default function FollowUpsList() {
     if (isDemoRecord(followUp.id)) {
       applyLocal(followUp)
       setCompletingFollowUp(null)
-      showToast({ title: 'Follow-up completed', message: `Outcome: ${completeOutcome.replace(/_/g, ' ')}.` })
+      showToast({ title: 'Follow-up completed', message: completeOutcome ? `Outcome: ${completeOutcome.replace(/_/g, ' ')}.` : 'Follow-up completed.' })
       return
     }
 
     setActingId(followUp.id)
-    // The API has no outcome/notes field on complete yet - we call the existing
-    // /complete endpoint and keep the outcome locally for display.
-    // TODO: send { outcome, notes } once the backend accepts them.
-    const result = await completeFollowUp(followUp.id)
+    const outcome = completeOutcome.trim()
+    const notes = completeNotes.trim()
+    const result = await completeFollowUp(followUp.id, {
+      ...(outcome ? { outcome } : {}),
+      ...(notes ? { outcomeNotes: notes } : {}),
+    })
     setActingId('')
 
     if (!result.success) {
@@ -445,12 +471,12 @@ export default function FollowUpsList() {
       return
     }
 
-    applyLocal(result.followUp)
+    setFollowUps((current) => current.map((entry) => (entry.id === followUp.id ? result.followUp : entry)))
 
     setCompletingFollowUp(null)
     // The next action (Convert / Add Follow-up / Log Visit) is surfaced inline on the
     // row itself via followUpNextAction() - no separate banner needed.
-    showToast({ title: 'Follow-up completed', message: `Outcome: ${completeOutcome.replace(/_/g, ' ')}.` })
+    showToast({ title: 'Follow-up completed', message: outcome ? `Outcome: ${outcome.replace(/_/g, ' ')}.` : 'Follow-up completed.' })
   }
 
   const runNextAction = (action, contact) => {
@@ -561,11 +587,13 @@ export default function FollowUpsList() {
                         {buckets[tab.value].map((followUp) => {
                           const contact = resolveContact(followUp)
                           const next = followUpNextAction(followUp, contact)
+                          const visitOrigin = followUp.visitId ? visitIndex.get(followUp.visitId) : null
                           return (
                             <Fragment key={followUp.id}>
                               <FollowUpRow
                                 followUp={followUp}
                                 contact={contact}
+                                visitOrigin={visitOrigin}
                                 actingId={actingId}
                                 onComplete={() => openComplete(followUp)}
                                 onEdit={() => handleEditFollowUp(followUp)}
@@ -612,27 +640,52 @@ export default function FollowUpsList() {
         onConverted={applyLeadConverted}
       />
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingFollowUp ? 'Edit Follow-up' : 'Add Follow-up'}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingFollowUp ? 'Edit Follow-up' : 'Add Follow-up'} size="xl">
         <form onSubmit={handleSaveFollowUp} className="space-y-4">
           {formError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
           )}
-          <Select
-            label="Customer"
-            options={customerOptions}
-            value={formData.customerId}
-            onChange={(event) => setFormData((current) => ({ ...current, customerId: event.target.value }))}
-            placeholder={
-              isLoadingCustomers
-                ? 'Loading customers...'
-                : editingFollowUp?.visitId && !formData.customerId
-                  ? 'No customer (linked to a lead visit)'
-                  : 'Select customer'
-            }
-            disabled={isLoadingCustomers}
-            searchable
-            required={!editingFollowUp?.visitId}
-          />
+          <div>
+            <p className="mb-2 text-sm font-medium text-neutral-700">Follow-up For <span className="text-red-500">*</span></p>
+            <div className="flex rounded-xl bg-neutral-100 p-1">
+              {[{ value: 'customer', label: 'Customer' }, { value: 'lead', label: 'Lead' }].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  disabled={Boolean(editingFollowUp)}
+                  onClick={() => setFormData((current) => ({ ...current, party: option.value, customerId: '', leadId: '' }))}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                    formData.party === option.value ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'
+                  } disabled:cursor-not-allowed disabled:opacity-70`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {formData.party === 'lead' ? (
+            <Select
+              label="Lead"
+              options={leadOptions}
+              value={formData.leadId}
+              onChange={(event) => setFormData((current) => ({ ...current, leadId: event.target.value }))}
+              placeholder={leads.length ? 'Select lead' : 'No leads available'}
+              disabled={Boolean(editingFollowUp?.visitId) || leads.length === 0}
+              searchable
+              required={!editingFollowUp?.visitId}
+            />
+          ) : (
+            <Select
+              label="Customer"
+              options={customerOptions}
+              value={formData.customerId}
+              onChange={(event) => setFormData((current) => ({ ...current, customerId: event.target.value }))}
+              placeholder={isLoadingCustomers ? 'Loading customers...' : 'Select customer'}
+              disabled={Boolean(editingFollowUp?.visitId) || isLoadingCustomers}
+              searchable
+              required={!editingFollowUp?.visitId}
+            />
+          )}
           <Input
             label="Task Title"
             value={formData.title}
@@ -687,7 +740,7 @@ export default function FollowUpsList() {
           <p className="text-sm text-neutral-500">{completingFollowUp?.title}</p>
           <Select
             label="Outcome"
-            options={FOLLOWUP_OUTCOME_OPTIONS}
+            options={[{ value: '', label: 'No outcome' }, ...FOLLOWUP_OUTCOME_OPTIONS]}
             value={completeOutcome}
             onChange={(event) => setCompleteOutcome(event.target.value)}
           />

@@ -29,19 +29,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Ta
 import { useToast } from '../../components/ui/toastContext'
 import { ROLES } from '../../auth/roles'
 import {
-  LEAD_MANUAL_STATUS_OPTIONS,
   deleteLead,
   getLead,
+  manualStatusOptionsFor,
   updateLead,
 } from '../../api/leads'
-import { listCustomers } from '../../api/customers'
 import { listAssignableStaff, listUsers } from '../../api/users'
 import { VISIT_TYPE_OPTIONS, createVisit, createVisitFollowUp, listVisits } from '../../api/visits'
+import { completeFollowUp, createFollowUp, deleteFollowUp, listFollowUps, updateFollowUp } from '../../api/followups'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import { customerBasePathByRole } from '../customers/customerConstants'
 import { LeadEditForm } from './LeadForms'
 import ConvertLeadModal from './ConvertLeadModal'
+import { deriveFollowUpStatus, deriveVisitStatus } from '../visits/visitStatus'
 import {
   FOLLOWUP_OUTCOME_OPTIONS,
   LEAD_STATUS_VARIANT as statusVariant,
@@ -80,11 +81,16 @@ const taskPriorityOptions = [
 ]
 
 function emptyVisitFormData() {
+  const now = new Date()
+  const roundedMinutes = Math.ceil(now.getMinutes() / 15) * 15
+  now.setMinutes(roundedMinutes, 0, 0)
+
   return {
     visitType: 'site_visit',
+    visitDate: now.toISOString().slice(0, 10),
+    visitTime: now.toTimeString().slice(0, 5),
     purpose: '',
     notes: '',
-    outcome: '',
     createFollowUpTask: false,
     title: '',
     description: '',
@@ -220,7 +226,6 @@ export default function LeadDetail() {
   const [lead, setLead] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [customers, setCustomers] = useState([])
   const [salespeople, setSalespeople] = useState([])
 
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -253,21 +258,23 @@ export default function LeadDetail() {
   const [visitFormError, setVisitFormError] = useState('')
   const [assignableStaff, setAssignableStaff] = useState([])
 
-  // Follow-ups raised directly on a lead. The backend /follow-ups endpoint needs a
-  // customer or a visit to attach to, and a raw lead has neither, so for this UI
-  // phase they live in local state (shape matches normalizeFollowUp so a real
-  // POST /follow-ups?lead_id=... can drop in later).
-  // TODO: replace with a real lead-follow-up endpoint once the backend adds one.
-  const [localFollowUps, setLocalFollowUps] = useState([])
+  // Follow-ups raised directly on a lead - persisted via POST /follow-ups with lead_id
+  // (the backend now supports a lead-only follow-up: no customer_id / visit_id needed).
+  // These are the lead's DIRECT follow-ups; the ones that came from a visit arrive
+  // through visits[].followUps instead and are filtered out of this list.
+  const [directFollowUps, setDirectFollowUps] = useState([])
+  const [isLoadingFollowUps, setIsLoadingFollowUps] = useState(true)
+  const [followUpsError, setFollowUpsError] = useState('')
   const [activitiesTab, setActivitiesTab] = useState('followups')
 
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false)
   const [followUpFormData, setFollowUpFormData] = useState(emptyFollowUpFormData)
   const [editingFollowUpId, setEditingFollowUpId] = useState(null)
   const [followUpFormError, setFollowUpFormError] = useState('')
+  const [savingFollowUp, setSavingFollowUp] = useState(false)
 
   const [completingFollowUp, setCompletingFollowUp] = useState(null)
-  const [completeOutcome, setCompleteOutcome] = useState('interested')
+  const [completeOutcome, setCompleteOutcome] = useState('')
   const [completeNotes, setCompleteNotes] = useState('')
   const [readyToConvertNudge, setReadyToConvertNudge] = useState(false)
 
@@ -323,16 +330,46 @@ export default function LeadDetail() {
   useEffect(() => {
     let isMounted = true
 
-    async function loadOptions() {
-      const customersPromise = listCustomers()
-      const usersPromise = currentUser?.role === ROLES.SALES_OFFICER ? Promise.resolve({ success: true, users: [] }) : listUsers()
-      // GET /users/assignable is the privacy-safe picker any follow_ups:create role can call
-      // (unlike admin-only GET /users) - used for the Log Visit follow-up task assignee field.
-      const staffPromise = listAssignableStaff()
-      const [customersResult, usersResult, staffResult] = await Promise.all([customersPromise, usersPromise, staffPromise])
+    async function loadFollowUps() {
+      setIsLoadingFollowUps(true)
+      setFollowUpsError('')
+
+      const result = await listFollowUps({ leadId: id })
+
       if (!isMounted) return
 
-      if (customersResult.success) setCustomers(customersResult.customers)
+      if (!result.success) {
+        setDirectFollowUps([])
+        setFollowUpsError(result.error)
+        setIsLoadingFollowUps(false)
+        return
+      }
+
+      // GET /follow-ups?lead_id= returns visit-generated follow-ups too (they carry
+      // lead_id). Those already render through the Visits tab, so keep only this lead's
+      // DIRECT ones. Requiring leadId === id also guards an older backend that ignores
+      // the lead_id filter.
+      setDirectFollowUps(result.followUps.filter((task) => task.leadId === id && !task.visitId))
+      setIsLoadingFollowUps(false)
+    }
+
+    loadFollowUps()
+    return () => {
+      isMounted = false
+    }
+  }, [id])
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadOptions() {
+      const usersPromise = currentUser?.role === ROLES.SALES_OFFICER ? Promise.resolve({ success: true, users: [] }) : listUsers()
+      // GET /users/assignable is the privacy-safe picker any follow_ups:create role can call
+      // (unlike admin-only GET /users) - used for the Schedule Visit follow-up task assignee field.
+      const staffPromise = listAssignableStaff()
+      const [usersResult, staffResult] = await Promise.all([usersPromise, staffPromise])
+      if (!isMounted) return
+
       if (currentUser?.role === ROLES.SALES_OFFICER) {
         setSalespeople(
           currentUser?.id
@@ -359,10 +396,6 @@ export default function LeadDetail() {
     }
   }, [currentUser?.id, currentUser?.name, currentUser?.role])
 
-  const customerOptions = useMemo(
-    () => customers.map((customer) => ({ value: customer.id, label: `${customer.name}${customer.phone ? ` • ${customer.phone}` : ''}` })),
-    [customers],
-  )
   const salespersonOptions = useMemo(
     () => salespeople.map((user) => ({ value: user.id, label: user.name })),
     [salespeople],
@@ -376,26 +409,58 @@ export default function LeadDetail() {
   // A Lost lead cannot convert straight to a customer - the rep must first re-open it
   // (Edit Lead -> status Contacted / Qualified). Recovery activity stays available.
   const isLost = lead?.leadStatus === 'lost'
+  // A converted lead is read-only server-side: PATCH / DELETE on the lead return 400
+  // (spec §10.6). Editing, notes, status and delete are hidden; activity history stays.
+  const isReadOnlyLead = isConverted || lead?.leadStatus === 'won'
 
   const journeyState = useMemo(() => getLeadJourneyState(lead), [lead])
 
+  // Every follow-up that belongs to this lead THROUGH one of its visits (real, persisted).
+  // Each is tagged with the visit it came from so the origin stays visible.
+  const visitFollowUps = useMemo(
+    () =>
+      visits.flatMap((visit) =>
+        (visit.followUps || []).map((task) => ({
+          ...task,
+          origin: { visitId: visit.id, visitType: visit.visitType, visitDate: visit.visitDate },
+        })),
+      ),
+    [visits],
+  )
+
+  // The lead's full follow-up list = via-visit (real) + direct (real, POST /follow-ups
+  // with lead_id). Direct ones are editable here; via-visit ones are managed from the visit.
+  const allLeadFollowUps = useMemo(
+    () => {
+      const direct = directFollowUps.map((task) => ({
+        ...task,
+        isDirect: true,
+      }))
+      return [...visitFollowUps, ...direct].sort(
+        (a, b) => new Date(a.dueDate || a.createdAt || 0) - new Date(b.dueDate || b.createdAt || 0),
+      )
+    },
+    [visitFollowUps, directFollowUps],
+  )
+
   const timelineEvents = useMemo(
-    () => buildLeadTimeline({ lead, visits, localFollowUps }),
-    [lead, visits, localFollowUps],
+    () => buildLeadTimeline({ lead, visits, localFollowUps: directFollowUps }),
+    [lead, visits, directFollowUps],
   )
 
   const noteEntries = useMemo(() => parseNoteEntries(lead?.notes), [lead?.notes])
 
-  // The backend stores interested products as one free-text field; reps enter several separated
-  // by comma / newline / bullet, so split it into a list for display.
-  const interestedProducts = useMemo(
-    () =>
-      String(lead?.interestedProduct || '')
-        .split(/\s*(?:,|;|\n|\||•)\s*/)
-        .map((item) => item.trim())
-        .filter(Boolean),
-    [lead?.interestedProduct],
-  )
+  // Interested products: the normalized `interestedProducts` briefs when present, else the
+  // legacy free-text field split on comma / newline / bullet.
+  const interestedProducts = useMemo(() => {
+    if (Array.isArray(lead?.interestedProducts) && lead.interestedProducts.length > 0) {
+      return lead.interestedProducts.map((product) => product.name).filter(Boolean)
+    }
+    return String(lead?.interestedProduct || '')
+      .split(/\s*(?:,|;|\n|\||•)\s*/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }, [lead?.interestedProducts, lead?.interestedProduct])
 
   const handleSaveLead = async (formData) => {
     setIsSaving(true)
@@ -486,10 +551,9 @@ export default function LeadDetail() {
     const result = await createVisit({
       leadId: id,
       visitType: visitFormData.visitType,
+      visitDate: `${visitFormData.visitDate}T${visitFormData.visitTime}:00`,
       purpose: visitFormData.purpose.trim(),
       notes: visitFormData.notes.trim(),
-      outcome: visitFormData.outcome.trim(),
-      status: 'completed',
     })
 
     if (!result.success) {
@@ -519,8 +583,8 @@ export default function LeadDetail() {
       setIsVisitOpen(false)
       showToast(
         taskResult.success
-          ? { title: 'Visit logged', message: 'The visit and follow-up task have been saved.' }
-          : { title: 'Visit saved, follow-up failed', message: taskResult.error, variant: 'error' },
+          ? { title: 'Visit scheduled', message: 'The visit and follow-up task have been saved.' }
+          : { title: 'Visit scheduled, follow-up failed', message: taskResult.error, variant: 'error' },
       )
       return
     }
@@ -528,7 +592,7 @@ export default function LeadDetail() {
     setVisits((current) => [visit, ...current])
     setIsSavingVisit(false)
     setIsVisitOpen(false)
-    showToast({ title: 'Visit logged', message: 'The visit has been saved to this lead.' })
+    showToast({ title: 'Visit scheduled', message: 'The visit has been saved to this lead.' })
   }
 
   const openStatusModal = () => {
@@ -578,51 +642,40 @@ export default function LeadDetail() {
     setIsFollowUpOpen(true)
   }
 
-  const handleSaveFollowUp = () => {
+  const handleSaveFollowUp = async () => {
     if (!followUpFormData.title.trim()) {
       setFollowUpFormError('Enter a follow-up title.')
       return
     }
 
     const dueDate = `${followUpFormData.dueDate}T${followUpFormData.dueTime}:00`
-    const assignee = assigneeOptions.find((option) => option.value === followUpFormData.assigneeId)
+    const payload = {
+      title: followUpFormData.title.trim(),
+      description: followUpFormData.description.trim(),
+      dueDate,
+      priority: followUpFormData.priority,
+      assigneeId: followUpFormData.assigneeId || undefined,
+    }
 
-    setLocalFollowUps((current) => {
-      if (editingFollowUpId) {
-        return current.map((task) =>
-          task.id === editingFollowUpId
-            ? {
-                ...task,
-                title: followUpFormData.title.trim(),
-                description: followUpFormData.description.trim(),
-                dueDate,
-                priority: followUpFormData.priority,
-                assignedToId: followUpFormData.assigneeId,
-                assignedToName: assignee?.label || task.assignedToName || '',
-              }
-            : task,
-        )
-      }
-      return [
-        {
-          id: `local-${Date.now()}`,
-          leadId: id,
-          title: followUpFormData.title.trim(),
-          description: followUpFormData.description.trim(),
-          dueDate,
-          priority: followUpFormData.priority,
-          status: 'pending',
-          assignedToId: followUpFormData.assigneeId,
-          assignedToName: assignee?.label || currentUser?.name || '',
-          outcome: '',
-          outcomeNotes: '',
-          createdAt: new Date().toISOString(),
-          completedAt: null,
-        },
-        ...current,
-      ]
-    })
+    setSavingFollowUp(true)
+    setFollowUpFormError('')
 
+    const result = editingFollowUpId
+      ? await updateFollowUp(editingFollowUpId, payload)
+      : await createFollowUp({ ...payload, leadId: id })
+
+    setSavingFollowUp(false)
+
+    if (!result.success) {
+      setFollowUpFormError(result.error)
+      return
+    }
+
+    setDirectFollowUps((current) =>
+      editingFollowUpId
+        ? current.map((task) => (task.id === editingFollowUpId ? result.followUp : task))
+        : [result.followUp, ...current],
+    )
     setIsFollowUpOpen(false)
     setActivitiesTab('followups')
     showToast({
@@ -631,30 +684,45 @@ export default function LeadDetail() {
     })
   }
 
-  const deleteLocalFollowUp = (taskId) => {
-    setLocalFollowUps((current) => current.filter((task) => task.id !== taskId))
+  const deleteDirectFollowUp = async (taskId) => {
+    const result = await deleteFollowUp(taskId)
+    if (!result.success) {
+      showToast({ title: 'Delete failed', message: result.error, variant: 'error' })
+      return
+    }
+    setDirectFollowUps((current) => current.filter((task) => task.id !== taskId))
   }
 
   const openCompleteFollowUp = (task) => {
     setCompletingFollowUp(task)
-    setCompleteOutcome('interested')
+    setCompleteOutcome('')
     setCompleteNotes('')
   }
 
-  const handleCompleteFollowUp = () => {
-    setLocalFollowUps((current) =>
-      current.map((task) =>
-        task.id === completingFollowUp.id
-          ? { ...task, status: 'completed', completedAt: new Date().toISOString(), outcome: completeOutcome, outcomeNotes: completeNotes.trim() }
-          : task,
-      ),
-    )
-    const outcome = completeOutcome
+  const handleCompleteFollowUp = async () => {
+    const task = completingFollowUp
+    if (!task) return
+    const outcome = completeOutcome.trim()
+    const notes = completeNotes.trim()
+
+    setSavingFollowUp(true)
+    const result = await completeFollowUp(task.id, {
+      ...(outcome ? { outcome } : {}),
+      ...(notes ? { outcomeNotes: notes } : {}),
+    })
+    setSavingFollowUp(false)
+
+    if (!result.success) {
+      showToast({ title: 'Unable to complete follow-up', message: result.error, variant: 'error' })
+      return
+    }
+
+    setDirectFollowUps((current) => current.map((entry) => (entry.id === task.id ? result.followUp : entry)))
     setCompletingFollowUp(null)
     if (isReadyToConvertOutcome(outcome) && !isConverted && !isLost) {
       setReadyToConvertNudge(true)
     }
-    showToast({ title: 'Follow-up completed', message: `Outcome: ${formatLabel(outcome)}.` })
+    showToast({ title: 'Follow-up completed', message: outcome ? `Outcome: ${formatLabel(outcome)}.` : 'Follow-up completed.' })
   }
 
   if (isLoading) {
@@ -699,17 +767,19 @@ export default function LeadDetail() {
           <p className="mt-1 text-sm text-neutral-500">{lead.leadId}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => { setFormError(''); setIsEditOpen(true) }}>
-            <Pencil className="size-4" aria-hidden="true" />
-            Edit Lead
-          </Button>
+          {!isReadOnlyLead && (
+            <Button variant="outline" size="sm" onClick={() => { setFormError(''); setIsEditOpen(true) }}>
+              <Pencil className="size-4" aria-hidden="true" />
+              Edit Lead
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={openAddFollowUp}>
             <ClipboardList className="size-4" aria-hidden="true" />
             Add Follow-up
           </Button>
           <Button variant="outline" size="sm" onClick={openVisitModal}>
             <MapPin className="size-4" aria-hidden="true" />
-            Log Visit
+            Schedule Visit
           </Button>
           {isConverted ? (
             <Button size="sm" onClick={() => navigate(`${customerBasePath}/${lead.convertedCustomerId}`)}>
@@ -722,15 +792,23 @@ export default function LeadDetail() {
               Convert to Customer
             </Button>
           )}
-          <ActionMenu
-            items={[
-              // A converted lead's status is locked - no manual Update Status.
-              ...(lead.leadStatus === 'won' ? [] : [{ label: 'Update Status', icon: RefreshCw, onClick: openStatusModal }]),
-              { label: 'Delete Lead', icon: Trash2, danger: true, onClick: () => { setDeleteError(''); setIsDeleteOpen(true) } },
-            ]}
-          />
+          {!isReadOnlyLead && (
+            <ActionMenu
+              items={[
+                { label: 'Update Status', icon: RefreshCw, onClick: openStatusModal },
+                // DELETE on a converted lead returns 400, so it is only offered here.
+                { label: 'Delete Lead', icon: Trash2, danger: true, onClick: () => { setDeleteError(''); setIsDeleteOpen(true) } },
+              ]}
+            />
+          )}
         </div>
       </div>
+
+      {isReadOnlyLead && (
+        <div className="rounded-2xl border border-neutral-100 bg-neutral-50/70 px-4 py-2.5 text-xs text-neutral-500">
+          This lead has been converted to a customer and is read-only. Its visit and follow-up history stays available below.
+        </div>
+      )}
 
       {/* Compact summary strip - the facts a rep needs at a glance, shown once. */}
       <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
@@ -824,10 +902,12 @@ export default function LeadDetail() {
         title="Notes / Requirements"
         icon={StickyNote}
         actions={
-          <Button type="button" variant="outline" size="sm" onClick={openNoteModal}>
-            <Plus className="size-4" aria-hidden="true" />
-            Add Note
-          </Button>
+          isReadOnlyLead ? null : (
+            <Button type="button" variant="outline" size="sm" onClick={openNoteModal}>
+              <Plus className="size-4" aria-hidden="true" />
+              Add Note
+            </Button>
+          )
         }
       >
         {noteEntries.length === 0 ? (
@@ -876,48 +956,68 @@ export default function LeadDetail() {
             </Button>
             <Button type="button" variant="outline" size="sm" onClick={openVisitModal}>
               <Plus className="size-4" aria-hidden="true" />
-              Log Visit
+              Schedule Visit
             </Button>
           </div>
         }
       >
         <Tabs value={activitiesTab} onValueChange={setActivitiesTab}>
           <TabsList className="mb-4">
-            <TabsTrigger value="followups">Follow-ups ({localFollowUps.length})</TabsTrigger>
+            <TabsTrigger value="followups">Follow-ups ({allLeadFollowUps.length})</TabsTrigger>
             <TabsTrigger value="visits">Visits ({visits.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="followups">
-            {localFollowUps.length === 0 ? (
+            {followUpsError ? (
+              <p className="py-6 text-center text-sm text-red-600">{followUpsError}</p>
+            ) : isLoadingFollowUps && directFollowUps.length === 0 ? (
+              <LoadingSpinner label="Loading follow-ups..." />
+            ) : allLeadFollowUps.length === 0 ? (
               <p className="py-6 text-center text-sm text-neutral-400">No follow-ups for this lead yet.</p>
             ) : (
               <div className="space-y-3">
-                {localFollowUps.map((task) => {
+                {allLeadFollowUps.map((task) => {
                   const due = describeDueDate(task.dueDate)
+                  const fuStatus = deriveFollowUpStatus(task)
                   return (
                     <div key={task.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-neutral-900">{task.title}</p>
-                          <p className={`mt-0.5 text-xs ${due.tone === 'danger' ? 'font-medium text-red-600' : 'text-neutral-500'}`}>
+                          <p className={`mt-0.5 text-xs ${due.tone === 'danger' && task.status !== 'completed' ? 'font-medium text-red-600' : 'text-neutral-500'}`}>
                             {task.status === 'completed' ? `Completed ${formatDateTime(task.completedAt)}` : due.label}
                           </p>
                         </div>
-                        <Badge variant={task.status === 'completed' ? 'success' : 'warning'}>{formatLabel(task.status)}</Badge>
+                        <Badge variant={fuStatus.variant} dot>{fuStatus.label}</Badge>
                       </div>
+
+                      <p className="mt-2 text-[0.7rem] text-neutral-400">
+                        {task.origin
+                          ? `From visit · ${formatLabel(task.origin.visitType)} · ${formatDate(task.origin.visitDate)}`
+                          : 'Direct follow-up on this lead'}
+                      </p>
+
                       {task.description && (
                         <p className="mt-3 whitespace-pre-line border-t border-neutral-100 pt-3 text-sm text-neutral-700">{task.description}</p>
                       )}
+
                       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
                         <span>Priority: {formatLabel(task.priority)}{task.assignedToName ? ` · ${task.assignedToName}` : ''}</span>
-                        {task.status === 'completed' ? (
-                          task.outcome && <span className="font-medium text-neutral-700">Outcome: {formatLabel(task.outcome)}</span>
+                        {task.isDirect ? (
+                          task.status === 'completed' ? (
+                            <span className="flex flex-wrap gap-x-3 gap-y-1">
+                              {task.outcome && <span className="font-medium text-neutral-700">Outcome: {formatLabel(task.outcome)}</span>}
+                              {task.outcomeNotes && <span className="font-medium text-neutral-700">Notes: {task.outcomeNotes}</span>}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <button type="button" onClick={() => openCompleteFollowUp(task)} className="rounded-md px-2 py-1 font-medium text-primary-700 hover:bg-primary-50">Complete</button>
+                              <button type="button" onClick={() => openEditFollowUp(task)} className="rounded-md px-2 py-1 font-medium text-neutral-600 hover:bg-neutral-100">Edit</button>
+                              <button type="button" onClick={() => deleteDirectFollowUp(task.id)} className="rounded-md px-2 py-1 font-medium text-red-600 hover:bg-red-50">Delete</button>
+                            </span>
+                          )
                         ) : (
-                          <span className="flex items-center gap-1">
-                            <button type="button" onClick={() => openCompleteFollowUp(task)} className="rounded-md px-2 py-1 font-medium text-primary-700 hover:bg-primary-50">Complete</button>
-                            <button type="button" onClick={() => openEditFollowUp(task)} className="rounded-md px-2 py-1 font-medium text-neutral-600 hover:bg-neutral-100">Edit</button>
-                            <button type="button" onClick={() => deleteLocalFollowUp(task.id)} className="rounded-md px-2 py-1 font-medium text-red-600 hover:bg-red-50">Delete</button>
-                          </span>
+                          <span className="text-neutral-400">Manage from the visit or Follow-ups page</span>
                         )}
                       </div>
                     </div>
@@ -938,7 +1038,9 @@ export default function LeadDetail() {
               <p className="py-6 text-center text-sm text-neutral-400">No visits recorded for this lead yet.</p>
             ) : (
               <div className="space-y-3">
-                {visits.map((visit) => (
+                {visits.map((visit) => {
+                  const vStatus = deriveVisitStatus(visit)
+                  return (
                   <div key={visit.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -951,9 +1053,7 @@ export default function LeadDetail() {
                           {visit.purpose ? ` · ${visit.purpose}` : ''}
                         </p>
                       </div>
-                      <Badge variant={visit.status === 'completed' ? 'success' : visit.status === 'cancelled' ? 'neutral' : 'info'}>
-                        {formatLabel(visit.status)}
-                      </Badge>
+                      <Badge variant={vStatus.variant} dot>{vStatus.label}</Badge>
                     </div>
 
                     {visit.notes && (
@@ -961,7 +1061,12 @@ export default function LeadDetail() {
                     )}
                     {visit.outcome && (
                       <p className="mt-2 text-sm text-neutral-600">
-                        <span className="font-medium text-neutral-800">Outcome:</span> {visit.outcome}
+                        <span className="font-medium text-neutral-800">Outcome:</span> {formatLabel(visit.outcome)}
+                      </p>
+                    )}
+                    {visit.status === 'cancelled' && visit.cancellationReason && (
+                      <p className="mt-2 text-sm text-neutral-600">
+                        <span className="font-medium text-neutral-800">Cancellation reason:</span> {visit.cancellationReason}
                       </p>
                     )}
 
@@ -987,7 +1092,8 @@ export default function LeadDetail() {
                       </div>
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </TabsContent>
@@ -997,7 +1103,6 @@ export default function LeadDetail() {
       <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Lead" className="max-w-2xl">
         <LeadEditForm
           lead={lead}
-          customerOptions={customerOptions}
           salespersonOptions={salespersonOptions}
           saving={isSaving}
           formError={formError}
@@ -1101,18 +1206,18 @@ export default function LeadDetail() {
             onChange={(event) => setFollowUpFormData((current) => ({ ...current, priority: event.target.value }))}
           />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setIsFollowUpOpen(false)}>Cancel</Button>
-            <Button type="button" onClick={handleSaveFollowUp}>{editingFollowUpId ? 'Save Follow-up' : 'Add Follow-up'}</Button>
+            <Button type="button" variant="secondary" disabled={savingFollowUp} onClick={() => setIsFollowUpOpen(false)}>Cancel</Button>
+            <Button type="button" loading={savingFollowUp} onClick={handleSaveFollowUp}>{editingFollowUpId ? 'Save Follow-up' : 'Add Follow-up'}</Button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={Boolean(completingFollowUp)} onClose={() => setCompletingFollowUp(null)} title="Complete Follow-up">
+      <Modal isOpen={Boolean(completingFollowUp)} onClose={() => { if (!savingFollowUp) setCompletingFollowUp(null) }} title="Complete Follow-up">
         <div className="space-y-4">
           <p className="text-sm text-neutral-500">{completingFollowUp?.title}</p>
           <Select
             label="Outcome"
-            options={FOLLOWUP_OUTCOME_OPTIONS}
+            options={[{ value: '', label: 'No outcome' }, ...FOLLOWUP_OUTCOME_OPTIONS]}
             value={completeOutcome}
             onChange={(event) => setCompleteOutcome(event.target.value)}
           />
@@ -1125,8 +1230,8 @@ export default function LeadDetail() {
             placeholder="What happened on this follow-up?"
           />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setCompletingFollowUp(null)}>Cancel</Button>
-            <Button type="button" onClick={handleCompleteFollowUp}>Complete Follow-up</Button>
+            <Button type="button" variant="secondary" disabled={savingFollowUp} onClick={() => setCompletingFollowUp(null)}>Cancel</Button>
+            <Button type="button" loading={savingFollowUp} onClick={handleCompleteFollowUp}>Complete Follow-up</Button>
           </div>
         </div>
       </Modal>
@@ -1135,11 +1240,14 @@ export default function LeadDetail() {
         <div className="space-y-4">
           <Select
             label="Lead Status"
-            options={LEAD_MANUAL_STATUS_OPTIONS}
+            options={manualStatusOptionsFor(lead.leadStatus)}
             value={statusValue}
             onChange={(event) => setStatusValue(event.target.value)}
             error={statusError}
           />
+          {isLost && (
+            <p className="text-xs text-neutral-500">Reopening a lost lead moves it back to Contacted or Qualified.</p>
+          )}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" disabled={isSavingStatus} onClick={() => setIsStatusOpen(false)}>Cancel</Button>
             <Button type="button" loading={isSavingStatus} onClick={handleSaveStatus}>Save Status</Button>
@@ -1147,7 +1255,7 @@ export default function LeadDetail() {
         </div>
       </Modal>
 
-      <Modal isOpen={isVisitOpen} onClose={() => { if (!isSavingVisit) setIsVisitOpen(false) }} title="Log Visit" className="max-w-lg">
+      <Modal isOpen={isVisitOpen} onClose={() => { if (!isSavingVisit) setIsVisitOpen(false) }} title="Schedule Visit" className="max-w-lg">
         <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
           {visitFormError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{visitFormError}</div>
@@ -1158,6 +1266,22 @@ export default function LeadDetail() {
             value={visitFormData.visitType}
             onChange={(event) => setVisitFormData((current) => ({ ...current, visitType: event.target.value }))}
           />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Visit Date"
+              type="date"
+              value={visitFormData.visitDate}
+              onChange={(event) => setVisitFormData((current) => ({ ...current, visitDate: event.target.value }))}
+              required
+            />
+            <Input
+              label="Visit Time"
+              type="time"
+              value={visitFormData.visitTime}
+              onChange={(event) => setVisitFormData((current) => ({ ...current, visitTime: event.target.value }))}
+              required
+            />
+          </div>
           <Input
             label="Purpose"
             value={visitFormData.purpose}
@@ -1171,14 +1295,6 @@ export default function LeadDetail() {
             onChange={(event) => setVisitFormData((current) => ({ ...current, notes: event.target.value }))}
             inputClassName="min-h-20"
           />
-          <Input
-            as="textarea"
-            label="Outcome"
-            value={visitFormData.outcome}
-            onChange={(event) => setVisitFormData((current) => ({ ...current, outcome: event.target.value }))}
-            inputClassName="min-h-16"
-          />
-
           <label className="flex items-center gap-2 rounded-xl border border-neutral-100 bg-neutral-50/60 px-3.5 py-3 text-sm font-medium text-neutral-800">
             <input
               type="checkbox"
@@ -1237,7 +1353,7 @@ export default function LeadDetail() {
         </div>
         <div className="mt-4 flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" disabled={isSavingVisit} onClick={() => setIsVisitOpen(false)}>Cancel</Button>
-          <Button type="button" loading={isSavingVisit} onClick={handleSaveVisit}>Save Visit</Button>
+          <Button type="button" loading={isSavingVisit} onClick={handleSaveVisit}>Schedule Visit</Button>
         </div>
       </Modal>
     </div>

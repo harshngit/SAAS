@@ -81,18 +81,21 @@ const DELIVERY_VARIANT = {
 
 export function getDeliveryStatus(order) {
   if (!order) return { key: 'not_planned', label: '—', variant: 'neutral' }
-  const method = order.fulfilmentMethod
   const fs = order.fulfilmentStatus || 'not_started'
   const ps = order.pickupStatus || 'not_started'
 
-  if (method === 'pickup') {
+  if (isTakeawayOrder(order)) {
     if (ps === 'collected') return { key: 'picked_up', label: 'Picked Up', variant: DELIVERY_VARIANT.picked_up }
     if (ps === 'ready') return { key: 'ready_for_pickup', label: 'Ready for Pickup', variant: DELIVERY_VARIANT.ready_for_pickup }
     if (ps === 'picking') return { key: 'picking', label: 'Picking', variant: DELIVERY_VARIANT.picking }
-    return { key: 'not_planned', label: 'Not Planned', variant: DELIVERY_VARIANT.not_planned }
+    // A takeaway order needs no delivery. Before the pickup is prepared show "Awaiting
+    // Pickup" once the order is confirmed, and "—" while it is still a draft - never
+    // "Not Planned" (there is no delivery to plan).
+    if (isOrderEffectivelyConfirmed(order)) return { key: 'awaiting_pickup', label: 'Awaiting Pickup', variant: 'warning' }
+    return { key: 'not_applicable', label: '—', variant: 'neutral' }
   }
 
-  if (!method) return { key: 'not_planned', label: '—', variant: 'neutral' }
+  if (!order.fulfilmentMethod) return { key: 'not_planned', label: '—', variant: 'neutral' }
 
   if (fs === 'delivered') return { key: 'delivered', label: 'Delivered', variant: DELIVERY_VARIANT.delivered }
   if (fs === 'partially_delivered') return { key: 'partially_delivered', label: 'Partially Delivered', variant: DELIVERY_VARIANT.partially_delivered }
@@ -111,6 +114,28 @@ export function isStockReserved(order) {
   return RESERVED_STATES.includes(order?.fulfilmentStatus) || ['picking', 'ready', 'collected'].includes(order?.pickupStatus)
 }
 
+// Whether the order has, in practice, moved past confirmation - either its status says so
+// OR downstream fulfilment / pickup progress exists (stock reserved, partner assigned,
+// picking, loaded, ready, collected...). Backend `/orders/{id}/confirm` reserves stock AND
+// flips status together, so any of those implies confirmation happened. The stepper and the
+// Confirm action both use THIS (not `order.status` alone) so they can never disagree with
+// the "Stock Reserved" node.
+export function isOrderEffectivelyConfirmed(order) {
+  if (!order) return false
+  if (['confirmed', 'completed'].includes(order.status)) return true
+  if (isStockReserved(order)) return true
+  if (order.assignedDeliveryPartnerId) return true
+  if (['picking', 'picked'].includes(order.deliveryPickingStatus)) return true
+  return false
+}
+
+// True only when the frontend Draft badge and the backend order state disagree - the order
+// reads `placed`/`draft` yet fulfilment has already advanced. The UI surfaces this instead
+// of hiding it (Confirm is withheld, a warning banner is shown).
+export function hasOrderStateMismatch(order) {
+  return ['placed', 'draft'].includes(order?.status) && isOrderEffectivelyConfirmed(order)
+}
+
 // Method-aware business progress stepper shown on Order Detail. First step is
 // "Order Confirmed" (confirmation is required, so "Order Placed" is not an operational
 // milestone). Home delivery milestones (approved 2026-09-03):
@@ -122,7 +147,10 @@ export function isStockReserved(order) {
 // without it fall back to deriving both from `fulfilmentStatus`.
 export function getOrderProgress(order) {
   if (!order) return []
-  const isConfirmed = ['confirmed', 'completed'].includes(order.status)
+  // "Order Confirmed" is DONE whenever the order is effectively confirmed - either its status
+  // says so or fulfilment has advanced. This guarantees monotonic progress: if "Stock
+  // Reserved" is done, "Order Confirmed" is done too (never the reverse).
+  const confirmed = isOrderEffectivelyConfirmed(order)
   const reserved = isStockReserved(order)
   const fs = order.fulfilmentStatus
   const ps = order.pickupStatus
@@ -130,10 +158,10 @@ export function getOrderProgress(order) {
 
   const node = (label, done, current) => ({ label, status: done ? 'done' : current ? 'current' : 'pending' })
 
-  if (order.fulfilmentMethod === 'pickup') {
+  if (isTakeawayOrder(order)) {
     return [
-      node('Order Confirmed', isConfirmed, !isConfirmed),
-      node('Stock Reserved', reserved, isConfirmed && !reserved),
+      node('Order Confirmed', confirmed, !confirmed),
+      node('Stock Reserved', reserved, confirmed && !reserved),
       node('Ready for Pickup', ['ready', 'collected'].includes(ps), ps === 'picking'),
       node('Picked Up', ps === 'collected', ps === 'ready'),
     ]
@@ -148,8 +176,8 @@ export function getOrderProgress(order) {
   const loadedCurrent = assigned && !loaded && dps === 'picked'
 
   return [
-    node('Order Confirmed', isConfirmed, !isConfirmed),
-    node('Stock Reserved', reserved, isConfirmed && !reserved),
+    node('Order Confirmed', confirmed, !confirmed),
+    node('Stock Reserved', reserved, confirmed && !reserved),
     node('Delivery Assigned', assigned, reserved && !assigned),
     node('Picking', pickingDone, pickingCurrent),
     node('Vehicle Loaded', loaded, loadedCurrent),
@@ -171,12 +199,17 @@ export function getOrderActions(order, { invoices = [] } = {}) {
   const status = order.status
   const hasInvoice = invoices.length > 0
   const invoiceAction = hasInvoice ? 'viewInvoice' : 'createInvoice'
-  const isPickup = order.fulfilmentMethod === 'pickup'
+  const isPickup = isTakeawayOrder(order)
   const fs = order.fulfilmentStatus
   const loadedOrBeyond = ['loaded', 'in_transit', 'delivered', 'partially_delivered'].includes(fs)
 
   // Draft: the finalized flow is Draft -> Confirm -> Confirmed (no approve/reject step).
-  if (status === 'placed' || status === 'draft') return ['edit', 'confirm', 'cancel']
+  // BUT only offer Confirm when the backend state is actually confirmable - if fulfilment has
+  // already advanced while status still reads `placed`, confirming would be rejected, so we
+  // withhold it (OrderDetail shows a state-mismatch banner instead).
+  if (status === 'placed' || status === 'draft') {
+    return isOrderEffectivelyConfirmed(order) ? ['edit', 'cancel'] : ['edit', 'confirm', 'cancel']
+  }
 
   if (status === 'cancelled' || status === 'rejected') return ['duplicate']
 
@@ -193,6 +226,9 @@ export function getOrderActions(order, { invoices = [] } = {}) {
     const acts = []
     if (order.pickupStatus === 'picking') acts.push('pickupReady')
     else if (order.pickupStatus === 'ready') acts.push('confirmPickup')
+    // Stock is reserved (checked above) but pickup prep has not begun - offer the first
+    // step so a confirmed takeaway is never a dead end. Uses POST /orders/{id}/pickup/pick.
+    else if (order.pickupStatus === 'not_started' || !order.pickupStatus) acts.push('pickupPick')
     acts.push(invoiceAction)
     if (order.pickupStatus !== 'collected') acts.push('cancel')
     return acts
@@ -256,7 +292,7 @@ export function buildOrderTimeline(order, { invoices = [] } = {}) {
   if (isStockReserved(order)) {
     events.push({ id: 'reserved', icon: PackageCheck, iconClass: 'bg-blue-50 text-blue-600', title: 'Stock reserved', subtitle: 'Inventory held for this order', timestamp: stamp })
   }
-  if (order.fulfilmentMethod !== 'pickup') {
+  if (!isTakeawayOrder(order)) {
     if (order.assignedDeliveryPartnerId) {
       events.push({ id: 'assigned', icon: Truck, iconClass: 'bg-indigo-50 text-indigo-600', title: `Delivery assigned${order.assignedDeliveryPartnerName ? ` to ${order.assignedDeliveryPartnerName}` : ''}`, subtitle: order.deliveryNumber || 'Delivery planned', timestamp: stamp })
     }

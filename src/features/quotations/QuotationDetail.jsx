@@ -29,7 +29,6 @@ import {
   deleteQuotation,
   downloadQuotationPdf,
   getQuotation,
-  linkQuotationCustomer,
   updateQuotationStatus,
 } from '../../api/quotations'
 import { listWarehouses } from '../../api/warehouses'
@@ -43,9 +42,10 @@ import {
   getQuotationActions,
   getQuotationMeta,
   patchQuotationMeta,
+  quotationParty,
   quotationTotals,
 } from './quotationHelpers'
-import { demoQuotationMeta, getDemoQuotation, isDemoQuotation, patchDemoQuotation } from './quotationDemoData'
+import { getDemoQuotation, isDemoQuotation, patchDemoQuotation } from './quotationDemoData'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -116,7 +116,8 @@ export default function QuotationDetail() {
     if (isDemo) {
       const demo = getDemoQuotation(id)
       setQuotation(demo)
-      setMetaState({ ...(demoQuotationMeta[id] || {}), ...(getQuotationMeta(id) || {}) })
+      // Meta now only holds display-only edit-flow flags; the lead link is on the object.
+      setMetaState(getQuotationMeta(id) || {})
       setLoadError(demo ? '' : 'Demo quotation not found.')
       setIsLoading(false)
       return
@@ -163,11 +164,13 @@ export default function QuotationDetail() {
   }
 
   const displayStatus = deriveQuotationStatus(quotation)
-  const actions = getQuotationActions(quotation, meta)
+  const actions = getQuotationActions(quotation)
   const expiry = describeExpiry(quotation.validUntil)
   const hasCustomer = Boolean(quotation.customerId)
-  const entityLabel = hasCustomer ? 'Customer' : meta?.leadName ? 'Lead' : ''
-  const entityName = quotation.customerName || meta?.leadName || '—'
+  const party = quotationParty(quotation)
+  const hasParty = Boolean(party.id)
+  const entityLabel = hasParty ? (party.type === 'customer' ? 'Customer' : 'Lead') : ''
+  const entityName = party.name || '—'
 
   const applyMetaPatch = (partial) => {
     if (!isDemo) patchQuotationMeta(id, partial)
@@ -257,17 +260,23 @@ export default function QuotationDetail() {
   }
 
   const handleLeadConverted = async ({ customerId, customer }) => {
-    applyMetaPatch({ convertedCustomerId: customerId })
-    setQuotation((current) => ({
-      ...current,
-      customerId,
-      customerName: customer?.name || meta?.leadName || 'New customer',
-    }))
-    // Link the new customer on the backend quotation too, so Convert to Order works.
-    if (!isDemo) {
-      const result = await linkQuotationCustomer(quotation.id, customerId)
-      if (result.success) setQuotation(result.quotation)
-      else setActionError(`Customer created, but linking it to the quotation failed: ${result.error}`)
+    if (isDemo) {
+      setQuotation((current) => ({ ...current, customerId, customerName: customer?.name || party.name || 'New customer' }))
+      showToast({ title: 'Lead converted', message: 'The customer is now linked to this quotation (demo).' })
+      return
+    }
+    // The backend auto-attaches the new customer_id to this lead's quotations on conversion
+    // (crm_changes Phase 3 §3). Just refetch and trust it - the frontend never PATCHes the
+    // quotation's party itself. If the link is genuinely missing, surface it rather than
+    // silently fixing it client-side.
+    const refreshed = await getQuotation(quotation.id)
+    if (refreshed.success) setQuotation(refreshed.quotation)
+
+    if (refreshed.success && !refreshed.quotation.customerId) {
+      setActionError(
+        'The lead was converted, but the backend has not linked the new customer to this quotation yet. Refresh in a moment; if it stays unlinked, contact support.',
+      )
+      return
     }
     showToast({ title: 'Lead converted', message: 'The customer is now linked to this quotation.' })
   }
@@ -310,9 +319,12 @@ export default function QuotationDetail() {
               {entityLabel ? (
                 <>
                   <span className="font-medium text-neutral-700">{entityLabel}:</span> {entityName}
-                  <span className={`ml-2 rounded px-1.5 py-0.5 text-[0.62rem] font-medium ${hasCustomer ? 'bg-neutral-100 text-neutral-500' : 'bg-blue-50 text-blue-600'}`}>
+                  <span className={`ml-2 rounded px-1.5 py-0.5 text-[0.62rem] font-medium ${party.type === 'customer' ? 'bg-neutral-100 text-neutral-500' : 'bg-blue-50 text-blue-600'}`}>
                     {entityLabel}
                   </span>
+                  {quotation.leadId && quotation.customerId && (
+                    <span className="ml-1.5 rounded bg-green-50 px-1.5 py-0.5 text-[0.62rem] font-medium text-green-600">from lead</span>
+                  )}
                 </>
               ) : (
                 'No customer or lead linked'
@@ -364,13 +376,13 @@ export default function QuotationDetail() {
               Convert to Customer
             </Button>
           )}
-          {has('viewCustomer') && meta?.convertedCustomerId && (
+          {has('viewCustomer') && quotation.customerId && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => (isDemo || String(meta.convertedCustomerId).startsWith('demo-')
+              onClick={() => (isDemo || String(quotation.customerId).startsWith('demo-')
                 ? showToast({ title: 'Demo quotation', message: 'On a real quotation this opens the linked customer.' })
-                : navigate(`${customersBasePath}/${meta.convertedCustomerId}`))}
+                : navigate(`${customersBasePath}/${quotation.customerId}`))}
             >
               <ArrowRightCircle className="size-4" aria-hidden="true" />
               View Customer
@@ -563,7 +575,7 @@ export default function QuotationDetail() {
       <ConvertLeadModal
         isOpen={convertLeadOpen}
         onClose={() => setConvertLeadOpen(false)}
-        leadId={meta?.leadId || ''}
+        leadId={quotation.leadId || ''}
         onConverted={handleLeadConverted}
       />
 

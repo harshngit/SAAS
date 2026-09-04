@@ -3,7 +3,7 @@ import { LocateFixed } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
-import { LEAD_MANUAL_STATUS_OPTIONS, LEAD_SEGMENT_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_TYPE_OPTIONS } from '../../api/leads'
+import { LEAD_SEGMENT_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_TYPE_OPTIONS, leadInterestedProductList, manualStatusOptionsFor } from '../../api/leads'
 import { formatLeadStatus } from './leadActivity'
 import InterestedProductsField from './InterestedProductsField'
 
@@ -12,14 +12,18 @@ export const customerCategoryOptions = ['Retail', 'Wholesale', 'Corporate', 'VIP
   label: value,
 }))
 
-export function LeadEditForm({ lead, customerOptions, salespersonOptions, saving, formError, onClose, onSave, lockAssignee = false }) {
-  const [formData, setFormData] = useState(lead)
+export function LeadEditForm({ lead, salespersonOptions, saving, formError, onClose, onSave, lockAssignee = false }) {
+  const [formData, setFormData] = useState(() => (lead ? { ...lead, interestedProductList: leadInterestedProductList(lead) } : lead))
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
-    setFormData(lead)
+    setFormData(lead ? { ...lead, interestedProductList: leadInterestedProductList(lead) } : lead)
     setErrors({})
   }, [lead])
+
+  // Manual status options follow the backend workflow, keyed off the lead's ORIGINAL status
+  // (so a `lost` lead can be reopened to Contacted/Qualified, and no backward jumps).
+  const statusOptions = manualStatusOptionsFor(lead?.leadStatus)
 
   const updateField = (field, value) => {
     setFormData((current) => ({ ...current, [field]: value }))
@@ -75,12 +79,6 @@ export function LeadEditForm({ lead, customerOptions, salespersonOptions, saving
           onChange={(event) => updateField('leadSource', event.target.value)}
           error={errors.leadSource}
         />
-        <Select
-          label="Existing Customer"
-          options={[{ value: '', label: 'No existing customer' }, ...customerOptions]}
-          value={formData.customerId}
-          onChange={(event) => updateField('customerId', event.target.value)}
-        />
         <Input
           label="Mobile Number"
           required
@@ -110,7 +108,7 @@ export function LeadEditForm({ lead, customerOptions, salespersonOptions, saving
           <Select
             label="Lead Status"
             required
-            options={LEAD_MANUAL_STATUS_OPTIONS}
+            options={statusOptions}
             value={formData.leadStatus}
             onChange={(event) => updateField('leadStatus', event.target.value)}
           />
@@ -130,8 +128,9 @@ export function LeadEditForm({ lead, customerOptions, salespersonOptions, saving
           placeholder="Select a segment"
         />
         <InterestedProductsField
-          value={formData.interestedProduct}
-          onChange={(next) => updateField('interestedProduct', next)}
+          selected={formData.interestedProductList || []}
+          legacyText={formData.interestedProduct}
+          onChange={(list) => updateField('interestedProductList', list)}
           className="sm:col-span-2"
         />
         <Input

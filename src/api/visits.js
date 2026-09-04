@@ -44,10 +44,26 @@ export const VISIT_TYPE_OPTIONS = [
   { value: 'audit', label: 'Audit' },
 ]
 
+// Visit lifecycle (backend state machine - app/core/workflow.py):
+//   planned -> in_progress -> completed
+//   planned -> completed   (backward-compatible direct completion)
+//   planned -> cancelled  |  in_progress -> cancelled
+// Invalid transitions return 400.
 export const VISIT_STATUS_OPTIONS = [
-  { value: 'planned', label: 'Planned' },
+  { value: 'planned', label: 'Scheduled' },
+  { value: 'in_progress', label: 'In Progress' },
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
+]
+
+// Controlled visit outcome vocabulary (backend VISIT_OUTCOMES). Anything else -> 400.
+export const VISIT_OUTCOME_VALUES = [
+  'interested',
+  'follow_up_required',
+  'ready_to_convert',
+  'not_interested',
+  'meeting_completed',
+  'other',
 ]
 
 function normalizeFollowUp(followUp) {
@@ -57,7 +73,12 @@ function normalizeFollowUp(followUp) {
     id: followUp.id,
     customerId: followUp.customer_id || followUp.customer?.id || '',
     customerName: followUp.customer?.name || '',
-    visitId: followUp.visit_id || '',
+    // Lead linkage: a follow-up created from a Lead visit belongs to that lead THROUGH the
+    // visit (follow_up.visit_id -> visit.lead_id). If the backend ever exposes lead_id / lead
+    // directly on a follow-up these read it; today they stay '' for real records.
+    leadId: followUp.lead_id || followUp.lead?.id || '',
+    leadName: followUp.lead?.name || '',
+    visitId: followUp.visit_id || followUp.visit?.id || '',
     assignedToId: followUp.assigned_to_id || followUp.assigned_to?.id || '',
     assignedToName: followUp.assigned_to?.name || '',
     title: followUp.title || '',
@@ -65,6 +86,8 @@ function normalizeFollowUp(followUp) {
     dueDate: followUp.due_date || '',
     priority: followUp.priority || 'medium',
     status: followUp.status || 'pending',
+    outcome: followUp.outcome || '',
+    outcomeNotes: followUp.outcome_notes || '',
     completedAt: followUp.completed_at || null,
     createdAt: followUp.created_at,
   }
@@ -89,6 +112,13 @@ function normalizeVisit(visit) {
     outcome: visit.outcome || '',
     status: visit.status || 'completed',
     location: visit.location || '',
+    // Backend-managed lifecycle timestamps (migration 6e44ff004c19). Nullable - a direct
+    // planned -> completed visit never gets a checked_in_at.
+    checkedInAt: visit.checked_in_at || null,
+    checkedOutAt: visit.checked_out_at || null,
+    completedAt: visit.completed_at || null,
+    cancelledAt: visit.cancelled_at || null,
+    cancellationReason: visit.cancellation_reason || '',
     followUps: (visit.follow_ups || []).map(normalizeFollowUp),
     createdAt: visit.created_at,
   }
@@ -98,8 +128,11 @@ function buildVisitBody(payload) {
   const body = {
     visit_date: payload.visitDate || payload.visit_date || new Date().toISOString(),
     visit_type: payload.visitType || payload.visit_type || 'site_visit',
-    status: payload.status || 'completed',
   }
+
+  // Only send status when the caller sets it - a bare create defaults to `planned`
+  // server-side, and a status PATCH drives the lifecycle transitions / timestamps.
+  if (payload.status) body.status = payload.status
 
   const customerId = payload.customerId || payload.customer_id
   if (customerId) body.customer_id = customerId
@@ -107,8 +140,13 @@ function buildVisitBody(payload) {
   if (leadId) body.lead_id = leadId
   if (payload.purpose !== undefined) body.purpose = payload.purpose || ''
   if (payload.notes !== undefined) body.notes = payload.notes || ''
-  if (payload.outcome !== undefined) body.outcome = payload.outcome || ''
+  // Outcome is a controlled vocabulary (VISIT_OUTCOME_VALUES) - an empty string would be
+  // rejected as invalid, so only send a real value.
+  if (payload.outcome) body.outcome = payload.outcome
   if (payload.location !== undefined) body.location = payload.location || ''
+  // Persisted on a cancel transition; omitting it later never erases an existing reason.
+  const cancellationReason = payload.cancellationReason ?? payload.cancellation_reason
+  if (cancellationReason !== undefined && cancellationReason !== '') body.cancellation_reason = cancellationReason
 
   return body
 }

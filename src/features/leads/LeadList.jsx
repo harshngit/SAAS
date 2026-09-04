@@ -10,7 +10,6 @@ import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
 import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, deleteLead, listLeads, updateLead } from '../../api/leads'
-import { listCustomers } from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
@@ -52,7 +51,6 @@ export default function LeadList() {
   const [leads, setLeads] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
-  const [customers, setCustomers] = useState([])
   const [salespeople, setSalespeople] = useState([])
 
   const [statusFilter, setStatusFilter] = useState('all')
@@ -95,12 +93,9 @@ export default function LeadList() {
     let isMounted = true
 
     async function loadOptions() {
-      const customersPromise = listCustomers()
-      const usersPromise = currentUser?.role === ROLES.SALES_OFFICER ? Promise.resolve({ success: true, users: [] }) : listUsers()
-      const [customersResult, usersResult] = await Promise.all([customersPromise, usersPromise])
+      const usersResult = currentUser?.role === ROLES.SALES_OFFICER ? { success: true, users: [] } : await listUsers()
       if (!isMounted) return
 
-      if (customersResult.success) setCustomers(customersResult.customers)
       if (currentUser?.role === ROLES.SALES_OFFICER) {
         setSalespeople(
           currentUser?.id
@@ -129,10 +124,6 @@ export default function LeadList() {
     }
   }, [])
 
-  const customerOptions = useMemo(
-    () => customers.map((customer) => ({ value: customer.id, label: `${customer.name}${customer.phone ? ` • ${customer.phone}` : ''}` })),
-    [customers],
-  )
   const salespersonOptions = useMemo(
     () => salespeople.map((user) => ({ value: user.id, label: user.name })),
     [salespeople],
@@ -454,7 +445,6 @@ export default function LeadList() {
       <Modal isOpen={Boolean(editingLead)} onClose={() => setEditingLead(null)} title="Edit Lead" className="max-w-2xl">
         <LeadEditForm
           lead={editingLead}
-          customerOptions={customerOptions}
           salespersonOptions={salespersonOptions}
           saving={isSaving}
           formError={formError}
