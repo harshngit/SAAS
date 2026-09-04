@@ -75,3 +75,18 @@ export function getDemoSupplierPayments(id) {
 export function getDemoSupplierPurchases(id) {
   return demoPurchases.filter((purchase) => purchase.supplierId === id)
 }
+
+// Human-friendly display references for demo records - the internal `demo-supplier-*` /
+// `demo-payment-*` ids stay exactly as they are for logic/safety (isDemoRecord checks, API
+// guards); these are purely cosmetic labels for what the UI shows the user.
+export function getDemoSupplierDisplayId(id) {
+  const index = demoSuppliers.findIndex((supplier) => supplier.id === id)
+  return index === -1 ? id : `SUP-${String(index + 1).padStart(4, '0')}`
+}
+
+export function getDemoPaymentDisplayId(paymentId) {
+  const index = demoPayments.findIndex((payment) => payment.id === paymentId)
+  if (index === -1) return paymentId
+  const year = demoPayments[index].paidOn ? new Date(demoPayments[index].paidOn).getFullYear() : new Date().getFullYear()
+  return `PAY-${year}-${String(index + 1).padStart(3, '0')}`
+}

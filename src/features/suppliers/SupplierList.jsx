@@ -34,6 +34,8 @@ const supplierStatusTabs = [
 const getInitials = (name = '') =>
   name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
 
+const formatSupplierStatus = (status) => (status === 'active' ? 'Active' : 'Inactive')
+
 export default function SupplierList() {
   const navigate = useNavigate()
   const { showToast } = useToast()
@@ -151,8 +153,11 @@ export default function SupplierList() {
     })
 
     return filtered.sort((left, right) => {
-      const leftTime = new Date(left.createdAt || 0).getTime()
-      const rightTime = new Date(right.createdAt || 0).getTime()
+      // "Recent" means most recently active, not just most recently created - prefer
+      // updatedAt (bumped by any edit/status change/payment) and fall back to createdAt
+      // for a record that has never been touched since creation.
+      const leftTime = new Date(left.updatedAt || left.createdAt || 0).getTime()
+      const rightTime = new Date(right.updatedAt || right.createdAt || 0).getTime()
 
       return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
     })
@@ -428,7 +433,7 @@ export default function SupplierList() {
                       <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-50 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">{getInitials(supplier.name)}</div>
                       <div className="min-w-0"><p className="truncate font-medium text-neutral-900">{supplier.name}</p><p className="truncate text-xs text-neutral-500">{supplier.contactPerson || '—'}</p></div>
                     </button>
-                    <Badge variant={supplier.status === 'active' ? 'success' : 'neutral'}>{supplier.status}</Badge>
+                    <Badge variant={supplier.status === 'active' ? 'success' : 'neutral'}>{formatSupplierStatus(supplier.status)}</Badge>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                     <div><p className="text-xs text-neutral-400">Contact</p><p className="mt-1 truncate text-neutral-700">{supplier.phone || supplier.email || '—'}</p></div>
@@ -490,7 +495,7 @@ export default function SupplierList() {
                     </td>
                     <td className="px-4 py-3.5">
                       <Badge variant={supplier.status === 'active' ? 'success' : 'neutral'}>
-                        {supplier.status}
+                        {formatSupplierStatus(supplier.status)}
                       </Badge>
                     </td>
                     <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>

@@ -371,13 +371,7 @@ export default function SupplierForm({
 
       <div className="flex items-start gap-2.5 rounded-2xl border border-neutral-100 bg-neutral-50/70 px-4 py-3 text-xs text-neutral-500">
         <Info className="mt-0.5 size-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
-        <p>
-          Name, Contact Person, Phone, Email, GST Number, Supplier Type, Address, City and Opening Balance are saved
-          directly on the supplier record. Products Supplied is saved too, via each selected product&apos;s Preferred
-          Supplier field. PAN, State, PIN Code, Country, Payment Terms, Credit Limit, Purchase Currency and Supplier
-          Category apply immediately in demo mode; for a real supplier they stay in this form only until the backend
-          adds storage for them.
-        </p>
+        <p>Enter supplier details, commercial terms, and products supplied.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
@@ -458,10 +452,7 @@ export default function SupplierForm({
 
           <FormSection number="4" icon={PackageSearch} title="Products Supplied">
             <p className="mb-4 text-xs text-neutral-500">
-              Select products this supplier provides. Saving sets each selected product&apos;s Preferred Supplier to this
-              supplier and persists immediately — the backend currently supports one preferred supplier per product, so
-              selecting a product here moves its preferred supplier away from whoever held it before. True Supplier ↔
-              many-Products / Product ↔ many-Suppliers support is BACKEND LATER.
+              Select the products this supplier currently provides.
             </p>
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <div>

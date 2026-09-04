@@ -29,7 +29,14 @@ import { formatPaymentTerms, normalizeApiPayment, normalizeApiSupplier, supplier
 import { normalizeApiProduct } from '../products/productUtils'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { getSupplierProducts, syncSupplierProductLinks } from './supplierProductUtils'
-import { demoProducts, getDemoSupplier, getDemoSupplierPayments, getDemoSupplierPurchases } from './supplierDemoData'
+import {
+  demoProducts,
+  getDemoPaymentDisplayId,
+  getDemoSupplier,
+  getDemoSupplierDisplayId,
+  getDemoSupplierPayments,
+  getDemoSupplierPurchases,
+} from './supplierDemoData'
 import { getPaymentMethodFlags } from '../payments/paymentMethodUtils'
 import SupplierForm from './SupplierForm'
 
@@ -550,7 +557,7 @@ export default function SupplierDetail() {
 
       <Card title="Basic Information">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <DetailField label="Supplier ID" value={supplier.id} />
+          <DetailField label="Supplier ID" value={useDemoSuppliers ? getDemoSupplierDisplayId(supplier.id) : supplier.id} />
           <DetailField label="Supplier Type" value={supplier.category} />
           <DetailField label="Status" value={supplier.status === 'active' ? 'Active' : 'Inactive'} />
           <DetailField label="Created On" value={supplier.createdAt ? formatDateTime(supplier.createdAt) : null} />
@@ -695,7 +702,7 @@ export default function SupplierDetail() {
                 <tbody className="divide-y divide-neutral-50">
                   {payments.map((payment) => (
                     <tr key={payment.id} className="transition-colors hover:bg-primary-50/35">
-                      <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{payment.id || '—'}</td>
+                      <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{(useDemoSuppliers ? getDemoPaymentDisplayId(payment.id) : payment.id) || '—'}</td>
                       <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">
                         {new Date(payment.paidOn).toLocaleDateString()}
                       </td>
@@ -737,7 +744,7 @@ export default function SupplierDetail() {
               ))}
             </div>
             <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Documents and internal notes are not persisted by the current backend. BACKEND LATER.
+              Document and notes management will be available in a future update.
             </div>
           </Card>
         </TabsContent>
