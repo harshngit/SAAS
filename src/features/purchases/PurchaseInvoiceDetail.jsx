@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react'
-import { Ban, Check, IndianRupee, Pencil, RotateCcw, Trash2, Upload } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, Ban, Check, FileText, IndianRupee, PackageSearch, Pencil, RotateCcw, Trash2, Upload, Wallet } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import StatCard from '../../components/ui/StatCard'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs'
+import { useToast } from '../../components/ui/toastContext'
 import { formatCurrency } from '../../utils/format'
 import {
   approvePurchase,
@@ -18,9 +23,8 @@ import {
   updatePurchasePaymentStatus,
   uploadPurchaseDocument,
 } from '../../api/purchases'
-
-const statusVariant = { pending: 'warning', approved: 'success', cancelled: 'danger' }
-const paymentStatusVariant = { unpaid: 'danger', partial: 'warning', paid: 'success' }
+import { deriveReceivingStatus, derivePaymentStatus, derivePurchaseOutstanding, derivePurchaseStatus, getPurchaseActions } from './purchaseHelpers'
+import { getDemoPurchase, isDemoPurchase, patchDemoPurchase } from './purchaseDemoData'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -29,85 +33,107 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
-export default function PurchaseInvoiceDetail({ purchaseId, isOpen, onClose, onChanged, onEdit }) {
+function displayValue(value) {
+  return value === null || value === undefined || value === '' ? '—' : value
+}
+
+function DetailField({ label, value, className = '' }) {
+  return (
+    <div className={className}>
+      <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">{label}</p>
+      <p className="mt-1 text-sm text-neutral-800">{displayValue(value)}</p>
+    </div>
+  )
+}
+
+export default function PurchaseInvoiceDetail() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { showToast } = useToast()
+  const isSalesPath = window.location.pathname.startsWith('/sales')
+  const basePath = isSalesPath ? '/sales/purchases' : '/admin/purchases'
+  const isDemo = isDemoPurchase(id)
+
   const [purchase, setPurchase] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
-
-  const [isApproving, setIsApproving] = useState(false)
+  const [isActing, setIsActing] = useState(false)
 
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
-  const [isCancelling, setIsCancelling] = useState(false)
   const [cancelError, setCancelError] = useState('')
 
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [paymentStatus, setPaymentStatus] = useState('unpaid')
   const [paymentAmount, setPaymentAmount] = useState('')
-  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false)
   const [paymentError, setPaymentError] = useState('')
 
   const [returnOpen, setReturnOpen] = useState(false)
-  const [returnItems, setReturnItems] = useState({})
+  const [returnItems, setReturnItemsState] = useState({})
   const [returnReason, setReturnReason] = useState('')
-  const [isReturning, setIsReturning] = useState(false)
   const [returnError, setReturnError] = useState('')
 
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
-
   const [isUploading, setIsUploading] = useState(false)
 
   const loadPurchase = async () => {
     setIsLoading(true)
     setLoadError('')
 
-    const result = await getPurchase(purchaseId)
+    if (isDemo) {
+      const record = getDemoPurchase(id)
+      setPurchase(record)
+      setLoadError(record ? '' : 'Demo purchase not found.')
+      setIsLoading(false)
+      return
+    }
 
+    const result = await getPurchase(id)
     if (!result.success) {
       setLoadError(result.error)
       setIsLoading(false)
       return
     }
-
     setPurchase(result.purchase)
     setIsLoading(false)
   }
 
   useEffect(() => {
-    if (!isOpen || !purchaseId) return
-
     setActionError('')
     loadPurchase()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, purchaseId])
+  }, [id])
 
-  if (!isOpen) return null
+  const actions = useMemo(() => getPurchaseActions(purchase), [purchase])
+  const purchaseStatus = useMemo(() => derivePurchaseStatus(purchase), [purchase])
+  const receiving = useMemo(() => deriveReceivingStatus(purchase), [purchase])
+  const payment = useMemo(() => derivePaymentStatus(purchase), [purchase])
+  const outstanding = useMemo(() => derivePurchaseOutstanding(purchase), [purchase])
 
-  const canEdit = purchase?.status === 'pending'
-  const canApprove = purchase?.status === 'pending'
-  const canCancel = purchase?.status === 'approved'
-  const canDelete = purchase?.status === 'pending'
-  const canReturn = purchase?.status === 'approved'
-  const canUpdatePayment = purchase?.status !== 'cancelled'
+  const applyDemo = (partial) => {
+    patchDemoPurchase(id, partial)
+    setPurchase((current) => ({ ...current, ...partial }))
+  }
 
-  const handleApprove = async () => {
-    setIsApproving(true)
+  const handleConfirm = async () => {
+    setIsActing(true)
     setActionError('')
 
-    const result = await approvePurchase(purchase.id)
-
-    if (!result.success) {
-      setActionError(result.error)
-      setIsApproving(false)
+    if (isDemo) {
+      applyDemo({ status: 'approved' })
+      setIsActing(false)
+      showToast({ title: 'Purchase confirmed', message: 'This purchase is now Confirmed.' })
       return
     }
 
+    const result = await approvePurchase(id)
+    setIsActing(false)
+    if (!result.success) {
+      setActionError(result.error)
+      return
+    }
     setPurchase(result.purchase)
-    setIsApproving(false)
-    onChanged?.(result.purchase)
   }
 
   const openCancelModal = () => {
@@ -117,21 +143,24 @@ export default function PurchaseInvoiceDetail({ purchaseId, isOpen, onClose, onC
   }
 
   const handleCancel = async () => {
-    setIsCancelling(true)
+    setIsActing(true)
     setCancelError('')
 
-    const result = await cancelPurchase(purchase.id, cancelReason.trim() || undefined)
-
-    if (!result.success) {
-      setCancelError(result.error)
-      setIsCancelling(false)
+    if (isDemo) {
+      applyDemo({ status: 'cancelled' })
+      setIsActing(false)
+      setCancelOpen(false)
       return
     }
 
+    const result = await cancelPurchase(id, cancelReason.trim() || undefined)
+    setIsActing(false)
+    if (!result.success) {
+      setCancelError(result.error)
+      return
+    }
     setPurchase(result.purchase)
-    setIsCancelling(false)
     setCancelOpen(false)
-    onChanged?.(result.purchase)
   }
 
   const openPaymentModal = () => {
@@ -142,46 +171,45 @@ export default function PurchaseInvoiceDetail({ purchaseId, isOpen, onClose, onC
   }
 
   const handleUpdatePayment = async () => {
-    setIsUpdatingPayment(true)
+    setIsActing(true)
     setPaymentError('')
 
-    const result = await updatePurchasePaymentStatus(purchase.id, {
-      paymentStatus,
-      amountPaid: paymentAmount === '' ? undefined : paymentAmount,
-    })
-
-    if (!result.success) {
-      setPaymentError(result.error)
-      setIsUpdatingPayment(false)
+    if (isDemo) {
+      const amountPaid = paymentAmount === '' ? purchase.amountPaid : Number(paymentAmount) || 0
+      applyDemo({ paymentStatus, amountPaid, outstandingAmount: derivePurchaseOutstanding({ total: purchase.total, amountPaid }) })
+      setIsActing(false)
+      setPaymentOpen(false)
       return
     }
 
+    const result = await updatePurchasePaymentStatus(id, {
+      paymentStatus,
+      amountPaid: paymentAmount === '' ? undefined : paymentAmount,
+    })
+    setIsActing(false)
+    if (!result.success) {
+      setPaymentError(result.error)
+      return
+    }
     setPurchase(result.purchase)
-    setIsUpdatingPayment(false)
     setPaymentOpen(false)
-    onChanged?.(result.purchase)
   }
 
   const openReturnModal = () => {
     setReturnError('')
     setReturnReason('')
     const initial = {}
-    purchase.items.forEach((item) => {
-      initial[item.productId] = { checked: false, quantity: item.quantity, variantId: item.variantId }
+    purchase.items.forEach((purchaseItem) => {
+      initial[purchaseItem.productId] = { checked: false, quantity: purchaseItem.quantity, variantId: purchaseItem.variantId }
     })
-    setReturnItems(initial)
+    setReturnItemsState(initial)
     setReturnOpen(true)
   }
 
   const updateReturnItem = (productId, field, value) => {
-    setReturnItems((current) => ({
-      ...current,
-      [productId]: { ...current[productId], [field]: value },
-    }))
+    setReturnItemsState((current) => ({ ...current, [productId]: { ...current[productId], [field]: value } }))
   }
 
-  // Rounds/clamps on blur, not on every keystroke - see the identical pattern used for order
-  // items elsewhere (rounding mid-typing jumps the cursor and mangles later digits).
   const roundReturnQuantityOnBlur = (productId, maxQuantity) => (event) => {
     const rounded = Math.round(Number(event.target.value))
     const safe = Number.isFinite(rounded) ? rounded : 1
@@ -198,39 +226,44 @@ export default function PurchaseInvoiceDetail({ purchaseId, isOpen, onClose, onC
       return
     }
 
-    setIsReturning(true)
+    setIsActing(true)
     setReturnError('')
 
-    const result = await returnPurchaseItems(purchase.id, { items, reason: returnReason.trim() || undefined })
-
-    if (!result.success) {
-      setReturnError(result.error)
-      setIsReturning(false)
+    if (isDemo) {
+      showToast({ title: 'Items returned', message: 'Recorded locally for this demo purchase.' })
+      setIsActing(false)
+      setReturnOpen(false)
       return
     }
 
-    setIsReturning(false)
+    const result = await returnPurchaseItems(id, { items, reason: returnReason.trim() || undefined })
+    setIsActing(false)
+    if (!result.success) {
+      setReturnError(result.error)
+      return
+    }
     setReturnOpen(false)
     await loadPurchase()
-    onChanged?.()
   }
 
   const handleDelete = async () => {
-    setIsDeleting(true)
-    setDeleteError('')
+    setIsActing(true)
 
-    const result = await deletePurchase(purchase.id)
-
-    if (!result.success) {
-      setDeleteError(result.error)
-      setIsDeleting(false)
+    if (isDemo) {
+      setIsActing(false)
+      setDeleteOpen(false)
+      navigate(basePath)
       return
     }
 
-    setIsDeleting(false)
-    setDeleteOpen(false)
-    onChanged?.(null)
-    onClose()
+    const result = await deletePurchase(id)
+    setIsActing(false)
+    if (!result.success) {
+      setActionError(result.error)
+      setDeleteOpen(false)
+      return
+    }
+    navigate(basePath)
   }
 
   const handleUploadDocument = async (event) => {
@@ -241,232 +274,321 @@ export default function PurchaseInvoiceDetail({ purchaseId, isOpen, onClose, onC
     setIsUploading(true)
     setActionError('')
 
-    const result = await uploadPurchaseDocument(purchase.id, file)
-
-    if (!result.success) {
-      setActionError(result.error)
+    if (isDemo) {
+      applyDemo({ attachmentUrl: file.name })
       setIsUploading(false)
+      showToast({ title: 'Document attached', message: 'Recorded locally for this demo purchase.' })
       return
     }
 
+    const result = await uploadPurchaseDocument(id, file)
     setIsUploading(false)
+    if (!result.success) {
+      setActionError(result.error)
+      return
+    }
     await loadPurchase()
   }
 
+  if (isLoading) {
+    return <LoadingSpinner label="Loading purchase..." />
+  }
+
+  if (loadError || !purchase) {
+    return (
+      <Card>
+        <EmptyState
+          icon={PackageSearch}
+          title="Purchase not found"
+          description={loadError || 'This purchase may have been removed.'}
+          action={{ label: 'Back to Purchases', onClick: () => navigate(basePath) }}
+        />
+      </Card>
+    )
+  }
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={purchase?.invoiceNumber || 'Purchase Invoice'} className="w-full max-w-4xl">
-      <div className="max-h-[75vh] space-y-5 overflow-y-auto pr-1">
-        {isLoading ? (
-          <LoadingSpinner label="Loading purchase invoice..." />
-        ) : loadError || !purchase ? (
-          <EmptyState title="Purchase invoice not found" description={loadError || 'This invoice may have been removed.'} />
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={statusVariant[purchase.status] || 'neutral'}>{purchase.status}</Badge>
-                <Badge variant={paymentStatusVariant[purchase.paymentStatus] || 'neutral'} dot>{purchase.paymentStatus}</Badge>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3.5 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
-                  <Upload className="size-4" aria-hidden="true" />
-                  {isUploading ? 'Uploading...' : 'Attach Document'}
-                  <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleUploadDocument} disabled={isUploading} />
-                </label>
-                {canEdit && (
-                  <Button type="button" variant="outline" size="sm" onClick={() => onEdit?.(purchase)}>
-                    <Pencil className="size-4" aria-hidden="true" />
-                    Edit
-                  </Button>
-                )}
-                {canApprove && (
-                  <Button type="button" variant="primary" size="sm" loading={isApproving} onClick={handleApprove}>
-                    <Check className="size-4" aria-hidden="true" />
-                    Approve
-                  </Button>
-                )}
-                {canCancel && (
-                  <Button type="button" variant="danger" size="sm" onClick={openCancelModal}>
-                    <Ban className="size-4" aria-hidden="true" />
-                    Cancel
-                  </Button>
-                )}
-                {canReturn && (
-                  <Button type="button" variant="outline" size="sm" onClick={openReturnModal}>
-                    <RotateCcw className="size-4" aria-hidden="true" />
-                    Return Items
-                  </Button>
-                )}
-                {canUpdatePayment && (
-                  <Button type="button" variant="outline" size="sm" onClick={openPaymentModal}>
-                    <IndianRupee className="size-4" aria-hidden="true" />
-                    Payment Status
-                  </Button>
-                )}
-                {canDelete && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>
-                    <Trash2 className="size-4" aria-hidden="true" />
-                    Delete
-                  </Button>
-                )}
-              </div>
+    <div className="space-y-5 pb-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="secondary" size="sm" onClick={() => navigate(basePath)}>
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Back
+          </Button>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold text-neutral-900">{purchase.invoiceNumber}</h1>
+              <Badge variant={purchaseStatus.variant}>{purchaseStatus.label}</Badge>
+              {isDemo && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>}
             </div>
-
-            {actionError && (
-              <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div className="rounded-xl border border-neutral-100 bg-neutral-50/70 p-3">
-                <p className="text-xs text-neutral-400">Subtotal</p>
-                <p className="mt-1 text-sm font-semibold text-neutral-900">{formatCurrency(purchase.subtotal)}</p>
-              </div>
-              <div className="rounded-xl border border-neutral-100 bg-neutral-50/70 p-3">
-                <p className="text-xs text-neutral-400">Total</p>
-                <p className="mt-1 text-sm font-semibold text-neutral-900">{formatCurrency(purchase.total)}</p>
-              </div>
-              <div className="rounded-xl border border-neutral-100 bg-neutral-50/70 p-3">
-                <p className="text-xs text-neutral-400">Paid</p>
-                <p className="mt-1 text-sm font-semibold text-neutral-900">{formatCurrency(purchase.amountPaid)}</p>
-              </div>
-              <div className="rounded-xl border border-neutral-100 bg-amber-50 p-3">
-                <p className="text-xs text-amber-700">Due</p>
-                <p className="mt-1 text-sm font-semibold text-amber-700">{formatCurrency(purchase.outstandingAmount)}</p>
-              </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-neutral-400">
+              <span>{purchase.supplierName || '—'}</span>
+              <span>·</span>
+              <span>{purchase.purchaseType || '—'}</span>
+              <span>·</span>
+              <span>{formatDate(purchase.purchaseDate || purchase.invoiceDate)}</span>
             </div>
+          </div>
+        </div>
 
-            <div className="overflow-x-auto rounded-xl border border-neutral-100">
-              <table className="w-full min-w-2xl text-left text-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          {actions.includes('edit') && (
+            <Button variant="outline" size="sm" onClick={() => navigate(`${basePath}/${id}/edit`)}>
+              <Pencil className="size-4" aria-hidden="true" />
+              Edit
+            </Button>
+          )}
+          {actions.includes('confirm') && (
+            <Button variant="primary" size="sm" loading={isActing} onClick={handleConfirm}>
+              <Check className="size-4" aria-hidden="true" />
+              Confirm Purchase
+            </Button>
+          )}
+          {actions.includes('return') && (
+            <Button variant="outline" size="sm" onClick={openReturnModal}>
+              <RotateCcw className="size-4" aria-hidden="true" />
+              Return Items
+            </Button>
+          )}
+          {actions.includes('recordPayment') && (
+            <Button variant="outline" size="sm" onClick={openPaymentModal}>
+              <IndianRupee className="size-4" aria-hidden="true" />
+              Record / Update Payment
+            </Button>
+          )}
+          {actions.includes('cancel') && (
+            <Button variant="danger" size="sm" onClick={openCancelModal}>
+              <Ban className="size-4" aria-hidden="true" />
+              Cancel
+            </Button>
+          )}
+          {actions.includes('delete') && (
+            <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="size-4" aria-hidden="true" />
+              Delete
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {actionError && (
+        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard icon={IndianRupee} iconVariant="primary" label="Grand Total" value={formatCurrency(purchase.total)} />
+        <StatCard icon={PackageSearch} iconVariant="info" label="Receiving" value={receiving.label} />
+        <StatCard icon={Wallet} iconVariant="success" label="Amount Paid" value={formatCurrency(purchase.amountPaid)} />
+        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={formatCurrency(outstanding)} />
+      </div>
+
+      <Tabs defaultValue="overview">
+        <div className="overflow-x-auto pb-1">
+          <TabsList className="min-w-max">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="items">Items</TabsTrigger>
+            <TabsTrigger value="receipts">Goods Receipts</TabsTrigger>
+            <TabsTrigger value="invoices">Invoices</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="documents">Documents / Notes</TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="overview" className="mt-4 space-y-4">
+          <Card title="Purchase Information">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <DetailField label="Purchase #" value={purchase.purchaseNumber || purchase.invoiceNumber} />
+              <DetailField label="Supplier" value={purchase.supplierName} />
+              <DetailField label="Supplier Reference / Invoice #" value={purchase.invoiceNumber} />
+              <DetailField label="Purchase Type" value={purchase.purchaseType} />
+              <DetailField label="Purchase Date" value={formatDate(purchase.purchaseDate || purchase.invoiceDate)} />
+              <DetailField label="Warehouse" value={purchase.warehouseName} />
+              <DetailField label="Billing Address" value={purchase.billingAddress} />
+              <DetailField label="Financial Year" value={purchase.financialYear} />
+              <DetailField label="Purchase Status" value={purchaseStatus.label} />
+              <DetailField label="Receiving Status" value={receiving.label} />
+              <DetailField label="Payment Status" value={payment.label} />
+              {purchase.notes && <DetailField label="Notes" value={purchase.notes} className="sm:col-span-2 lg:col-span-3" />}
+            </div>
+          </Card>
+
+          <Card title="Commercial Summary">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+              <DetailField label="Subtotal" value={formatCurrency(purchase.subtotal)} />
+              <DetailField label="Discount" value={formatCurrency(purchase.discount)} />
+              <DetailField label="Tax" value={formatCurrency(purchase.tax)} />
+              <DetailField label="Grand Total" value={formatCurrency(purchase.total)} />
+              <DetailField label="Amount Paid" value={formatCurrency(purchase.amountPaid)} />
+              <DetailField label="Outstanding" value={formatCurrency(outstanding)} />
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="items" className="mt-4">
+          <Card title="Items" className="p-0" bodyClassName="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-3xl text-left text-sm">
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                    <th className="px-3.5 py-2.5">Product</th>
-                    <th className="px-3.5 py-2.5 text-right">Qty</th>
-                    <th className="px-3.5 py-2.5 text-right">Purchase Price</th>
-                    <th className="px-3.5 py-2.5 text-right">Discount</th>
-                    <th className="px-3.5 py-2.5 text-right">Tax</th>
-                    <th className="px-3.5 py-2.5 text-right">Line Total</th>
+                    <th className="px-5 py-3">Product</th>
+                    <th className="px-5 py-3">SKU</th>
+                    <th className="px-5 py-3 text-right">Ordered Qty</th>
+                    <th className="px-5 py-3 text-right">Purchase Price</th>
+                    <th className="px-5 py-3 text-right">Discount</th>
+                    <th className="px-5 py-3 text-right">Tax</th>
+                    <th className="px-5 py-3 text-right">Line Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
-                  {purchase.items.map((item) => (
-                    <tr key={item.id || item.productId}>
-                      <td className="px-3.5 py-2.5 text-neutral-800">{item.productName || 'Item'}</td>
-                      <td className="px-3.5 py-2.5 text-right text-neutral-600">{item.quantity}</td>
-                      <td className="px-3.5 py-2.5 text-right text-neutral-600">{formatCurrency(item.purchasePrice)}</td>
-                      <td className="px-3.5 py-2.5 text-right text-neutral-600">{item.discount ? `${item.discount}%` : '—'}</td>
-                      <td className="px-3.5 py-2.5 text-right text-neutral-600">{item.tax ? `${item.tax}%` : '—'}</td>
-                      <td className="px-3.5 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
+                  {purchase.items.map((purchaseItem) => (
+                    <tr key={purchaseItem.id || purchaseItem.productId} className="hover:bg-primary-50/35">
+                      <td className="px-5 py-3.5 font-medium text-neutral-900">{purchaseItem.productName || 'Item'}</td>
+                      <td className="px-5 py-3.5 text-neutral-600">{displayValue(purchaseItem.sku)}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-600">{purchaseItem.quantity}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-600">{formatCurrency(purchaseItem.purchasePrice)}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-600">{purchaseItem.discount ? `${purchaseItem.discount}%` : '—'}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-600">{purchaseItem.tax ? `${purchaseItem.tax}%` : '—'}</td>
+                      <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(purchaseItem.lineTotal)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          </Card>
+        </TabsContent>
 
+        <TabsContent value="receipts" className="mt-4">
+          <Card>
+            <EmptyState
+              icon={PackageSearch}
+              title="No goods receipts yet"
+              description="Goods receipt tracking will appear here once receiving is enabled."
+            />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="invoices" className="mt-4 space-y-4">
+          <Card title="Supplier Invoice Reference">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Supplier</p>
-                <p className="mt-1 text-sm text-neutral-800">{purchase.supplierName || '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Invoice Date</p>
-                <p className="mt-1 text-sm text-neutral-800">{formatDate(purchase.invoiceDate)}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Purchase Type</p>
-                <p className="mt-1 text-sm text-neutral-800">{purchase.purchaseType || '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Purchase Number</p>
-                <p className="mt-1 text-sm text-neutral-800">{purchase.purchaseNumber || '—'}</p>
-              </div>
-              {purchase.notes && (
-                <div className="sm:col-span-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Notes</p>
-                  <p className="mt-1 text-sm text-neutral-800">{purchase.notes}</p>
-                </div>
-              )}
+              <DetailField label="Supplier Reference / Invoice #" value={purchase.invoiceNumber} />
+              <DetailField label="Invoice Date" value={formatDate(purchase.invoiceDate)} />
             </div>
-          </>
-        )}
-      </div>
+          </Card>
+          <Card>
+            <EmptyState
+              icon={FileText}
+              title="No additional invoices"
+              description="Matching multiple supplier invoices to one purchase will be available in a future update."
+            />
+          </Card>
+        </TabsContent>
 
-      <Modal isOpen={cancelOpen} onClose={() => !isCancelling && setCancelOpen(false)} title="Cancel Purchase Invoice">
+        <TabsContent value="payments" className="mt-4">
+          <Card
+            title="Payments"
+            subtitle="Aggregate payment amount and status for this purchase."
+            actions={
+              actions.includes('recordPayment') ? (
+                <Button type="button" size="sm" onClick={openPaymentModal}>
+                  <IndianRupee className="size-4" aria-hidden="true" />
+                  Record / Update Payment
+                </Button>
+              ) : undefined
+            }
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <DetailField label="Amount Paid" value={formatCurrency(purchase.amountPaid)} />
+              <DetailField label="Outstanding" value={formatCurrency(outstanding)} />
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Payment Status</p>
+                <div className="mt-1"><Badge variant={payment.variant}>{payment.label}</Badge></div>
+              </div>
+            </div>
+            <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
+              This tracks one aggregate amount/status for the purchase. Itemised supplier payment records are not yet supported.
+            </p>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documents" className="mt-4 space-y-4">
+          <Card
+            title="Attached Document"
+            actions={
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3.5 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+                <Upload className="size-4" aria-hidden="true" />
+                {isUploading ? 'Uploading...' : 'Attach Document'}
+                <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleUploadDocument} disabled={isUploading} />
+              </label>
+            }
+          >
+            {purchase.attachmentUrl ? (
+              <p className="text-sm text-neutral-700">{purchase.attachmentUrl}</p>
+            ) : (
+              <p className="text-sm text-neutral-400">No document uploaded yet.</p>
+            )}
+          </Card>
+          <Card title="Notes">
+            {purchase.notes ? (
+              <p className="whitespace-pre-line text-sm text-neutral-700">{purchase.notes}</p>
+            ) : (
+              <p className="text-sm text-neutral-400">No notes added.</p>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Modal isOpen={cancelOpen} onClose={() => !isActing && setCancelOpen(false)} title="Cancel Purchase">
         <div className="space-y-4">
-          {cancelError && (
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{cancelError}</div>
-          )}
+          {cancelError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{cancelError}</div>}
           <p className="text-sm leading-6 text-neutral-600">
-            Cancelling reverses the stock added on approval and reduces the supplier&apos;s total purchases.
+            Cancelling this purchase may reverse related inventory effects. Continue only if the purchase has not been operationally completed.
           </p>
-          <Input
-            as="textarea"
-            label="Reason"
-            value={cancelReason}
-            onChange={(event) => setCancelReason(event.target.value)}
-            placeholder="Optional reason for cancellation"
-          />
+          <Input as="textarea" label="Reason" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Optional reason for cancellation" />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" disabled={isCancelling} onClick={() => setCancelOpen(false)}>Back</Button>
-            <Button type="button" variant="danger" loading={isCancelling} onClick={handleCancel}>Cancel Invoice</Button>
+            <Button type="button" variant="secondary" disabled={isActing} onClick={() => setCancelOpen(false)}>Back</Button>
+            <Button type="button" variant="danger" loading={isActing} onClick={handleCancel}>Cancel Purchase</Button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={paymentOpen} onClose={() => !isUpdatingPayment && setPaymentOpen(false)} title="Update Payment Status">
+      <Modal isOpen={paymentOpen} onClose={() => !isActing && setPaymentOpen(false)} title="Record / Update Payment">
         <div className="space-y-4">
-          {paymentError && (
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{paymentError}</div>
-          )}
-          <Select
-            label="Payment Status"
-            options={PURCHASE_PAYMENT_STATUS_OPTIONS}
-            value={paymentStatus}
-            onChange={(event) => setPaymentStatus(event.target.value)}
-          />
-          <Input
-            label="Amount Paid"
-            type="number"
-            min="0"
-            step="0.01"
-            value={paymentAmount}
-            onChange={(event) => setPaymentAmount(event.target.value)}
-          />
+          {paymentError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{paymentError}</div>}
+          <Select label="Payment Status" options={PURCHASE_PAYMENT_STATUS_OPTIONS} value={paymentStatus} onChange={(event) => setPaymentStatus(event.target.value)} />
+          <Input label="Amount Paid" type="number" min="0" step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" disabled={isUpdatingPayment} onClick={() => setPaymentOpen(false)}>Cancel</Button>
-            <Button type="button" loading={isUpdatingPayment} onClick={handleUpdatePayment}>Save</Button>
+            <Button type="button" variant="secondary" disabled={isActing} onClick={() => setPaymentOpen(false)}>Cancel</Button>
+            <Button type="button" loading={isActing} onClick={handleUpdatePayment}>Save</Button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={returnOpen} onClose={() => !isReturning && setReturnOpen(false)} title="Return Items to Supplier" className="max-w-2xl">
+      <Modal isOpen={returnOpen} onClose={() => !isActing && setReturnOpen(false)} title="Return Items to Supplier" className="max-w-2xl">
         <div className="space-y-4">
-          {returnError && (
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{returnError}</div>
-          )}
+          {returnError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{returnError}</div>}
           <div className="space-y-3">
-            {purchase?.items.map((item) => {
-              const values = returnItems[item.productId] || { checked: false, quantity: item.quantity }
-
+            {purchase.items.map((purchaseItem) => {
+              const values = returnItems[purchaseItem.productId] || { checked: false, quantity: purchaseItem.quantity }
               return (
-                <div key={item.productId} className="rounded-xl border border-neutral-100 bg-neutral-50/70 p-3">
+                <div key={purchaseItem.productId} className="rounded-xl border border-neutral-100 bg-neutral-50/70 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <label className="flex items-center gap-2 text-sm font-medium text-neutral-800">
                       <input
                         type="checkbox"
                         checked={values.checked}
-                        onChange={(event) => updateReturnItem(item.productId, 'checked', event.target.checked)}
+                        onChange={(event) => updateReturnItem(purchaseItem.productId, 'checked', event.target.checked)}
                         className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                       />
-                      {item.productName || 'Item'}
+                      {purchaseItem.productName || 'Item'}
                     </label>
                     <input
                       type="number"
                       min="1"
-                      max={item.quantity}
+                      max={purchaseItem.quantity}
                       step="1"
                       value={values.quantity}
-                      onChange={(event) => updateReturnItem(item.productId, 'quantity', event.target.value)}
-                      onBlur={roundReturnQuantityOnBlur(item.productId, item.quantity)}
+                      onChange={(event) => updateReturnItem(purchaseItem.productId, 'quantity', event.target.value)}
+                      onBlur={roundReturnQuantityOnBlur(purchaseItem.productId, purchaseItem.quantity)}
                       className="w-24 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
                     />
                   </div>
@@ -474,32 +596,23 @@ export default function PurchaseInvoiceDetail({ purchaseId, isOpen, onClose, onC
               )
             })}
           </div>
-          <Input
-            as="textarea"
-            label="Reason"
-            value={returnReason}
-            onChange={(event) => setReturnReason(event.target.value)}
-            placeholder="Why are these items being returned?"
-          />
+          <Input as="textarea" label="Reason" value={returnReason} onChange={(event) => setReturnReason(event.target.value)} placeholder="Why are these items being returned?" />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" disabled={isReturning} onClick={() => setReturnOpen(false)}>Cancel</Button>
-            <Button type="button" loading={isReturning} onClick={handleReturn}>Return Items</Button>
+            <Button type="button" variant="secondary" disabled={isActing} onClick={() => setReturnOpen(false)}>Cancel</Button>
+            <Button type="button" loading={isActing} onClick={handleReturn}>Return Items</Button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={deleteOpen} onClose={() => !isDeleting && setDeleteOpen(false)} title="Delete Purchase Invoice">
+      <Modal isOpen={deleteOpen} onClose={() => !isActing && setDeleteOpen(false)} title="Delete Purchase">
         <div className="space-y-5">
-          <p className="text-sm leading-6 text-neutral-600">Delete {purchase?.invoiceNumber}? This cannot be undone.</p>
-          {deleteError && (
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</div>
-          )}
+          <p className="text-sm leading-6 text-neutral-600">Delete {purchase.invoiceNumber}? This cannot be undone.</p>
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" disabled={isDeleting} onClick={() => setDeleteOpen(false)}>Cancel</Button>
-            <Button type="button" variant="danger" loading={isDeleting} onClick={handleDelete}>Delete</Button>
+            <Button type="button" variant="secondary" disabled={isActing} onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button type="button" variant="danger" loading={isActing} onClick={handleDelete}>Delete</Button>
           </div>
         </div>
       </Modal>
-    </Modal>
+    </div>
   )
 }

@@ -27,6 +27,8 @@ import VehicleStockOverview from '../features/vehicleStock/VehicleStockOverview'
 import WarehouseList from '../features/warehouses/WarehouseList'
 import VehicleList from '../features/vehicles/VehicleList'
 import PurchaseInvoiceList from '../features/purchases/PurchaseInvoiceList'
+import PurchaseInvoiceForm from '../features/purchases/PurchaseInvoiceForm'
+import PurchaseInvoiceDetail from '../features/purchases/PurchaseInvoiceDetail'
 import ReportsHub from '../features/reports/ReportsHub'
 import NotificationsList from '../features/notifications/NotificationsList'
 import AuditLogList from '../features/auditLogs/AuditLogList'
@@ -230,6 +232,9 @@ export default function AppRoutes() {
           <Route path="/admin/vehicle-stock" element={<VehicleStockOverview />} />
           <Route path="/admin/vehicles" element={<VehicleList />} />
           <Route path="/admin/purchases" element={<PurchaseInvoiceList />} />
+          <Route path="/admin/purchases/create" element={<PurchaseInvoiceForm />} />
+          <Route path="/admin/purchases/:id/edit" element={<PurchaseInvoiceForm />} />
+          <Route path="/admin/purchases/:id" element={<PurchaseInvoiceDetail />} />
           <Route path="/admin/deliveries" element={<AdminDeliveries />} />
           <Route path="/admin/deliveries/:id" element={<DeliveryDetail />} />
           <Route path="/admin/expenses" element={<AdminExpenses />} />
