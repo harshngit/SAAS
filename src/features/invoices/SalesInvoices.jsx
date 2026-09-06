@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Eye, Wallet } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import DataTable from '../../components/ui/DataTable'
 import Badge from '../../components/ui/Badge'
+import { usePermission } from '../../auth/usePermission'
 import { listInvoices } from '../../api/invoices'
+import RecordPaymentDrawer from './RecordPaymentDrawer'
+import { isOpenReceivable } from './invoiceHelpers'
 import { formatCurrency } from '../../utils/format'
 
 const statusVariant = {
@@ -14,27 +18,30 @@ const statusVariant = {
 
 export default function SalesInvoices() {
   const navigate = useNavigate()
+  const { can } = usePermission()
+  // Recording a customer payment is a financial transaction - gate it on payments:create only.
+  const canRecordPayment = can('payments', 'create')
   const [invoices, setInvoices] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [paymentInvoice, setPaymentInvoice] = useState(null)
 
-  useEffect(() => {
-    let isMounted = true
-
+  const load = useCallback(() => {
+    setIsLoading(true)
     listInvoices().then((result) => {
-      if (!isMounted) return
       if (!result.success) {
         setError(result.error)
       } else {
+        setError('')
         setInvoices(result.invoices)
       }
       setIsLoading(false)
     })
-
-    return () => {
-      isMounted = false
-    }
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   return (
     <div className="space-y-6">
@@ -55,7 +62,7 @@ export default function SalesInvoices() {
               header: 'Invoice #',
               sortable: true,
               render: (row) => (
-                <button type="button" onClick={() => navigate(`/admin/invoices/${row.id}`)} className="font-medium text-primary-700 hover:underline">
+                <button type="button" onClick={() => navigate(`/accounts/invoices/sales/${row.id}`)} className="font-medium text-primary-700 hover:underline">
                   {row.invoiceNumber}
                 </button>
               ),
@@ -69,12 +76,29 @@ export default function SalesInvoices() {
               render: (row) => <Badge variant={statusVariant[row.paymentStatus] || 'neutral'} dot>{row.paymentStatus}</Badge>,
             },
             { key: 'total', header: 'Total', sortable: true, align: 'right', render: (row) => formatCurrency(row.total) },
+            { key: 'outstandingAmount', header: 'Outstanding', sortable: true, align: 'right', render: (row) => formatCurrency(row.outstandingAmount) },
           ]}
           data={invoices}
           searchKeys={['invoiceNumber', 'customerName', 'paymentStatus']}
           searchPlaceholder="Search sales invoices..."
+          actions={(row) => [
+            ...(canRecordPayment && isOpenReceivable(row)
+              ? [{ label: 'Record Payment', icon: Wallet, onClick: () => setPaymentInvoice(row) }]
+              : []),
+            { label: 'View Invoice', icon: Eye, onClick: () => navigate(`/accounts/invoices/sales/${row.id}`) },
+          ]}
         />
       </Card>
+
+      <RecordPaymentDrawer
+        isOpen={Boolean(paymentInvoice)}
+        onClose={() => setPaymentInvoice(null)}
+        invoice={paymentInvoice}
+        onSave={() => {
+          setPaymentInvoice(null)
+          load()
+        }}
+      />
     </div>
   )
 }

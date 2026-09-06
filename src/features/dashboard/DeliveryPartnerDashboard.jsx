@@ -25,6 +25,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { listDeliveries } from '../../api/deliveries'
 import { demoDeliveriesResolved, demoVehicleStockResolved, isDemoDelivery } from '../orders/orderDemoData'
 import { getDeliveryStage } from '../deliveries/deliveryStage'
@@ -34,10 +35,15 @@ import { attendanceDemoResolved } from '../attendance/attendanceDemo'
 import { durationLabel, normalizeAttendanceRecord } from '../attendance/attendanceUtils'
 import { formatTime } from '../attendance/attendanceConstants'
 import { postLocationPing } from '../../api/users'
-import { formatCurrency, formatDate } from '../../utils/format'
+import { formatCurrency, formatDate, toLocalDateString } from '../../utils/format'
+
+// Explicit dev switch only (VITE_DEMO_DATA=true). Demo data is never mixed into, or used as a
+// fallback for, real API results. `DEMO_DASHBOARD_ENABLED` = fixtures exist; the NETWORK
+// boundary is `DEMO_MODE` (true OR empty -> no real call).
+const DEMO_DASHBOARD_ENABLED = DEMO_MODE && !DEMO_EMPTY
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10)
+  return toLocalDateString()
 }
 
 function StatCard({ icon: Icon, iconClassName, label, value, footer, footerClassName = 'text-primary-700', onClick }) {
@@ -114,6 +120,12 @@ export default function DeliveryPartnerDashboard() {
   const [isSharingLocation, setIsSharingLocation] = useState(false)
 
   const handleShareLocation = () => {
+    // Demo mode: never send a real location ping to the backend.
+    if (DEMO_MODE) {
+      showToast({ title: 'Demo mode', message: 'Location sharing is simulated — nothing was sent to the server.' })
+      return
+    }
+
     if (!navigator.geolocation) {
       showToast({ title: 'Not supported', message: 'This device does not support location sharing.', variant: 'error' })
       return
@@ -151,18 +163,23 @@ export default function DeliveryPartnerDashboard() {
     setIsLoading(true)
     setLoadError('')
 
-    const result = await listDeliveries({ delivery_partner_id: currentUser.id })
-    const demoRows = demoDeliveriesResolved()
-
-    setIsLoading(false)
-
-    if (!result.success) {
-      setDeliveries(demoRows)
-      setLoadError(demoRows.length ? '' : result.error)
+    // Any demo mode: never calls GET /deliveries. empty -> no deliveries.
+    if (DEMO_MODE) {
+      setDeliveries(DEMO_EMPTY ? [] : demoDeliveriesResolved())
+      setIsLoading(false)
       return
     }
 
-    setDeliveries([...result.deliveries, ...demoRows])
+    const result = await listDeliveries({ delivery_partner_id: currentUser.id })
+    setIsLoading(false)
+
+    // Real mode: a failure shows the real error; an empty list is a truthful empty state.
+    if (!result.success) {
+      setDeliveries([])
+      setLoadError(result.error)
+      return
+    }
+    setDeliveries(result.deliveries)
   }, [currentUser?.id])
 
   useEffect(() => {
@@ -174,8 +191,20 @@ export default function DeliveryPartnerDashboard() {
 
     async function loadExtras() {
       if (!currentUser?.id) return
+      const today = todayIso()
 
-      // A 404 here just means "no active loading session right now" - expected, not an error.
+      // Any demo mode: never calls GET /vehicle-stock/current or GET /attendance/me.
+      // empty -> no vehicle session, no attendance.
+      if (DEMO_MODE) {
+        const raw = DEMO_EMPTY
+          ? null
+          : attendanceDemoResolved().history.find((entry) => (entry.date || '').slice(0, 10) === today)
+        if (isMounted) setTodaysAttendance(raw ? normalizeAttendanceRecord(raw) : null)
+        return
+      }
+
+      // Real mode: a 404 just means "no active loading session" - expected. A missing / failed
+      // attendance record is a truthful "not checked in", never demo attendance.
       const stockResult = await getCurrentVehicleStock(currentUser.id)
       if (isMounted && stockResult.success) {
         setVehicleSession(stockResult.session)
@@ -183,11 +212,7 @@ export default function DeliveryPartnerDashboard() {
 
       const attendanceResult = await getMyAttendance()
       if (isMounted) {
-        const today = todayIso()
-        const rawRows =
-          attendanceResult.success && attendanceResult.records.length > 0
-            ? attendanceResult.records
-            : attendanceDemoResolved().history
+        const rawRows = attendanceResult.success ? attendanceResult.records : []
         const raw = rawRows.find((entry) => (entry.date || '').slice(0, 10) === today)
         setTodaysAttendance(raw ? normalizeAttendanceRecord(raw) : null)
       }
@@ -235,7 +260,7 @@ export default function DeliveryPartnerDashboard() {
   // Primary lifecycle counts (Assigned -> Accepted -> Picking -> Vehicle Loaded -> In Transit -> Delivered).
   const assignedCount = countStage('assigned')
   const acceptedCount = countStage('accepted')
-  const pickingCount = countStage('picking')
+  const pickingCount = countStage('picking', 'ready')
   const loadedCount = countStage('loaded')
   const inTransitCount = countStage('in_transit')
   const deliveredCount = countStage('delivered')
@@ -246,7 +271,7 @@ export default function DeliveryPartnerDashboard() {
   const needsResponseCount = countStage('assigned', 'rejected')
 
   const completedToday = deliveredCount
-  const pendingToday = countStage('assigned', 'accepted', 'picking', 'loaded', 'in_transit')
+  const pendingToday = countStage('assigned', 'accepted', 'picking', 'ready', 'loaded', 'in_transit')
   const completedPercent = todaysDeliveries.length > 0 ? Math.round((completedToday / todaysDeliveries.length) * 100) : 0
 
   const stats = [
@@ -336,12 +361,14 @@ export default function DeliveryPartnerDashboard() {
     { label: 'Delivered', value: deliveredCount, icon: CheckCircle2, iconClassName: 'bg-green-50 text-green-600' },
   ]
 
-  // Fall back to the demo van load when there is no real loading session but demo deliveries
-  // are in scope, so the Current Vehicle Load card stays meaningful for demo testing.
-  const hasDemoDeliveries = deliveries.some((delivery) => isDemoDelivery(delivery.id))
-  const effectiveVehicleSession =
-    vehicleSession || (hasDemoDeliveries ? { vehicleNumber: 'MH-12-AB-4521', items: demoVehicleStockResolved() } : null)
-  const vehicleLoadItems = (effectiveVehicleSession?.items || []).filter((item) => (item.loadedQuantity || 0) > 0)
+  // Current Vehicle Load. Demo mode uses the demo van; real mode uses the real active session
+  // only (null when GET /vehicle-stock/current 404s). Rows are the stock CURRENTLY on the
+  // vehicle - remainingQuantity (= loaded + extra - delivered - returned), not historical loaded.
+  const effectiveVehicleSession = DEMO_DASHBOARD_ENABLED
+    ? { vehicleNumber: 'MH-12-AB-4521', items: demoVehicleStockResolved() }
+    : vehicleSession
+  const currentQtyOf = (item) => Number(item.remainingQuantity ?? item.expectedClosingQty ?? 0) || 0
+  const vehicleLoadItems = (effectiveVehicleSession?.items || []).filter((item) => currentQtyOf(item) > 0)
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -458,7 +485,7 @@ export default function DeliveryPartnerDashboard() {
             />
           ) : (
             <>
-              <p className="text-xs text-neutral-400">{effectiveVehicleSession?.vehicleNumber || 'Vehicle'} · loaded stock</p>
+              <p className="text-xs text-neutral-400">{effectiveVehicleSession?.vehicleNumber || 'Vehicle'} · on vehicle now</p>
               <div className="mt-3 space-y-2.5">
                 {vehicleLoadItems.map((item) => (
                   <div key={item.productId} className="flex items-center justify-between gap-3 text-sm">
@@ -466,7 +493,7 @@ export default function DeliveryPartnerDashboard() {
                       <Package className="size-3.5 text-neutral-400" aria-hidden="true" />
                       {item.productName}
                     </span>
-                    <span className="shrink-0 font-medium text-neutral-900">{item.loadedQuantity} units</span>
+                    <span className="shrink-0 font-medium text-neutral-900">{currentQtyOf(item)} units</span>
                   </div>
                 ))}
               </div>

@@ -21,7 +21,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
-import { roleMenus, roleLabels, ROLES } from '../../auth/roles'
+import { roleMenus, roleLabels, ROLES, resolveWorkspaceRole } from '../../auth/roles'
 import { usePermission } from '../../auth/usePermission'
 import { listSuperAdminOrganizations } from '../../api/superadmin'
 import { getMyAttendance } from '../../api/attendance'
@@ -65,8 +65,9 @@ export default function Sidebar({
   const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
-  const currentRole = currentUser?.role
-  const { can } = usePermission()
+  const { can, role } = usePermission()
+  // Custom roles fall back to their workspace's canonical menu (then permission-filtered below).
+  const currentRole = resolveWorkspaceRole({ role, currentUser })
   // Items without a `module` tag (personal pages, or concepts the backend doesn't model yet,
   // like Visits/Follow-ups) are always shown - only permission-mapped items get gated.
   const menuGroups = (currentRole ? roleMenus[currentRole] || [] : [])

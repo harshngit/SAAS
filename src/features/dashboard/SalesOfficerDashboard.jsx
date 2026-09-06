@@ -22,27 +22,47 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useAuthStore } from '../../store/authStore'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { listCustomers } from '../../api/customers'
 import { listOrders } from '../../api/orders'
 import { ORDER_STATUS_VARIANT, formatOrderStatus } from '../orders/orderHelpers'
 import { listQuotations } from '../../api/quotations'
 import { getMyAttendance } from '../../api/attendance'
-import { visits } from '../../mockData/visits'
-import { formatCurrency } from '../../utils/format'
+import { listVisits, VISIT_STATUS_OPTIONS } from '../../api/visits'
+import { demoOrdersResolved } from '../orders/orderDemoData'
+import { demoQuotationsResolved } from '../quotations/quotationDemoData'
+import { demoVisits } from '../leads/demoData'
+import { attendanceDemoResolved } from '../attendance/attendanceDemo'
+import { formatCurrency, toLocalDateString } from '../../utils/format'
 
-// The visits mock file only models a single hardcoded sales officer ("usr-3") - Visits/Follow-ups
-// have no backend endpoint yet (see src/auth/roles.js roleMenus comment), so this stays mocked.
-const MOCK_VISITS_OFFICER_ID = 'usr-3'
-const MONTHLY_TARGET = 80000
-
-const visitStatusVariant = {
-  Completed: 'success',
-  Scheduled: 'info',
-  'Follow-up Required': 'warning',
-  Missed: 'danger',
+// A Sales Officer demo customer list, derived from the shared demo orders so it stays coherent
+// with everything else (there is no standalone demo customer store).
+function demoSalesCustomers() {
+  const seen = new Map()
+  demoOrdersResolved().forEach((order) => {
+    if (order.customerId && !seen.has(order.customerId)) {
+      seen.set(order.customerId, { id: order.customerId, name: order.customerName })
+    }
+  })
+  return [...seen.values()]
 }
 
-const myVisits = visits.filter((visit) => visit.salesOfficerId === MOCK_VISITS_OFFICER_ID)
+const MONTHLY_TARGET = 80000
+
+// A committed sale - never a Draft (or cancelled, or a quotation). Order status is normalized
+// to draft / confirmed / completed / cancelled at the API boundary.
+const COMMITTED_ORDER_STATUSES = new Set(['confirmed', 'completed'])
+const isCommittedOrder = (order) => COMMITTED_ORDER_STATUSES.has(String(order?.status || '').toLowerCase())
+
+// Keyed on the backend visit status value (planned / in_progress / completed / cancelled).
+const visitStatusVariant = {
+  completed: 'success',
+  planned: 'info',
+  in_progress: 'warning',
+  cancelled: 'danger',
+}
+const visitStatusLabel = Object.fromEntries(VISIT_STATUS_OPTIONS.map((option) => [option.value, option.label]))
+const formatVisitStatus = (status) => visitStatusLabel[status] || status || '—'
 
 function getGreeting() {
   const hour = new Date().getHours()
@@ -145,6 +165,7 @@ export default function SalesOfficerDashboard() {
   const [customers, setCustomers] = useState([])
   const [orders, setOrders] = useState([])
   const [quotations, setQuotations] = useState([])
+  const [myVisits, setMyVisits] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -154,11 +175,20 @@ export default function SalesOfficerDashboard() {
     setIsLoading(true)
     setLoadError('')
 
-    const [customersResult, ordersResult, quotationsResult] = await Promise.all([
-      listCustomers(),
-      listOrders(),
-      listQuotations(),
-    ])
+    // Demo mode: never calls GET /customers, /orders, /quotations or /visits.
+    const [customersResult, ordersResult, quotationsResult, visitsResult] = DEMO_MODE
+      ? [
+          { success: true, customers: DEMO_EMPTY ? [] : demoSalesCustomers() },
+          { success: true, orders: DEMO_EMPTY ? [] : demoOrdersResolved() },
+          { success: true, quotations: DEMO_EMPTY ? [] : demoQuotationsResolved() },
+          { success: true, visits: DEMO_EMPTY ? [] : demoVisits },
+        ]
+      : await Promise.all([
+          listCustomers(),
+          listOrders(),
+          listQuotations(),
+          currentUser?.id ? listVisits({ userId: currentUser.id }) : listVisits(),
+        ])
 
     setIsLoading(false)
 
@@ -178,7 +208,9 @@ export default function SalesOfficerDashboard() {
     setCustomers(customersResult.customers)
     setOrders(ordersResult.orders)
     setQuotations(quotationsResult.quotations)
-  }, [])
+    // Visits are informational on this dashboard - a failure just leaves the section empty.
+    setMyVisits(visitsResult.success ? visitsResult.visits : [])
+  }, [currentUser?.id])
 
   useEffect(() => {
     loadDashboardData()
@@ -188,10 +220,13 @@ export default function SalesOfficerDashboard() {
     let isMounted = true
 
     async function loadAttendance() {
-      const result = await getMyAttendance()
+      // Demo mode: never calls GET /attendance/me.
+      const result = DEMO_MODE
+        ? { success: true, records: DEMO_EMPTY ? [] : attendanceDemoResolved().history }
+        : await getMyAttendance()
       if (!isMounted || !result.success) return
 
-      const today = new Date().toISOString().slice(0, 10)
+      const today = toLocalDateString()
       const record = result.records.find((entry) => entry.date === today)
       setTodaysAttendance(record || null)
     }
@@ -219,14 +254,18 @@ export default function SalesOfficerDashboard() {
     )
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = toLocalDateString()
   const currentMonth = today.slice(0, 7)
 
   const assignedCustomers = customers
-  const visitsToday = myVisits.filter((visit) => visit.date === today).length
-  const pendingFollowUps = myVisits.filter((visit) => visit.status === 'Follow-up Required').length
+  const visitsToday = myVisits.filter((visit) => (visit.visitDate || '').slice(0, 10) === today).length
+  const pendingFollowUps = myVisits.reduce(
+    (count, visit) => count + (visit.followUps || []).filter((task) => task.status === 'pending').length,
+    0,
+  )
+  // Sales metrics count committed orders only - a Draft is not a sale.
   const ordersThisMonth = orders.filter(
-    (order) => order.status !== 'cancelled' && (order.orderDate || '').slice(0, 7) === currentMonth,
+    (order) => isCommittedOrder(order) && (order.orderDate || '').slice(0, 7) === currentMonth,
   )
   const monthlySales = ordersThisMonth.reduce((sum, order) => sum + (order.total || 0), 0)
   const targetProgress = Math.min(100, Math.round((monthlySales / MONTHLY_TARGET) * 100))
@@ -235,16 +274,18 @@ export default function SalesOfficerDashboard() {
     (order) => (order.deliveryDate || '').slice(0, 10) === today && order.status !== 'cancelled',
   ).length
 
-  // Finalized Order Status: Draft / Confirmed / Completed / Cancelled. The backend still
-  // returns `placed` for the unconfirmed state - shown as "Draft" in the UI.
+  // Order Status is normalized to draft / confirmed / completed / cancelled at the API
+  // boundary (api/orders.js) - the dashboard only ever sees those four.
   const orderStatusCounts = {
-    draft: orders.filter((order) => order.status === 'placed' || order.status === 'draft').length,
+    draft: orders.filter((order) => order.status === 'draft').length,
     confirmed: orders.filter((order) => order.status === 'confirmed').length,
     completed: orders.filter((order) => order.status === 'completed').length,
     cancelled: orders.filter((order) => order.status === 'cancelled').length,
   }
 
-  const upcomingVisits = [...myVisits].sort((a, b) => (a.date < b.date ? -1 : 1)).slice(0, 3)
+  const upcomingVisits = [...myVisits]
+    .sort((a, b) => new Date(b.visitDate || 0) - new Date(a.visitDate || 0))
+    .slice(0, 3)
   const recentOrders = [...orders]
     .sort((a, b) => (a.orderDate < b.orderDate ? 1 : -1))
     .slice(0, 3)
@@ -377,11 +418,11 @@ export default function SalesOfficerDashboard() {
               <tbody className="divide-y divide-neutral-50">
                 {upcomingVisits.map((visit) => (
                   <tr key={visit.id} className="transition-colors hover:bg-primary-50/35">
-                    <td className="whitespace-nowrap py-3 pr-3 font-medium text-neutral-800">{visit.customerName}</td>
-                    <td className="py-3 pr-3 text-neutral-500">{visit.purpose}</td>
-                    <td className="whitespace-nowrap py-3 pr-3 text-neutral-500">{visit.date}</td>
+                    <td className="whitespace-nowrap py-3 pr-3 font-medium text-neutral-800">{visit.customerName || visit.leadName || '—'}</td>
+                    <td className="py-3 pr-3 text-neutral-500">{visit.purpose || '—'}</td>
+                    <td className="whitespace-nowrap py-3 pr-3 text-neutral-500">{(visit.visitDate || '').slice(0, 10) || '—'}</td>
                     <td className="whitespace-nowrap py-3 pr-3">
-                      <Badge variant={visitStatusVariant[visit.status] || 'neutral'} dot>{visit.status}</Badge>
+                      <Badge variant={visitStatusVariant[visit.status] || 'neutral'} dot>{formatVisitStatus(visit.status)}</Badge>
                     </td>
                     <td className="whitespace-nowrap py-3 text-right">
                       <button type="button" className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700" aria-label="More actions">

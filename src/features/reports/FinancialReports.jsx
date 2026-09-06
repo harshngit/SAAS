@@ -8,6 +8,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import { exportReport, getReport } from '../../api/reports'
 import { PERIOD_OPTIONS, REPORT_TYPES, getDateRangeForPeriod, humanizeKey } from './reportConstants'
+import { DEMO_MODE } from '../../config/demoMode'
 
 export default function FinancialReports({
   title = 'Financial Reports',
@@ -44,6 +45,12 @@ export default function FinancialReports({
       if (!result.success) {
         setReport(null)
         setLoadError(result.error)
+        return
+      }
+
+      if (result.report?.demoUnavailable) {
+        setReport(null)
+        setLoadError('Demo data for this report is not available yet.')
         return
       }
 
@@ -120,7 +127,7 @@ export default function FinancialReports({
           ) : loadError || rows.length === 0 ? (
             <EmptyState
               icon={FileSpreadsheet}
-              title="No data for the selected period"
+              title={/demo data/i.test(loadError || '') ? 'Not available in demo mode' : 'No data for the selected period'}
               description={loadError || `${currentReportLabel} will appear here once there is data for ${dateFrom} to ${dateTo}.`}
             />
           ) : (
@@ -161,28 +168,32 @@ export default function FinancialReports({
             </div>
           )}
 
-          <div className="mt-5 flex justify-end gap-3">
-            <Button
-              type="button"
-              variant="secondary"
-              loading={isExporting === 'pdf'}
-              disabled={Boolean(isExporting) || isLoading}
-              onClick={() => handleExport('pdf')}
-            >
-              <Download className="size-4" aria-hidden="true" />
-              Export PDF
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              loading={isExporting === 'excel'}
-              disabled={Boolean(isExporting) || isLoading}
-              onClick={() => handleExport('excel')}
-            >
-              <Download className="size-4" aria-hidden="true" />
-              Export Excel
-            </Button>
-          </div>
+          {DEMO_MODE ? (
+            <p className="mt-5 text-right text-xs text-neutral-400">Report export (PDF / Excel) is disabled in demo mode.</p>
+          ) : (
+            <div className="mt-5 flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={isExporting === 'pdf'}
+                disabled={Boolean(isExporting) || isLoading}
+                onClick={() => handleExport('pdf')}
+              >
+                <Download className="size-4" aria-hidden="true" />
+                Export PDF
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                loading={isExporting === 'excel'}
+                disabled={Boolean(isExporting) || isLoading}
+                onClick={() => handleExport('excel')}
+              >
+                <Download className="size-4" aria-hidden="true" />
+                Export Excel
+              </Button>
+            </div>
+          )}
         </div>
       </Card>
     </div>

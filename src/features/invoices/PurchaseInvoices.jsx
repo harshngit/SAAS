@@ -155,7 +155,7 @@ export default function PurchaseInvoices() {
             label="Amount Paid"
             type="number"
             min="0"
-            step="0.01"
+            step="1"
             value={paymentAmount}
             onChange={(event) => setPaymentAmount(event.target.value)}
           />

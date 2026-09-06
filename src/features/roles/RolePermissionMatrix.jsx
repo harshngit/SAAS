@@ -2,82 +2,58 @@ import { useEffect, useMemo, useState } from 'react'
 import { Building2, ShoppingCart, Truck, Wallet } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import Modal from '../../components/ui/Modal'
 import { getRolesCatalog } from '../../api/roles'
 
-// The single "Workspace" concept - the functional family a custom role belongs to. Admin /
-// Business Owner is the organization-level owner role and is configured separately - it is
-// deliberately NOT a selectable workspace here. "Finance" maps to the backend value `accounts`
-// (the existing role.workspace field; no new field is introduced).
+// "Workspace" only picks the user's primary shell / dashboard family - it is NOT a permission
+// whitelist. Backend authorization is entirely role.permissions[module][action]. A custom role
+// may legitimately hold permissions outside its workspace's common modules (e.g. a
+// warehouse-oriented Delivery role needing products:view / inventory:view), so EVERY module
+// GET /roles/catalog returns stays grantable - the workspace only decides which modules are
+// pre-sorted into "Recommended" vs "Other Available".
 const WORKSPACES = [
   { value: 'sales', label: 'Sales', icon: ShoppingCart, description: 'Customers, leads, quotations, sales orders, visits & activities.' },
   { value: 'delivery', label: 'Delivery', icon: Truck, description: 'Assigned deliveries, POD, collection, vehicle stock & returns.' },
   { value: 'accounts', label: 'Finance', icon: Wallet, description: 'Invoices, payments, receivables, expenses & financial reports.' },
 ]
 
-// Which permission-matrix modules belong to each workspace. Keys not listed anywhere (an
-// unrecognised catalog module) stay visible in every workspace so nothing is hidden by
-// accident. A workspace value that isn't one of the three (e.g. a legacy `admin` role) shows
-// every module.
-const WORKSPACE_MODULES = {
-  sales: ['dashboard', 'customers', 'leads', 'quotations', 'sales_orders', 'visits', 'follow_ups', 'products', 'suppliers', 'inventory', 'reports'],
-  delivery: ['dashboard', 'deliveries', 'vehicle_stock', 'attendance', 'leaves', 'expenses'],
-  accounts: ['dashboard', 'invoices', 'payments', 'expenses', 'purchases', 'gst', 'reports'],
-}
-const MAPPED_MODULE_KEYS = new Set(Object.values(WORKSPACE_MODULES).flat())
-
-// Some actions never make sense for a module inside a given workspace. The matrix renders
-// those cells as an inert "—" so an admin can't grant a permission the role should never
-// use (e.g. a Delivery role approving its own expense claims). This is a frontend guard
-// only - the backend permission catalog and role API are unchanged; the same module
-// (`expenses`, `leaves`, `attendance`) is still canonical, just with workspace-appropriate
-// actions. Finance keeps the full action set for these modules.
-const WORKSPACE_MODULE_ACTION_DENY = {
-  delivery: {
-    // Delivery Partner self-service: view + create, and cancel-own-pending via delete.
-    // `download` is denied because no expenses.download check exists in the app - receipts
-    // are viewed with a plain link - so the column would be a meaningless checkbox.
-    expenses: ['approve', 'export', 'edit', 'download'],
-    leaves: ['approve', 'export', 'edit', 'download'],
-    attendance: ['approve', 'export', 'edit', 'delete', 'download'],
-  },
+// Modules normally owned by each workspace - shown under "Recommended for <Workspace>".
+// Everything else the catalog returns (incl. modules unknown to the frontend) goes under
+// "Other Available Modules" - visible, never auto-enabled, never hidden.
+const RECOMMENDED_MODULES = {
+  sales: [
+    'dashboard', 'customers', 'leads', 'quotations', 'suppliers', 'products', 'inventory',
+    'sales_orders', 'sales_returns', 'visits', 'follow_ups', 'attendance', 'leaves',
+  ],
+  delivery: [
+    'dashboard', 'products', 'customers', 'deliveries', 'vehicle_stock', 'attendance', 'leaves', 'expenses',
+  ],
+  accounts: [
+    'dashboard', 'products', 'inventory', 'purchases', 'invoices', 'payments', 'payment_receipts',
+    'expenses', 'gst', 'reports', 'leaves',
+  ],
 }
 
-function actionAllowed(workspace, moduleKey, actionKey) {
-  const denied = WORKSPACE_MODULE_ACTION_DENY[workspace]?.[moduleKey]
-  return !denied || !denied.includes(actionKey)
-}
-
-// The permission key stays canonical (`vehicle_stock`) but under Delivery it gates the whole
-// vehicle-operations family (Vehicle Stock + Vehicle Loading + End of Day Return), so the
-// matrix row is relabelled there to make the grant's real scope obvious.
-const workspaceModuleLabels = {
-  delivery: {
-    vehicle_stock: 'Vehicle Stock / Loading / Returns',
-  },
-}
-function moduleLabelFor(moduleKey, fallbackLabel, workspace) {
-  return workspaceModuleLabels[workspace]?.[moduleKey] || moduleLabelOverrides[moduleKey] || fallbackLabel
-}
-
-const DATA_SCOPES = [
-  { value: 'own', label: 'Own Records', description: 'Only records assigned to this user.' },
-  { value: 'team', label: 'Team Records', description: 'Records assigned to this user and their team.' },
-  { value: 'all', label: 'All Workspace Records', description: 'All records available inside the selected workspace.' },
-]
-
-// The "products" module also gates the Categories screen, so the matrix row is relabeled
-// to make that scope clear without needing a separate backend module.
 const moduleLabelOverrides = {
   products: 'Product & Categories',
 }
-
-function moduleInWorkspace(moduleKey, workspace) {
-  const list = WORKSPACE_MODULES[workspace]
-  if (!list) return true // legacy / admin workspace -> show everything
-  return list.includes(moduleKey) || !MAPPED_MODULE_KEYS.has(moduleKey)
+function moduleLabelFor(moduleKey, fallbackLabel) {
+  return moduleLabelOverrides[moduleKey] || fallbackLabel
 }
+
+// Record Access -> backend data_scope. The current MVP exposes only own / all; the backend
+// still understands "team" (see §10) but it is not offered for new/edited roles here.
+const RECORD_ACCESS_OPTIONS = [
+  { value: 'own', label: 'Own Records' },
+  { value: 'all', label: 'All Records' },
+]
+// A role already saved with data_scope="team" keeps that value (read-only) until an Admin
+// explicitly picks Own or All - never silently rewritten just by opening the role.
+const LEGACY_TEAM_OPTION = { value: 'team', label: 'Team Records (Legacy)' }
+
+// Sensible starting point per workspace for NEW roles only (Admin can change it before saving).
+const WORKSPACE_DEFAULT_SCOPE = { sales: 'own', delivery: 'own', accounts: 'all' }
 
 function buildMatrix(permissions, moduleKeys, actionKeys) {
   return moduleKeys.reduce((matrix, moduleKey) => {
@@ -96,13 +72,18 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
   const [nameError, setNameError] = useState('')
   const [workspace, setWorkspace] = useState(role?.workspace || 'sales')
   const [description, setDescription] = useState(role?.description || '')
-  const [dataScope, setDataScope] = useState(role?.data_scope || 'own')
+  // New role: default from the workspace. Existing role: always its real backend value.
+  const [dataScope, setDataScope] = useState(
+    role?.data_scope || WORKSPACE_DEFAULT_SCOPE[role?.workspace || 'sales'] || 'own',
+  )
+  const [dataScopeTouched, setDataScopeTouched] = useState(false)
+  const isLegacyTeamScope = role?.data_scope === 'team' && dataScope === 'team'
+  const recordAccessOptions = isLegacyTeamScope ? [...RECORD_ACCESS_OPTIONS, LEGACY_TEAM_OPTION] : RECORD_ACCESS_OPTIONS
   const [catalogModules, setCatalogModules] = useState([])
   const [catalogActions, setCatalogActions] = useState([])
   const [isCatalogLoading, setIsCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState('')
   const [matrix, setMatrix] = useState({})
-  const [pendingWorkspace, setPendingWorkspace] = useState(null)
 
   useEffect(() => {
     let isMounted = true
@@ -114,7 +95,6 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
       const result = await getRolesCatalog()
 
       if (!isMounted) return
-
       setIsCatalogLoading(false)
 
       if (!result.success) {
@@ -131,41 +111,37 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
     }
 
     loadCatalog()
-
     return () => {
       isMounted = false
     }
   }, [role])
 
-  // A legacy role can carry a workspace value that isn't one of the three selectable families
-  // (e.g. `admin`). Keep it as a read-only chip so editing it doesn't silently reset it.
   const isLegacyWorkspace = workspace && !WORKSPACES.some((entry) => entry.value === workspace)
+  const workspaceLabel = WORKSPACES.find((entry) => entry.value === workspace)?.label || workspace
 
-  const visibleModules = useMemo(
-    () => catalogModules.filter((module) => moduleInWorkspace(module.key, workspace)),
-    [catalogModules, workspace],
-  )
+  // Every catalog module is grantable - split into recommended vs other by workspace.
+  const { recommendedModules, otherModules } = useMemo(() => {
+    const recommendedKeys = RECOMMENDED_MODULES[workspace] || []
+    const recommended = []
+    const other = []
+    catalogModules.forEach((module) => {
+      ;(recommendedKeys.includes(module.key) ? recommended : other).push(module)
+    })
+    // Keep the recommended list in the curated order, others in catalog order.
+    recommended.sort((a, b) => recommendedKeys.indexOf(a.key) - recommendedKeys.indexOf(b.key))
+    return { recommendedModules: recommended, otherModules: other }
+  }, [catalogModules, workspace])
 
-  const allowedActionsFor = (moduleKey) => catalogActions.filter((action) => actionAllowed(workspace, moduleKey, action.key))
+  const isRowFullyChecked = (moduleKey) =>
+    catalogActions.length > 0 && catalogActions.every((action) => matrix[moduleKey]?.[action.key])
 
-  const isRowFullyChecked = (moduleKey) => {
-    const allowed = allowedActionsFor(moduleKey)
-    return allowed.length > 0 && allowed.every((action) => matrix[moduleKey]?.[action.key])
-  }
-
-  const isColumnFullyChecked = (actionKey) => {
-    const applicable = visibleModules.filter((module) => actionAllowed(workspace, module.key, actionKey))
-    return applicable.length > 0 && applicable.every((module) => matrix[module.key]?.[actionKey])
-  }
+  const isColumnFullyChecked = (actionKey) =>
+    catalogModules.length > 0 && catalogModules.every((module) => matrix[module.key]?.[actionKey])
 
   const toggleAction = (moduleKey, actionKey) => {
-    if (!actionAllowed(workspace, moduleKey, actionKey)) return
     setMatrix((current) => ({
       ...current,
-      [moduleKey]: {
-        ...current[moduleKey],
-        [actionKey]: !current[moduleKey]?.[actionKey],
-      },
+      [moduleKey]: { ...current[moduleKey], [actionKey]: !current[moduleKey]?.[actionKey] },
     }))
   }
 
@@ -174,7 +150,7 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
     setMatrix((current) => ({
       ...current,
       [moduleKey]: catalogActions.reduce((actionsMap, action) => {
-        actionsMap[action.key] = actionAllowed(workspace, moduleKey, action.key) ? nextValue : false
+        actionsMap[action.key] = nextValue
         return actionsMap
       }, {}),
     }))
@@ -184,42 +160,17 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
     const nextValue = !isColumnFullyChecked(actionKey)
     setMatrix((current) => {
       const next = { ...current }
-      visibleModules.forEach((module) => {
-        if (!actionAllowed(workspace, module.key, actionKey)) return
+      catalogModules.forEach((module) => {
         next[module.key] = { ...next[module.key], [actionKey]: nextValue }
       })
       return next
     })
   }
 
-  const hasPermissionsOutside = (nextWorkspace) =>
-    catalogModules.some(
-      (module) =>
-        !moduleInWorkspace(module.key, nextWorkspace) &&
-        catalogActions.some((action) => matrix[module.key]?.[action.key]),
-    )
-
-  const requestWorkspaceChange = (nextWorkspace) => {
-    if (nextWorkspace === workspace) return
-    if (hasPermissionsOutside(nextWorkspace)) {
-      setPendingWorkspace(nextWorkspace)
-      return
-    }
-    setWorkspace(nextWorkspace)
-  }
-
-  const confirmWorkspaceChange = () => {
-    const nextWorkspace = pendingWorkspace
-    setMatrix((current) => {
-      const next = { ...current }
-      catalogModules.forEach((module) => {
-        if (!moduleInWorkspace(module.key, nextWorkspace)) next[module.key] = {}
-      })
-      return next
-    })
-    setWorkspace(nextWorkspace)
-    setPendingWorkspace(null)
-  }
+  const enabledModuleCount = useMemo(
+    () => catalogModules.filter((module) => catalogActions.some((action) => matrix[module.key]?.[action.key])).length,
+    [catalogModules, catalogActions, matrix],
+  )
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -230,37 +181,60 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
       return
     }
 
-    // Persist permissions for modules shown in the selected workspace.
-    const permissions = visibleModules.reduce((result, module) => {
+    // Persist every module that has at least one action checked - regardless of workspace.
+    const permissions = catalogModules.reduce((result, module) => {
       const moduleActions = matrix[module.key] || {}
-      const hasAnyAction = catalogActions.some(
-        (action) => actionAllowed(workspace, module.key, action.key) && moduleActions[action.key],
-      )
-
-      if (hasAnyAction) {
+      if (catalogActions.some((action) => moduleActions[action.key])) {
         result[module.key] = catalogActions.reduce((actionsMap, action) => {
-          actionsMap[action.key] =
-            actionAllowed(workspace, module.key, action.key) && Boolean(moduleActions[action.key])
+          actionsMap[action.key] = Boolean(moduleActions[action.key])
           return actionsMap
         }, {})
       }
-
       return result
     }, {})
 
-    // A plain edit that did NOT change the workspace keeps any pre-existing permissions for
-    // modules that fall outside the current workspace's visible list (nothing silently lost).
-    // A workspace CHANGE routes through the confirm dialog, which clears those first.
-    if (isEditing && workspace === (role.workspace || 'sales')) {
-      Object.entries(role.permissions || {}).forEach(([moduleKey, moduleValue]) => {
-        if (!permissions[moduleKey] && !moduleInWorkspace(moduleKey, workspace)) {
-          permissions[moduleKey] = moduleValue
-        }
-      })
-    }
-
     onSave({ name: name.trim(), workspace, description: description.trim(), dataScope, permissions })
   }
+
+  const renderModuleRow = (module) => {
+    const moduleLabel = moduleLabelFor(module.key, module.label)
+    return (
+      <tr key={module.key} className="border-b border-neutral-50 last:border-b-0">
+        <td className="sticky left-0 z-10 bg-white px-4 py-3 font-medium text-neutral-900">{moduleLabel}</td>
+        <td className="px-3 py-3 text-center">
+          <input
+            type="checkbox"
+            checked={isRowFullyChecked(module.key)}
+            onChange={() => toggleRow(module.key)}
+            aria-label={`Toggle all actions for ${moduleLabel}`}
+            className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+          />
+        </td>
+        {catalogActions.map((action) => (
+          <td key={action.key} className="px-3 py-3 text-center">
+            <input
+              type="checkbox"
+              checked={Boolean(matrix[module.key]?.[action.key])}
+              onChange={() => toggleAction(module.key, action.key)}
+              aria-label={`${action.label} - ${moduleLabel}`}
+              className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+            />
+          </td>
+        ))}
+      </tr>
+    )
+  }
+
+  const groupHeaderRow = (label) => (
+    <tr className="bg-neutral-50/80">
+      <td
+        colSpan={catalogActions.length + 2}
+        className="sticky left-0 px-4 py-2 text-[0.66rem] font-semibold uppercase tracking-widest text-neutral-400"
+      >
+        {label}
+      </td>
+    </tr>
+  )
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -274,14 +248,11 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
         className="max-w-md"
       />
 
-      {/* Workspace - the most important choice: it decides the module family. */}
       <div>
         <p className="text-sm font-semibold text-neutral-900">
           Workspace <span className="text-red-500">*</span>
         </p>
-        <p className="mt-0.5 text-xs text-neutral-500">
-          Determines which module family this role belongs to. Admin / Business Owner is the organization owner and is set up separately.
-        </p>
+        <p className="mt-0.5 text-xs text-neutral-500">Choose the main workspace for this role.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           {WORKSPACES.map((entry) => {
             const Icon = entry.icon
@@ -290,11 +261,13 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
               <button
                 key={entry.value}
                 type="button"
-                onClick={() => requestWorkspaceChange(entry.value)}
+                onClick={() => {
+                  setWorkspace(entry.value)
+                  // New role, untouched: follow the workspace's sensible default.
+                  if (!isEditing && !dataScopeTouched) setDataScope(WORKSPACE_DEFAULT_SCOPE[entry.value] || 'own')
+                }}
                 className={`flex flex-col gap-2 rounded-xl border p-3.5 text-left transition-colors ${
-                  isSelected
-                    ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500'
-                    : 'border-neutral-200 bg-white hover:border-primary-300'
+                  isSelected ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500' : 'border-neutral-200 bg-white hover:border-primary-300'
                 }`}
               >
                 <span className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
@@ -309,40 +282,26 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
         {isLegacyWorkspace && (
           <p className="mt-2 inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-700">
             <Building2 className="size-3.5 shrink-0" aria-hidden="true" />
-            This role uses the “{workspace}” workspace, managed at organization level. Pick a family above only if you want to move it.
+            This role uses the &ldquo;{workspace}&rdquo; workspace, managed at organization level. Pick a family above only if you want to move it.
           </p>
         )}
       </div>
 
-      {/* Data Scope */}
-      <div>
-        <p className="text-sm font-semibold text-neutral-900">Data Scope</p>
-        <p className="mt-0.5 text-xs text-neutral-500">How much of the workspace a user with this role can see.</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          {DATA_SCOPES.map((scope) => {
-            const isSelected = dataScope === scope.value
-            return (
-              <label
-                key={scope.value}
-                className={`flex cursor-pointer flex-col gap-1 rounded-xl border p-3 transition-colors ${
-                  isSelected ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500' : 'border-neutral-200 bg-white hover:border-primary-300'
-                }`}
-              >
-                <span className="flex items-center gap-2 text-sm font-medium text-neutral-900">
-                  <input
-                    type="radio"
-                    name="dataScope"
-                    checked={isSelected}
-                    onChange={() => setDataScope(scope.value)}
-                    className="size-4 text-primary-600 focus:ring-primary-500"
-                  />
-                  {scope.label}
-                </span>
-                <span className="pl-6 text-xs leading-snug text-neutral-500">{scope.description}</span>
-              </label>
-            )
-          })}
-        </div>
+      <div className="max-w-md">
+        <Select
+          label="Record Access"
+          options={recordAccessOptions}
+          value={dataScope}
+          onChange={(event) => {
+            setDataScope(event.target.value)
+            setDataScopeTouched(true)
+          }}
+        />
+        <p className="mt-1 text-xs text-neutral-500">
+          {isLegacyTeamScope
+            ? 'Team-based access is not used in the current MVP. Choose Own or All Records to update it.'
+            : 'Choose how much data this role can access.'}
+        </p>
       </div>
 
       <Input
@@ -353,11 +312,16 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
         className="max-w-md"
       />
 
-      {/* Permissions */}
       <div>
-        <p className="text-sm font-semibold text-neutral-900">Permissions</p>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-sm font-semibold text-neutral-900">Permissions</p>
+          {!isCatalogLoading && !catalogError && (
+            <p className="text-xs text-neutral-400">{enabledModuleCount} of {catalogModules.length} modules enabled</p>
+          )}
+        </div>
         <p className="mt-0.5 text-xs text-neutral-500">
-          Only modules that belong to the <span className="font-medium text-neutral-700">{WORKSPACES.find((entry) => entry.value === workspace)?.label || workspace}</span> workspace are shown.
+          Modules commonly used by the <span className="font-medium text-neutral-700">{workspaceLabel}</span> workspace are listed first; every other
+          catalog module stays available under &ldquo;Other Available Modules&rdquo;.
         </p>
 
         {isCatalogLoading ? (
@@ -366,9 +330,9 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
           </div>
         ) : catalogError ? (
           <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{catalogError}</div>
-        ) : visibleModules.length === 0 ? (
+        ) : catalogModules.length === 0 ? (
           <p className="mt-3 rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-400">
-            No permission modules for this workspace.
+            The permission catalog is empty.
           </p>
         ) : (
           <div className="mt-3 max-h-104 overflow-auto rounded-2xl border border-neutral-100">
@@ -393,40 +357,10 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
                 </tr>
               </thead>
               <tbody>
-                {visibleModules.map((module) => {
-                  const moduleLabel = moduleLabelFor(module.key, module.label, workspace)
-                  return (
-                    <tr key={module.key} className="border-b border-neutral-50 last:border-b-0">
-                      <td className="sticky left-0 z-10 bg-white px-4 py-3 font-medium text-neutral-900">{moduleLabel}</td>
-                      <td className="px-3 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isRowFullyChecked(module.key)}
-                          onChange={() => toggleRow(module.key)}
-                          aria-label={`Toggle all actions for ${moduleLabel}`}
-                          className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-                        />
-                      </td>
-                      {catalogActions.map((action) => (
-                        <td key={action.key} className="px-3 py-3 text-center">
-                          {actionAllowed(workspace, module.key, action.key) ? (
-                            <input
-                              type="checkbox"
-                              checked={Boolean(matrix[module.key]?.[action.key])}
-                              onChange={() => toggleAction(module.key, action.key)}
-                              aria-label={`${action.label} - ${moduleLabel}`}
-                              className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-                            />
-                          ) : (
-                            <span className="text-neutral-300" title={`${action.label} does not apply to ${moduleLabel} in this workspace`} aria-hidden="true">
-                              —
-                            </span>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  )
-                })}
+                {recommendedModules.length > 0 && groupHeaderRow(`Recommended for ${workspaceLabel}`)}
+                {recommendedModules.map(renderModuleRow)}
+                {otherModules.length > 0 && groupHeaderRow('Other Available Modules')}
+                {otherModules.map(renderModuleRow)}
               </tbody>
             </table>
           </div>
@@ -441,26 +375,6 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
           {isEditing ? 'Save Changes' : 'Create Role'}
         </Button>
       </div>
-
-      <Modal
-        isOpen={Boolean(pendingWorkspace)}
-        onClose={() => setPendingWorkspace(null)}
-        title="Change workspace?"
-        footer={
-          <>
-            <Button type="button" variant="secondary" onClick={() => setPendingWorkspace(null)}>Keep current</Button>
-            <Button type="button" variant="danger" onClick={confirmWorkspaceChange}>Change &amp; reset</Button>
-          </>
-        }
-      >
-        <p className="text-sm leading-6 text-neutral-600">
-          Changing the workspace to{' '}
-          <span className="font-medium text-neutral-900">
-            {WORKSPACES.find((entry) => entry.value === pendingWorkspace)?.label || pendingWorkspace}
-          </span>{' '}
-          will reset permissions that do not belong to the new workspace.
-        </p>
-      </Modal>
     </form>
   )
 }

@@ -6,36 +6,32 @@ import { CheckCircle2, Clock, FileText, PackageCheck, PackageSearch, ShoppingCar
 // The two things the UI must keep SEPARATE:
 //   Order status   - business state: Draft / Confirmed / Completed / Cancelled
 //   Delivery status - operational step: Not Planned / Assigned / Loaded / ...
-// Backend `order.status` is already collapsed to placed|confirmed|completed|
-// cancelled (+ rejected). "placed" == the unconfirmed state == shown as "Draft".
+// `order.status` is normalized to exactly draft|confirmed|completed|cancelled at the API
+// boundary (api/orders.js normalizeOrder) - every helper below assumes only those values.
 // =============================================================================
 
 export const ORDER_STATUS_LABEL = {
-  placed: 'Draft',
   draft: 'Draft',
   confirmed: 'Confirmed',
   completed: 'Completed',
   cancelled: 'Cancelled',
-  rejected: 'Rejected',
 }
 
 export const ORDER_STATUS_VARIANT = {
-  placed: 'neutral',
   draft: 'neutral',
   confirmed: 'primary',
   completed: 'success',
   cancelled: 'danger',
-  rejected: 'danger',
 }
 
 export function formatOrderStatus(status) {
   return ORDER_STATUS_LABEL[status] || String(status || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-// List/filter tabs - Draft maps to the backend `placed` value.
+// List/filter tabs - canonical statuses only (GET /orders accepts `draft`).
 export const ORDER_TABS = [
   { value: 'all', label: 'All', apiStatus: null },
-  { value: 'draft', label: 'Draft', apiStatus: 'placed' },
+  { value: 'draft', label: 'Draft', apiStatus: 'draft' },
   { value: 'confirmed', label: 'Confirmed', apiStatus: 'confirmed' },
   { value: 'completed', label: 'Completed', apiStatus: 'completed' },
   { value: 'cancelled', label: 'Cancelled', apiStatus: 'cancelled' },
@@ -129,11 +125,12 @@ export function isOrderEffectivelyConfirmed(order) {
   return false
 }
 
-// True only when the frontend Draft badge and the backend order state disagree - the order
-// reads `placed`/`draft` yet fulfilment has already advanced. The UI surfaces this instead
-// of hiding it (Confirm is withheld, a warning banner is shown).
+// Defensive: a genuine backend inconsistency - the order reads `draft` yet downstream
+// fulfilment / pickup progress already exists (which only happens after confirm). This is NOT
+// legacy-`placed` handling; it just refuses to drive the normal Draft flow (Confirm is
+// withheld, a warning banner is shown) rather than hide a real inconsistency.
 export function hasOrderStateMismatch(order) {
-  return ['placed', 'draft'].includes(order?.status) && isOrderEffectivelyConfirmed(order)
+  return order?.status === 'draft' && isOrderEffectivelyConfirmed(order)
 }
 
 // Method-aware business progress stepper shown on Order Detail. First step is
@@ -169,7 +166,9 @@ export function getOrderProgress(order) {
 
   const loaded = ['loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(fs)
   const inTransit = ['in_transit', 'partially_delivered', 'delivered'].includes(fs)
-  const delivered = ['delivered', 'partially_delivered'].includes(fs)
+  // "Delivered" is DONE only on a full delivery. `partially_delivered` keeps the final step
+  // visibly incomplete (it's shown as "current", not "done").
+  const delivered = fs === 'delivered'
   const assigned = Boolean(order.assignedDeliveryPartnerId) || ['planned', ...RESERVED_STATES.slice(1)].includes(fs)
   const pickingDone = loaded || dps === 'picked'
   const pickingCurrent = assigned && !pickingDone && (dps ? dps === 'picking' : true)
@@ -204,14 +203,13 @@ export function getOrderActions(order, { invoices = [] } = {}) {
   const loadedOrBeyond = ['loaded', 'in_transit', 'delivered', 'partially_delivered'].includes(fs)
 
   // Draft: the finalized flow is Draft -> Confirm -> Confirmed (no approve/reject step).
-  // BUT only offer Confirm when the backend state is actually confirmable - if fulfilment has
-  // already advanced while status still reads `placed`, confirming would be rejected, so we
-  // withhold it (OrderDetail shows a state-mismatch banner instead).
-  if (status === 'placed' || status === 'draft') {
+  // Confirm is withheld only in the defensive case where fulfilment has somehow already
+  // advanced on a Draft record (OrderDetail shows a state-mismatch banner instead).
+  if (status === 'draft') {
     return isOrderEffectivelyConfirmed(order) ? ['edit', 'cancel'] : ['edit', 'confirm', 'cancel']
   }
 
-  if (status === 'cancelled' || status === 'rejected') return ['duplicate']
+  if (status === 'cancelled') return ['duplicate']
 
   // Confirmed but stock never reserved (e.g. shortage at confirm time). There is no
   // "reserve stock" endpoint - the only sensible action left is to cancel.
@@ -227,8 +225,8 @@ export function getOrderActions(order, { invoices = [] } = {}) {
     if (order.pickupStatus === 'picking') acts.push('pickupReady')
     else if (order.pickupStatus === 'ready') acts.push('confirmPickup')
     // Stock is reserved (checked above) but pickup prep has not begun - offer the first
-    // step so a confirmed takeaway is never a dead end. Uses POST /orders/{id}/pickup/pick.
-    else if (order.pickupStatus === 'not_started' || !order.pickupStatus) acts.push('pickupPick')
+    // step so a confirmed takeaway is never a dead end. Uses POST /orders/{id}/pickup/start.
+    else if (order.pickupStatus === 'not_started' || !order.pickupStatus) acts.push('pickupStart')
     acts.push(invoiceAction)
     if (order.pickupStatus !== 'collected') acts.push('cancel')
     return acts
@@ -320,12 +318,12 @@ export function buildOrderTimeline(order, { invoices = [] } = {}) {
   if (order.status === 'completed') {
     events.push({ id: 'completed', icon: Sparkles, iconClass: 'bg-green-50 text-green-600', title: 'Order completed', subtitle: 'Fulfilment and billing done', timestamp: stamp })
   }
-  if (order.status === 'cancelled' || order.status === 'rejected') {
+  if (order.status === 'cancelled') {
     events.push({
       id: 'cancelled',
       icon: XCircle,
       iconClass: 'bg-red-50 text-red-600',
-      title: order.status === 'rejected' ? 'Order rejected' : 'Order cancelled',
+      title: 'Order cancelled',
       subtitle: order.rejectReason || 'No reason recorded',
       timestamp: stamp,
     })

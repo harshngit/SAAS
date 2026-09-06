@@ -173,7 +173,7 @@ function historyRecord({ id, day, statusValue, rows }) {
     vehicleNumber: 'MH-12-AB-4521',
     vehicleType: 'Tempo',
     deliveryPartnerName: 'Ravi Kumar',
-    warehouseName: 'Main Warehouse',
+    warehouseName: 'Central Mumbai Warehouse',
     status: statusValue,
     submittedAt: daysAgo(day),
     submittedBy: 'Ravi Kumar',

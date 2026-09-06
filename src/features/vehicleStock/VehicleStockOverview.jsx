@@ -8,22 +8,33 @@ import Modal from '../../components/ui/Modal'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { ROLES } from '../../auth/roles'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { getCurrentVehicleStock, listVehicleStockSessions } from '../../api/vehicleStock'
 import { useAuthStore } from '../../store/authStore'
-import { demoDeliveriesResolved, demoVehicleSessionResolved } from '../orders/orderDemoData'
+import { demoVehicleSessionResolved } from '../orders/orderDemoData'
 import { formatDateTime } from '../../utils/format'
+
+// Explicit dev switch only (VITE_DEMO_DATA=true). Demo is NEVER inferred from a 404 /
+// empty session / empty list.
+const DEMO_VEHICLE_STOCK_ENABLED = DEMO_MODE && !DEMO_EMPTY
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const looksLikeUuid = (value) => UUID_RE.test(String(value || ''))
 const friendly = (value) => (value && !looksLikeUuid(value) ? value : '')
 
+// Current available on the vehicle. Backend-authoritative (normalizeSessionItem):
+// loaded + extra - delivered - returned.
 const availableOf = (item) => Number(item.remainingQuantity) || 0
-const loadedOf = (item) => (Number(item.loadedQuantity) || 0) + (Number(item.extraQuantity) || 0)
+const loadedOf = (item) => Number(item.loadedQuantity) || 0
+const extraOf = (item) => Number(item.extraQuantity) || 0
+// Total units placed on the vehicle (opening load + any extra load).
+const onVehicleOf = (item) => loadedOf(item) + extraOf(item)
 
+// Route stock, not warehouse replenishment stock - just "has units" vs "none".
 function stockStatus(item) {
   return availableOf(item) > 0
     ? { label: 'Available', variant: 'success' }
-    : { label: 'Out of Stock', variant: 'danger' }
+    : { label: 'Zero', variant: 'neutral' }
 }
 
 function skuVariantLabel(item) {
@@ -34,7 +45,7 @@ function SummaryTiles({ items }) {
   const totals = useMemo(() => {
     return items.reduce(
       (acc, item) => ({
-        loaded: acc.loaded + loadedOf(item),
+        loaded: acc.loaded + onVehicleOf(item),
         delivered: acc.delivered + (Number(item.deliveredQuantity) || 0),
         available: acc.available + availableOf(item),
       }),
@@ -118,6 +129,7 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
                   <th className="px-4 py-3">SKU / Variant</th>
                   <th className="px-4 py-3">UOM</th>
                   <th className="px-4 py-3 text-right">Loaded</th>
+                  <th className="px-4 py-3 text-right">Extra</th>
                   <th className="px-4 py-3 text-right">Delivered</th>
                   <th className="px-4 py-3 text-right">Returned</th>
                   <th className="px-4 py-3 text-right">Available</th>
@@ -136,6 +148,9 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
                       <td className="px-4 py-3 text-neutral-500">{item.uom || '—'}</td>
                       <td className="px-4 py-3 text-right text-neutral-600">
                         <QtyCell value={loadedOf(item)} />
+                      </td>
+                      <td className="px-4 py-3 text-right text-neutral-600">
+                        <QtyCell value={extraOf(item)} />
                       </td>
                       <td className="px-4 py-3 text-right text-neutral-600">
                         <QtyCell value={item.deliveredQuantity} />
@@ -178,16 +193,17 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
                     </div>
                     <Badge variant={status.variant}>{status.label}</Badge>
                   </div>
-                  <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+                  <div className="mt-3 grid grid-cols-5 gap-1.5 text-center">
                     {[
                       ['Loaded', loadedOf(item)],
+                      ['Extra', extraOf(item)],
                       ['Delivered', Number(item.deliveredQuantity) || 0],
                       ['Returned', Number(item.returnedQuantity) || 0],
                       ['Available', availableOf(item)],
-                    ].map(([label, value], i) => (
+                    ].map(([label, value]) => (
                       <div key={label}>
-                        <p className={`text-sm font-semibold ${i === 3 ? 'text-primary-700' : 'text-neutral-900'}`}>{value}</p>
-                        <p className="text-[0.65rem] uppercase tracking-wide text-neutral-400">{label}</p>
+                        <p className={`text-sm font-semibold ${label === 'Available' ? 'text-primary-700' : 'text-neutral-900'}`}>{value}</p>
+                        <p className="text-[0.6rem] uppercase tracking-wide text-neutral-400">{label}</p>
                       </div>
                     ))}
                   </div>
@@ -207,7 +223,7 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
         </Card>
       )}
 
-      {totalRemaining > 0 && (
+      {onEndDayReturn && totalRemaining > 0 && (
         <div className="flex justify-end">
           <Button type="button" variant="outline" onClick={onEndDayReturn}>
             <Boxes className="size-4" aria-hidden="true" />
@@ -243,15 +259,16 @@ function ItemDetailModal({ item, onClose }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {[
               ['Loaded Qty', loadedOf(item)],
+              ['Extra Qty', extraOf(item)],
               ['Delivered Qty', Number(item.deliveredQuantity) || 0],
               ['Returned Qty', Number(item.returnedQuantity) || 0],
               ['Available Qty', availableOf(item)],
-            ].map(([label, value], i) => (
+            ].map(([label, value]) => (
               <div key={label} className="rounded-xl bg-neutral-50 p-3 text-center">
-                <p className={`text-lg font-semibold ${i === 3 ? 'text-primary-700' : 'text-neutral-900'}`}>{value}</p>
+                <p className={`text-lg font-semibold ${label === 'Available Qty' ? 'text-primary-700' : 'text-neutral-900'}`}>{value}</p>
                 <p className="mt-0.5 text-[0.7rem] text-neutral-500">{label}</p>
               </div>
             ))}
@@ -281,13 +298,22 @@ export default function VehicleStockOverview() {
     setIsLoading(true)
     setError('')
 
+    // Explicit demo mode: local fixtures only, no real API call.
+    if (DEMO_VEHICLE_STOCK_ENABLED) {
+      setSessions([demoVehicleSessionResolved()])
+      setIsLoading(false)
+      return
+    }
+
     if (isAdmin) {
-      const result = await listVehicleStockSessions()
+      // Only ACTIVE sessions belong on "stock currently on vehicles". Closed sessions are
+      // history and live in End of Day Return / Previous Returns.
+      const result = await listVehicleStockSessions({ status: 'active' })
       if (!result.success) {
         setError(result.error)
         setSessions([])
       } else {
-        setSessions(result.sessions)
+        setSessions((result.sessions || []).filter((s) => String(s.status || 'active').toLowerCase() === 'active'))
       }
       setIsLoading(false)
       return
@@ -298,13 +324,10 @@ export default function VehicleStockOverview() {
       if (!result.success) {
         setError(result.error)
         setSessions([])
-      } else if (result.session) {
-        setSessions([result.session])
       } else {
-        // No real active session - fall back to the shared demo session so the delivery
-        // flow stays explorable. Demo ids never reach a mutation endpoint.
-        const demoSession = demoDeliveriesResolved().length > 0 ? demoVehicleSessionResolved() : null
-        setSessions(demoSession ? [demoSession] : [])
+        // Real mode: a null session (404 / no active load) is a truthful empty state -
+        // never a demo fallback.
+        setSessions(result.session ? [result.session] : [])
       }
     }
 
@@ -343,7 +366,7 @@ export default function VehicleStockOverview() {
         <Card>
           <EmptyState
             icon={PackageSearch}
-            title={isAdmin ? 'No vehicle stock sessions' : 'No active vehicle load'}
+            title={isAdmin ? 'No vehicle stock sessions' : 'No active vehicle stock session.'}
             description={
               isAdmin
                 ? 'Vehicle stock will appear here once a delivery partner confirms a vehicle load.'
@@ -363,7 +386,10 @@ export default function VehicleStockOverview() {
               key={session.id}
               session={session}
               onViewDetails={setSelectedItem}
-              onEndDayReturn={() => navigate('/delivery/end-of-day')}
+              // The EOD page runs against the signed-in user's own session, so it is a
+              // delivery-partner action only. Admin gets no button until a proper
+              // admin-selected-session EOD workflow exists (BACKEND/UI LATER).
+              onEndDayReturn={isAdmin ? null : () => navigate('/delivery/end-of-day')}
             />
           ))}
         </div>

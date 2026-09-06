@@ -63,16 +63,36 @@ function extractShortages(errorData) {
   return null
 }
 
-// Finalized Order Status vocabulary. The backend still returns `placed` for the
-// unconfirmed state - the UI maps it to "Draft" (see orderHelpers.formatOrderStatus).
-// Legacy internal values (awaiting_approval / processing) are intentionally gone from
-// the user-facing options; they are never produced by the finalized Draft -> Confirm flow.
+// Canonical public Order Status vocabulary. POST /orders always creates `draft`;
+// POST /orders/{id}/confirm moves it to `confirmed`; the only other public states are
+// `completed` and `cancelled`. Any legacy internal value the backend may still emit for old
+// records (placed / processing / awaiting_approval / rejected) is collapsed to a canonical
+// value inside normalizeOrder() - every UI component only ever sees these four.
 export const ORDER_STATUS_OPTIONS = [
-  { value: 'placed', label: 'Draft' },
+  { value: 'draft', label: 'Draft' },
   { value: 'confirmed', label: 'Confirmed' },
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
 ]
+
+// Legacy -> canonical public status. `placed` is the OLD unconfirmed name and is NOT Draft
+// under the current contract - a `placed` record has already been confirmed, so it maps to
+// `confirmed`. Applied only at this API boundary (normalizeOrder).
+const LEGACY_ORDER_STATUS_MAP = {
+  draft: 'draft',
+  placed: 'confirmed',
+  processing: 'confirmed',
+  awaiting_approval: 'confirmed',
+  confirmed: 'confirmed',
+  completed: 'completed',
+  cancelled: 'cancelled',
+  rejected: 'cancelled',
+}
+
+function canonicalOrderStatus(raw) {
+  const value = String(raw || 'draft').toLowerCase()
+  return LEGACY_ORDER_STATUS_MAP[value] || value
+}
 
 // Operational fulfilment states - NOT order statuses. Kept separate on purpose.
 export const FULFILMENT_STATUS_OPTIONS = [
@@ -183,7 +203,7 @@ function normalizeOrder(order) {
   return {
     id: order.id,
     orderNumber: order.order_number || order.sales_order_number || order.id,
-    status: order.status || order.order_status || 'draft',
+    status: canonicalOrderStatus(order.status || order.order_status),
     fulfilmentStatus: order.fulfilment_status || 'not_started',
     customerId: order.customer_id || order.customer?.id || '',
     customerName: order.customer?.name || order.customer_name || '',
@@ -368,9 +388,9 @@ export async function confirmOrder(orderId) {
 }
 
 // The finalized flow has no pre-confirmation approval/rejection step - a Draft is either
-// Confirmed or Cancelled. `approveOrder` / `rejectOrder` wrappers were removed with the old
-// approval workflow. A `rejected` status may still arrive from legacy records; the UI only
-// maps it for display (orderHelpers), it is never produced from the app.
+// Confirmed (POST /orders/{id}/confirm) or Cancelled (PATCH /orders/{id}/cancel). There are
+// no `approveOrder` / `rejectOrder` wrappers; the app never calls the /approve or /reject
+// endpoints. Any legacy `rejected` status is normalized to `cancelled` at the API boundary.
 
 export async function assignDeliveryPartner(orderId, deliveryPartnerId) {
   try {
@@ -392,9 +412,10 @@ export async function assignDeliveryPartner(orderId, deliveryPartnerId) {
   }
 }
 
-export async function pickupPick(orderId) {
+// Canonical pickup start (was the legacy POST /orders/{id}/pickup/pick).
+export async function pickupStart(orderId) {
   try {
-    const { data } = await apiClient.post(`/orders/${orderId}/pickup/pick`, {}, {
+    const { data } = await apiClient.post(`/orders/${orderId}/pickup/start`, {}, {
       headers: authHeader(),
     })
 

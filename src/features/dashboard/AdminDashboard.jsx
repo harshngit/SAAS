@@ -4,6 +4,9 @@ import { formatCompactCurrency, formatCurrency } from '../../utils/format'
 import { getAdminDashboard } from '../../api/dashboard'
 import { getExpenseCategories } from '../../api/expenses'
 import { listOrders } from '../../api/orders'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
+import { demoOrdersResolved } from '../orders/orderDemoData'
+import { DEMO_EXPENSE_CATEGORIES } from '../expenses/expenseDemo'
 import { ORDER_STATUS_VARIANT, formatOrderStatus } from '../orders/orderHelpers'
 import {
   Ban,
@@ -491,9 +494,13 @@ export default function AdminDashboard() {
     setIsLoading(true)
     setError('')
 
+    // Demo mode: the dashboard shape comes from getAdminDashboard's demo branch; the extra
+    // orders list (Today's Sales card) comes from the demo order store - no real /orders call.
     const [dashboardResult, ordersResult] = await Promise.all([
       getAdminDashboard(resolveDateRange(preset, range)),
-      listOrders(),
+      DEMO_MODE
+        ? Promise.resolve({ success: true, orders: DEMO_EMPTY ? [] : demoOrdersResolved() })
+        : listOrders(),
     ])
 
     setIsLoading(false)
@@ -515,6 +522,10 @@ export default function AdminDashboard() {
 
   // Category names for the Expense Breakdown legend — so it lists rows even at ₹0 spend.
   useEffect(() => {
+    if (DEMO_MODE) {
+      setExpenseCategoryNames(DEMO_EMPTY ? [] : DEMO_EXPENSE_CATEGORIES)
+      return
+    }
     getExpenseCategories().then((result) => {
       if (result.success && Array.isArray(result.categories)) {
         setExpenseCategoryNames(
@@ -699,7 +710,7 @@ export default function AdminDashboard() {
   // todaysOrders list below, not from all-time/period summaries (ordersSummary/recentOrders
   // are separate, period-scoped data used elsewhere on this dashboard, e.g. Order
   // Cancellations and the Recent Orders table).
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localIso(new Date())
   const todaysOrders = orders.filter(
     (order) => (order.orderDate || order.createdAt || '').slice(0, 10) === today && order.status !== 'cancelled',
   )

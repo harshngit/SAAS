@@ -48,6 +48,7 @@ import {
   SlidersHorizontal,
   Undo2,
   Bus,
+  HandCoins,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -86,6 +87,24 @@ export const workspaceHomePath = {
 }
 
 const UNIVERSAL_FALLBACK_PATH = '/profile'
+
+const WORKSPACE_TO_ROLE = {
+  admin: ROLES.ADMIN,
+  sales: ROLES.SALES_OFFICER,
+  delivery: ROLES.DELIVERY_PARTNER,
+  accounts: ROLES.ACCOUNTANT,
+}
+
+// The canonical role key used to pick the sidebar menu + route-tree shell. A session whose
+// role string is already one of the 5 built-in roles keeps it; a CUSTOM role resolves via its
+// `role.workspace` so it still lands in the right shell (permissions then filter within it).
+// Falls back to the raw role string if neither is recognised. Not authorization - just shell
+// selection; every screen is still permission-gated.
+export function resolveWorkspaceRole({ role, currentUser } = {}) {
+  const raw = currentUser?.role
+  if (raw && Object.values(ROLES).includes(raw)) return raw
+  return WORKSPACE_TO_ROLE[role?.workspace] || raw || null
+}
 
 // Resolves where a signed-in user should land: full_access (Admin) always goes to the admin
 // dashboard; otherwise workspace drives it; falls back to the legacy role-string map for
@@ -144,17 +163,25 @@ export const roleMenus = {
         { label: 'Inventory', path: '/admin/inventory', icon: Warehouse, module: 'inventory' },
         { label: 'Warehouses', path: '/admin/warehouses', icon: Building2, module: 'inventory' },
         { label: 'Orders', path: '/admin/orders', icon: ShoppingCart, module: 'sales_orders' },
-        { label: 'Sales Returns', path: '/admin/sales-returns', icon: Undo2, module: 'sales_orders' },
+        { label: 'Sales Returns', path: '/admin/sales-returns', icon: Undo2, module: 'sales_returns' },
         { label: 'Vehicle Stock', path: '/admin/vehicle-stock', icon: Car, module: 'vehicle_stock' },
         { label: 'Vehicles', path: '/admin/vehicles', icon: Bus, module: 'vehicle_stock' },
         { label: 'Purchases', path: '/admin/purchases', icon: PackagePlus, module: 'purchases' },
+        { label: 'Purchase Returns', path: '/admin/purchase-returns', icon: Undo2, module: 'purchases' },
         { label: 'Deliveries', path: '/admin/deliveries', icon: Truck, module: 'deliveries' },
       ],
     },
     {
       section: 'Finance',
       items: [
-        { label: 'Invoices', path: '/admin/invoices', icon: FileText, module: 'invoices' },
+        { label: 'Sales Invoices', path: '/admin/invoices', icon: FileText, module: 'invoices' },
+        { label: 'Receivables', path: '/admin/receivables', icon: IndianRupee, module: 'invoices' },
+        { label: 'Supplier Invoices', path: '/admin/supplier-invoices', icon: Receipt, module: 'invoices' },
+        { label: 'Accounts Payable', path: '/admin/payables', icon: Wallet, module: 'invoices' },
+        { label: 'Supplier Payments', path: '/admin/supplier-payments', icon: Wallet, module: 'invoices' },
+        { label: 'Collection Reconciliation', path: '/admin/collections', icon: HandCoins, module: 'payments' },
+        // Cash Reconciliation (/admin/reconciliation/cash) is FRONTEND-READY / BACKEND LATER
+        // (no persisted session) - route + component kept, sidebar entry hidden for MVP.
         { label: 'Expenses', path: '/admin/expenses', icon: Receipt, module: 'expenses' },
         { label: 'Reports', path: '/admin/reports', icon: FileSpreadsheet, module: 'reports' },
       ],
@@ -190,6 +217,7 @@ export const roleMenus = {
         { label: 'Quotations', path: '/sales/quotations', icon: FileText, module: 'quotations' },
         { label: 'Orders', path: '/sales/orders', icon: ShoppingCart, module: 'sales_orders' },
         { label: 'Create Order', path: '/sales/orders/create', icon: ShoppingCart, module: 'sales_orders', action: 'create' },
+        { label: 'Sales Returns', path: '/sales/sales-returns', icon: Undo2, module: 'sales_returns' },
         { label: 'Stock', path: '/sales/stock', icon: Boxes, module: 'inventory' },
         { label: 'Visits', path: '/sales/visits', icon: MapPin, module: 'visits' },
         { label: 'Follow-ups', path: '/sales/followups', icon: ClipboardList, module: 'follow_ups' },
@@ -229,13 +257,16 @@ export const roleMenus = {
       section: 'Main menu',
       items: [
         { label: 'Dashboard', path: '/accounts/dashboard', icon: LayoutDashboard, module: 'dashboard' },
-        { label: 'Purchase Invoices', path: '/accounts/invoices/purchases', icon: PackagePlus, module: 'invoices' },
+        { label: 'Supplier Invoices', path: '/accounts/supplier-invoices', icon: PackagePlus, module: 'invoices' },
+        { label: 'Accounts Payable', path: '/accounts/payables', icon: Wallet, module: 'invoices' },
+        { label: 'Supplier Payments', path: '/accounts/supplier-payments', icon: Wallet, module: 'invoices' },
         { label: 'Sales Invoices', path: '/accounts/invoices/sales', icon: ShoppingCart, module: 'invoices' },
-        { label: 'Record Payment', path: '/accounts/payments/record', icon: Wallet, module: 'payments' },
+        { label: 'Receivables', path: '/accounts/receivables', icon: TrendingUp, module: 'invoices' },
+        { label: 'Collection Reconciliation', path: '/accounts/collections', icon: HandCoins, module: 'payments' },
         { label: 'Expense Approval', path: '/accounts/expenses/approval', icon: Receipt, module: 'expenses', action: 'approve' },
         { label: 'Leaves', path: '/accounts/leaves', icon: CalendarClock, module: 'leaves' },
-        { label: 'Cash Reconciliation', path: '/accounts/reconciliation/cash', icon: IndianRupee, module: 'payments' },
-        { label: 'Receivables/Payables', path: '/accounts/outstanding', icon: TrendingUp, module: 'reports' },
+        // Cash Reconciliation (/accounts/reconciliation/cash) is FRONTEND-READY / BACKEND LATER
+        // (no persisted session) - route + component kept, sidebar entry hidden for MVP.
         { label: 'GST Summary', path: '/accounts/gst', icon: FileCheck, module: 'gst' },
         { label: 'Financial Reports', path: '/accounts/reports', icon: FileSpreadsheet, module: 'reports' },
       ],

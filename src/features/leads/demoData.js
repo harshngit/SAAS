@@ -2,15 +2,18 @@
 // FRONTEND DEMO / MOCK RECORDS - UI TESTING ONLY
 // -----------------------------------------------------------------------------
 // These fixtures make every Follow-up and Visit "next action" state visible on
-// screen without hand-creating each scenario. They are appended to the page
-// state AFTER the real API data loads and are NEVER sent to any backend
-// endpoint (no create/update/delete calls carry a `demo-` id).
+// screen without hand-creating each scenario. They are NEVER sent to any backend
+// endpoint (no create/update/delete carries a `demo-` id).
 //
-// TODO: remove demo records (or set DEMO_RECORDS_ENABLED = false) when the
-// backend provides seeded test data.
+// Gated on the canonical explicit demo switch (VITE_DEMO_DATA=true) - in real
+// mode these fixtures are NOT rendered and are never mixed into real API data.
+//
+// TODO: remove demo records when the backend provides seeded test data.
 // =============================================================================
 
-export const DEMO_RECORDS_ENABLED = true
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
+
+export const DEMO_RECORDS_ENABLED = DEMO_MODE && !DEMO_EMPTY
 
 export function isDemoRecord(id) {
   return typeof id === 'string' && id.startsWith('demo-')

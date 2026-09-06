@@ -11,7 +11,7 @@ import { deleteRole, getRolesCatalog, listRoles } from '../../api/roles'
 import { RequirePermission } from '../../auth/RequirePermission'
 
 const WORKSPACE_LABELS = { sales: 'Sales', delivery: 'Delivery', accounts: 'Finance', admin: 'Admin' }
-const DATA_SCOPE_LABELS = { own: 'Own Records', team: 'Team Records', all: 'All Workspace Records' }
+const DATA_SCOPE_LABELS = { own: 'Own Records', team: 'Team Records (Legacy)', all: 'All Records' }
 
 function getModuleSummary(role, catalogModuleCount, catalogActionKeys) {
   const permissions = role.permissions || {}
@@ -19,17 +19,19 @@ function getModuleSummary(role, catalogModuleCount, catalogActionKeys) {
   const moduleCount = moduleKeys.length
 
   if (moduleCount === 0) {
-    return 'No access configured'
+    return 'No permissions enabled'
   }
 
-  const isFullAccess =
+  // "Every catalog module, every action" - within this role's own matrix. NOT organization-admin
+  // access (that is `full_access` on the Admin/Business Owner role only).
+  const isEveryPermission =
     catalogModuleCount > 0 &&
     moduleCount === catalogModuleCount &&
     moduleKeys.every((moduleKey) =>
       catalogActionKeys.every((actionKey) => Boolean(permissions[moduleKey]?.[actionKey])),
     )
 
-  return `${moduleCount} module${moduleCount === 1 ? '' : 's'} • ${isFullAccess ? 'Full access' : 'Limited'}`
+  return `${moduleCount} module${moduleCount === 1 ? '' : 's'} enabled${isEveryPermission ? ' • all permissions' : ''}`
 }
 
 export default function RolesList() {

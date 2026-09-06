@@ -6,7 +6,7 @@ import Badge from '../../components/ui/Badge'
 import DataTable from '../../components/ui/DataTable'
 import Button from '../../components/ui/Button'
 import { acceptDelivery, listDeliveries } from '../../api/deliveries'
-import { demoDeliveriesResolved, getDemoDelivery, isDemoDelivery, patchDemoDelivery } from '../orders/orderDemoData'
+import { DEMO_ORDERS_ENABLED, demoDeliveriesResolved, getDemoDelivery, isDemoDelivery, patchDemoDelivery } from '../orders/orderDemoData'
 import { getDeliveryStage } from './deliveryStage'
 import RejectDeliveryModal from './RejectDeliveryModal'
 import { useAuthStore } from '../../store/authStore'
@@ -19,6 +19,7 @@ const STATUS_FILTERS = [
   { value: 'assigned', label: 'Assigned' },
   { value: 'accepted', label: 'Accepted' },
   { value: 'picking', label: 'Picking' },
+  { value: 'ready', label: 'Ready' },
   { value: 'loaded', label: 'Vehicle Loaded' },
   { value: 'in_transit', label: 'In Transit' },
   { value: 'delivered', label: 'Delivered' },
@@ -44,7 +45,8 @@ export default function AssignedDeliveries() {
     setError('')
 
     const result = await listDeliveries({ delivery_partner_id: currentUser.id })
-    const demoRows = demoDeliveriesResolved()
+    // Demo rows only in explicit demo mode - never mixed into (or used to mask errors on) real data.
+    const demoRows = DEMO_ORDERS_ENABLED ? demoDeliveriesResolved() : []
 
     if (!result.success) {
       setDeliveries(demoRows)
@@ -74,7 +76,7 @@ export default function AssignedDeliveries() {
     setAcceptingId(delivery.id)
 
     if (isDemoDelivery(delivery.id)) {
-      patchDemoDelivery(delivery.id, { status: 'accepted', pickingStatus: 'not_started' })
+      patchDemoDelivery(delivery.id, { status: 'accepted', internalStatus: 'accepted', pickingStatus: 'not_started' })
       setAcceptingId('')
       setDeliveries((current) => current.map((item) => (item.id === delivery.id ? getDemoDelivery(delivery.id) : item)))
       showToast({ title: 'Delivery accepted', message: `${delivery.deliveryNumber || delivery.orderNumber} — start picking next.` })

@@ -8,20 +8,47 @@ import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import { createExpense, deleteExpense, getExpenseCategories, listExpenses, uploadExpenseReceipt } from '../../api/expenses'
+import {
+  createExpense,
+  deleteExpense,
+  getExpenseCategories,
+  listExpenses,
+  updateExpense,
+  uploadExpenseReceipt,
+} from '../../api/expenses'
 import { getFileUrl } from '../../api/files'
+import { usePermission } from '../../auth/usePermission'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
-import { DEMO_MODE } from '../../config/demoMode'
-import { DEMO_EXPENSE_CATEGORIES, demoExpensesResolved, simulateDemoCancelExpense, simulateDemoCreateExpense } from './expenseDemo'
+import {
+  DEMO_EXPENSES_ENABLED,
+  DEMO_EXPENSE_CATEGORIES,
+  demoExpensesResolved,
+  simulateDemoCancelExpense,
+  simulateDemoCreateExpense,
+  simulateDemoUpdateExpense,
+} from './expenseDemo'
 
 const PAYMENT_MODES = ['Cash', 'UPI', 'Card', 'Bank Transfer']
-const STATUS_VARIANT = { Approved: 'success', Pending: 'warning', Rejected: 'danger' }
+const STATUS_VARIANT = {
+  Approved: 'success',
+  Pending: 'warning',
+  Rejected: 'danger',
+  Reimbursed: 'primary',
+  'Clarification Required': 'info',
+}
+// An approved claim that has been paid reads as "Reimbursed" to the employee.
+const claimStatus = (expense) =>
+  expense.approvalStatus === 'Approved' && expense.paymentStatus === 'Paid' ? 'Reimbursed' : expense.approvalStatus
+const needsClarification = (expense) =>
+  expense.statusKey === 'clarification_requested' || expense.approvalStatus === 'Clarification Required'
 const FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'Pending', label: 'Pending' },
+  { key: 'Clarification Required', label: 'Clarification Required' },
   { key: 'Approved', label: 'Approved' },
+  { key: 'Reimbursed', label: 'Reimbursed' },
   { key: 'Rejected', label: 'Rejected' },
 ]
 
@@ -42,16 +69,30 @@ function receiptHrefOf(expense) {
   return expense.isDemo ? expense.receiptUrl : getFileUrl(expense.receiptUrl)
 }
 
-function DetailModal({ expense, onClose }) {
+function DetailModal({ expense, onClose, onUpdate, canEdit }) {
+  const showUpdate = expense && needsClarification(expense) && canEdit
   return (
-    <Modal isOpen={Boolean(expense)} onClose={onClose} title="Expense claim" size="lg">
+    <Modal
+      isOpen={Boolean(expense)}
+      onClose={onClose}
+      title="Expense claim"
+      size="lg"
+      footer={
+        showUpdate ? (
+          <>
+            <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
+            <Button type="button" onClick={() => onUpdate(expense)}>Update Expense</Button>
+          </>
+        ) : undefined
+      }
+    >
       {expense && (
         <div className="space-y-4 text-sm">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Category" value={expense.category || '—'} />
             <Field
               label="Status"
-              value={<Badge variant={STATUS_VARIANT[expense.approvalStatus] || 'neutral'} dot>{expense.approvalStatus}</Badge>}
+              value={<Badge variant={STATUS_VARIANT[claimStatus(expense)] || 'neutral'} dot>{claimStatus(expense)}</Badge>}
             />
             <Field label="Amount" value={formatCurrency(expense.amount)} />
             <Field label="Payment Mode" value={expense.paymentMode || '—'} />
@@ -86,6 +127,11 @@ function DetailModal({ expense, onClose }) {
           {expense.approvalStatus === 'Approved' && (
             <Field label="Reimbursement" value={expense.paymentStatus === 'Paid' ? 'Paid' : 'Pending'} />
           )}
+          {needsClarification(expense) && expense.clarificationNote && (
+            <div className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
+              <span className="font-semibold">Clarification requested:</span> {expense.clarificationNote}
+            </div>
+          )}
           {expense.approvalStatus === 'Rejected' && expense.clarificationNote && (
             <div className="rounded-xl bg-red-50 px-4 py-3 text-xs text-red-700">
               <span className="font-semibold">Rejection reason:</span> {expense.clarificationNote}
@@ -109,11 +155,12 @@ function Field({ label, value }) {
 export default function MyExpenses() {
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
+  const { can } = usePermission()
+  const canCreate = can('expenses', 'create')
+  const canEdit = can('expenses', 'edit')
+  const canDelete = can('expenses', 'delete')
 
-  // Demo data shows when the explicit flag is on OR when a real user has no expense claims
-  // yet (same fallback as Attendance / Leaves) - so the flow is always visible for review.
-  // Real records always win when they exist; a load failure shows the error, not demo.
-  const [demo, setDemo] = useState(DEMO_MODE)
+  const demo = DEMO_EXPENSES_ENABLED
   const [expenses, setExpenses] = useState([])
   const [categories, setCategories] = useState([])
   const [categoryNotice, setCategoryNotice] = useState('') // real mode: categories unavailable / error
@@ -123,6 +170,7 @@ export default function MyExpenses() {
   const [search, setSearch] = useState('')
 
   const [showForm, setShowForm] = useState(false)
+  const [editTarget, setEditTarget] = useState(null)
   const [formData, setFormData] = useState(emptyForm)
   const [receiptFile, setReceiptFile] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -136,9 +184,8 @@ export default function MyExpenses() {
     setIsLoading(true)
     setListError('')
 
-    // Explicit demo mode (VITE_DEMO_DATA): local fixtures only, no API call.
-    if (DEMO_MODE) {
-      setDemo(true)
+    // Explicit demo mode (VITE_DEMO_DATA=true): local fixtures only, no API call.
+    if (DEMO_EXPENSES_ENABLED) {
       setExpenses(demoExpensesResolved())
       setIsLoading(false)
       return
@@ -149,22 +196,15 @@ export default function MyExpenses() {
       return
     }
 
+    // Real mode: the API is the only source. An empty list is a truthful empty state; a
+    // failure shows the real error - neither falls back to demo data.
     const result = await listExpenses({ submitted_by: currentUser.id })
     if (!result.success) {
-      setDemo(false)
       setExpenses([])
       setListError(result.error)
       setIsLoading(false)
       return
     }
-    if (result.expenses.length === 0) {
-      // No real claims yet - show the demo world so the flow stays reviewable.
-      setDemo(true)
-      setExpenses(demoExpensesResolved())
-      setIsLoading(false)
-      return
-    }
-    setDemo(false)
     setExpenses(result.expenses)
     setIsLoading(false)
   }, [currentUser?.id])
@@ -210,7 +250,7 @@ export default function MyExpenses() {
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
     return expenses.filter((e) => {
-      if (filter !== 'all' && e.approvalStatus !== filter) return false
+      if (filter !== 'all' && claimStatus(e) !== filter) return false
       if (!q) return true
       return `${e.category} ${e.description}`.toLowerCase().includes(q)
     })
@@ -230,7 +270,24 @@ export default function MyExpenses() {
   }, [expenses, formData])
 
   const openForm = () => {
+    setEditTarget(null)
     setFormData(emptyForm())
+    setReceiptFile(null)
+    setFormError('')
+    setShowForm(true)
+  }
+
+  // Correct a clarification-requested claim - backend PATCH /expenses/{id} accepts this and
+  // flips the status back to pending.
+  const openEditForm = (expense) => {
+    setEditTarget(expense)
+    setFormData({
+      category: expense.category || '',
+      description: expense.description || '',
+      amount: expense.amount ? String(Math.round(Number(expense.amount))) : '',
+      expenseDate: (expense.expenseDate || todayIso()).slice(0, 10),
+      paymentMode: expense.paymentMode || '',
+    })
     setReceiptFile(null)
     setFormError('')
     setShowForm(true)
@@ -249,17 +306,54 @@ export default function MyExpenses() {
     setFormError('')
 
     if (demo) {
-      simulateDemoCreateExpense({ ...formData, amount, hasReceipt: Boolean(receiptFile) })
+      if (editTarget) {
+        simulateDemoUpdateExpense(editTarget.id, {
+          category: formData.category,
+          description: formData.description,
+          amount,
+          expenseDate: formData.expenseDate,
+          paymentMode: formData.paymentMode,
+        })
+        showToast({ title: 'Expense updated (demo)', message: 'The claim is back with the reviewer as Pending.' })
+      } else {
+        simulateDemoCreateExpense({ ...formData, amount, hasReceipt: Boolean(receiptFile) })
+        showToast({ title: 'Expense submitted (demo)', message: 'Your claim is now pending approval.' })
+      }
       setExpenses(demoExpensesResolved())
       setIsSubmitting(false)
       setShowForm(false)
-      showToast({ title: 'Expense submitted (demo)', message: 'Your claim is now pending approval.' })
+      setEditTarget(null)
       return
     }
 
     if (categories.length === 0) {
       setFormError('Expense categories are not available yet — cannot submit.')
       setIsSubmitting(false)
+      return
+    }
+
+    // Update an existing claim during clarification (backend flips it to pending on success).
+    if (editTarget) {
+      const updateResult = await updateExpense(editTarget.id, {
+        category: formData.category,
+        description: formData.description,
+        amount,
+        expenseDate: formData.expenseDate,
+        paymentMode: formData.paymentMode,
+      })
+      if (!updateResult.success) {
+        setFormError(updateResult.error)
+        setIsSubmitting(false)
+        return
+      }
+      if (receiptFile) {
+        await uploadExpenseReceipt(editTarget.id, receiptFile)
+      }
+      setIsSubmitting(false)
+      setShowForm(false)
+      setEditTarget(null)
+      showToast({ title: 'Expense updated', message: 'The claim has been resubmitted for review.' })
+      load()
       return
     }
 
@@ -335,10 +429,12 @@ export default function MyExpenses() {
           </div>
           <p className="mt-1 text-sm text-neutral-500">Track and submit your work-related expenses.</p>
         </div>
-        <Button onClick={openForm}>
-          <Plus className="size-4" aria-hidden="true" />
-          Add Expense
-        </Button>
+        {canCreate && (
+          <Button onClick={openForm}>
+            <Plus className="size-4" aria-hidden="true" />
+            Add Expense
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -424,7 +520,7 @@ export default function MyExpenses() {
                           {e.receiptUrl ? 'Uploaded' : 'No receipt'}
                         </span>
                       </td>
-                      <td className="px-4 py-3"><Badge variant={STATUS_VARIANT[e.approvalStatus] || 'neutral'} dot>{e.approvalStatus}</Badge></td>
+                      <td className="px-4 py-3"><Badge variant={STATUS_VARIANT[claimStatus(e)] || 'neutral'} dot>{claimStatus(e)}</Badge></td>
                       <td className="px-4 py-3 text-neutral-500">{e.createdAt ? formatDate(e.createdAt) : '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
@@ -432,7 +528,10 @@ export default function MyExpenses() {
                             <Eye className="size-4" aria-hidden="true" />
                             Details
                           </Button>
-                          {e.approvalStatus === 'Pending' && (
+                          {needsClarification(e) && canEdit && (
+                            <Button type="button" variant="outline" size="sm" onClick={() => openEditForm(e)}>Update</Button>
+                          )}
+                          {e.approvalStatus === 'Pending' && canDelete && (
                             <Button type="button" variant="ghost" size="sm" onClick={() => setCancelTarget(e)}>Cancel</Button>
                           )}
                         </div>
@@ -453,14 +552,17 @@ export default function MyExpenses() {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-neutral-900">{formatCurrency(e.amount)}</p>
-                      <Badge variant={STATUS_VARIANT[e.approvalStatus] || 'neutral'} dot>{e.approvalStatus}</Badge>
+                      <Badge variant={STATUS_VARIANT[claimStatus(e)] || 'neutral'} dot>{claimStatus(e)}</Badge>
                     </div>
                   </div>
                   {e.description && <p className="mt-2 text-xs text-neutral-500">{e.description}</p>}
                   <p className="mt-1 text-[0.7rem] text-neutral-400">{e.receiptUrl ? 'Receipt uploaded' : 'No receipt'}</p>
                   <div className="mt-3 flex gap-2">
                     <Button type="button" variant="outline" size="sm" onClick={() => setDetailExpense(e)}>Details</Button>
-                    {e.approvalStatus === 'Pending' && (
+                    {needsClarification(e) && canEdit && (
+                      <Button type="button" variant="outline" size="sm" onClick={() => openEditForm(e)}>Update</Button>
+                    )}
+                    {e.approvalStatus === 'Pending' && canDelete && (
                       <Button type="button" variant="ghost" size="sm" onClick={() => setCancelTarget(e)}>Cancel</Button>
                     )}
                   </div>
@@ -471,9 +573,25 @@ export default function MyExpenses() {
         )}
       </Card>
 
-      {/* Add Expense */}
-      <Modal isOpen={showForm} onClose={() => !isSubmitting && setShowForm(false)} title="Add Expense">
+      {/* Add / Update Expense */}
+      <Modal
+        isOpen={showForm}
+        onClose={() => {
+          if (isSubmitting) return
+          setShowForm(false)
+          setEditTarget(null)
+        }}
+        title={editTarget ? 'Update Expense' : 'Add Expense'}
+      >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {editTarget && (
+            <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+              {editTarget.clarificationNote
+                ? `Clarification requested: ${editTarget.clarificationNote}`
+                : 'Correct the details below.'}{' '}
+              Saving resubmits the claim for review.
+            </div>
+          )}
           {formError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
           {!demo && categoryNotice && (
             <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">{categoryNotice}</div>
@@ -534,13 +652,23 @@ export default function MyExpenses() {
             </p>
           )}
           <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setShowForm(false)} disabled={isSubmitting}>Cancel</Button>
-            <Button type="submit" loading={isSubmitting} disabled={!demo && categories.length === 0}>Submit Claim</Button>
+            <Button type="button" variant="secondary" onClick={() => { setShowForm(false); setEditTarget(null) }} disabled={isSubmitting}>Cancel</Button>
+            <Button type="submit" loading={isSubmitting} disabled={!demo && categories.length === 0}>
+              {editTarget ? 'Resubmit for Review' : 'Submit Claim'}
+            </Button>
           </div>
         </form>
       </Modal>
 
-      <DetailModal expense={detailExpense} onClose={() => setDetailExpense(null)} />
+      <DetailModal
+        expense={detailExpense}
+        onClose={() => setDetailExpense(null)}
+        canEdit={canEdit}
+        onUpdate={(expense) => {
+          setDetailExpense(null)
+          openEditForm(expense)
+        }}
+      />
 
       <Modal isOpen={Boolean(cancelTarget)} onClose={() => setCancelTarget(null)} title="Cancel expense claim" size="md">
         <div className="space-y-5">

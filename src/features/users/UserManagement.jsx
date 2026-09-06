@@ -1162,7 +1162,7 @@ export default function UserManagement() {
               {activeStaffSection === '6' && (
               <StaffSection number="6" title="Payroll Information" description="Salary bank and payment details.">
                 <StaffField description="Base salary amount." format="Decimal" required={false}>
-                  <Input label="Basic Salary" name="basicSalary" type="number" step="0.01" value={formData.basicSalary} onChange={handleFormChange} />
+                  <Input label="Basic Salary" name="basicSalary" type="number" step="1" value={formData.basicSalary} onChange={handleFormChange} />
                 </StaffField>
                 <StaffField description="Salary bank." format="Text" required={false}>
                   <Input label="Bank Name" name="bankName" value={formData.bankName} onChange={handleFormChange} />

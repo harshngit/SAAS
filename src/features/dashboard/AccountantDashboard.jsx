@@ -9,10 +9,12 @@ import DataTable from '../../components/ui/DataTable'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import CategoryPieChart from '../../components/charts/CategoryPieChart'
 import { useAuthStore } from '../../store/authStore'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { getReport } from '../../api/reports'
 import { listInvoices } from '../../api/invoices'
 import { listPaymentReceipts } from '../../api/paymentReceipts'
-import { formatCurrency } from '../../utils/format'
+import { demoInvoicesResolved, demoReceiptsResult } from '../invoices/invoiceDemoData'
+import { formatCurrency, toLocalDateString } from '../../utils/format'
 
 const paymentVariant = {
   Paid: 'success',
@@ -20,13 +22,18 @@ const paymentVariant = {
   Unpaid: 'danger',
 }
 
+// Report summary values can arrive as formatted strings (demo layer) or numbers (backend).
+const toAmount = (value) =>
+  typeof value === 'number' ? value : Number(String(value ?? '').replace(/[^0-9.-]/g, '')) || 0
+
+// Local calendar dates for report date_from/date_to - toISOString() would shift a day in IST.
 function todayIso() {
-  return new Date().toISOString().slice(0, 10)
+  return toLocalDateString()
 }
 
 function firstOfMonthIso() {
   const now = new Date()
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+  return toLocalDateString(new Date(now.getFullYear(), now.getMonth(), 1))
 }
 
 export default function AccountantDashboard() {
@@ -59,8 +66,13 @@ export default function AccountantDashboard() {
       getReport('supplier-outstanding'),
       getReport('expense', { date_from: firstOfMonthIso(), date_to: todayIso() }),
       getReport('gst-summary'),
-      listInvoices(),
-      listPaymentReceipts(),
+      // Demo mode: never calls GET /invoices or GET /payment-receipts.
+      DEMO_MODE
+        ? Promise.resolve({ success: true, invoices: DEMO_EMPTY ? [] : demoInvoicesResolved() })
+        : listInvoices(),
+      DEMO_MODE
+        ? Promise.resolve(DEMO_EMPTY ? { success: true, receipts: [] } : demoReceiptsResult())
+        : listPaymentReceipts(),
     ])
 
     setIsLoading(false)
@@ -115,9 +127,9 @@ export default function AccountantDashboard() {
     const gstReport = gstResult.report || {}
     const gstFlat = gstReport.summary || gstReport
 
-    setOutstandingReceivables(receivablesTotal || 0)
-    setOutstandingPayables(payablesTotal || 0)
-    setExpensesThisMonth(expenseSummary.total_expense ?? 0)
+    setOutstandingReceivables(toAmount(receivablesTotal))
+    setOutstandingPayables(toAmount(payablesTotal))
+    setExpensesThisMonth(toAmount(expenseSummary.total_expense))
     setGstSummary({
       outputGst: gstFlat.output_gst ?? 0,
       inputGst: gstFlat.input_gst ?? 0,

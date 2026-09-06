@@ -18,7 +18,7 @@ import {
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
 import { formatDate, formatDateTime } from '../../utils/format'
-import { demoDeliveriesResolved } from '../orders/orderDemoData'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import {
   buildDemoEodDraft,
   demoEodHistoryResolved,
@@ -27,6 +27,10 @@ import {
   rollupTotals,
   simulateDemoEodSubmit,
 } from './eodReturnDemo'
+
+// Explicit dev switch only (VITE_DEMO_DATA=true). Demo is NEVER inferred from a 404 /
+// empty session / empty deliveries.
+const DEMO_VEHICLE_STOCK_ENABLED = DEMO_MODE && !DEMO_EMPTY
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const friendly = (value) => (value && !UUID_RE.test(String(value)) ? value : '')
@@ -488,22 +492,33 @@ export default function EndOfDayReturn() {
 
   const mapRealReconciliation = useCallback(
     (recon, ctx) => {
-      const recLines = (recon.items || []).map((it) => ({
-        productId: it.productId || it.id,
-        productName: friendly(it.productName) || '—',
-        sku: '',
-        variantId: it.variantId || '',
-        uom: '',
-        loadedQuantity: (it.loadedQuantity || 0) + (it.extraQuantity || 0),
-        deliveredQuantity: it.deliveredQuantity || 0,
-        expectedRemaining: it.expectedClosingQty || 0,
-        physicalCount: it.physicalQuantity || 0,
-        damaged: 0,
-        reason: it.notes || '',
-        goodReturn: it.returnedQuantity || 0,
-        shortage: Math.max(-(it.varianceQuantity || 0), 0),
-        excess: Math.max(it.varianceQuantity || 0, 0),
-      }))
+      const recLines = (recon.items || []).map((it) => {
+        // Backend reconciliation rows are POST-return snapshots:
+        //   expected_closing_qty = loaded + extra - delivered - returned
+        //   physical_qty         = count left on the vehicle AFTER good stock was returned
+        //   returned_qty         = good stock handed back to the warehouse
+        // The Previous Returns table mirrors the pre-handover EOD count (same as the form and
+        // the immediate success summary), so reconstruct the before-return figures.
+        const returnedQ = it.returnedQuantity || 0
+        const expectedBeforeReturn = (it.expectedClosingQty || 0) + returnedQ
+        const physicalBeforeReturn = (it.physicalQuantity || 0) + returnedQ
+        return {
+          productId: it.productId || it.id,
+          productName: friendly(it.productName) || '—',
+          sku: '',
+          variantId: it.variantId || '',
+          uom: '',
+          loadedQuantity: (it.loadedQuantity || 0) + (it.extraQuantity || 0),
+          deliveredQuantity: it.deliveredQuantity || 0,
+          expectedRemaining: expectedBeforeReturn,
+          physicalCount: physicalBeforeReturn,
+          damaged: 0,
+          reason: it.notes || '',
+          goodReturn: returnedQ,
+          shortage: Math.max(-(it.varianceQuantity || 0), 0),
+          excess: Math.max(it.varianceQuantity || 0, 0),
+        }
+      })
       return {
         id: recon.id,
         sessionId: recon.loadingId,
@@ -522,6 +537,33 @@ export default function EndOfDayReturn() {
     [],
   )
 
+  // Build the post-submit success/read-only summary from what the partner just submitted plus
+  // the /reconcile response id + timestamp. Deterministic - it does NOT rely on the reconcile
+  // response carrying full line detail, nor on GET /vehicle-stock/current (which now 404s).
+  const buildSubmittedRecord = (recon, sess, submittedLines) => {
+    const finalLines = submittedLines.map((l) => ({
+      ...l,
+      goodReturn: goodReturnOf(l),
+      shortage: Math.max((l.expectedRemaining || 0) - (l.physicalCount || 0), 0),
+      excess: Math.max((l.physicalCount || 0) - (l.expectedRemaining || 0), 0),
+    }))
+    const now = new Date().toISOString()
+    return {
+      id: recon?.id || `eod-${Date.now().toString(36)}`,
+      sessionId: sess?.id || recon?.loadingId || '',
+      date: recon?.createdAt || now,
+      vehicleNumber: sess?.vehicleNumber || '',
+      vehicleType: sess?.vehicleType || '',
+      deliveryPartnerName: sess?.deliveryPartnerName || currentUser?.name || '',
+      warehouseName: sess?.warehouseName || '',
+      status: recon?.status || 'submitted',
+      submittedAt: recon?.createdAt || now,
+      submittedBy: currentUser?.name || sess?.deliveryPartnerName || '',
+      totals: rollupTotals(finalLines),
+      lines: finalLines,
+    }
+  }
+
   // Previous Returns from real APIs, without a new endpoint: list the partner's vehicle-stock
   // sessions, then pull each session's reconciliation record. If the sessions list isn't
   // available we can only reach the CURRENT session's reconciliations - that is NOT full
@@ -531,6 +573,12 @@ export default function EndOfDayReturn() {
       const sessionsResult = await listVehicleStockSessions({ delivery_partner_id: currentUser.id })
 
       if (!sessionsResult.success || !Array.isArray(sessionsResult.sessions) || sessionsResult.sessions.length === 0) {
+        // No sessions list. Fall back to the current session's reconciliations if we have one;
+        // otherwise there is simply nothing to show. "limited" only when the list call failed
+        // (a genuine gap) - not when it authoritatively returned zero sessions.
+        if (!currentSession?.id) {
+          return { records: [], limited: !sessionsResult.success }
+        }
         const recon = await listVehicleStockReconciliations(currentSession.id)
         const records = recon.success ? recon.reconciliations.map((r) => mapRealReconciliation(r, currentSession)) : []
         return { records, limited: true }
@@ -564,20 +612,9 @@ export default function EndOfDayReturn() {
     setPartialFailure(false)
     setSubmitError('')
 
-    const result = await getCurrentVehicleStock(currentUser.id)
-    if (!result.success) {
-      setLoadError(result.error)
-      setIsLoading(false)
-      return
-    }
-
-    // No real active session - fall back to the shared demo session when demo deliveries exist.
-    if (!result.session) {
-      if (demoDeliveriesResolved().length === 0) {
-        setSession(null)
-        setIsLoading(false)
-        return
-      }
+    // Explicit demo mode only (VITE_DEMO_DATA=true) - never inferred from a 404 / empty
+    // session / empty deliveries. No real API is called in this mode.
+    if (DEMO_VEHICLE_STOCK_ENABLED) {
       const { session: demoSession, lines: demoLines } = buildDemoEodDraft()
       setDemo(true)
       setSession(demoSession)
@@ -585,6 +622,26 @@ export default function EndOfDayReturn() {
       setLines(demoLines)
       setHistory(demoEodHistoryResolved())
       setHistoryLimited(false)
+      setIsLoading(false)
+      return
+    }
+
+    const result = await getCurrentVehicleStock(currentUser.id)
+    if (!result.success) {
+      setLoadError(result.error)
+      setIsLoading(false)
+      return
+    }
+
+    // Real mode: a null session (404 / no active load) is a truthful empty state, never demo.
+    // A closed/absent session does NOT mean there is no history - load Previous Returns anyway.
+    if (!result.session) {
+      setSession(null)
+      setDemo(false)
+      setSubmittedRecord(null)
+      const { records, limited } = await loadRealHistory(null)
+      setHistory(records)
+      setHistoryLimited(limited)
       setIsLoading(false)
       return
     }
@@ -636,6 +693,10 @@ export default function EndOfDayReturn() {
   )
   const totals = useMemo(() => rollupTotals(normalisedLines), [normalisedLines])
   const expectedTotal = totals.expected
+  // §17: the backend can close the loading session once the EOD return is done. Any status
+  // other than "active" makes this screen read-only - no second return, no reconcile post.
+  // The backend remains authoritative; this only stops an obviously-invalid resubmit.
+  const sessionClosed = Boolean(session) && !demo && String(session.status || 'active').toLowerCase() !== 'active'
 
   const lineErrors = useMemo(() => {
     const errs = {}
@@ -696,13 +757,21 @@ export default function EndOfDayReturn() {
       })
       .join(' | ')
 
+    // /reconcile runs AFTER /end-of-day has already moved the good stock back to the
+    // warehouse. So the physical count to send is what is LEFT ON THE VEHICLE after that
+    // return - the pre-return count the partner entered minus what was handed back. The
+    // backend's expected_closing_qty is also post-return, so variance stays correct.
+    //   exact:    physical 4, returned 4 -> 0 ; expected 0 -> variance 0
+    //   shortage: physical 3, returned 3 -> 0 ; expected 1 -> variance -1
+    //   excess:   physical 5, returned 4 -> 1 ; expected 0 -> variance +1
+    //   damaged:  physical 4, returned 2 -> 2 ; expected 2 -> variance 0 (damage stays in notes)
     const reconResult = await reconcileVehicleStock(session.id, {
       notes: notes || undefined,
       items: normalisedLines.map((l) => ({
         loadingItemId: l.lineId,
         productId: l.productId,
         variantId: l.variantId,
-        physicalQty: l.physicalCount,
+        physicalQty: Math.max(l.physicalCount - goodReturnOf(l), 0),
       })),
     })
     if (!reconResult.success) {
@@ -713,12 +782,22 @@ export default function EndOfDayReturn() {
       return
     }
 
+    // The session is now closed server-side, so GET /vehicle-stock/current will 404. Build the
+    // success/read-only summary NOW from what we just submitted + the reconcile response, and
+    // keep the closed session as a local context snapshot - do NOT re-fetch active stock to
+    // recover it. A later manual reload correctly shows the empty state + Previous Returns.
+    const record = buildSubmittedRecord(reconResult.reconciliation, session, normalisedLines)
+    setSubmittedRecord(record)
+    setHistory((current) =>
+      [record, ...current.filter((r) => r.id !== record.id)].sort(
+        (a, b) => new Date(b.date || 0) - new Date(a.date || 0),
+      ),
+    )
     setReturnPosted(false)
     setPartialFailure(false)
     setIsSubmitting(false)
     setShowConfirm(false)
     showToast({ title: 'Return submitted', message: 'End of day vehicle return has been recorded.' })
-    load()
   }
 
   const goToStock = () => navigate('/delivery/vehicle-stock')
@@ -753,7 +832,7 @@ export default function EndOfDayReturn() {
             <Card>
               <EmptyState
                 icon={Truck}
-                title="No active vehicle load found"
+                title="No active vehicle stock session."
                 description="Load your assigned deliveries first — the return workflow opens once a vehicle load is confirmed."
                 action={{ label: 'Go to Vehicle Loading', onClick: () => navigate('/delivery/vehicle-loading') }}
               />
@@ -765,6 +844,16 @@ export default function EndOfDayReturn() {
                 Today&apos;s return has already been submitted. It is read-only now — the back office verifies it next.
               </p>
               <SubmittedSummary record={submittedRecord} onViewStock={goToStock} />
+            </>
+          ) : sessionClosed ? (
+            <>
+              <VehicleContextCard session={session} onViewStock={goToStock} />
+              <p className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+                This vehicle session is closed ({session.status}). The end of day return is complete and cannot be
+                resubmitted.
+              </p>
+              <SummaryTiles totals={totals} />
+              <ReturnLines lines={lines} editable={false} onChange={updateLine} lineErrors={{}} />
             </>
           ) : (
             <>

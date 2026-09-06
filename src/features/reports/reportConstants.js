@@ -15,15 +15,21 @@ export const REPORT_TYPES = [
   { value: 'profit-loss', label: 'Profit & Loss' },
 ]
 
+// One standard period set reused across every report + report-style screen (§43).
 export const PERIOD_OPTIONS = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
+  { value: 'daily', label: 'Today' },
+  { value: 'weekly', label: 'This Week' },
+  { value: 'monthly', label: 'This Month' },
+  { value: 'last-month', label: 'Last Month' },
   { value: 'fy', label: 'Financial Year' },
   { value: 'custom', label: 'Custom Range' },
 ]
 
-const toIsoDate = (date) => date.toISOString().slice(0, 10)
+import { toLocalDateString } from '../../utils/format'
+
+// LOCAL calendar date - `date.toISOString().slice(0,10)` would roll back a day at local
+// midnight in IST (+5:30) and similar zones, sending the wrong date_from/date_to.
+const toIsoDate = (date) => toLocalDateString(date)
 
 export function getDateRangeForPeriod(period, customFrom, customTo) {
   const today = new Date()
@@ -42,6 +48,12 @@ export function getDateRangeForPeriod(period, customFrom, customTo) {
   if (period === 'monthly') {
     const from = new Date(today.getFullYear(), today.getMonth(), 1)
     return { dateFrom: toIsoDate(from), dateTo: todayStr }
+  }
+
+  if (period === 'last-month') {
+    const from = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    const to = new Date(today.getFullYear(), today.getMonth(), 0)
+    return { dateFrom: toIsoDate(from), dateTo: toIsoDate(to) }
   }
 
   if (period === 'fy') {

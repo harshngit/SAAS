@@ -206,7 +206,7 @@ function CurrencyField({ label, value, onChange, error, helper }) {
         <input
           type="number"
           min="0"
-          step="0.01"
+          step="1"
           placeholder="0.00"
           value={value}
           onChange={onChange}

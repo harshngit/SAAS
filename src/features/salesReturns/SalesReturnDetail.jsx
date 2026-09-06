@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Ban, Check, IndianRupee, PackageCheck, RotateCcw, Trash2, Undo2 } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -11,6 +11,7 @@ import Select from '../../components/ui/Select'
 import Input from '../../components/ui/Input'
 import StatCard from '../../components/ui/StatCard'
 import { formatCurrency } from '../../utils/format'
+import { usePermission } from '../../auth/usePermission'
 import {
   approveSalesReturn,
   deleteSalesReturn,
@@ -19,15 +20,24 @@ import {
   rejectSalesReturn,
 } from '../../api/salesReturns'
 import { listWarehouses } from '../../api/warehouses'
-
-const basePath = '/admin/sales-returns'
-
-const statusVariant = {
-  requested: 'info',
-  received: 'warning',
-  approved: 'success',
-  rejected: 'danger',
-}
+import {
+  SALES_RETURNS_DEMO_ENABLED,
+  approveDemoSalesReturn,
+  deleteDemoSalesReturn,
+  getDemoSalesReturn,
+  isDemoSalesReturn,
+  receiveDemoSalesReturn,
+  rejectDemoSalesReturn,
+} from './salesReturnDemoData'
+import {
+  buildReturnActivity,
+  itemDamagedQty,
+  itemRestockableQty,
+  srNextActions,
+  srStatusMeta,
+  totalReceivedQty,
+  totalReturnQty,
+} from './salesReturnHelpers'
 
 const conditionOptions = [
   { value: 'saleable', label: 'Saleable' },
@@ -52,11 +62,19 @@ function formatDateTime(value) {
 export default function SalesReturnDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const { can } = usePermission()
+  const basePath = pathname.startsWith('/sales') ? '/sales/sales-returns' : '/admin/sales-returns'
+  // Canonical `sales_returns` module actions (backend authority; `can` already grants
+  // everything to a full-access admin). Reject is the flip side of the review decision, so
+  // it follows the same permission as approve.
+  const canEditReturn = can('sales_returns', 'edit')
+  const canApproveReturn = can('sales_returns', 'approve')
+  const canDeleteReturn = can('sales_returns', 'delete')
 
   const [salesReturn, setSalesReturn] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-
   const [warehouses, setWarehouses] = useState([])
 
   const [receiveOpen, setReceiveOpen] = useState(false)
@@ -86,14 +104,20 @@ export default function SalesReturnDetail() {
     setIsLoading(true)
     setLoadError('')
 
-    const result = await getSalesReturn(id)
+    if (SALES_RETURNS_DEMO_ENABLED && isDemoSalesReturn(id)) {
+      const record = getDemoSalesReturn(id)
+      if (!record) setLoadError('Demo sales return not found.')
+      else setSalesReturn(record)
+      setIsLoading(false)
+      return
+    }
 
+    const result = await getSalesReturn(id)
     if (!result.success) {
       setLoadError(result.error)
       setIsLoading(false)
       return
     }
-
     setSalesReturn(result.salesReturn)
     setIsLoading(false)
   }
@@ -124,56 +148,63 @@ export default function SalesReturnDetail() {
     )
   }
 
+  const isDemo = isDemoSalesReturn(salesReturn.id)
+  const meta = srStatusMeta(salesReturn.status)
+  // srNextActions gives the lifecycle-valid steps; each is then gated by its own permission.
+  const nextActions = srNextActions(salesReturn.status)
+  const showReceive = nextActions.includes('receive') && canEditReturn
+  const showComplete = nextActions.includes('complete') && canApproveReturn
+  const showReject = nextActions.includes('reject') && canApproveReturn
+  const canDelete = canDeleteReturn && meta.key === 'pending'
+  const activity = buildReturnActivity(salesReturn)
+
   const openReceiveModal = () => {
     setReceiveError('')
     setReceiveNotes('')
     const initial = {}
     salesReturn.items.forEach((item) => {
-      initial[item.id] = {
-        receivedQuantity: item.quantityReturned,
-        condition: 'saleable',
-        restock: true,
-      }
+      initial[item.id] = { receivedQuantity: item.quantityReturned, condition: 'saleable', restock: true }
     })
     setReceiveItems(initial)
     setReceiveOpen(true)
   }
 
   const updateReceiveItem = (itemId, field, value) => {
-    setReceiveItems((current) => ({
-      ...current,
-      [itemId]: { ...current[itemId], [field]: value },
-    }))
+    setReceiveItems((current) => ({ ...current, [itemId]: { ...current[itemId], [field]: value } }))
   }
 
   const handleReceive = async () => {
-    const hasFractionalQuantity = Object.values(receiveItems).some(
-      (values) => !Number.isInteger(Number(values.receivedQuantity)),
-    )
-    if (hasFractionalQuantity) {
-      setReceiveError('Received quantity must be a whole number.')
+    const bad = salesReturn.items.some((item) => {
+      const values = receiveItems[item.id] || {}
+      const received = Number(values.receivedQuantity)
+      return !Number.isInteger(received) || received < 0 || received > item.quantityReturned
+    })
+    if (bad) {
+      setReceiveError('Received quantity must be a whole number from 0 up to the approved return quantity.')
       return
     }
 
     setIsReceiving(true)
     setReceiveError('')
-
-    const result = await receiveSalesReturn(salesReturn.id, {
+    const payload = {
       items: Object.entries(receiveItems).map(([returnItemId, values]) => ({
         returnItemId,
-        receivedQuantity: values.receivedQuantity,
+        receivedQuantity: Number(values.receivedQuantity) || 0,
         condition: values.condition,
         restock: values.restock,
       })),
       notes: receiveNotes.trim() || undefined,
-    })
+    }
+
+    const result = isDemo
+      ? { success: true, salesReturn: receiveDemoSalesReturn(salesReturn.id, payload) }
+      : await receiveSalesReturn(salesReturn.id, payload)
 
     if (!result.success) {
       setReceiveError(result.error)
       setIsReceiving(false)
       return
     }
-
     setSalesReturn(result.salesReturn)
     setIsReceiving(false)
     setReceiveOpen(false)
@@ -187,35 +218,33 @@ export default function SalesReturnDetail() {
     salesReturn.items.forEach((item) => {
       initial[item.id] = {
         condition: item.condition || 'saleable',
-        restock: true,
+        restock: item.condition ? item.restock : true,
       }
     })
     setApproveItems(initial)
     setApproveWarehouseId(salesReturn.warehouseId || '')
     setApproveOpen(true)
 
-    const result = await listWarehouses()
-    if (result.success) {
-      setWarehouses(result.warehouses)
-      if (!salesReturn.warehouseId) {
-        const defaultWarehouse = result.warehouses.find((warehouse) => warehouse.isDefault)
-        setApproveWarehouseId(defaultWarehouse?.id || result.warehouses[0]?.id || '')
+    if (!isDemo) {
+      const result = await listWarehouses()
+      if (result.success) {
+        setWarehouses(result.warehouses)
+        if (!salesReturn.warehouseId) {
+          const def = result.warehouses.find((warehouse) => warehouse.isDefault)
+          setApproveWarehouseId(def?.id || result.warehouses[0]?.id || '')
+        }
       }
     }
   }
 
   const updateApproveItem = (itemId, field, value) => {
-    setApproveItems((current) => ({
-      ...current,
-      [itemId]: { ...current[itemId], [field]: value },
-    }))
+    setApproveItems((current) => ({ ...current, [itemId]: { ...current[itemId], [field]: value } }))
   }
 
   const handleApprove = async () => {
     setIsApproving(true)
     setApproveError('')
-
-    const result = await approveSalesReturn(salesReturn.id, {
+    const payload = {
       items: Object.entries(approveItems).map(([returnItemId, values]) => ({
         returnItemId,
         condition: values.condition,
@@ -224,14 +253,17 @@ export default function SalesReturnDetail() {
       warehouseId: approveWarehouseId || undefined,
       creditNote: approveCreditNote,
       notes: approveNotes.trim() || undefined,
-    })
+    }
+
+    const result = isDemo
+      ? { success: true, salesReturn: approveDemoSalesReturn(salesReturn.id, payload) }
+      : await approveSalesReturn(salesReturn.id, payload)
 
     if (!result.success) {
       setApproveError(result.error)
       setIsApproving(false)
       return
     }
-
     setSalesReturn(result.salesReturn)
     setIsApproving(false)
     setApproveOpen(false)
@@ -242,18 +274,18 @@ export default function SalesReturnDetail() {
       setRejectError('A reason is required to reject a return.')
       return
     }
-
     setIsRejecting(true)
     setRejectError('')
 
-    const result = await rejectSalesReturn(salesReturn.id, rejectReason.trim())
+    const result = isDemo
+      ? { success: true, salesReturn: rejectDemoSalesReturn(salesReturn.id, rejectReason.trim()) }
+      : await rejectSalesReturn(salesReturn.id, rejectReason.trim())
 
     if (!result.success) {
       setRejectError(result.error)
       setIsRejecting(false)
       return
     }
-
     setSalesReturn(result.salesReturn)
     setIsRejecting(false)
     setRejectOpen(false)
@@ -262,22 +294,14 @@ export default function SalesReturnDetail() {
   const handleDelete = async () => {
     setIsDeleting(true)
     setDeleteError('')
-
-    const result = await deleteSalesReturn(salesReturn.id)
-
+    const result = isDemo ? deleteDemoSalesReturn(salesReturn.id) : await deleteSalesReturn(salesReturn.id)
     if (!result.success) {
       setDeleteError(result.error)
       setIsDeleting(false)
       return
     }
-
     navigate(basePath)
   }
-
-  const canReceive = salesReturn.status === 'requested'
-  const canApprove = salesReturn.status === 'requested' || salesReturn.status === 'received'
-  const canReject = salesReturn.status === 'requested' || salesReturn.status === 'received'
-  const canDelete = salesReturn.status !== 'approved'
 
   return (
     <div className="space-y-5">
@@ -290,26 +314,30 @@ export default function SalesReturnDetail() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold text-neutral-900">{salesReturn.returnNumber}</h1>
-              <Badge variant={statusVariant[salesReturn.status] || 'neutral'}>{salesReturn.status}</Badge>
+              <Badge variant={meta.variant}>{meta.label}</Badge>
+              {isDemo && <Badge variant="warning">Demo</Badge>}
             </div>
-            <p className="mt-1.5 text-xs text-neutral-400">{salesReturn.customerName || 'Unlinked customer'}</p>
+            <p className="mt-1.5 text-xs text-neutral-400">
+              {salesReturn.customerName || 'Unlinked customer'}
+              {salesReturn.orderNumber ? ` · Order ${salesReturn.orderNumber}` : salesReturn.invoiceNumber ? ` · ${salesReturn.invoiceNumber}` : ''}
+            </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {canReceive && (
+          {showReceive && (
             <Button variant="outline" size="sm" onClick={openReceiveModal}>
               <PackageCheck className="size-4" aria-hidden="true" />
-              Mark Received
+              Receive Return
             </Button>
           )}
-          {canApprove && (
+          {showComplete && (
             <Button variant="primary" size="sm" onClick={openApproveModal}>
               <Check className="size-4" aria-hidden="true" />
-              Approve
+              Complete Return
             </Button>
           )}
-          {canReject && (
+          {showReject && (
             <Button variant="danger" size="sm" onClick={() => { setRejectError(''); setRejectReason(''); setRejectOpen(true) }}>
               <Ban className="size-4" aria-hidden="true" />
               Reject
@@ -325,22 +353,24 @@ export default function SalesReturnDetail() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard icon={RotateCcw} iconVariant="info" label="Return Qty" value={String(totalReturnQty(salesReturn))} />
+        <StatCard icon={PackageCheck} iconVariant="warning" label="Received Qty" value={String(totalReceivedQty(salesReturn))} />
         <StatCard icon={IndianRupee} iconVariant="primary" label="Credit Amount" value={formatCurrency(salesReturn.creditAmount)} />
-        <StatCard icon={RotateCcw} iconVariant="info" label="Items" value={String(salesReturn.items.length)} />
-        <StatCard icon={PackageCheck} iconVariant="warning" label="Received" value={formatDate(salesReturn.receivedAt)} />
-        <StatCard icon={Check} iconVariant="success" label="Approved" value={formatDate(salesReturn.approvedAt)} />
+        <StatCard icon={Check} iconVariant="success" label="Completed" value={formatDate(salesReturn.approvedAt)} />
       </div>
 
-      <Card title="Return Items" subtitle="Products included in this return" className="p-0" bodyClassName="p-0">
+      {/* ---- Items ---- */}
+      <Card title="Items" subtitle="Delivered goods being sent back" className="p-0" bodyClassName="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-3xl text-left text-sm">
+          <table className="w-full min-w-4xl text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
                 <th className="whitespace-nowrap px-5 py-3">Product</th>
-                <th className="whitespace-nowrap px-5 py-3 text-right">Returned Qty</th>
-                <th className="whitespace-nowrap px-5 py-3 text-right">Received Qty</th>
+                <th className="whitespace-nowrap px-5 py-3 text-right">This Return</th>
+                <th className="whitespace-nowrap px-5 py-3 text-right">Received</th>
+                <th className="whitespace-nowrap px-5 py-3 text-right">Restockable</th>
+                <th className="whitespace-nowrap px-5 py-3 text-right">Damaged</th>
                 <th className="whitespace-nowrap px-5 py-3">Condition</th>
-                <th className="whitespace-nowrap px-5 py-3">Restocked</th>
                 <th className="whitespace-nowrap px-5 py-3 text-right">Line Total</th>
               </tr>
             </thead>
@@ -353,8 +383,13 @@ export default function SalesReturnDetail() {
                   </td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.quantityReturned}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.receivedQuantity ?? '—'}</td>
+                  <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">
+                    {item.receivedQuantity == null ? '—' : itemRestockableQty(item)}
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">
+                    {item.receivedQuantity == null ? '—' : itemDamagedQty(item)}
+                  </td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{item.condition || '—'}</td>
-                  <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{item.restock ? 'Yes' : 'No'}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
                 </tr>
               ))}
@@ -363,78 +398,65 @@ export default function SalesReturnDetail() {
         </div>
       </Card>
 
+      {/* ---- Overview + Activity ---- */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Card title="Return Information">
+        <Card title="Overview">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Return Date</p>
-              <p className="mt-1 text-sm text-neutral-800">{formatDate(salesReturn.returnDate)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Return Type</p>
-              <p className="mt-1 text-sm text-neutral-800">{salesReturn.returnType || '—'}</p>
-            </div>
-            <div className="sm:col-span-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Reason</p>
-              <p className="mt-1 text-sm text-neutral-800">{salesReturn.returnReason || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Received At</p>
-              <p className="mt-1 text-sm text-neutral-800">{formatDateTime(salesReturn.receivedAt)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Approved At</p>
-              <p className="mt-1 text-sm text-neutral-800">{formatDateTime(salesReturn.approvedAt)}</p>
-            </div>
-            {salesReturn.status === 'rejected' && (
-              <div className="sm:col-span-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Rejection Reason</p>
-                <p className="mt-1 text-sm text-neutral-800">{salesReturn.rejectedReason || '—'}</p>
-              </div>
+            <Field label="Customer" value={salesReturn.customerName} />
+            <Field label="Order / Invoice" value={salesReturn.orderNumber || salesReturn.invoiceNumber} />
+            <Field label="Reason" value={salesReturn.returnReason} className="sm:col-span-2" />
+            <Field label="Return Date" value={formatDate(salesReturn.returnDate)} />
+            <Field
+              label="Receiving Warehouse"
+              value={salesReturn.warehouseName || (salesReturn.warehouseId ? salesReturn.warehouseId : '—')}
+            />
+            {salesReturn.notes && <Field label="Notes" value={salesReturn.notes} className="sm:col-span-2" />}
+            {meta.key === 'rejected' && (
+              <Field label="Rejection Reason" value={salesReturn.rejectedReason} className="sm:col-span-2" />
             )}
           </div>
+          <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
+            Credit / refund handling is managed separately.
+            {salesReturn.creditNoteId
+              ? ` A credit note (${formatCurrency(salesReturn.creditAmount)}) was raised on completion.`
+              : meta.key === 'completed'
+                ? ' No credit note was raised for this return.'
+                : ' A credit note is raised when the return is completed.'}
+          </p>
         </Card>
 
-        <Card title="Invoice & Credit Note">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Invoice</p>
-              <p className="mt-1 text-sm text-neutral-800">{salesReturn.invoiceNumber || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Customer</p>
-              <p className="mt-1 text-sm text-neutral-800">{salesReturn.customerName || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Credit Note</p>
-              <p className="mt-1 text-sm text-neutral-800">{salesReturn.creditNoteId || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Credit Amount</p>
-              <p className="mt-1 text-sm text-neutral-800">{formatCurrency(salesReturn.creditAmount)}</p>
-            </div>
-          </div>
+        <Card title="Activity">
+          {activity.length === 0 ? (
+            <p className="text-sm text-neutral-500">No activity recorded yet.</p>
+          ) : (
+            <ol className="space-y-3">
+              {activity.map((event, index) => (
+                <li key={`${event.label}-${index}`} className="flex gap-3 text-sm">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-neutral-800">{event.label}</p>
+                    <p className="text-xs text-neutral-400">{formatDateTime(event.at)}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
         </Card>
       </div>
 
-      {salesReturn.notes && (
-        <Card title="Notes" subtitle="Internal remarks">
-          <p className="text-sm leading-6 text-neutral-700">{salesReturn.notes}</p>
-        </Card>
-      )}
-
-      <Modal isOpen={receiveOpen} onClose={() => !isReceiving && setReceiveOpen(false)} title="Mark Return as Received" className="max-w-2xl">
+      {/* ---- Receive modal ---- */}
+      <Modal isOpen={receiveOpen} onClose={() => !isReceiving && setReceiveOpen(false)} title="Receive Returned Goods" className="max-w-2xl">
         <div className="space-y-4">
           {receiveError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{receiveError}</div>
           )}
+          <p className="text-sm text-neutral-500">Record what physically arrived. Received cannot exceed the return quantity.</p>
           <div className="space-y-3">
             {salesReturn.items.map((item) => {
               const values = receiveItems[item.id] || { receivedQuantity: item.quantityReturned, condition: 'saleable', restock: true }
-
               return (
                 <div key={item.id} className="rounded-xl border border-neutral-100 bg-neutral-50/70 p-3">
-                  <p className="text-sm font-medium text-neutral-800">{item.productName || 'Item'}</p>
+                  <p className="text-sm font-medium text-neutral-800">{item.productName || 'Item'} <span className="text-neutral-400">· return {item.quantityReturned}</span></p>
                   <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <Input
                       label="Received Qty"
@@ -458,42 +480,40 @@ export default function SalesReturnDetail() {
                         onChange={(event) => updateReceiveItem(item.id, 'restock', event.target.checked)}
                         className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                       />
-                      Restock on approval
+                      Restock on completion
                     </label>
                   </div>
                 </div>
               )
             })}
           </div>
-          <Input
-            as="textarea"
-            label="Notes"
-            value={receiveNotes}
-            onChange={(event) => setReceiveNotes(event.target.value)}
-            placeholder="Optional remarks about the goods received"
-          />
+          <Input as="textarea" label="Notes" value={receiveNotes} onChange={(event) => setReceiveNotes(event.target.value)} placeholder="Optional remarks about the goods received" />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" disabled={isReceiving} onClick={() => setReceiveOpen(false)}>Cancel</Button>
-            <Button type="button" loading={isReceiving} onClick={handleReceive}>Mark Received</Button>
+            <Button type="button" loading={isReceiving} onClick={handleReceive}>Confirm Received</Button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={approveOpen} onClose={() => !isApproving && setApproveOpen(false)} title="Approve Sales Return" className="max-w-2xl">
+      {/* ---- Complete (approve) modal ---- */}
+      <Modal isOpen={approveOpen} onClose={() => !isApproving && setApproveOpen(false)} title="Complete Sales Return" className="max-w-2xl">
         <div className="space-y-4">
           {approveError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{approveError}</div>
           )}
           <p className="text-sm leading-6 text-neutral-600">
-            Only lines marked saleable and restock will re-enter stock. The customer will be credited for everything received unless credit note is disabled.
+            Only lines marked <span className="font-medium">saleable</span> and restock re-enter available stock. The customer is
+            credited for everything received unless the credit note is switched off. This does not change the original order.
           </p>
           <div className="space-y-3">
             {salesReturn.items.map((item) => {
               const values = approveItems[item.id] || { condition: 'saleable', restock: true }
-
               return (
                 <div key={item.id} className="rounded-xl border border-neutral-100 bg-neutral-50/70 p-3">
-                  <p className="text-sm font-medium text-neutral-800">{item.productName || 'Item'}</p>
+                  <p className="text-sm font-medium text-neutral-800">
+                    {item.productName || 'Item'}
+                    <span className="text-neutral-400"> · received {item.receivedQuantity ?? item.quantityReturned}</span>
+                  </p>
                   <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Select
                       label="Condition"
@@ -515,13 +535,15 @@ export default function SalesReturnDetail() {
               )
             })}
           </div>
-          <Select
-            label="Warehouse"
-            options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
-            value={approveWarehouseId}
-            onChange={(event) => setApproveWarehouseId(event.target.value)}
-            placeholder="Use firm default warehouse"
-          />
+          {!isDemo && (
+            <Select
+              label="Warehouse"
+              options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
+              value={approveWarehouseId}
+              onChange={(event) => setApproveWarehouseId(event.target.value)}
+              placeholder="Use firm default warehouse"
+            />
+          )}
           <label className="flex items-center gap-2 text-sm text-neutral-700">
             <input
               type="checkbox"
@@ -531,20 +553,15 @@ export default function SalesReturnDetail() {
             />
             Raise a credit note for the customer
           </label>
-          <Input
-            as="textarea"
-            label="Notes"
-            value={approveNotes}
-            onChange={(event) => setApproveNotes(event.target.value)}
-            placeholder="Optional approval remarks"
-          />
+          <Input as="textarea" label="Notes" value={approveNotes} onChange={(event) => setApproveNotes(event.target.value)} placeholder="Optional remarks" />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" disabled={isApproving} onClick={() => setApproveOpen(false)}>Cancel</Button>
-            <Button type="button" loading={isApproving} onClick={handleApprove}>Approve Return</Button>
+            <Button type="button" loading={isApproving} onClick={handleApprove}>Complete Return</Button>
           </div>
         </div>
       </Modal>
 
+      {/* ---- Reject modal ---- */}
       <Modal isOpen={rejectOpen} onClose={() => !isRejecting && setRejectOpen(false)} title="Reject Sales Return">
         <div className="space-y-4">
           {rejectError && (
@@ -578,6 +595,15 @@ export default function SalesReturnDetail() {
           </div>
         </div>
       </Modal>
+    </div>
+  )
+}
+
+function Field({ label, value, className = '' }) {
+  return (
+    <div className={className}>
+      <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">{label}</p>
+      <p className="mt-1 text-sm text-neutral-800 break-words">{value || '—'}</p>
     </div>
   )
 }

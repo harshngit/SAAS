@@ -1,5 +1,7 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { DEMO_MODE } from '../config/demoMode'
+import { getDemoReport } from '../features/reports/reportsDemoData'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -38,6 +40,10 @@ function authHeader() {
 }
 
 export async function getReport(type, params = {}) {
+  // ANY demo mode (true OR empty) - never calls GET /reports/*. getDemoReport returns an
+  // empty result for VITE_DEMO_DATA=empty.
+  if (DEMO_MODE) return getDemoReport(type, params)
+
   try {
     const queryParams = {}
     if (params.date_from) queryParams.date_from = params.date_from
@@ -61,6 +67,10 @@ export async function getReport(type, params = {}) {
 }
 
 export async function exportReport(type, params = {}, format = 'pdf') {
+  if (DEMO_MODE) {
+    return { success: false, error: 'Report export is disabled in demo mode.', demoUnavailable: true }
+  }
+
   try {
     const response = await apiClient.get(`/reports/${type}/export`, {
       headers: authHeader(),

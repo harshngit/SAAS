@@ -106,7 +106,7 @@ export default function OrderList() {
   const stats = useMemo(
     () => ({
       total: orders.length,
-      draft: orders.filter((o) => o.status === 'placed').length,
+      draft: orders.filter((o) => o.status === 'draft').length,
       confirmed: orders.filter((o) => o.status === 'confirmed').length,
       value: orders.filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + o.total, 0),
     }),

@@ -240,7 +240,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
         setWarehouses((current) =>
           current.some((w) => w.id === src.warehouseId)
             ? current
-            : [...current, { id: src.warehouseId || 'demo-wh', name: src.warehouseName || 'Main Warehouse' }],
+            : [...current, { id: src.warehouseId || 'demo-wh', name: src.warehouseName || 'Central Mumbai Warehouse' }],
         )
       }
       setSelectedCustomerId(src.customerId || '')
@@ -268,7 +268,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
           setPrefillNotice('Demo order not found.')
           return
         }
-        if (editOrderId && src.status !== 'placed') {
+        if (editOrderId && src.status !== 'draft') {
           navigate(window.location.pathname.replace(/\/edit$/, ''), { replace: true })
           return
         }
@@ -295,7 +295,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
           return
         }
         const src = result.order
-        if (editOrderId && src.status !== 'placed') {
+        if (editOrderId && src.status !== 'draft') {
           navigate(`${window.location.pathname.replace(/\/edit$/, '')}`, { replace: true })
           return
         }
@@ -620,10 +620,18 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
     showToast({
       title: 'Order created',
-      message: `${result.order.orderNumber} has been created successfully.`,
+      message: `${result.order.orderNumber} created as a Draft. Confirm it to reserve stock.`,
     })
     setIsSubmitting(false)
-    navigate(currentUser?.role === ROLES.ADMIN ? '/admin/orders' : roleHomePath[currentUser?.role] || '/')
+    // The delivery-vehicle app returns to its own home; everyone else lands on the new Draft
+    // Order detail so they can review and Confirm (fulfilment / delivery planning is
+    // unavailable until confirmation succeeds).
+    if (restrictToVehicleStock) {
+      navigate(roleHomePath[currentUser?.role] || '/')
+      return
+    }
+    const ordersBase = currentUser?.role === ROLES.ADMIN ? '/admin/orders' : '/sales/orders'
+    navigate(result.order?.id ? `${ordersBase}/${result.order.id}` : ordersBase)
   }
 
   const assignedDeliveryBoyName = restrictToVehicleStock ? currentUser?.name : null

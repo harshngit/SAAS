@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Calendar,
@@ -20,9 +20,12 @@ import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import { downloadInvoicePdf, getInvoice, getInvoiceSettings } from '../../api/invoices'
+import { listPaymentReceipts } from '../../api/paymentReceipts'
 import { getOrganizationSettings } from '../../api/organizations'
+import { usePermission } from '../../auth/usePermission'
 import { templateComponents, money as formatPreviewMoney, buildInvoicePreviewData } from './invoiceTemplates'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
+import { FINANCIAL_STATUS_VARIANT, financialStatus } from './invoiceHelpers'
 import { formatCurrency } from '../../utils/format'
 
 function formatDateLabel(dateString) {
@@ -201,10 +204,17 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
 export default function InvoiceDetail() {
   const { invoiceNumber } = useParams()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const invoicesBase = pathname.startsWith('/accounts') ? '/accounts/invoices/sales' : '/admin/invoices'
+  const { can } = usePermission()
+  // Recording a customer payment is a financial transaction - gate it on payments:create only.
+  const canRecordPayment = can('payments', 'create')
 
   const [invoice, setInvoice] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [payments, setPayments] = useState([])
+  const [paymentsError, setPaymentsError] = useState('')
   const [isPaymentDrawerOpen, setIsPaymentDrawerOpen] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState('')
@@ -227,6 +237,23 @@ export default function InvoiceDetail() {
 
     setInvoice(result.invoice)
     setIsLoading(false)
+    loadPayments(result.invoice.id)
+  }
+
+  // Actual payment records applied to this invoice (§9). A 403 / empty response just means
+  // no ledger detail is available for this role - the aggregate paid amount is still shown.
+  const loadPayments = async (invoiceId) => {
+    if (!invoiceId) return
+    setPaymentsError('')
+    const result = await listPaymentReceipts({ invoice_id: invoiceId })
+    if (!result.success) {
+      setPayments([])
+      setPaymentsError(result.error)
+      return
+    }
+    setPayments(
+      [...result.receipts].sort((a, b) => new Date(b.receiptDate || b.createdAt || 0) - new Date(a.receiptDate || a.createdAt || 0)),
+    )
   }
 
   // Best-effort: the preview still works (just without company letterhead/branding details)
@@ -262,7 +289,7 @@ export default function InvoiceDetail() {
     return (
       <div className="rounded-2xl border border-neutral-100 bg-white p-10 text-center shadow-(--shadow-card)">
         <p className="text-sm text-neutral-500">{loadError || `Invoice ${invoiceNumber} was not found.`}</p>
-        <Button type="button" variant="outline" className="mt-4" onClick={() => navigate('/admin/invoices')}>
+        <Button type="button" variant="outline" className="mt-4" onClick={() => navigate(invoicesBase)}>
           Back to Invoices
         </Button>
       </div>
@@ -290,18 +317,18 @@ export default function InvoiceDetail() {
 
   const handlePaymentSaved = () => {
     setIsPaymentDrawerOpen(false)
-    loadInvoice()
+    loadInvoice() // reloads the invoice + its payment ledger
   }
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 text-sm">
         <Link
-          to="/admin/invoices"
+          to={invoicesBase}
           className="flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 font-medium text-primary-700 hover:bg-primary-50/60"
         >
           <ArrowLeft className="size-3.5" />
-          Invoices
+          {invoicesBase.startsWith('/accounts') ? 'Sales Invoices' : 'Invoices'}
         </Link>
         <span className="text-neutral-300">/</span>
         <span className="text-neutral-400">Invoice Details</span>
@@ -316,7 +343,7 @@ export default function InvoiceDetail() {
           <p className="mt-1 text-xl font-semibold tracking-tight text-neutral-900">{invoice.invoiceNumber}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          {invoice.outstandingAmount > 0 && (
+          {invoice.outstandingAmount > 0 && canRecordPayment && (
             <Button type="button" onClick={() => setIsPaymentDrawerOpen(true)}>
               <Wallet className="size-4" />
               Record Payment
@@ -345,7 +372,7 @@ export default function InvoiceDetail() {
           <Badge variant={invoiceStatusVariant[invoice.invoiceStatus] || 'neutral'} dot>{invoice.invoiceStatus}</Badge>
         </HeaderInfoItem>
         <HeaderInfoItem icon={IndianRupee} iconClassName="bg-amber-50 text-amber-600" label="Payment Status">
-          <Badge variant={paymentStatusVariant[invoice.paymentStatus] || 'neutral'} dot>{invoice.paymentStatus}</Badge>
+          <Badge variant={FINANCIAL_STATUS_VARIANT[financialStatus(invoice)] || 'neutral'} dot>{financialStatus(invoice)}</Badge>
         </HeaderInfoItem>
       </div>
 
@@ -375,7 +402,7 @@ export default function InvoiceDetail() {
                     <span className="text-neutral-400">Due Date</span>
                     <span className="font-medium text-neutral-800">{formatDateLabel(invoice.dueDate)}</span>
                   </div>
-                  {invoice.orderId && (
+                  {invoice.orderId && !invoicesBase.startsWith('/accounts') && (
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-neutral-400">Linked Order</span>
                       <Link to={`/admin/orders/${invoice.orderId}`} className="font-medium text-primary-700 hover:underline">View Order</Link>
@@ -411,6 +438,60 @@ export default function InvoiceDetail() {
                 <p className="font-medium text-neutral-800">{formatDateLabel(invoice.dueDate)}</p>
               </div>
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="flex items-center justify-between gap-3">
+              <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
+                <Wallet className="size-4 text-neutral-400" aria-hidden="true" />
+                Payments
+              </p>
+              <span className="text-xs text-neutral-400">
+                {formatCurrency(invoice.amountPaid)} of {formatCurrency(invoice.total)} received
+              </span>
+            </div>
+            {paymentsError ? (
+              <p className="mt-3 text-xs text-neutral-500">
+                Payment ledger detail isn&apos;t available for this view. The amount paid above is authoritative.
+              </p>
+            ) : payments.length === 0 ? (
+              <p className="mt-3 text-sm text-neutral-400">
+                {invoice.amountPaid > 0
+                  ? 'No individual payment records — only the aggregate paid amount is available.'
+                  : 'No payments recorded.'}
+              </p>
+            ) : (
+              <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-100">
+                <table className="w-full min-w-2xl text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                      <th className="px-3.5 py-2.5">Date</th>
+                      <th className="px-3.5 py-2.5">Receipt #</th>
+                      <th className="px-3.5 py-2.5 text-right">Amount</th>
+                      <th className="px-3.5 py-2.5">Mode</th>
+                      <th className="px-3.5 py-2.5">Reference</th>
+                      <th className="px-3.5 py-2.5">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-50">
+                    {payments.map((payment) => (
+                      <tr key={payment.id}>
+                        <td className="px-3.5 py-2.5 text-neutral-600">{formatDateLabel(payment.receiptDate || payment.createdAt)}</td>
+                        <td className="px-3.5 py-2.5 text-neutral-800">{payment.receiptNumber || '—'}</td>
+                        <td className="px-3.5 py-2.5 text-right font-medium text-green-600">{formatCurrency(payment.amountReceived)}</td>
+                        <td className="px-3.5 py-2.5 text-neutral-500">{payment.paymentMethod ? String(payment.paymentMethod).replace(/_/g, ' ') : '—'}</td>
+                        <td className="px-3.5 py-2.5 text-neutral-500">{payment.transactionReference || '—'}</td>
+                        <td className="px-3.5 py-2.5">
+                          <Badge variant={paymentStatusVariant[String(payment.paymentStatus || '').replace(/^\w/, (c) => c.toUpperCase())] || 'neutral'}>
+                            {payment.paymentStatus || 'Recorded'}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">

@@ -1,5 +1,10 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import {
+  INVOICE_DEMO_ENABLED,
+  demoInvoicesResolved,
+  getDemoInvoiceById,
+} from '../features/invoices/invoiceDemoData'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -207,6 +212,11 @@ function normalizeInvoice(invoice) {
 }
 
 export async function listInvoices(params = {}) {
+  // Demo mode: seeded demo invoices only - never touches the real /invoices endpoint.
+  if (INVOICE_DEMO_ENABLED) {
+    return { success: true, invoices: demoInvoicesResolved(params) }
+  }
+
   try {
     const queryParams = {}
     if (params.customer_id) queryParams.customer_id = params.customer_id
@@ -232,6 +242,11 @@ export async function listInvoices(params = {}) {
 }
 
 export async function getInvoice(invoiceId) {
+  if (INVOICE_DEMO_ENABLED) {
+    const invoice = getDemoInvoiceById(invoiceId)
+    return invoice ? { success: true, invoice } : { success: false, error: 'Invoice not found.' }
+  }
+
   try {
     const { data } = await apiClient.get(`/invoices/${invoiceId}`, {
       headers: authHeader(),
@@ -250,6 +265,10 @@ export async function getInvoice(invoiceId) {
 }
 
 export async function createInvoice(payload) {
+  if (INVOICE_DEMO_ENABLED) {
+    return { success: false, error: 'Invoice creation is simulated in demo mode. Turn demo data off to create real invoices.' }
+  }
+
   try {
     const { data } = await apiClient.post('/invoices', buildInvoiceBody(payload), {
       headers: authHeader(),
@@ -278,6 +297,10 @@ function extractDuplicateInvoiceRef(message) {
 }
 
 export async function invoiceOrder(orderId, deliveryId) {
+  if (INVOICE_DEMO_ENABLED) {
+    return { success: false, error: 'Invoicing an order is simulated in demo mode. Turn demo data off to create real invoices.', duplicateRef: null }
+  }
+
   try {
     const { data } = await apiClient.post(`/orders/${orderId}/invoice`, deliveryId ? { delivery_id: deliveryId } : {}, {
       headers: authHeader(),
@@ -301,6 +324,10 @@ export async function invoiceOrder(orderId, deliveryId) {
 }
 
 export async function downloadInvoicePdf(invoiceId, invoiceNumber, format = 'detailed') {
+  if (INVOICE_DEMO_ENABLED) {
+    return { success: false, error: 'The server-generated PDF is unavailable in demo mode. Use Download PDF for the on-screen version.' }
+  }
+
   try {
     const response = await apiClient.get(`/invoices/${invoiceId}/pdf`, {
       headers: authHeader(),
@@ -330,6 +357,10 @@ export async function downloadInvoicePdf(invoiceId, invoiceNumber, format = 'det
 }
 
 export async function creditNoteInvoice(invoiceId, payload = {}) {
+  if (INVOICE_DEMO_ENABLED) {
+    return { success: false, error: 'Credit notes are not simulated in demo mode.' }
+  }
+
   try {
     const requestBody = {}
     if (payload.items) requestBody.items = payload.items
@@ -388,6 +419,10 @@ function normalizeInvoiceSettings(settings) {
 }
 
 export async function getInvoiceSettings() {
+  if (INVOICE_DEMO_ENABLED) {
+    return { success: true, settings: normalizeInvoiceSettings(null) }
+  }
+
   try {
     const { data } = await apiClient.get('/invoice-settings', {
       headers: authHeader(),

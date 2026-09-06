@@ -29,7 +29,7 @@ export default function RejectDeliveryModal({ delivery, isOpen, onClose, onRejec
     setError('')
 
     if (isDemoDelivery(delivery.id)) {
-      patchDemoDelivery(delivery.id, { status: 'rejected', failureReason: reason.trim() })
+      patchDemoDelivery(delivery.id, { status: 'rejected', internalStatus: 'rejected', failureReason: reason.trim() })
       setIsRejecting(false)
       setReason('')
       onRejected?.(getDemoDelivery(delivery.id))

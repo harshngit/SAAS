@@ -57,8 +57,15 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
 
   const handleSave = async (event) => {
     event.preventDefault()
+    if (isSaving) return
     if (paymentMethod !== 'cod' && receivedAmount <= 0) {
       setError('Enter an amount greater than zero.')
+      return
+    }
+    // §10 - never silently create an overpayment. The backend has no advance-payment
+    // allocation, so a payment cannot exceed what is still outstanding.
+    if (paymentMethod !== 'cod' && receivedAmount > Number(invoice.outstandingAmount) + 0.5) {
+      setError(`Amount cannot exceed the outstanding balance of ${formatCurrency(invoice.outstandingAmount)}.`)
       return
     }
 
@@ -170,7 +177,8 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
               label="Amount Received"
               type="number"
               min="0"
-              step="0.01"
+              max={invoice.outstandingAmount}
+              step="1"
               required={paymentMethod !== 'cod'}
               value={amountReceived}
               onChange={(event) => setAmountReceived(event.target.value)}

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Info, Minus, Package, PackageCheck, Plus, RotateCw, Truck } from 'lucide-react'
+import { AlertTriangle, Info, Package, PackageCheck, RotateCw, Truck } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { listDeliveries, loadDeliveryOntoVehicle, markDeliveryReady } from '../../api/deliveries'
 import { listProducts } from '../../api/products'
 import {
@@ -17,8 +18,14 @@ import { getDeliveryStage } from '../deliveries/deliveryStage'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
 
-// Deliveries eligible for loading: the goods are picked and waiting to go on the van.
-const LOADABLE_STAGES = ['accepted', 'picking']
+// Explicit dev switch only (VITE_DEMO_DATA=true). Demo is NEVER inferred from a failed / empty
+// deliveries API.
+const DEMO_VEHICLE_STOCK_ENABLED = DEMO_MODE && !DEMO_EMPTY
+
+// A delivery only reaches "Deliveries to Load" once every planned line is fully picked (or the
+// backend has already moved it to `ready`). A partially-picked delivery waits under "Picking
+// in progress" instead of failing a backend 400 at load time.
+const LOADABLE_STAGES = ['accepted', 'picking', 'ready']
 // Still operationally onboard the vehicle. A fully Delivered delivery is NOT onboard any
 // more, so it is not shown here - My Deliveries owns completed-delivery history.
 const ONBOARD_STAGES = ['loaded', 'in_transit']
@@ -29,10 +36,21 @@ const hasRemainingOnboard = (delivery) =>
 const isParentCancelled = (delivery) =>
   String(delivery.order?.status || delivery.orderStatus || '').toLowerCase() === 'cancelled'
 
-const pickedTotal = (delivery) =>
-  (delivery.items || []).reduce((sum, item) => sum + (Number(item.pickedQuantity) || 0), 0)
+// Every planned line picked in full. `ready` deliveries are already past picking.
+const isFullyPicked = (delivery) => {
+  const items = delivery.items || []
+  if (items.length === 0) return false
+  const totalPlanned = items.reduce((sum, it) => sum + (Number(it.plannedQuantity) || 0), 0)
+  if (totalPlanned <= 0) return false
+  return items.every((it) => (Number(it.pickedQuantity) || 0) >= (Number(it.plannedQuantity) || 0))
+}
 
-const stepInput = 'h-9 w-14 shrink-0 rounded-lg border border-neutral-200 bg-white text-center text-sm font-semibold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25'
+const isLoadable = (delivery) => {
+  if (isParentCancelled(delivery)) return false
+  const key = getDeliveryStage(delivery).key
+  if (!LOADABLE_STAGES.includes(key)) return false
+  return key === 'ready' || isFullyPicked(delivery)
+}
 
 export default function VehicleLoading() {
   const navigate = useNavigate()
@@ -43,7 +61,6 @@ export default function VehicleLoading() {
   const [productMeta, setProductMeta] = useState({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [loadQty, setLoadQty] = useState({}) // `${deliveryId}::${productId}` -> number
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -53,11 +70,18 @@ export default function VehicleLoading() {
     setIsLoading(true)
     setError('')
 
+    // Explicit demo mode: demo deliveries only, no real API call.
+    if (DEMO_VEHICLE_STOCK_ENABLED) {
+      setDeliveries(demoDeliveriesResolved())
+      setProductMeta({})
+      setIsLoading(false)
+      return
+    }
+
     const [result, productsResult] = await Promise.all([
       listDeliveries({ delivery_partner_id: currentUser.id }),
       listProducts(),
     ])
-    const demoRows = demoDeliveriesResolved()
 
     if (productsResult.success) {
       const meta = {}
@@ -67,9 +91,15 @@ export default function VehicleLoading() {
       setProductMeta(meta)
     }
 
-    const rows = result.success ? [...result.deliveries, ...demoRows] : demoRows
-    if (!result.success && demoRows.length === 0) setError(result.error)
-    setDeliveries(rows)
+    // Real mode: the delivery list is authoritative. A failure shows the real error; an empty
+    // list is a truthful empty state - never a demo fallback.
+    if (!result.success) {
+      setError(result.error)
+      setDeliveries([])
+      setIsLoading(false)
+      return
+    }
+    setDeliveries(result.deliveries)
     setIsLoading(false)
   }, [currentUser?.id])
 
@@ -77,24 +107,16 @@ export default function VehicleLoading() {
     load()
   }, [load])
 
-  const eligible = useMemo(
-    () =>
-      deliveries.filter(
-        (delivery) =>
-          !isParentCancelled(delivery) &&
-          LOADABLE_STAGES.includes(getDeliveryStage(delivery).key) &&
-          pickedTotal(delivery) > 0,
-      ),
-    [deliveries],
-  )
+  const eligible = useMemo(() => deliveries.filter(isLoadable), [deliveries])
 
+  // Loadable stage but picking is not yet complete on every line.
   const waitingForPicking = useMemo(
     () =>
       deliveries.filter(
         (delivery) =>
           !isParentCancelled(delivery) &&
-          LOADABLE_STAGES.includes(getDeliveryStage(delivery).key) &&
-          pickedTotal(delivery) === 0,
+          ['accepted', 'picking'].includes(getDeliveryStage(delivery).key) &&
+          !isFullyPicked(delivery),
       ),
     [deliveries],
   )
@@ -111,18 +133,8 @@ export default function VehicleLoading() {
     [deliveries],
   )
 
-  // Seed the load quantities + selection once the eligible list resolves.
+  // Select every eligible delivery by default.
   useEffect(() => {
-    setLoadQty((current) => {
-      const next = { ...current }
-      eligible.forEach((delivery) => {
-        ;(delivery.items || []).forEach((item) => {
-          const key = `${delivery.id}::${item.productId}`
-          if (next[key] == null) next[key] = Number(item.pickedQuantity) || 0
-        })
-      })
-      return next
-    })
     setSelectedIds((current) => {
       if (current.size > 0) return current
       return new Set(eligible.map((delivery) => delivery.id))
@@ -147,6 +159,9 @@ export default function VehicleLoading() {
 
   const selectedDeliveries = eligible.filter((delivery) => selectedIds.has(delivery.id))
 
+  // Load quantity is always the full picked quantity - POST /deliveries/{id}/load moves the
+  // delivery's picked stock as the backend holds it; the frontend does not send per-item
+  // quantities, so there is nothing to edit.
   const summary = useMemo(() => {
     const productIds = new Set()
     let units = 0
@@ -154,7 +169,7 @@ export default function VehicleLoading() {
     let weightKnown = true
     selectedDeliveries.forEach((delivery) => {
       ;(delivery.items || []).forEach((item) => {
-        const qty = Number(loadQty[`${delivery.id}::${item.productId}`]) || 0
+        const qty = Number(item.pickedQuantity) || 0
         if (qty <= 0) return
         productIds.add(item.productId)
         units += qty
@@ -164,20 +179,10 @@ export default function VehicleLoading() {
       })
     })
     return { deliveries: selectedDeliveries.length, products: productIds.size, units, weight, weightKnown }
-  }, [selectedDeliveries, loadQty, productMeta])
+  }, [selectedDeliveries, productMeta])
 
   const overCapacity =
     summary.weightKnown && vehicle?.capacityKg != null && summary.weight > vehicle.capacityKg
-  const anyPartial = selectedDeliveries.some((delivery) =>
-    (delivery.items || []).some((item) => (Number(loadQty[`${delivery.id}::${item.productId}`]) || 0) < (Number(item.pickedQuantity) || 0)),
-  )
-
-  const setQty = (deliveryId, item, value) => {
-    const rounded = Math.round(Number(value))
-    const max = Number(item.pickedQuantity) || 0
-    const clamped = Math.min(Math.max(Number.isFinite(rounded) ? rounded : 0, 0), max)
-    setLoadQty((current) => ({ ...current, [`${deliveryId}::${item.productId}`]: clamped }))
-  }
 
   const toggleDelivery = (deliveryId) => {
     setSelectedIds((current) => {
@@ -202,7 +207,7 @@ export default function VehicleLoading() {
         .map((item) => ({
           productId: item.productId,
           productName: item.productName,
-          qty: Number(loadQty[`${delivery.id}::${item.productId}`]) || 0,
+          qty: Number(item.pickedQuantity) || 0,
         }))
         .filter((entry) => entry.qty > 0)
       if (items.length === 0) continue
@@ -212,8 +217,8 @@ export default function VehicleLoading() {
         continue
       }
 
-      // Real delivery: reuse the existing per-delivery load endpoints (no new API). The
-      // backend loads the full picked quantity - partial per-item load isn't persisted.
+      // Real delivery: POST /ready (if not already) then POST /load - the canonical
+      // delivery loading path. If /ready fails we do NOT call /load.
       const readyResult = await markDeliveryReady(delivery.id)
       if (!readyResult.success && !/already|ready|state|status/i.test(readyResult.error || '')) {
         failures.push(`${delivery.deliveryNumber || delivery.orderNumber}: ${readyResult.error}`)
@@ -227,6 +232,9 @@ export default function VehicleLoading() {
 
     if (failures.length) {
       setSubmitError(failures.join(' · '))
+      // Refresh: a delivery the backend reports as already loaded should drop out of the
+      // eligible list. Backend stays authoritative - we only re-read.
+      load()
       return
     }
 
@@ -321,11 +329,11 @@ export default function VehicleLoading() {
         <Card>
           <EmptyState
             icon={PackageCheck}
-            title={waitingForPicking.length > 0 ? 'Nothing picked yet' : 'No deliveries are ready to load'}
+            title={waitingForPicking.length > 0 ? 'Picking in progress' : 'No deliveries are ready to load'}
             description={
               waitingForPicking.length > 0
-                ? 'Complete picking for an accepted delivery before loading.'
-                : 'Accept a delivery and pick its items — they will appear here to load onto the vehicle.'
+                ? 'Finish picking every line of a delivery before it can be loaded onto the vehicle.'
+                : 'Accept a delivery and pick its items in full — they will appear here to load onto the vehicle.'
             }
           />
         </Card>
@@ -383,12 +391,10 @@ export default function VehicleLoading() {
                     </thead>
                     <tbody className="divide-y divide-neutral-50">
                       {(delivery.items || []).map((item) => {
-                        const key = `${delivery.id}::${item.productId}`
-                        const qty = loadQty[key] ?? 0
                         const picked = Number(item.pickedQuantity) || 0
                         const sku = productMeta[item.productId]?.sku
                         const available = item.warehouseAvailable
-                        const shortStock = available != null && available < qty
+                        const shortStock = available != null && available < picked
                         return (
                           <tr key={item.id || item.productId}>
                             <td className="px-2 py-2.5">
@@ -399,39 +405,7 @@ export default function VehicleLoading() {
                               )}
                             </td>
                             <td className="px-2 py-2.5 text-right text-neutral-500">{picked}</td>
-                            <td className="px-2 py-2.5">
-                              <div className="mx-auto flex w-fit items-center gap-1">
-                                <button
-                                  type="button"
-                                  disabled={!isSelected || qty <= 0}
-                                  onClick={() => setQty(delivery.id, item, qty - 1)}
-                                  className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-30"
-                                  aria-label={`Reduce ${item.productName}`}
-                                >
-                                  <Minus className="size-3.5" aria-hidden="true" />
-                                </button>
-                                <input
-                                  value={qty}
-                                  inputMode="numeric"
-                                  disabled={!isSelected}
-                                  onChange={(event) => setQty(delivery.id, item, event.target.value)}
-                                  className={`${stepInput} disabled:opacity-50`}
-                                  aria-label={`Load quantity for ${item.productName}`}
-                                />
-                                <button
-                                  type="button"
-                                  disabled={!isSelected || qty >= picked}
-                                  onClick={() => setQty(delivery.id, item, qty + 1)}
-                                  className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-30"
-                                  aria-label={`Add ${item.productName}`}
-                                >
-                                  <Plus className="size-3.5" aria-hidden="true" />
-                                </button>
-                              </div>
-                              {qty < picked && (
-                                <p className="mt-1 text-center text-[0.68rem] text-amber-600">Remaining to load: {picked - qty}</p>
-                              )}
-                            </td>
+                            <td className="px-2 py-2.5 text-center font-semibold text-neutral-900">{picked}</td>
                             <td className="px-2 py-2.5 text-neutral-500">{item.uom || item.variantId || '—'}</td>
                           </tr>
                         )
@@ -443,13 +417,6 @@ export default function VehicleLoading() {
             )
           })}
 
-          {anyPartial && (
-            <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-700">
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              Loading less than the picked quantity is shown here for the record. For a real delivery the full picked
-              quantity is moved onto the vehicle — partial loading isn&apos;t saved yet.
-            </p>
-          )}
           {overCapacity && (
             <p className="flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-xs text-red-700">
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
@@ -491,7 +458,10 @@ export default function VehicleLoading() {
           <ul className="divide-y divide-neutral-100">
             {alreadyLoaded.map((delivery) => {
               const stage = getDeliveryStage(delivery)
-              const loadedUnits = (delivery.items || []).reduce((sum, item) => sum + (Number(item.loadedQuantity) || 0), 0)
+              const onboardUnits = (delivery.items || []).reduce(
+                (sum, item) => sum + (Number(item.remainingQuantity ?? item.loadedQuantity) || 0),
+                0,
+              )
               return (
                 <li key={delivery.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
                   <div className="flex items-start gap-2">
@@ -504,7 +474,7 @@ export default function VehicleLoading() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-neutral-500">{loadedUnits} units loaded</span>
+                    <span className="text-xs text-neutral-500">{onboardUnits} units onboard</span>
                     <Badge variant={stage.variant} dot>{stage.label}</Badge>
                     <Button
                       type="button"

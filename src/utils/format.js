@@ -27,6 +27,19 @@ export function formatNumber(value) {
   return new Intl.NumberFormat('en-IN').format(value)
 }
 
+// Local calendar date as YYYY-MM-DD. NEVER use `new Date().toISOString().slice(0,10)` for a
+// date-only business field: at local midnight in a positive-offset zone (IST is +5:30) that
+// returns the previous day. This reads the local Y/M/D directly. Keep real ISO timestamps
+// (`toISOString()`) for actual points in time (createdAt, reconciledAt, …).
+export function toLocalDateString(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const dateFormatter = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 const timeFormatter = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' })
 

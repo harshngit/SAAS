@@ -44,24 +44,51 @@ function normalizeSessionItem(item) {
   const deliveredQuantity = item.delivered_qty ?? item.delivered_quantity ?? 0
   const returnedQuantity = item.returned_qty ?? item.returned_quantity ?? 0
   const extraQuantity = item.extra_qty ?? item.extra_quantity ?? 0
-  const remainingQuantity = item.remaining_qty ?? Math.max(loadedQuantity + extraQuantity - deliveredQuantity, 0)
+  // Backend contract: available / expected-closing on the vehicle =
+  //   loaded_qty + extra_qty - delivered_qty - returned_qty
+  // Prefer the backend-authoritative value; derive it only for the older item schema that
+  // does not return it. (This is the ONE place the formula lives - see §31 of the spec.)
+  const derivedAvailable = Math.max(loadedQuantity + extraQuantity - deliveredQuantity - returnedQuantity, 0)
+  // Backend contract: remaining_qty = loaded + extra - delivered (EXCLUDES returned_qty), so it
+  // is NOT the stock currently on the vehicle once a return exists. expected_closing_qty is the
+  // authoritative post-return available. Prefer it; derive only when the backend omits it.
+  const availableQuantity = item.expected_closing_qty ?? item.available_qty ?? derivedAvailable
 
   return {
     id: item.id,
     productId: item.product_id,
     variantId: item.variant_id,
     productName: item.product_name || item.name || '',
+    sku: item.sku || item.product_sku || '',
+    uom: item.uom || item.unit || item.unit_of_measure || '',
     loadedQuantity,
     extraQuantity,
     deliveredQuantity,
     returnedQuantity,
-    remainingQuantity,
-    expectedClosingQty: item.expected_closing_qty ?? Math.max(remainingQuantity - returnedQuantity, 0),
+    // Current available on the vehicle (post-return). This is what every screen displays.
+    remainingQuantity: availableQuantity,
+    expectedClosingQty: availableQuantity,
+    // Raw backend field, reference only - excludes returned_qty, never shown as available.
+    rawRemainingQty: item.remaining_qty ?? null,
+    // Only present once a physical count has been recorded against the session.
+    physicalQuantity: item.physical_qty ?? null,
+    varianceQuantity: item.variance_qty ?? null,
   }
 }
 
 function normalizeReconciliationItem(item) {
   if (!item) return item
+
+  const loadedQuantity = item.loaded_qty ?? 0
+  const extraQuantity = item.extra_qty ?? 0
+  const deliveredQuantity = item.delivered_qty ?? 0
+  const returnedQuantity = item.returned_qty ?? 0
+  // expected_closing_qty = loaded + extra - delivered - returned ; variance = physical - expected.
+  // Backend value preferred; derived only when the row omits it.
+  const expectedClosingQty =
+    item.expected_closing_qty ?? Math.max(loadedQuantity + extraQuantity - deliveredQuantity - returnedQuantity, 0)
+  const physicalQuantity = item.physical_qty ?? 0
+  const varianceQuantity = item.variance_qty ?? physicalQuantity - expectedClosingQty
 
   return {
     id: item.id,
@@ -69,13 +96,13 @@ function normalizeReconciliationItem(item) {
     productId: item.product_id,
     variantId: item.variant_id,
     productName: item.product_name || '',
-    loadedQuantity: item.loaded_qty ?? 0,
-    extraQuantity: item.extra_qty ?? 0,
-    deliveredQuantity: item.delivered_qty ?? 0,
-    returnedQuantity: item.returned_qty ?? 0,
-    expectedClosingQty: item.expected_closing_qty ?? 0,
-    physicalQuantity: item.physical_qty ?? 0,
-    varianceQuantity: item.variance_qty ?? 0,
+    loadedQuantity,
+    extraQuantity,
+    deliveredQuantity,
+    returnedQuantity,
+    expectedClosingQty,
+    physicalQuantity,
+    varianceQuantity,
     notes: item.notes || '',
   }
 }
@@ -102,10 +129,15 @@ function normalizeSession(session) {
     deliveryPartnerId: session.delivery_partner_id || session.delivery_partner?.id || '',
     deliveryPartnerName: session.delivery_partner?.name || '',
     vehicleId: session.vehicle_id || session.vehicle?.id || '',
-    vehicleNumber: session.vehicle?.vehicle_number || '',
+    vehicleNumber: session.vehicle?.vehicle_number || session.vehicle_number || '',
     vehicleType: session.vehicle?.vehicle_type || '',
     vehicleCapacityKg: session.vehicle?.capacity_kg ?? null,
+    warehouseId: session.warehouse_id || session.warehouse?.id || '',
+    warehouseName: session.warehouse?.name || session.warehouse_name || '',
     date: session.date,
+    lastLoadedAt: session.last_loaded_at || session.loaded_at || null,
+    // Raw backend status - the UI treats anything other than "active" as a closed / read-only
+    // session (§17). Lifecycle names are NOT invented here.
     status: session.status || 'active',
     items: (session.items || []).map(normalizeSessionItem),
     createdAt: session.created_at,
@@ -113,6 +145,14 @@ function normalizeSession(session) {
   }
 }
 
+// POST /vehicle-stock/loading — manual / ad-hoc vehicle loading session.
+//
+// ⚠️ NOT the delivery path. A planned delivery is loaded through
+// POST /deliveries/{id}/load (see api/deliveries.js loadDeliveryOntoVehicle), which performs
+// the warehouse -> vehicle stock movement AND advances the delivery. This endpoint is only
+// for backend-expected manual sessions (e.g. a van doing ad-hoc field sales with no delivery
+// behind it). NEVER call this for units already loaded via a delivery - it would double-move
+// stock. Currently no screen calls this; the Vehicle Stock UI only READS the session.
 export async function loadVehicleStock(payload) {
   try {
     const requestBody = {

@@ -6,6 +6,7 @@ import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import { useToast } from '../../components/ui/toastContext'
 import { createPurchase, getPurchase, updatePurchase } from '../../api/purchases'
 import { listProducts } from '../../api/products'
 import { listSuppliers, getSupplier } from '../../api/suppliers'
@@ -56,6 +57,7 @@ function ReadOnlyField({ label, value }) {
 
 export default function PurchaseInvoiceForm() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const { id } = useParams()
   const isEditing = Boolean(id)
   const isSalesPath = window.location.pathname.startsWith('/sales')
@@ -82,7 +84,7 @@ export default function PurchaseInvoiceForm() {
     if (demoModeOn) {
       setSuppliers(demoSuppliers)
       setProducts(demoSupplierProducts)
-      setWarehouses([{ id: 'demo-wh-main', name: 'Main Warehouse' }, { id: 'demo-wh-central', name: 'Central Warehouse' }])
+      setWarehouses([{ id: 'demo-wh-main', name: 'Central Mumbai Warehouse' }, { id: 'demo-wh-central', name: 'Navi Mumbai Warehouse' }])
       setIsLoadingOptions(false)
       return
     }
@@ -225,6 +227,21 @@ export default function PurchaseInvoiceForm() {
   }
 
   const updateItem = (index, field, value) => {
+    if (field === 'productId' && value) {
+      const duplicateIndex = formState.items.findIndex((item, itemIndex) => itemIndex !== index && item.productId === value)
+      if (duplicateIndex !== -1) {
+        const productName = products.find((product) => product.id === value)?.name || 'Product'
+        setFormState((current) => ({
+          ...current,
+          items: current.items.map((item, itemIndex) =>
+            itemIndex === duplicateIndex ? { ...item, quantity: (Number(item.quantity) || 0) + 1 } : item,
+          ),
+        }))
+        showToast({ title: 'Product already added', message: `${productName} is already on this purchase — quantity increased on the existing line.` })
+        return
+      }
+    }
+
     setFormState((current) => ({
       ...current,
       items: current.items.map((item, itemIndex) => {
@@ -301,6 +318,7 @@ export default function PurchaseInvoiceForm() {
         notes: formState.notes.trim(),
         discount: extraDiscount,
         subtotal,
+        tax: taxTotal,
         total,
         items,
       }
@@ -499,7 +517,7 @@ export default function PurchaseInvoiceForm() {
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="1"
                         value={item.purchasePrice}
                         onChange={(event) => updateItem(index, 'purchasePrice', event.target.value)}
                         className="w-24 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
@@ -522,7 +540,7 @@ export default function PurchaseInvoiceForm() {
                         type="number"
                         min="0"
                         max="100"
-                        step="0.01"
+                        step="1"
                         value={item.tax}
                         onChange={(event) => updateItem(index, 'tax', event.target.value)}
                         className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
@@ -556,7 +574,7 @@ export default function PurchaseInvoiceForm() {
                 label="Extra Discount (₹)"
                 type="number"
                 min="0"
-                step="0.01"
+                step="1"
                 value={formState.discount}
                 onChange={(event) => updateField('discount', event.target.value)}
               />

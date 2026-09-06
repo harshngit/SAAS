@@ -1,3 +1,4 @@
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { quotationTotals } from './quotationHelpers'
 
 // =============================================================================
@@ -14,7 +15,9 @@ import { quotationTotals } from './quotationHelpers'
 // TODO: remove quotation demo data when the backend provides test fixtures.
 // =============================================================================
 
-export const DEMO_QUOTATIONS_ENABLED = true
+// Gated on the canonical explicit demo switch (VITE_DEMO_DATA=true). Real mode never renders
+// these rows and never mixes them into real API results.
+export const DEMO_QUOTATIONS_ENABLED = DEMO_MODE && !DEMO_EMPTY
 
 export function isDemoQuotation(id) {
   return typeof id === 'string' && id.startsWith('demo-qt-')

@@ -42,7 +42,7 @@ export default function AdminDeliveries() {
   const stats = useMemo(() => {
     const stageOf = (row) => getDeliveryStage(row).key
     const delivered = deliveries.filter((row) => stageOf(row) === 'delivered').length
-    const inProgress = deliveries.filter((row) => ['accepted', 'picking', 'loaded', 'in_transit'].includes(stageOf(row))).length
+    const inProgress = deliveries.filter((row) => ['accepted', 'picking', 'ready', 'loaded', 'in_transit'].includes(stageOf(row))).length
     const failed = deliveries.filter((row) => stageOf(row) === 'failed').length
     const awaiting = deliveries.filter((row) => ['assigned', 'rejected'].includes(stageOf(row))).length
     return { total: deliveries.length, delivered, inProgress, failed, awaiting }

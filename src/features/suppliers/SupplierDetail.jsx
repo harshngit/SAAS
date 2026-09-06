@@ -34,10 +34,18 @@ import {
   getDemoPaymentDisplayId,
   getDemoSupplier,
   getDemoSupplierDisplayId,
-  getDemoSupplierPayments,
   getDemoSupplierPurchases,
 } from './supplierDemoData'
 import { getPaymentMethodFlags } from '../payments/paymentMethodUtils'
+import { getDemoPurchase } from '../purchases/purchaseDemoData'
+import { getDemoGrns } from '../purchases/purchaseGrnDemoData'
+import { getDemoSupplierInvoicesForSupplier, SUPPLIER_INVOICES_DEMO_ENABLED } from '../supplierInvoices/supplierInvoiceDemoData'
+import { invoiceStatusMeta, paymentStatusMeta, resolveSupplierInvoice } from '../supplierInvoices/supplierInvoiceHelpers'
+import SupplierInvoiceQuickView from '../supplierInvoices/SupplierInvoiceQuickView'
+import { getSupplierPayments as getDemoSupplierPaymentLedger } from '../supplierPayments/supplierPaymentDemoData'
+import { paymentStatusMeta as supplierPaymentStatusMeta } from '../supplierPayments/supplierPaymentHelpers'
+import RecordSupplierPaymentDrawer from '../supplierPayments/RecordSupplierPaymentDrawer'
+import SupplierPaymentQuickView from '../supplierPayments/SupplierPaymentQuickView'
 import SupplierForm from './SupplierForm'
 
 const paymentModeOptions = [
@@ -132,6 +140,10 @@ export default function SupplierDetail() {
   const [purchases, setPurchases] = useState([])
   const [isLoadingPurchases, setIsLoadingPurchases] = useState(true)
   const [purchasesError, setPurchasesError] = useState('')
+  const [quickViewInvoiceId, setQuickViewInvoiceId] = useState(null)
+  const [paymentsRefresh, setPaymentsRefresh] = useState(0)
+  const [recordDrawerOpen, setRecordDrawerOpen] = useState(false)
+  const [quickViewPaymentId, setQuickViewPaymentId] = useState(null)
 
   const loadSupplier = async () => {
     setIsLoading(true)
@@ -160,7 +172,14 @@ export default function SupplierDetail() {
     setPaymentsError('')
 
     if (useDemoSuppliers) {
-      setPayments(getDemoSupplierPayments(id))
+      // Canonical demo Supplier Payment ledger - same source as the Supplier Payments module.
+      setPayments(
+        getDemoSupplierPaymentLedger({ supplierId: id }).map((payment) => ({
+          ...payment,
+          paidOn: payment.paymentDate,
+          note: payment.notes,
+        })),
+      )
       setIsLoadingPayments(false)
       return
     }
@@ -199,10 +218,14 @@ export default function SupplierDetail() {
 
   useEffect(() => {
     loadSupplier()
-    loadPayments()
     loadRelatedData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, useDemoSuppliers])
+
+  useEffect(() => {
+    loadPayments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, useDemoSuppliers, paymentsRefresh])
 
   const supplierProducts = useMemo(
     () => getSupplierProducts(supplier, products, { demoMode: useDemoSuppliers }),
@@ -223,6 +246,29 @@ export default function SupplierDetail() {
     }, null),
     [purchases],
   )
+  const supplierInvoices = useMemo(
+    () =>
+      useDemoSuppliers
+        ? getDemoSupplierInvoicesForSupplier(id).map((invoice) =>
+            resolveSupplierInvoice(invoice, {
+              purchase: invoice.purchaseId ? getDemoPurchase(invoice.purchaseId) : null,
+              grns: invoice.purchaseId ? getDemoGrns(invoice.purchaseId) : [],
+            }),
+          )
+        : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [id, useDemoSuppliers, paymentsRefresh],
+  )
+  // Demo only: keep the payable stat cards coherent with Accounts Payable / Supplier Invoices,
+  // which are the source of truth for what has actually been paid. Baseline figures already
+  // match the supplier fixture; this makes them track simulated payments too.
+  const demoPayableTotals = useMemo(() => {
+    if (!useDemoSuppliers || supplierInvoices.length === 0) return null
+    return {
+      totalPaid: supplierInvoices.reduce((sum, invoice) => sum + (Number(invoice.amountPaid) || 0), 0),
+      outstandingPayable: supplierInvoices.reduce((sum, invoice) => sum + (Number(invoice.outstanding) || 0), 0),
+    }
+  }, [useDemoSuppliers, supplierInvoices])
 
   if (isLoading) {
     return <LoadingSpinner label="Loading supplier details..." />
@@ -538,8 +584,8 @@ export default function SupplierDetail() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={IndianRupee} iconVariant="success" label="Total Purchases" value={formatCurrency(supplier.totalPurchases)} />
-        <StatCard icon={Wallet} iconVariant="primary" label="Total Paid" value={formatCurrency(supplier.totalPaid)} />
-        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={formatCurrency(supplier.outstandingPayable)} />
+        <StatCard icon={Wallet} iconVariant="primary" label="Total Paid" value={formatCurrency(demoPayableTotals?.totalPaid ?? supplier.totalPaid)} />
+        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={formatCurrency(demoPayableTotals?.outstandingPayable ?? supplier.outstandingPayable)} />
         <StatCard icon={FileText} iconVariant="info" label="Last Purchase" value={formatDate(lastPurchase?.purchaseDate || lastPurchase?.invoiceDate)} />
       </div>
 
@@ -549,6 +595,7 @@ export default function SupplierDetail() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="purchases">Purchases</TabsTrigger>
+            <TabsTrigger value="supplier-invoices">Supplier Invoices</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
             <TabsTrigger value="documents">Documents / Notes</TabsTrigger>
           </TabsList>
@@ -660,6 +707,68 @@ export default function SupplierDetail() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="supplier-invoices" className="mt-4">
+          <Card
+            title="Supplier Invoices"
+            subtitle={
+              SUPPLIER_INVOICES_DEMO_ENABLED
+                ? `${supplierInvoices.length} supplier invoice${supplierInvoices.length === 1 ? '' : 's'} on file.`
+                : undefined
+            }
+            className="p-0"
+            bodyClassName="p-0"
+          >
+            {!SUPPLIER_INVOICES_DEMO_ENABLED ? (
+              <p className="px-5 py-8 text-center text-sm text-neutral-500">
+                Supplier invoice history will appear here once the supplier invoicing backend is enabled.
+              </p>
+            ) : supplierInvoices.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-neutral-500">No supplier invoices recorded for this supplier yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-4xl text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                      <th className="px-5 py-3">Supplier Invoice #</th>
+                      <th className="px-5 py-3">Invoice Date</th>
+                      <th className="px-5 py-3">Purchase #</th>
+                      <th className="px-5 py-3 text-right">Invoice Total</th>
+                      <th className="px-5 py-3 text-right">Outstanding</th>
+                      <th className="px-5 py-3">Payment Status</th>
+                      <th className="px-5 py-3">Invoice Status</th>
+                      <th className="px-5 py-3">Verification</th>
+                      <th className="px-5 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-50">
+                    {supplierInvoices.map((invoice) => {
+                      const invStatus = invoiceStatusMeta(invoice.invoiceStatus)
+                      const payStatus = paymentStatusMeta(invoice.paymentStatus)
+                      return (
+                        <tr key={invoice.id} className="hover:bg-primary-50/35">
+                          <td className="px-5 py-3.5 font-medium text-primary-700">{invoice.supplierInvoiceNumber}</td>
+                          <td className="px-5 py-3.5 text-neutral-600">{formatDate(invoice.invoiceDate)}</td>
+                          <td className="px-5 py-3.5 text-neutral-600">{invoice.purchaseNumber || '—'}</td>
+                          <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(invoice.invoiceTotal)}</td>
+                          <td className="px-5 py-3.5 text-right text-neutral-700">{formatCurrency(invoice.outstanding)}</td>
+                          <td className="px-5 py-3.5"><Badge variant={payStatus.variant} dot>{payStatus.label}</Badge></td>
+                          <td className="px-5 py-3.5"><Badge variant={invStatus.variant}>{invStatus.label}</Badge></td>
+                          <td className="px-5 py-3.5">{invoice.match ? <Badge variant={invoice.match.variant}>{invoice.match.label}</Badge> : <span className="text-neutral-400">—</span>}</td>
+                          <td className="px-5 py-3.5 text-right">
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setQuickViewInvoiceId(invoice.id)}>
+                              <Eye className="size-4" aria-hidden="true" /> Quick View
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
         <TabsContent value="payments" className="mt-4">
       <Card
         title="Payments"
@@ -667,7 +776,7 @@ export default function SupplierDetail() {
         className="p-0"
         bodyClassName="p-0"
         actions={
-          <Button type="button" size="sm" onClick={handleOpenPaymentModal}>
+          <Button type="button" size="sm" onClick={useDemoSuppliers ? () => setRecordDrawerOpen(true) : handleOpenPaymentModal}>
             <Plus className="size-4" aria-hidden="true" />
             Record Payment
           </Button>
@@ -695,14 +804,14 @@ export default function SupplierDetail() {
                     <th className="whitespace-nowrap px-5 py-3 text-right">Amount</th>
                     <th className="whitespace-nowrap px-5 py-3">Payment Mode</th>
                     <th className="whitespace-nowrap px-5 py-3">Reference</th>
-                    <th className="whitespace-nowrap px-5 py-3">Note</th>
+                    <th className="whitespace-nowrap px-5 py-3">Status</th>
                     <th className="whitespace-nowrap px-5 py-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {payments.map((payment) => (
                     <tr key={payment.id} className="transition-colors hover:bg-primary-50/35">
-                      <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{(useDemoSuppliers ? getDemoPaymentDisplayId(payment.id) : payment.id) || '—'}</td>
+                      <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{(useDemoSuppliers ? payment.paymentNumber || getDemoPaymentDisplayId(payment.id) : payment.id) || '—'}</td>
                       <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">
                         {new Date(payment.paidOn).toLocaleDateString()}
                       </td>
@@ -715,12 +824,25 @@ export default function SupplierDetail() {
                         </Badge>
                       </td>
                       <td className="px-5 py-3.5 text-neutral-500">{payment.reference || '—'}</td>
-                      <td className="px-5 py-3.5 text-neutral-500">{payment.note || '—'}</td>
+                      <td className="px-5 py-3.5">
+                        {payment.status ? (
+                          <Badge variant={supplierPaymentStatusMeta(payment.status).variant}>{supplierPaymentStatusMeta(payment.status).label}</Badge>
+                        ) : (
+                          <Badge variant="neutral">Recorded</Badge>
+                        )}
+                      </td>
                       <td className="whitespace-nowrap px-5 py-3.5 text-right">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setVoidTarget(payment)}>
-                          <Undo2 className="size-4" aria-hidden="true" />
-                          Void
-                        </Button>
+                        {useDemoSuppliers ? (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setQuickViewPaymentId(payment.id)}>
+                            <Eye className="size-4" aria-hidden="true" />
+                            Quick View
+                          </Button>
+                        ) : (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setVoidTarget(payment)}>
+                            <Undo2 className="size-4" aria-hidden="true" />
+                            Void
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -749,6 +871,32 @@ export default function SupplierDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <SupplierInvoiceQuickView
+        invoiceId={quickViewInvoiceId}
+        isOpen={Boolean(quickViewInvoiceId)}
+        onClose={() => setQuickViewInvoiceId(null)}
+        onOpenFull={() => navigate(`/admin/supplier-invoices/${quickViewInvoiceId}`)}
+      />
+
+      <RecordSupplierPaymentDrawer
+        isOpen={recordDrawerOpen}
+        preset={{ supplierId: id }}
+        onClose={() => setRecordDrawerOpen(false)}
+        onRecorded={() => {
+          setRecordDrawerOpen(false)
+          setPaymentsRefresh((value) => value + 1)
+        }}
+      />
+
+      <SupplierPaymentQuickView
+        paymentId={quickViewPaymentId}
+        isOpen={Boolean(quickViewPaymentId)}
+        onClose={() => setQuickViewPaymentId(null)}
+        onVoided={() => setPaymentsRefresh((value) => value + 1)}
+        invoiceBasePath="/admin/supplier-invoices"
+        supplierBasePath="/admin/suppliers"
+      />
 
       <Modal
         isOpen={isStatusModalOpen}
@@ -840,7 +988,7 @@ export default function SupplierDetail() {
             label="Amount"
             type="number"
             min="0"
-            step="0.01"
+            step="1"
             value={paymentForm.amount}
             onChange={(event) => setPaymentForm((current) => ({ ...current, amount: event.target.value }))}
             required={!useDemoSuppliers || paymentForm.paymentMode !== 'cod'}

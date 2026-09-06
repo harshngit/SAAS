@@ -13,6 +13,7 @@ import {
   Pencil,
   Store,
   Truck,
+  Undo2,
   User,
   Wallet,
   Warehouse,
@@ -31,17 +32,21 @@ import {
   confirmOrder,
   getOrder,
   pickupConfirm,
-  pickupPick,
   pickupReady,
+  pickupStart,
 } from '../../api/orders'
 import { listDeliveries, listDeliveryPartners, planDelivery } from '../../api/deliveries'
 import { listInvoices } from '../../api/invoices'
+import { listSalesReturns } from '../../api/salesReturns'
+import { SALES_RETURNS_DEMO_ENABLED, getDemoSalesReturns } from '../salesReturns/salesReturnDemoData'
+import { srStatusMeta, totalReturnQty } from '../salesReturns/salesReturnHelpers'
 import { getSalesWorkflowSettings } from '../../api/settings'
 import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
 import { getUser, listAssignableStaff } from '../../api/users'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 import { ROLES, roleLabels } from '../../auth/roles'
+import { usePermission } from '../../auth/usePermission'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import {
@@ -121,6 +126,9 @@ export default function OrderDetail() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
+  const { can } = usePermission()
+  const canViewReturns = can('sales_returns', 'view')
+  const canCreateReturns = can('sales_returns', 'create')
   const isSalesPath = window.location.pathname.startsWith('/sales')
   const basePath = isSalesPath ? '/sales/orders' : window.location.pathname.startsWith('/delivery') ? '/delivery/orders' : '/admin/orders'
   const quotationsBasePath = isSalesPath ? '/sales/quotations' : '/admin/quotations'
@@ -150,6 +158,7 @@ export default function OrderDetail() {
   const [pickupError, setPickupError] = useState('')
   const [isConfirmingPickup, setIsConfirmingPickup] = useState(false)
   const [orderInvoices, setOrderInvoices] = useState([])
+  const [orderReturns, setOrderReturns] = useState([])
   const [hasMoreToInvoice, setHasMoreToInvoice] = useState(false)
   const [invoiceMode, setInvoiceMode] = useState('per_delivery')
   const [isViewDeliveryOpen, setIsViewDeliveryOpen] = useState(false)
@@ -196,6 +205,41 @@ export default function OrderDetail() {
     loadOrder()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // Sales Returns raised against this order (via its invoices). Read-only cross-link (§20).
+  useEffect(() => {
+    if (!order?.id || !canViewReturns) {
+      setOrderReturns([])
+      return
+    }
+    if (SALES_RETURNS_DEMO_ENABLED) {
+      setOrderReturns(getDemoSalesReturns().filter((sr) => sr.orderId === order.id))
+      return
+    }
+    if (isDemo) {
+      setOrderReturns([])
+      return
+    }
+    const invoiceIds = orderInvoices.map((invoice) => invoice.id).filter(Boolean)
+    if (invoiceIds.length === 0) {
+      setOrderReturns([])
+      return
+    }
+    let isMounted = true
+    Promise.all(invoiceIds.slice(0, 5).map((invoiceId) => listSalesReturns({ invoice_reference_id: invoiceId }))).then(
+      (results) => {
+        if (!isMounted) return
+        const byId = new Map()
+        results.forEach((result) => {
+          if (result.success) result.salesReturns.forEach((sr) => byId.set(sr.id, sr))
+        })
+        setOrderReturns([...byId.values()].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)))
+      },
+    )
+    return () => {
+      isMounted = false
+    }
+  }, [order?.id, isDemo, orderInvoices, canViewReturns])
 
   useEffect(() => {
     if (!order?.id) {
@@ -384,24 +428,11 @@ export default function OrderDetail() {
 
   const handleConfirm = async () => {
     if (isDemo) {
-      // Confirmation does a stock check.
+      // POST /orders/{id}/confirm validates + reserves stock. Any shortage is rejected
+      // outright - the order stays a Draft with nothing reserved (no partial reservation).
       if (demoShortages.length > 0) {
-        if (order.blockConfirmOnShortage) {
-          // Confirmation is rejected outright - nothing advances (stays Draft, reserved 0).
-          setActionError(`Insufficient stock for one or more items — ${demoShortageText}. The order stays a Draft; restock and try again.`)
-          showToast({ title: 'Insufficient stock', message: 'Confirmation was blocked. The order is still a Draft.', variant: 'error' })
-          return
-        }
-        // Otherwise the order still becomes Confirmed but stock is NOT reserved
-        // (mirrors a backend "confirmed, unfulfilled" state).
-        applyDemo({
-          status: 'confirmed',
-          fulfilmentStatus: 'not_started',
-          approvedAt: new Date().toISOString(),
-          items: order.items.map((item) => ({ ...item, reservedQuantity: 0 })),
-        })
-        setActionError(`Insufficient stock — ${demoShortageText}. The order is Confirmed but stock could not be reserved.`)
-        showToast({ title: 'Stock check failed', message: 'Order confirmed, but there was not enough stock to reserve.', variant: 'error' })
+        setActionError(`Insufficient stock for one or more items — ${demoShortageText}. The order stays a Draft; restock and try again.`)
+        showToast({ title: 'Insufficient stock', message: 'Confirmation was blocked. The order is still a Draft.', variant: 'error' })
         return
       }
       applyDemo({
@@ -512,13 +543,13 @@ export default function OrderDetail() {
     navigate(`/admin/deliveries/${result.delivery?.id || order.deliveryId}`)
   }
 
-  const handlePickupPick = async () => {
+  const handlePickupStart = async () => {
     if (isDemo) {
       applyDemo({ pickupStatus: 'picking', fulfilmentStatus: 'reserved' })
       showToast({ title: 'Pickup preparation started', message: 'Items are being picked for collection.' })
       return
     }
-    await runAction(() => pickupPick(order.id))
+    await runAction(() => pickupStart(order.id))
   }
 
   const handlePickupReady = async () => {
@@ -540,10 +571,12 @@ export default function OrderDetail() {
 
   const handleConfirmPickup = async () => {
     if (isDemo) {
-      // Collected, but not Completed yet - the order completes once it is also invoiced.
+      // POST /orders/{id}/pickup/confirm = fulfilment complete. The order is Completed now,
+      // independent of whether an invoice exists (invoicing is a separate workflow).
       applyDemo({
         pickupStatus: 'collected',
         fulfilmentStatus: 'delivered',
+        status: 'completed',
         collectedBy: collectedBy.trim() || order.customerName,
         collectedAt: new Date().toISOString(),
         pickupNotes: pickupNotesInput.trim(),
@@ -593,13 +626,13 @@ export default function OrderDetail() {
   const handleCreateInvoice = () => {
     if (isDemo) {
       const invoiceNumber = `INV-DEMO-${String(order.orderNumber || '').replace(/^SO-DEMO-/, '')}`
+      // Invoicing is a separate workflow - it never changes the Order lifecycle status.
+      // Completion comes only from delivery / pickup confirmation.
       const patch = {
         invoiceId: `demo-inv-${order.id}`,
         invoiceNumber,
         demoInvoice: buildDemoInvoice({ ...order, invoiceNumber }),
       }
-      // Fulfilment + billing done -> the order is Completed.
-      if (order.fulfilmentStatus === 'delivered' || order.pickupStatus === 'collected') patch.status = 'completed'
       applyDemo(patch)
       setOrderInvoices([{ id: patch.invoiceId, invoiceNumber, deliveryId: null, demo: patch.demoInvoice }])
       showToast({ title: 'Invoice created', message: `${invoiceNumber} has been generated.` })
@@ -698,10 +731,10 @@ export default function OrderDetail() {
               View Delivery
             </Button>
           )}
-          {actions.includes('pickupPick') && (
-            <Button variant="outline" size="sm" loading={isActing} onClick={handlePickupPick}>
+          {actions.includes('pickupStart') && (
+            <Button variant="outline" size="sm" loading={isActing} onClick={handlePickupStart}>
               <PackageSearch className="size-4" aria-hidden="true" />
-              Start Pickup Preparation
+              Start Pickup
             </Button>
           )}
           {actions.includes('pickupReady') && (
@@ -781,17 +814,17 @@ export default function OrderDetail() {
         </div>
       )}
 
-      {order.status === 'placed' && demoShortages.length > 0 && (
+      {order.status === 'draft' && demoShortages.length > 0 && (
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <p className="font-medium">Insufficient Stock for this draft.</p>
           <p className="mt-0.5">{demoShortageText}</p>
-          <p className="mt-0.5 text-amber-700">Confirming will not be able to reserve stock until more is available.</p>
+          <p className="mt-0.5 text-amber-700">Confirmation will be blocked until more stock is available.</p>
         </div>
       )}
 
-      {order.rejectReason && (order.status === 'cancelled' || order.status === 'rejected') && (
+      {order.rejectReason && order.status === 'cancelled' && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {order.status === 'rejected' ? 'Rejected' : 'Cancelled'}: {order.rejectReason}
+          Cancelled: {order.rejectReason}
         </div>
       )}
 
@@ -862,7 +895,7 @@ export default function OrderDetail() {
         </div>
       )}
 
-      {progress.length > 0 && order.status !== 'cancelled' && order.status !== 'rejected' && (
+      {progress.length > 0 && order.status !== 'cancelled' && (
         <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
           <div className="flex items-start overflow-x-auto pb-1">
             {progress.map((step, index) => (
@@ -1018,6 +1051,70 @@ export default function OrderDetail() {
           )}
         </Card>
       </div>
+
+      {(() => {
+        // Mirror the backend: no sales_returns:view -> no returns context on the order at all.
+        if (!canViewReturns) return null
+        const salesReturnsBase = isSalesPath ? '/sales/sales-returns' : '/admin/sales-returns'
+        const orderDelivered =
+          order.status === 'completed' || ['delivered', 'partially_delivered'].includes(order.fulfilmentStatus)
+        const canCreateReturn =
+          orderDelivered &&
+          order.status !== 'cancelled' &&
+          (isDemo || Boolean(firstInvoice)) &&
+          canCreateReturns
+        if (orderReturns.length === 0 && !canCreateReturn) return null
+        return (
+          <Card
+            title="Returns"
+            subtitle="Goods sent back by the customer against this order"
+            actions={
+              canCreateReturn ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    navigate(
+                      firstInvoice
+                        ? `${salesReturnsBase}/new?invoice=${encodeURIComponent(firstInvoice.id)}`
+                        : `${salesReturnsBase}/new`,
+                    )
+                  }
+                >
+                  <Undo2 className="size-4" aria-hidden="true" />
+                  Create Sales Return
+                </Button>
+              ) : null
+            }
+          >
+            {orderReturns.length === 0 ? (
+              <p className="text-sm text-neutral-400">No returns raised against this order yet.</p>
+            ) : (
+              <ul className="divide-y divide-neutral-100">
+                {orderReturns.map((sr) => {
+                  const meta = srStatusMeta(sr.status)
+                  return (
+                    <li key={sr.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
+                      <button
+                        type="button"
+                        className="font-medium text-primary-700 hover:underline"
+                        onClick={() => navigate(`${salesReturnsBase}/${encodeURIComponent(sr.id)}`)}
+                      >
+                        {sr.returnNumber}
+                      </button>
+                      <div className="flex items-center gap-3">
+                        <span className="text-neutral-500">Qty {totalReturnQty(sr)}</span>
+                        <span className="text-neutral-400">{formatDate(sr.createdAt || sr.returnDate)}</span>
+                        <Badge variant={meta.variant}>{meta.label}</Badge>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </Card>
+        )
+      })()}
 
       {order.notes && (
         <Card title="Notes">

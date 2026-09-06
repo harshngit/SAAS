@@ -16,7 +16,11 @@
 // TODO: remove order/delivery demo simulation when the backend provides fixtures.
 // =============================================================================
 
-export const DEMO_ORDERS_ENABLED = true
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
+
+// Gated on the canonical explicit demo switch (VITE_DEMO_DATA=true). Real mode never
+// renders these rows and never mixes them into real API results.
+export const DEMO_ORDERS_ENABLED = DEMO_MODE && !DEMO_EMPTY
 
 export function isDemoOrder(id) {
   return typeof id === 'string' && id.startsWith('demo-so-')
@@ -37,8 +41,8 @@ export const DEMO_VEHICLES = [
   { id: 'demo-veh-2', vehicleNumber: 'MH-14-CD-7824', vehicleType: 'Pickup', capacityKg: 900 },
 ]
 export const DEMO_WAREHOUSES = [
-  { id: 'demo-wh-main', name: 'Main Warehouse' },
-  { id: 'demo-wh-central', name: 'Central Warehouse' },
+  { id: 'demo-wh-main', name: 'Central Mumbai Warehouse' },
+  { id: 'demo-wh-central', name: 'Navi Mumbai Warehouse' },
 ]
 
 const CUSTOMERS = {
@@ -108,6 +112,7 @@ function line(overrides) {
 function order({
   key, number, customer, status, fulfilmentStatus = 'not_started', method = 'delivery',
   pickupStatus = 'not_started', partnerId, deliveryPickingStatus, deliveryAccepted = false,
+  deliveryReady = false,
   deliveryFailed = false, deliveryRejected = false, deliveryRejectReason = '',
   deliveryVehicle, quotation,
   deliveryId, invoiceId, rejectReason, notes, items, previousBalance = 0,
@@ -131,6 +136,7 @@ function order({
     // demo-only hints consumed by getOrderProgress / buildOrderTimeline / the demo delivery builder
     deliveryPickingStatus: deliveryPickingStatus || null,
     deliveryAccepted,
+    deliveryReady,
     deliveryFailed,
     deliveryRejected,
     deliveryRejectReason,
@@ -150,7 +156,7 @@ function order({
     customerPhone: c.phone,
     customerEmail: c.email,
     warehouseId: 'demo-wh-main',
-    warehouseName: 'Main Warehouse',
+    warehouseName: 'Central Mumbai Warehouse',
     orderDate: iso(-3),
     deliveryDate: iso(2),
     fulfilmentMethod: method,
@@ -198,7 +204,7 @@ function order({
 export const demoOrders = [
   // A. Draft Home Delivery - Edit / Confirm / Cancel; no reservation, no delivery.
   order({
-    key: 'draft', number: 'SO-DEMO-01', customer: 'balaji', status: 'placed',
+    key: 'draft', number: 'SO-DEMO-01', customer: 'balaji', status: 'draft',
     items: [line({ id: 'i1', ...RICE, quantity: 10 })],
   }),
   // B. Confirmed / Stock Reserved - no delivery planned yet -> Plan Delivery / Create Invoice / Cancel.
@@ -254,7 +260,7 @@ export const demoOrders = [
   // Collection section shows Order Amount / Previous Pending / Total Due and the partner can
   // record a part-collection against an outstanding receivable (§10: Delivered != fully paid).
   order({
-    key: 'delivered', number: 'SO-DEMO-07', customer: 'metro', status: 'confirmed', fulfilmentStatus: 'delivered',
+    key: 'delivered', number: 'SO-DEMO-07', customer: 'metro', status: 'completed', fulfilmentStatus: 'delivered',
     partnerId: 'demo-dp-sunil', deliveryId: 'demo-dlv-delivered', deliveryVehicle: 'MH-14-CD-7824',
     deliveryPickingStatus: 'picked', previousBalance: 3000,
     items: [line({ id: 'i1', ...RICE, quantity: 20, deliveredQuantity: 20 })],
@@ -292,7 +298,7 @@ export const demoOrders = [
   // ---------------------------------------------------------------------------
   // K-A. Draft Takeaway - Edit / Confirm / Cancel; nothing reserved; payment fully unpaid.
   order({
-    key: 'takeaway-draft', number: 'SO-DEMO-11', customer: 'balaji', status: 'placed',
+    key: 'takeaway-draft', number: 'SO-DEMO-11', customer: 'balaji', status: 'draft',
     method: 'pickup',
     items: [
       line({ id: 'i1', ...RICE, quantity: 6, reservedQuantity: 0 }),
@@ -335,7 +341,7 @@ export const demoOrders = [
   //      attempt fails with a truthful stock error and DOES NOT advance the order
   //      (`blockConfirmOnShortage`): stays Draft, reserved stays 0.
   order({
-    key: 'takeaway-stock-blocked', number: 'SO-DEMO-22', customer: 'aarav', status: 'placed',
+    key: 'takeaway-stock-blocked', number: 'SO-DEMO-22', customer: 'aarav', status: 'draft',
     method: 'pickup', blockConfirmOnShortage: true,
     items: [
       line({ id: 'i1', ...RICE, quantity: 20, reservedQuantity: 0, availableStock: 8 }),
@@ -346,14 +352,14 @@ export const demoOrders = [
   // K-G. DEMO ERROR STATE - intentionally invalid: Order Status = Draft but stock is already
   //      reserved. Exists ONLY to exercise the "Order state mismatch" banner. Not a business flow.
   order({
-    key: 'takeaway-mismatch', number: 'SO-DEMO-23', customer: 'royal', status: 'placed',
+    key: 'takeaway-mismatch', number: 'SO-DEMO-23', customer: 'royal', status: 'draft',
     fulfilmentStatus: 'reserved', method: 'pickup', demoErrorState: true,
     items: [line({ id: 'i1', ...RICE, quantity: 5 })],
     notes: 'DEMO ERROR STATE — invalid on purpose (Draft + reserved stock) to test the mismatch banner.',
   }),
   // M. Insufficient Stock - Draft, so Confirm can be clicked and fail to reserve.
   order({
-    key: 'stock', number: 'SO-DEMO-13', customer: 'aarav', status: 'placed',
+    key: 'stock', number: 'SO-DEMO-13', customer: 'aarav', status: 'draft',
     items: [line({ id: 'i1', ...RICE, quantity: 10, reservedQuantity: 0, availableStock: 6 })],
     notes: 'Internal: only 6 of the 10 units required are in stock.',
   }),
@@ -495,7 +501,7 @@ export function duplicateDemoOrder(src) {
   const copy = {
     id,
     orderNumber: number,
-    status: 'placed',
+    status: 'draft',
     fulfilmentStatus: 'not_started',
     deliveryPickingStatus: null,
     customerId: src.customerId,
@@ -503,7 +509,7 @@ export function duplicateDemoOrder(src) {
     customerPhone: src.customerPhone || '',
     customerEmail: src.customerEmail || '',
     warehouseId: src.warehouseId || 'demo-wh-main',
-    warehouseName: src.warehouseName || 'Main Warehouse',
+    warehouseName: src.warehouseName || 'Central Mumbai Warehouse',
     orderDate: now,
     deliveryDate: src.deliveryDate,
     fulfilmentMethod: src.fulfilmentMethod || 'delivery',
@@ -611,7 +617,24 @@ function publicDeliveryStatus(order) {
 
 function pickingStatusFor(order) {
   if (['loaded', 'in_transit', 'partially_delivered', 'delivered'].includes(order.fulfilmentStatus)) return 'picked'
+  if (order.deliveryReady) return 'picked'
   return order.deliveryPickingStatus || 'not_started'
+}
+
+// Demo mirror of the backend's DeliveryOut.internal_status - the exact lifecycle stage.
+// Public `status` (publicDeliveryStatus) still collapses loaded -> in_transit; this is what
+// deliveryStage.js reads first.
+function internalDeliveryStatus(order) {
+  if (order.deliveryRejected) return 'rejected'
+  if (order.deliveryFailed) return 'failed'
+  const fs = order.fulfilmentStatus
+  if (fs === 'delivered') return 'delivered'
+  if (fs === 'partially_delivered') return 'partially_delivered'
+  if (fs === 'in_transit') return 'in_transit'
+  if (fs === 'loaded') return 'loaded'
+  if (order.deliveryReady) return 'ready'
+  if (order.deliveryAccepted || ['picking', 'picked'].includes(order.deliveryPickingStatus)) return 'accepted'
+  return 'planned'
 }
 
 export function buildDemoDeliveryRecord(deliveryId) {
@@ -661,6 +684,7 @@ export function buildDemoDeliveryRecord(deliveryId) {
     orderTotal: order.total,
     fulfilmentStatus: fs,
     pickingStatus: pickingStatusFor(order),
+    internalStatus: internalDeliveryStatus(order),
     order: { id: order.id, orderNumber: order.orderNumber, status: order.status, fulfilmentStatus: fs, total: order.total },
     customerId: order.customerId,
     customerName: order.customerName,
@@ -792,7 +816,7 @@ export function demoVehicleSessionResolved() {
     vehicleType: 'Tempo',
     vehicleCapacityKg: 1500,
     warehouseId: 'demo-wh-main',
-    warehouseName: 'Main Warehouse',
+    warehouseName: 'Central Mumbai Warehouse',
     date: iso(0),
     lastLoadedAt: iso(0, 7),
     status: 'active',
@@ -810,6 +834,7 @@ export function simulateDemoVehicleLoad(deliveryId, loadedItems = []) {
     .filter((li) => li.productId && li.qty > 0)
   patchDemoDelivery(deliveryId, {
     status: 'in_transit', // internal loaded -> public in_transit, no dispatchedAt -> stage "Vehicle Loaded"
+    internalStatus: 'loaded',
     pickingStatus: 'picked',
     dispatchedAt: null,
     loadedTotal: clean.reduce((sum, li) => sum + li.qty, 0),

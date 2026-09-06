@@ -107,7 +107,7 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
             label="Price / month"
             type="number"
             min="0"
-            step="0.01"
+            step="1"
             value={formData.price_monthly}
             onChange={handleChange('price_monthly')}
             required
@@ -116,7 +116,7 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
             label="Price / year"
             type="number"
             min="0"
-            step="0.01"
+            step="1"
             value={formData.price_yearly}
             onChange={handleChange('price_yearly')}
             required
@@ -125,7 +125,7 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
             label="Original price / month"
             type="number"
             min="0"
-            step="0.01"
+            step="1"
             value={formData.original_price_monthly}
             onChange={handleChange('original_price_monthly')}
           />
@@ -133,7 +133,7 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
             label="Original price / year"
             type="number"
             min="0"
-            step="0.01"
+            step="1"
             value={formData.original_price_yearly}
             onChange={handleChange('original_price_yearly')}
           />

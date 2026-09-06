@@ -33,6 +33,9 @@ import Select from '../../components/ui/Select'
 import { DELIVERY_STAGES, deliveryStageIndex, getDeliveryStage, getNextDeliveryAction } from './deliveryStage'
 import RejectDeliveryModal from './RejectDeliveryModal'
 import RecordCollectionModal from './RecordCollectionModal'
+import CollectionDetailDrawer from '../collections/CollectionDetailDrawer'
+import { COLLECTION_STATUS_VARIANT, formatPaymentMode, formatStatus } from '../collections/collectionHelpers'
+import { listDeliveryCollections } from '../../api/deliveryCollections'
 import {
   acceptDelivery,
   confirmDelivery,
@@ -64,9 +67,10 @@ import { formatCurrency } from '../../utils/format'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
 
-// The 6-stage flow (Assigned -> Accepted -> Picking -> Vehicle Loaded -> In Transit ->
-// Delivered) and its badge vocabulary are derived from the backend's collapsed status in
-// ./deliveryStage - this file never maps raw status values itself.
+// The 7-step flow (Assigned -> Accepted -> Picking -> Ready -> Vehicle Loaded -> In Transit
+// -> Delivered) and its badge vocabulary are derived in ./deliveryStage from the backend's
+// internal_status (with a legacy status-derivation fallback) - this file never maps raw
+// status values itself.
 
 function WorkflowTimeline({ delivery }) {
   const stage = getDeliveryStage(delivery)
@@ -306,6 +310,8 @@ export default function DeliveryDetail() {
   // Collection (financial action, gated by the firm's delivery_collection_allowed setting)
   const [collectionAllowed, setCollectionAllowed] = useState(true)
   const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false)
+  const [deliveryCollections, setDeliveryCollections] = useState([])
+  const [collectionDetail, setCollectionDetail] = useState(null)
 
   // Admin: reassignment
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false)
@@ -321,6 +327,30 @@ export default function DeliveryDetail() {
   const [editForm, setEditForm] = useState({ deliveryPartnerId: '', vehicleId: '', scheduledDate: '', deliveryAddress: '', notes: '' })
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
   const [cancelNotes, setCancelNotes] = useState('')
+
+  // Seed the "delivering qty" inputs for the confirm flow.
+  //  - First attempt: start at the full planned quantity (partner adjusts down/up).
+  //  - Re-attempt after a partial delivery: start at what is STILL owed AND still on the
+  //    vehicle (remaining_quantity / pending_quantity from the backend, capped by
+  //    loaded - already-delivered). Never re-sends the quantity already handed over.
+  const seedDeliveredQuantities = (dlv) => {
+    setDeliveredQuantities(
+      Object.fromEntries(
+        (dlv.items || []).map((item) => {
+          const planned = Number(item.plannedQuantity) || 0
+          const alreadyDelivered = Number(item.deliveredQuantity) || 0
+          if (alreadyDelivered <= 0) return [item.id, planned]
+          const owed = Math.max(
+            Number(item.remainingQuantity ?? item.pendingQuantity ?? (planned - alreadyDelivered)) || 0,
+            0,
+          )
+          const loaded = Number(item.loadedQuantity) || 0
+          const onVehicle = loaded > 0 ? Math.max(loaded - alreadyDelivered, 0) : owed
+          return [item.id, Math.min(owed, onVehicle)]
+        }),
+      ),
+    )
+  }
 
   const loadDetail = async () => {
     setIsLoading(true)
@@ -338,13 +368,7 @@ export default function DeliveryDetail() {
     }
 
     setDelivery(result.delivery)
-    // "Delivering qty" starts at the ordered (planned) quantity - the partner adjusts down or
-    // up from there based on what the customer actually accepts.
-    setDeliveredQuantities(
-      Object.fromEntries(
-        result.delivery.items.map((item) => [item.id, item.deliveredQuantity || item.plannedQuantity || 0]),
-      ),
-    )
+    seedDeliveredQuantities(result.delivery)
     setPickedQuantities(
       Object.fromEntries(
         result.delivery.items.map((item) => [item.id, item.pickedQuantity || item.plannedQuantity || 0]),
@@ -353,8 +377,15 @@ export default function DeliveryDetail() {
     setIsLoading(false)
   }
 
+  const loadCollections = () => {
+    listDeliveryCollections(id).then((result) => {
+      setDeliveryCollections(result.success ? result.collections : [])
+    })
+  }
+
   useEffect(() => {
     loadDetail()
+    loadCollections()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
@@ -465,7 +496,9 @@ export default function DeliveryDetail() {
   const nextAction = parentOrderCancelled ? null : getNextDeliveryAction(delivery, { isAdmin: isAdminView })
   const canReassign = isAdminView && ['assigned', 'rejected'].includes(stageKey)
   const canEdit = isAdminView && ['assigned', 'rejected'].includes(stageKey)
-  const canCancel = isAdminView && ['assigned', 'accepted', 'picking'].includes(stageKey)
+  // Pre-load only. Once goods are on the vehicle (loaded / in_transit) the backend rejects a
+  // plain cancel with a 400 and the real message is surfaced - no local stock reversal.
+  const canCancel = isAdminView && ['assigned', 'accepted', 'picking', 'ready'].includes(stageKey)
   // ---- Collection (operational money handling, NOT a delivery status) ----
   // The Delivery Partner records the money actually collected at the customer; the Accountant
   // reconciles it later. Values come straight from the delivery/order response - nothing is
@@ -478,17 +511,33 @@ export default function DeliveryDetail() {
   const collectedAmount = Number.isFinite(Number(delivery.collectedAmount))
     ? Number(delivery.collectedAmount)
     : Math.max(totalAmountDue - remainingReceivable, 0)
-  const collectionStatus =
-    totalAmountDue <= 0 && collectedAmount <= 0
-      ? '—'
-      : collectedAmount <= 0
-        ? 'Not Collected'
-        : collectedAmount >= totalAmountDue
-          ? 'Collected'
-          : 'Partially Collected'
+  // Physical collection lifecycle is kept strictly separate from financial payment truth.
+  const activeCollections = deliveryCollections.filter((collection) => collection.status !== 'voided')
+  const recordedCollections = deliveryCollections.filter((collection) => collection.status === 'recorded')
+  const reconciledCollections = deliveryCollections.filter((collection) => collection.status === 'reconciled')
+  const recordedCollectionsTotal = recordedCollections.reduce((sum, collection) => sum + (Number(collection.amount) || 0), 0)
+  // Backend-authoritative "money in": what the order/delivery says is no longer owed. Never
+  // derived from unreconciled recorded collections.
+  const reconciledPaidAmount = Math.max(totalAmountDue - amountDue, 0)
+  const collectionLifecycleStatus =
+    activeCollections.length === 0
+      ? 'No Collection'
+      : reconciledCollections.length === 0
+        ? 'Awaiting Reconciliation'
+        : recordedCollections.length > 0
+          ? 'Partially Reconciled'
+          : 'Reconciled / Paid'
+  const collectionStatusVariant =
+    collectionLifecycleStatus === 'Reconciled / Paid'
+      ? 'success'
+      : collectionLifecycleStatus === 'No Collection'
+        ? 'neutral'
+        : 'warning'
   const COLLECTION_STAGES = ['in_transit', 'delivered', 'partially_delivered']
   const showCollectionSection =
-    !parentOrderCancelled && COLLECTION_STAGES.includes(stageKey) && (totalAmountDue > 0 || collectedAmount > 0)
+    !parentOrderCancelled &&
+    (deliveryCollections.length > 0 ||
+      (COLLECTION_STAGES.includes(stageKey) && (totalAmountDue > 0 || collectedAmount > 0)))
   // The button shows for both the DP and the admin - if the DP's account can't yet persist a
   // receipt the real backend error is surfaced (never faked). Admin also respects the firm's
   // delivery_collection_allowed setting.
@@ -516,7 +565,9 @@ export default function DeliveryDetail() {
   const hasSerialTracking = delivery.items.some((item) => item.serialNumbers.length > 0)
 
   // ---- Delivery adjustment (partner, active delivery only) ----
-  const ADJUSTABLE_STAGES = ['accepted', 'picking', 'loaded', 'in_transit']
+  // `partially_delivered` is adjustable again - the partner re-attempts the balance still on
+  // the vehicle via another confirm.
+  const ADJUSTABLE_STAGES = ['accepted', 'picking', 'ready', 'loaded', 'in_transit', 'partially_delivered']
   const canAdjustDelivery = !isAdminView && !parentOrderCancelled && ADJUSTABLE_STAGES.includes(stageKey)
   const showAdjustmentSection = !isAdminView && !parentOrderCancelled && (canAdjustDelivery || isDeliveredStage)
   const adjustmentLocked = !canAdjustDelivery // delivered / any non-active stage -> read-only recap
@@ -537,20 +588,34 @@ export default function DeliveryDetail() {
   }
 
   const hasAnyPricing = Object.keys(orderPricing).length > 0 || catalogProducts.length > 0
-  const originalOrderAmount = delivery.items.reduce((sum, item) => {
-    const line = netLineTotal(unitPriceForProduct(item.productId, item.unitPrice), item.plannedQuantity, item.productId)
-    return sum + (line || 0)
-  }, 0)
-  const adjustedExistingAmount = delivery.items.reduce((sum, item) => {
-    const line = netLineTotal(unitPriceForProduct(item.productId, item.unitPrice), deliveredQuantities[item.id] ?? 0, item.productId)
-    return sum + (line || 0)
-  }, 0)
+  // Once the delivery is completed/read-only, the quantity basis is the PERSISTED
+  // deliveredQuantity - never the "delivering now" form state (which is 0 when nothing is
+  // left to deliver, and would show a bogus -100% difference).
+  const deliveredQtyFor = (item) =>
+    adjustmentLocked ? Number(item.deliveredQuantity) || 0 : deliveredQuantities[item.id] ?? 0
+  // Pre-tax line sums used only to derive the delivered-vs-planned RATIO (discount/tax cancel
+  // in the ratio). The displayed amounts are anchored to the order's own commercial total.
+  const plannedNetValue = delivery.items.reduce(
+    (sum, item) => sum + (netLineTotal(unitPriceForProduct(item.productId, item.unitPrice), item.plannedQuantity, item.productId) || 0),
+    0,
+  )
+  const deliveredNetValue = delivery.items.reduce(
+    (sum, item) => sum + (netLineTotal(unitPriceForProduct(item.productId, item.unitPrice), deliveredQtyFor(item), item.productId) || 0),
+    0,
+  )
   const addedProductsAmount = addedProducts.reduce(
     (sum, entry) => sum + (entry.unitPrice != null ? entry.unitPrice * (Number(entry.quantity) || 0) : 0),
     0,
   )
-  const adjustedDeliveryAmount = adjustedExistingAmount + addedProductsAmount
-  const adjustmentDifference = adjustedDeliveryAmount - originalOrderAmount
+  // Canonical commercial basis: the order's backend total (tax + discount already applied)
+  // when available, else the pre-tax line sum. Same rules on both sides -> no adjustment
+  // means Difference = 0 (§2, Scenario 1).
+  const canonicalOrderAmount = orderAmount > 0 ? orderAmount : plannedNetValue
+  const deliveredRatio = plannedNetValue > 0 ? deliveredNetValue / plannedNetValue : 1
+  const originalOrderAmount = canonicalOrderAmount
+  const adjustedDeliveryAmount =
+    (plannedNetValue > 0 ? canonicalOrderAmount * deliveredRatio : canonicalOrderAmount) + addedProductsAmount
+  const adjustmentDifference = Math.abs(adjustedDeliveryAmount - originalOrderAmount) < 0.005 ? 0 : adjustedDeliveryAmount - originalOrderAmount
 
   const addableVehicleProducts = vehicleStockItems.filter(
     (item) =>
@@ -608,7 +673,7 @@ export default function DeliveryDetail() {
 
     if (isDemoDelivery(delivery.id)) {
       return simulateDemoDelivery(
-        { status: 'accepted', pickingStatus: 'not_started' },
+        { status: 'accepted', internalStatus: 'accepted', pickingStatus: 'not_started' },
         { title: 'Delivery accepted', message: 'Start picking when you are ready to load.' },
       )
     }
@@ -639,8 +704,8 @@ export default function DeliveryDetail() {
 
     if (isDemoDelivery(delivery.id)) {
       return simulateDemoDelivery(
-        { status: 'accepted', pickingStatus: 'picked' },
-        { title: 'Items picked', message: 'Load the vehicle when picking is complete.' },
+        { status: 'accepted', internalStatus: 'accepted', pickingStatus: 'picked' },
+        { title: 'Items picked', message: 'Mark the delivery ready once every line is picked.' },
       )
     }
 
@@ -660,8 +725,76 @@ export default function DeliveryDetail() {
     showToast({ title: 'Items picked', message: 'Load the vehicle when picking is complete.' })
   }
 
-  // One button: mark ready (if the backend still needs it) then load the goods onto the
-  // vehicle. This is the only place warehouse stock physically moves, so it must never run twice.
+  // NEW contract only: picking is confirmed, mark the delivery ready to load. No stock moves
+  // here - POST /ready just gates the load step.
+  const handleMarkReady = async () => {
+    if (isActing) return
+    setIsActing(true)
+    setActionError('')
+
+    if (isDemoDelivery(delivery.id)) {
+      return simulateDemoDelivery(
+        { status: 'accepted', pickingStatus: 'picked', internalStatus: 'ready' },
+        { title: 'Marked ready', message: 'Load the vehicle when you are ready to leave.' },
+      )
+    }
+
+    const result = await markDeliveryReady(delivery.id)
+
+    if (!result.success) {
+      setActionError(result.error)
+      setIsActing(false)
+      return
+    }
+
+    setDelivery(result.delivery)
+    setIsActing(false)
+    showToast({ title: 'Marked ready', message: 'Load the vehicle when you are ready to leave.' })
+  }
+
+  // NEW contract only: load the ready goods onto the vehicle. POST /load is the single
+  // warehouse -> vehicle stock movement and is server-side idempotent; the frontend never
+  // mutates stock locally and surfaces the backend error verbatim if the call fails.
+  const handleLoad = async () => {
+    if (isActing) return
+    setIsActing(true)
+    setActionError('')
+
+    if (isDemoDelivery(delivery.id)) {
+      const loadedItems = delivery.items.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        qty: item.pickedQuantity || item.plannedQuantity || 0,
+      }))
+      return simulateDemoDelivery(
+        {
+          status: 'in_transit',
+          pickingStatus: 'picked',
+          internalStatus: 'loaded',
+          dispatchedAt: null,
+          loadedTotal: loadedItems.reduce((sum, li) => sum + li.qty, 0),
+          loadedItems,
+        },
+        { title: 'Vehicle loaded', message: 'Start the delivery when you leave the warehouse.' },
+      )
+    }
+
+    const result = await loadDeliveryOntoVehicle(delivery.id)
+
+    if (!result.success) {
+      setActionError(result.error)
+      setIsActing(false)
+      return
+    }
+
+    setDelivery(result.delivery)
+    setIsActing(false)
+    showToast({ title: 'Vehicle loaded', message: 'Start the delivery when you leave the warehouse.' })
+  }
+
+  // LEGACY contract: one button chains mark-ready (if the backend still needs it) then loads
+  // the goods onto the vehicle. This is the only place warehouse stock physically moves, so
+  // it must never run twice.
   const handleMarkLoaded = async () => {
     if (isActing) return
     setIsActing(true)
@@ -676,6 +809,7 @@ export default function DeliveryDetail() {
       return simulateDemoDelivery(
         {
           status: 'in_transit',
+          internalStatus: 'loaded',
           pickingStatus: 'picked',
           dispatchedAt: null,
           loadedTotal: loadedItems.reduce((sum, li) => sum + li.qty, 0),
@@ -715,7 +849,7 @@ export default function DeliveryDetail() {
 
     if (isDemoDelivery(delivery.id)) {
       return simulateDemoDelivery(
-        { status: 'in_transit', dispatchedAt: new Date().toISOString() },
+        { status: 'in_transit', internalStatus: 'in_transit', dispatchedAt: new Date().toISOString() },
         { title: 'Delivery started', message: 'Delivery is now in transit.' },
       )
     }
@@ -867,19 +1001,36 @@ export default function DeliveryDetail() {
 
     const combinedNotes = [notes.trim(), addedProductsNote].filter(Boolean).join('\n\n')
 
+    // The confirm payload carries the quantity handed over IN THIS ATTEMPT (per the
+    // DeliveryConfirm contract - "what was actually handed over"); the backend accumulates it.
+    // A re-attempt from partially_delivered therefore sends only the remaining balance.
+    const isReattempt = getDeliveryStage(delivery).key === 'partially_delivered'
+
     if (isDemoDelivery(delivery.id)) {
-      const deliveredItems = delivery.items.map((item) => ({ ...item, deliveredQuantity: deliveredQuantities[item.id] ?? 0 }))
-      const anyShort = deliveredItems.some((item) => item.deliveredQuantity < item.plannedQuantity)
-      return simulateDemoDelivery(
+      const deliveredItems = delivery.items.map((item) => {
+        const planned = Number(item.plannedQuantity) || 0
+        const already = Number(item.deliveredQuantity) || 0
+        const thisAttempt = Number(deliveredQuantities[item.id] ?? 0) || 0
+        const total = Math.min(isReattempt ? already + thisAttempt : thisAttempt, planned)
+        const remaining = Math.max(planned - total, 0)
+        return { ...item, deliveredQuantity: total, pendingQuantity: remaining, remainingQuantity: remaining }
+      })
+      const anyShort = deliveredItems.some((item) => item.deliveredQuantity < (Number(item.plannedQuantity) || 0))
+      simulateDemoDelivery(
         {
           status: anyShort ? 'partially_delivered' : 'delivered',
+          internalStatus: anyShort ? 'partially_delivered' : 'delivered',
           confirmedAt: new Date().toISOString(),
           receiverName: receiverName.trim() || delivery.customerName,
           notes: combinedNotes,
           items: deliveredItems,
+          deliveredTotal: deliveredItems.reduce((sum, it) => sum + (Number(it.deliveredQuantity) || 0), 0),
         },
         { title: 'Delivery confirmed', message: 'Delivery outcome recorded.' },
       )
+      seedDeliveredQuantities(getDemoDelivery(delivery.id))
+      setAddedProducts([])
+      return
     }
 
     const result = await confirmDelivery(delivery.id, {
@@ -899,7 +1050,17 @@ export default function DeliveryDetail() {
       return
     }
 
+    // Backend response is the source of truth for the new status and remaining quantities.
     setDelivery(result.delivery)
+    seedDeliveredQuantities(result.delivery)
+    setAddedProducts([])
+    // A confirm consumes vehicle stock server-side - refetch the session so the van
+    // availability shown here stays truthful (never decremented locally).
+    if (!isAdminView && currentUser?.id && !isDemoDelivery(delivery.id)) {
+      getCurrentVehicleStock(currentUser.id).then((stock) => {
+        if (stock.success) setVehicleStockItems(stock.session?.items || [])
+      })
+    }
     setIsActing(false)
     showToast({ title: 'Delivery confirmed', message: 'Delivery outcome recorded.' })
   }
@@ -917,7 +1078,7 @@ export default function DeliveryDetail() {
     if (isDemoDelivery(delivery.id)) {
       setShowFailForm(false)
       return simulateDemoDelivery(
-        { status: 'returned', failureReason: failureReason.trim(), notes: notes.trim() },
+        { status: 'returned', internalStatus: 'failed', failureReason: failureReason.trim(), notes: notes.trim() },
         { title: 'Delivery marked failed', message: failureReason.trim() },
       )
     }
@@ -1033,6 +1194,41 @@ export default function DeliveryDetail() {
         <WorkflowTimeline delivery={delivery} />
       </Card>
 
+      {/* Server-authored event log (DeliveryHistoryOut) from GET /deliveries/by-id/{id}.
+          Primary fields: event_type / created_at / notes / actor.name / previous_status ->
+          new_status. Aliases are compatibility fallbacks only. Never fabricated; the list
+          endpoint returns [] here and the card is simply not rendered. */}
+      {Array.isArray(delivery.timeline) && delivery.timeline.length > 0 && (
+        <Card title="Activity">
+          <ol className="space-y-3">
+            {delivery.timeline.map((entry, index) => {
+              const label = entry?.event_type || entry?.label || entry?.event || entry?.title || entry?.status || entry?.action || ''
+              if (!label) return null
+              const at = entry?.created_at || entry?.at || entry?.timestamp || entry?.time || null
+              const note = entry?.notes || entry?.note || entry?.description || entry?.detail || entry?.reason || ''
+              const actorName = entry?.actor?.name || entry?.actor_name || ''
+              const prevStatus = entry?.previous_status || ''
+              const nextStatus = entry?.new_status || ''
+              const prettify = (value) => String(value).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+              return (
+                <li key={entry?.id || `${label}-${index}`} className="flex gap-3 text-sm">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-neutral-800">{prettify(label)}</p>
+                    {actorName && <p className="text-neutral-600">{actorName}</p>}
+                    {prevStatus && nextStatus && (
+                      <p className="text-xs text-neutral-500">{prettify(prevStatus)} → {prettify(nextStatus)}</p>
+                    )}
+                    {note && <p className="text-neutral-500">{note}</p>}
+                    {at && <p className="text-xs text-neutral-400">{formatDate(at)}</p>}
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+        </Card>
+      )}
+
       {parentOrderCancelled && (
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
           <Ban className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden="true" />
@@ -1095,15 +1291,33 @@ export default function DeliveryDetail() {
         </Card>
       )}
 
-      {nextAction?.type === 'mark_loaded' && (
+      {nextAction?.type === 'mark_ready' && (
+        <Card title="Picking Complete">
+          <p className="text-sm text-neutral-500">
+            All lines are picked. Mark the delivery ready so it can be loaded onto {delivery.vehicleNumber || 'the vehicle'}.
+            No stock moves yet.
+          </p>
+          <Button type="button" className="mt-4" loading={isActing} onClick={handleMarkReady}>
+            <PackageCheck className="size-4" aria-hidden="true" />
+            Mark Ready
+          </Button>
+        </Card>
+      )}
+
+      {(nextAction?.type === 'mark_loaded' || nextAction?.type === 'load') && (
         <Card title="Load the Vehicle">
           <p className="text-sm text-neutral-500">
             Move the picked goods onto {delivery.vehicleNumber || 'your vehicle'}. This takes the stock off the
             warehouse and onto the van.
           </p>
-          <Button type="button" className="mt-4" loading={isActing} onClick={handleMarkLoaded}>
+          <Button
+            type="button"
+            className="mt-4"
+            loading={isActing}
+            onClick={nextAction.type === 'load' ? handleLoad : handleMarkLoaded}
+          >
             <PackageCheck className="size-4" aria-hidden="true" />
-            Mark Vehicle Loaded
+            {nextAction.type === 'load' ? 'Load Vehicle' : 'Mark Vehicle Loaded'}
           </Button>
         </Card>
       )}
@@ -1149,7 +1363,7 @@ export default function DeliveryDetail() {
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {delivery.items.map((item) => {
-                    const delivering = deliveredQuantities[item.id] ?? 0
+                    const delivering = deliveredQtyFor(item)
                     const price = unitPriceForProduct(item.productId, item.unitPrice)
                     const lineTotal = netLineTotal(price, delivering, item.productId)
                     const vanQty = vehicleQtyFor(item.productId)
@@ -1308,22 +1522,29 @@ export default function DeliveryDetail() {
 
             {/* Adjusted Delivery Summary */}
             <div className="rounded-xl border border-neutral-100 bg-neutral-50/70 p-4 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Original Order Amount</span>
-                <span className="font-medium text-neutral-900">{hasAnyPricing ? formatCurrency(originalOrderAmount) : '—'}</span>
-              </div>
-              <div className="mt-1.5 flex items-center justify-between">
-                <span className="text-neutral-500">Adjusted Delivery Amount</span>
-                <span className="font-semibold text-neutral-900">{hasAnyPricing ? formatCurrency(adjustedDeliveryAmount) : '—'}</span>
-              </div>
-              {hasAnyPricing && (
-                <div className="mt-1.5 flex items-center justify-between border-t border-neutral-200 pt-1.5">
-                  <span className="text-neutral-500">Difference</span>
-                  <span className={`font-bold ${adjustmentDifference > 0 ? 'text-primary-700' : adjustmentDifference < 0 ? 'text-red-600' : 'text-neutral-900'}`}>
-                    {adjustmentDifference > 0 ? '+' : ''}{formatCurrency(adjustmentDifference)}
-                  </span>
-                </div>
-              )}
+              {(() => {
+                const canShow = originalOrderAmount > 0 || hasAnyPricing
+                return (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-500">Original Order Amount</span>
+                      <span className="font-medium text-neutral-900">{canShow ? formatCurrency(originalOrderAmount) : '—'}</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <span className="text-neutral-500">Adjusted Delivery Amount</span>
+                      <span className="font-semibold text-neutral-900">{canShow ? formatCurrency(adjustedDeliveryAmount) : '—'}</span>
+                    </div>
+                    {canShow && (
+                      <div className="mt-1.5 flex items-center justify-between border-t border-neutral-200 pt-1.5">
+                        <span className="text-neutral-500">Difference</span>
+                        <span className={`font-bold ${adjustmentDifference > 0 ? 'text-primary-700' : adjustmentDifference < 0 ? 'text-red-600' : 'text-neutral-900'}`}>
+                          {adjustmentDifference > 0 ? '+' : ''}{formatCurrency(adjustmentDifference)}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
               <p className="mt-2 text-[0.7rem] text-neutral-400">Preview only — final commercial amounts are confirmed by the office.</p>
             </div>
           </div>
@@ -1331,18 +1552,36 @@ export default function DeliveryDetail() {
       )}
 
       {nextAction?.type === 'complete' && !showFailForm && (
-        <Card title="Complete Delivery">
+        <Card title={stageKey === 'partially_delivered' ? 'Complete Remaining Delivery' : 'Complete Delivery'}>
           <div className="space-y-4">
+            {stageKey === 'partially_delivered' && (
+              <p className="text-sm text-neutral-500">
+                Delivering the balance still on the vehicle. Quantities already handed over are not re-sent.
+              </p>
+            )}
             <div className="space-y-2 rounded-lg bg-neutral-50 p-3 text-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Final quantities</p>
-              {delivery.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-3">
-                  <span className="text-neutral-700">{item.productName}</span>
-                  <span className="shrink-0 text-neutral-500">
-                    Ordered {item.plannedQuantity} → <span className="font-semibold text-neutral-900">Delivering {deliveredQuantities[item.id] ?? 0}</span>
-                  </span>
-                </div>
-              ))}
+              <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
+                {stageKey === 'partially_delivered' ? 'This attempt' : 'Final quantities'}
+              </p>
+              {delivery.items.map((item) => {
+                const partial = stageKey === 'partially_delivered'
+                const already = Number(item.deliveredQuantity) || 0
+                const remaining = Math.max(
+                  Number(item.remainingQuantity ?? item.pendingQuantity ?? ((Number(item.plannedQuantity) || 0) - already)) || 0,
+                  0,
+                )
+                return (
+                  <div key={item.id} className="flex items-center justify-between gap-3">
+                    <span className="text-neutral-700">{item.productName}</span>
+                    <span className="shrink-0 text-neutral-500">
+                      {partial
+                        ? <>Remaining {remaining} → </>
+                        : <>Ordered {item.plannedQuantity} → </>}
+                      <span className="font-semibold text-neutral-900">Delivering {deliveredQuantities[item.id] ?? 0}</span>
+                    </span>
+                  </div>
+                )
+              })}
               {addedProducts.map((entry) => (
                 <div key={`recap-${entry.productId}`} className="flex items-center justify-between gap-3">
                   <span className="text-neutral-700">{entry.productName} <span className="text-primary-700">(added)</span></span>
@@ -1404,7 +1643,7 @@ export default function DeliveryDetail() {
             <div className="flex flex-wrap items-center gap-3">
               <Button type="button" loading={isActing} onClick={handleConfirm}>
                 <PackageCheck className="size-4" aria-hidden="true" />
-                Complete Delivery
+                {nextAction?.label || 'Complete Delivery'}
               </Button>
               <Button type="button" variant="danger" disabled={isActing} onClick={() => setShowFailForm(true)}>
                 <Ban className="size-4" aria-hidden="true" />
@@ -1458,14 +1697,13 @@ export default function DeliveryDetail() {
               <InfoField label="Order Amount" value={orderAmount > 0 ? formatCurrency(orderAmount) : '—'} />
               <InfoField label="Previous Pending Balance" value={previousPending != null ? formatCurrency(previousPending) : '—'} />
               <InfoField label="Total Amount Due" value={totalAmountDue > 0 ? formatCurrency(totalAmountDue) : '—'} />
-              <InfoField label="Amount Collected" value={formatCurrency(collectedAmount)} />
+              <InfoField label="Awaiting Reconciliation" value={formatCurrency(recordedCollectionsTotal)} />
+              <InfoField label="Reconciled / Paid" value={formatCurrency(reconciledPaidAmount)} />
               <InfoField label="Remaining Receivable" value={formatCurrency(remainingReceivable)} />
               <div>
                 <p className="text-xs text-neutral-400">Collection Status</p>
                 <div className="mt-1">
-                  <Badge variant={collectionStatus === 'Collected' ? 'success' : collectionStatus === 'Partially Collected' ? 'warning' : 'neutral'}>
-                    {collectionStatus}
-                  </Badge>
+                  <Badge variant={collectionStatusVariant}>{collectionLifecycleStatus}</Badge>
                 </div>
               </div>
             </div>
@@ -1476,10 +1714,51 @@ export default function DeliveryDetail() {
                   Record Collection
                 </Button>
               )}
-              {remainingReceivable <= 0 && collectedAmount > 0 && <Badge variant="success" dot>Fully collected</Badge>}
+              {remainingReceivable <= 0 && reconciledPaidAmount > 0 && <Badge variant="success" dot>Reconciled / Paid</Badge>}
             </div>
+
+            {deliveryCollections.length > 0 && (
+              <div className="overflow-x-auto rounded-xl border border-neutral-100">
+                <table className="w-full min-w-2xl text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                      <th className="px-3.5 py-2.5">Collection #</th>
+                      <th className="px-3.5 py-2.5 text-right">Amount</th>
+                      <th className="px-3.5 py-2.5">Mode</th>
+                      <th className="px-3.5 py-2.5">Reference</th>
+                      <th className="px-3.5 py-2.5">Recorded</th>
+                      <th className="px-3.5 py-2.5">Status</th>
+                      <th className="px-3.5 py-2.5" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-50">
+                    {deliveryCollections.map((collection) => (
+                      <tr key={collection.id}>
+                        <td className="px-3.5 py-2.5 font-medium text-neutral-800">{collection.collectionNumber}</td>
+                        <td className="px-3.5 py-2.5 text-right text-neutral-700">{formatCurrency(collection.amount)}</td>
+                        <td className="px-3.5 py-2.5 text-neutral-500">{formatPaymentMode(collection.paymentMode)}</td>
+                        <td className="px-3.5 py-2.5 text-neutral-500">{collection.reference || '—'}</td>
+                        <td className="px-3.5 py-2.5 text-neutral-500">
+                          {collection.recordedAt ? new Date(collection.recordedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                        </td>
+                        <td className="px-3.5 py-2.5">
+                          <Badge variant={COLLECTION_STATUS_VARIANT[collection.status] || 'neutral'} dot>{formatStatus(collection)}</Badge>
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right">
+                          <button type="button" onClick={() => setCollectionDetail(collection)} className="text-xs font-medium text-primary-700 hover:underline">
+                            Details
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             <p className="text-xs text-neutral-400">
-              Final commercial amounts are confirmed and reconciled by the accounts team.
+              A recorded collection is not a payment yet — the accounts team reconciles it, and the customer / invoice
+              balance updates only then.
             </p>
           </div>
         </Card>
@@ -1493,7 +1772,7 @@ export default function DeliveryDetail() {
               <InfoField label="Delivery Summary" value={`${delivery.deliveredTotal ?? 0} delivered of ${delivery.plannedTotal ?? 0} planned`} />
               <InfoField label="Received By" value={delivery.receiverName || '—'} />
               <InfoField label="Proof of Delivery" value={(podPhotoFileIds.length > 0 || podSignatureFileId) ? 'Uploaded' : 'Not uploaded'} />
-              <InfoField label="Collection Status" value={collectionStatus} />
+              <InfoField label="Collection Status" value={collectionLifecycleStatus} />
             </div>
             <div className="flex flex-wrap items-center gap-3">
               {!isAdminView && (
@@ -1505,7 +1784,8 @@ export default function DeliveryDetail() {
             </div>
             {stageKey === 'partially_delivered' && (
               <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                Some quantity is still pending. The sales team will plan the remaining delivery.
+                Some quantity is still pending and remains on the vehicle. Complete the remaining delivery or
+                return the stock at end of day.
               </p>
             )}
           </div>
@@ -1785,24 +2065,25 @@ export default function DeliveryDetail() {
         delivery={delivery}
         isOpen={isCollectionModalOpen}
         onClose={() => setIsCollectionModalOpen(false)}
-        onRecorded={(payload) => {
-          // Demo delivery: simulate locally (never a real payment API call).
-          if (isDemoDelivery(delivery.id) && payload && typeof payload.amount === 'number') {
-            const prevCollected = Number(delivery.collectedAmount) || 0
-            const prevDue = Number(delivery.amountDue) || 0
-            patchDemoDelivery(delivery.id, {
-              collectedAmount: prevCollected + payload.amount,
-              amountDue: Math.max(prevDue - payload.amount, 0),
-            })
-            setDelivery(getDemoDelivery(delivery.id))
-            setIsCollectionModalOpen(false)
-            showToast({ title: 'Collection recorded (demo)', message: `${formatCurrency(payload.amount)} collected.` })
-            return
-          }
+        onRecorded={(collection) => {
+          // A recorded collection is NOT a payment - it does not touch the delivery's amount
+          // due. It waits in the reconciliation queue for the accounts team.
           setIsCollectionModalOpen(false)
-          showToast({ title: 'Collection recorded', message: 'Payment receipt created.' })
-          loadDetail()
+          showToast({
+            title: 'Collection recorded',
+            message: collection?.amount != null
+              ? `${formatCurrency(collection.amount)} recorded — awaiting reconciliation.`
+              : 'Recorded — awaiting reconciliation by the accounts team.',
+          })
+          loadCollections()
         }}
+      />
+
+      <CollectionDetailDrawer
+        collection={collectionDetail}
+        isOpen={Boolean(collectionDetail)}
+        onClose={() => setCollectionDetail(null)}
+        canReconcile={false}
       />
     </div>
   )

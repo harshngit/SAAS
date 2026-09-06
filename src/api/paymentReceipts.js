@@ -1,5 +1,13 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import {
+  INVOICE_DEMO_ENABLED,
+  demoReceiptsResult,
+  getDemoReceiptById,
+  isDemoInvoice,
+  isDemoReceipt,
+  recordDemoPayment,
+} from '../features/invoices/invoiceDemoData'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -89,6 +97,11 @@ function normalizeReceipt(receipt) {
 }
 
 export async function listPaymentReceipts(params = {}) {
+  // Demo mode: the seeded + locally-recorded demo payment ledger only.
+  if (INVOICE_DEMO_ENABLED && (!params.invoice_id || isDemoInvoice(params.invoice_id))) {
+    return demoReceiptsResult(params)
+  }
+
   try {
     const queryParams = {}
     if (params.customer_id) queryParams.customer_id = params.customer_id
@@ -113,6 +126,11 @@ export async function listPaymentReceipts(params = {}) {
 }
 
 export async function getPaymentReceipt(receiptId) {
+  if (INVOICE_DEMO_ENABLED && isDemoReceipt(receiptId)) {
+    const receipt = getDemoReceiptById(receiptId)
+    return receipt ? { success: true, receipt } : { success: false, error: 'Payment receipt not found.' }
+  }
+
   try {
     const { data } = await apiClient.get(`/payment-receipts/${receiptId}`, {
       headers: authHeader(),
@@ -131,6 +149,11 @@ export async function getPaymentReceipt(receiptId) {
 }
 
 export async function createPaymentReceipt(payload) {
+  // Demo invoice -> simulate locally, never POST a demo id to the backend.
+  if (INVOICE_DEMO_ENABLED && isDemoInvoice(payload.invoiceReferenceId || payload.invoice_reference_id)) {
+    return recordDemoPayment(payload)
+  }
+
   try {
     const { data } = await apiClient.post('/payment-receipts', buildReceiptBody(payload), {
       headers: authHeader(),

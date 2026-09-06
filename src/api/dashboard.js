@@ -1,5 +1,7 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { DEMO_EMPTY, DEMO_MODE } from '../config/demoMode'
+import { buildDemoAdminDashboard, emptyDemoAdminDashboard } from '../features/dashboard/adminDashboardDemoData'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -42,6 +44,11 @@ function authHeader() {
 // branch_id is accepted by the backend but doesn't currently narrow anything (no record carries
 // a branch yet) - passed through anyway in case that changes.
 export async function getAdminDashboard(params = {}) {
+  // ANY demo mode - never calls GET /dashboard/admin.
+  if (DEMO_MODE) {
+    return { success: true, dashboard: DEMO_EMPTY ? emptyDemoAdminDashboard() : buildDemoAdminDashboard(params) }
+  }
+
   try {
     const queryParams = {}
     if (params.date_from) queryParams.date_from = params.date_from

@@ -37,6 +37,28 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
+// ---- Status normalization (ONE boundary) --------------------------------------------------
+// Backend Expense.status is lowercase: pending | approved | rejected | clarification_requested.
+// The UI shows human labels; these two helpers are the only place raw <-> label is mapped.
+const STATUS_LABEL = {
+  pending: 'Pending',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  clarification_requested: 'Clarification Required',
+}
+
+export function expenseStatusLabel(rawStatus) {
+  const key = String(rawStatus || 'pending').toLowerCase()
+  return STATUS_LABEL[key] || key.replace(/_/g, ' ')
+}
+
+// UI label OR key -> the raw value GET /expenses?status= expects.
+export function toExpenseStatusParam(value) {
+  const v = String(value || '').toLowerCase().replace(/\s+/g, '_')
+  if (v === 'clarification' || v === 'clarification_required') return 'clarification_requested'
+  return v // 'pending' | 'approved' | 'rejected' | 'clarification_requested'
+}
+
 function buildExpenseBody(payload) {
   const body = {
     category: payload.category || '',
@@ -64,15 +86,21 @@ function normalizeExpense(expense) {
     expenseDate: expense.expense_date,
     paymentMode: expense.payment_mode || '',
     receiptUrl: expense.receipt_url || '',
+    // Raw lowercase status is the source of truth; label + the legacy `approvalStatus` are
+    // derived so existing components keep working.
+    statusKey: String(expense.status || expense.approval_status || 'pending').toLowerCase(),
+    statusLabel: expenseStatusLabel(expense.status || expense.approval_status),
     expenseStatus: expense.expense_status || 'Submitted',
-    approvalStatus: expense.approval_status || 'Pending',
+    approvalStatus: expenseStatusLabel(expense.status || expense.approval_status),
     paymentStatus: expense.payment_status || 'Pending',
     submittedBy: expense.submitted_by || '',
-    submittedByName: expense.submitted_by_user?.name || '',
+    submittedByName: expense.submitted_by_user?.name || expense.submitted_by_name || '',
     approvedBy: expense.approved_by || null,
-    approverName: expense.approved_by_user?.name || expense.approver?.name || '',
+    approverName: expense.approved_by_user?.name || expense.approver?.name || expense.approved_by_name || '',
     reviewedAt: expense.reviewed_at || expense.approved_at || null,
-    clarificationNote: expense.clarification_note || expense.rejection_reason || '',
+    // Backend field is `reject_reason`; the others are defensive aliases.
+    rejectReason: expense.reject_reason || expense.clarification_note || expense.rejection_reason || '',
+    clarificationNote: expense.reject_reason || expense.clarification_note || expense.rejection_reason || '',
     createdAt: expense.created_at,
     updatedAt: expense.updated_at,
   }
@@ -100,7 +128,7 @@ export async function listExpenses(params = {}) {
   try {
     const queryParams = {}
     if (params.category) queryParams.category = params.category
-    if (params.status) queryParams.status = params.status
+    if (params.status) queryParams.status = toExpenseStatusParam(params.status)
     if (params.submitted_by) queryParams.submitted_by = params.submitted_by
 
     const { data } = await apiClient.get('/expenses', {
@@ -234,6 +262,10 @@ export async function rejectExpense(expenseId, reason) {
     return { success: false, error: message }
   }
 }
+
+// NOTE: there is NO real reimbursement/payment endpoint. Backend PATCH /expenses/{id} only
+// accepts edits while status is pending | clarification_requested, so an approved expense
+// cannot be marked paid from the frontend. Reimbursement stays BACKEND LATER.
 
 export async function requestExpenseClarification(expenseId, reason) {
   try {

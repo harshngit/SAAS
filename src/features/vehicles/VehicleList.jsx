@@ -1,178 +1,132 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CarFront, Edit, Plus, RotateCw, Search, Trash2, User } from 'lucide-react'
-import {
-  createVehicle,
-  deleteVehicle,
-  listVehicles,
-  updateVehicle,
-} from '../../api/vehicles'
+import { useNavigate } from 'react-router-dom'
+import { CarFront, CheckCircle2, Edit, Eye, Plus, RotateCw, Search, Trash2, Truck } from 'lucide-react'
+import { createVehicle, deleteVehicle, listVehicles, updateVehicle } from '../../api/vehicles'
 import { listDeliveryPartners } from '../../api/deliveries'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
-import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-
-const emptyForm = {
-  vehicleNumber: '',
-  vehicleType: '',
-  capacityKg: '',
-  defaultDriverId: '',
-  isActive: true,
-}
-
-function VehicleForm({ vehicle, drivers, saving, formError, onClose, onSave }) {
-  const [formData, setFormData] = useState(emptyForm)
-  const [errors, setErrors] = useState({})
-
-  useEffect(() => {
-    setFormData(vehicle ? { ...emptyForm, ...vehicle } : emptyForm)
-    setErrors({})
-  }, [vehicle])
-
-  const driverOptions = useMemo(
-    () => drivers.map((driver) => ({ value: driver.id, label: driver.name })),
-    [drivers],
-  )
-
-  const validate = () => {
-    const nextErrors = {}
-    if (!formData.vehicleNumber.trim()) nextErrors.vehicleNumber = 'Enter a vehicle number.'
-    if (formData.capacityKg !== '' && Number(formData.capacityKg) < 0) {
-      nextErrors.capacityKg = 'Capacity cannot be negative.'
-    }
-    setErrors(nextErrors)
-    return Object.keys(nextErrors).length === 0
-  }
-
-  const handleSubmit = (event) => {
-    event.preventDefault()
-    if (!validate()) return
-    onSave(formData)
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {formError && (
-        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
-      )}
-
-      <Input
-        label="Vehicle Number"
-        placeholder="e.g. MH12AB1234"
-        value={formData.vehicleNumber}
-        onChange={(event) => setFormData((current) => ({ ...current, vehicleNumber: event.target.value }))}
-        error={errors.vehicleNumber}
-        required
-      />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input
-          label="Vehicle Type"
-          placeholder="e.g. Truck, Van"
-          value={formData.vehicleType}
-          onChange={(event) => setFormData((current) => ({ ...current, vehicleType: event.target.value }))}
-        />
-        <Input
-          label="Capacity (kg)"
-          type="number"
-          min="0"
-          placeholder="Load capacity in kg"
-          value={formData.capacityKg}
-          onChange={(event) => setFormData((current) => ({ ...current, capacityKg: event.target.value }))}
-          error={errors.capacityKg}
-        />
-      </div>
-      <Select
-        label="Default Driver"
-        options={driverOptions}
-        value={formData.defaultDriverId}
-        onChange={(event) => setFormData((current) => ({ ...current, defaultDriverId: event.target.value }))}
-        placeholder={driverOptions.length ? 'Select a delivery partner' : 'No delivery partners available'}
-      />
-
-      <div className="flex flex-col gap-3 rounded-xl border border-neutral-100 bg-neutral-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
-          <input
-            type="checkbox"
-            checked={formData.isActive}
-            onChange={(event) => setFormData((current) => ({ ...current, isActive: event.target.checked }))}
-            className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-          />
-          Active
-        </label>
-      </div>
-
-      <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit" loading={saving}>
-          {vehicle ? 'Save Changes' : 'Register Vehicle'}
-        </Button>
-      </div>
-    </form>
-  )
-}
+import StatCard from '../../components/ui/StatCard'
+import {
+  AVAILABILITY_FILTER_OPTIONS,
+  capacityLabel,
+  deriveAvailability,
+  partnerDisplayName,
+  vehicleDisplayName,
+  vehicleStatus,
+  vehicleStatusMeta,
+  VEHICLE_SORT_OPTIONS,
+  VEHICLE_STATUS_FILTER_OPTIONS,
+  VEHICLE_TYPE_FILTER_OPTIONS,
+} from './vehicleHelpers'
+import {
+  VEHICLES_DEMO_ENABLED,
+  createDemoVehicle,
+  getDemoDeliveryPartners,
+  getDemoVehicles,
+  isDemoVehicle,
+  patchDemoVehicle,
+} from './vehicleDemoData'
+import VehicleForm from './VehicleForm'
 
 export default function VehicleList() {
+  const navigate = useNavigate()
+  const demoOn = VEHICLES_DEMO_ENABLED
+
   const [vehicles, setVehicles] = useState([])
   const [drivers, setDrivers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
-  const [searchTerm, setSearchTerm] = useState('')
+
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [availabilityFilter, setAvailabilityFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [sortFilter, setSortFilter] = useState('recent')
+
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingVehicle, setEditingVehicle] = useState(null)
-  const [deleteTarget, setDeleteTarget] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
+
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const loadVehicles = useCallback(async () => {
+  const load = useCallback(async () => {
     setIsLoading(true)
     setListError('')
 
     const [vehiclesResult, partnersResult] = await Promise.all([listVehicles(), listDeliveryPartners()])
+    const realDrivers = partnersResult.success ? partnersResult.partners : []
+    const demoDrivers = demoOn ? getDemoDeliveryPartners() : []
+    setDrivers([...realDrivers, ...demoDrivers.filter((demo) => !realDrivers.some((real) => real.id === demo.id))])
+
+    const demoRows = demoOn ? getDemoVehicles() : []
 
     if (!vehiclesResult.success) {
-      setVehicles([])
-      setListError(vehiclesResult.error)
+      setVehicles(demoRows)
+      setListError(demoRows.length ? '' : vehiclesResult.error)
       setIsLoading(false)
       return
     }
 
-    setVehicles(vehiclesResult.vehicles)
-
-    if (partnersResult.success) {
-      setDrivers(partnersResult.partners)
-    }
-
+    setVehicles([...vehiclesResult.vehicles, ...demoRows])
     setIsLoading(false)
-  }, [])
+  }, [demoOn])
 
   useEffect(() => {
-    loadVehicles()
-  }, [loadVehicles])
+    load()
+  }, [load])
 
   const driverNameById = useMemo(() => {
     const map = new Map()
-    drivers.forEach((driver) => map.set(driver.id, driver.name))
+    drivers.forEach((driver) => map.set(driver.id, partnerDisplayName(driver)))
     return map
   }, [drivers])
 
-  const filteredVehicles = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase()
-    if (!normalizedSearch) return vehicles
+  const assignedName = (vehicle) =>
+    vehicle.defaultDriverId ? driverNameById.get(vehicle.defaultDriverId) || 'Delivery Partner' : '—'
 
-    return vehicles.filter((vehicle) =>
-      [vehicle.vehicleNumber, vehicle.vehicleType, driverNameById.get(vehicle.defaultDriverId)]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(normalizedSearch)),
+  const stats = useMemo(() => {
+    return vehicles.reduce(
+      (acc, vehicle) => {
+        const active = vehicleStatus(vehicle) === 'active'
+        const assigned = active && Boolean(vehicle.defaultDriverId)
+        return {
+          total: acc.total + 1,
+          active: acc.active + (active ? 1 : 0),
+          assigned: acc.assigned + (assigned ? 1 : 0),
+          available: acc.available + (active && !assigned ? 1 : 0),
+        }
+      },
+      { total: 0, active: 0, assigned: 0, available: 0 },
     )
-  }, [vehicles, searchTerm, driverNameById])
+  }, [vehicles])
+
+  const rows = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    const filtered = vehicles.filter((vehicle) => {
+      const driverName = driverNameById.get(vehicle.defaultDriverId) || ''
+      const matchesSearch =
+        !query ||
+        [vehicleDisplayName(vehicle), vehicle.vehicleNumber, driverName].filter(Boolean).some((value) => String(value).toLowerCase().includes(query))
+      const matchesStatus = statusFilter === 'all' || vehicleStatus(vehicle) === statusFilter
+      const matchesAvailability = availabilityFilter === 'all' || deriveAvailability(vehicle).key === availabilityFilter
+      const matchesType = typeFilter === 'all' || vehicle.vehicleType === typeFilter
+      return matchesSearch && matchesStatus && matchesAvailability && matchesType
+    })
+
+    return filtered.sort((left, right) => {
+      if (sortFilter === 'number') return String(left.vehicleNumber).localeCompare(String(right.vehicleNumber))
+      if (sortFilter === 'name') return vehicleDisplayName(left).localeCompare(vehicleDisplayName(right))
+      return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()
+    })
+  }, [vehicles, search, statusFilter, availabilityFilter, typeFilter, sortFilter, driverNameById])
 
   const openForm = (vehicle = null) => {
     setEditingVehicle(vehicle)
@@ -180,46 +134,56 @@ export default function VehicleList() {
     setIsFormOpen(true)
   }
 
-  const closeForm = () => {
-    if (isSaving) return
-    setIsFormOpen(false)
-    setEditingVehicle(null)
-    setFormError('')
-  }
-
   const handleSave = async (formData) => {
     setIsSaving(true)
     setFormError('')
 
-    const result = editingVehicle
-      ? await updateVehicle(editingVehicle.id, formData)
-      : await createVehicle(formData)
+    if (editingVehicle && isDemoVehicle(editingVehicle.id)) {
+      patchDemoVehicle(editingVehicle.id, formData)
+      await load()
+      setIsSaving(false)
+      setIsFormOpen(false)
+      setEditingVehicle(null)
+      return
+    }
+    if (!editingVehicle && demoOn) {
+      createDemoVehicle(formData)
+      await load()
+      setIsSaving(false)
+      setIsFormOpen(false)
+      return
+    }
 
+    const result = editingVehicle ? await updateVehicle(editingVehicle.id, formData) : await createVehicle(formData)
     if (!result.success) {
       setFormError(result.error)
       setIsSaving(false)
       return
     }
-
-    await loadVehicles()
+    await load()
     setIsSaving(false)
-    closeForm()
+    setIsFormOpen(false)
+    setEditingVehicle(null)
   }
 
   const handleDelete = async () => {
     if (!deleteTarget) return
-
     setIsDeleting(true)
     setDeleteError('')
 
-    const result = await deleteVehicle(deleteTarget.id)
+    if (isDemoVehicle(deleteTarget.id)) {
+      setVehicles((current) => current.filter((vehicle) => vehicle.id !== deleteTarget.id))
+      setIsDeleting(false)
+      setDeleteTarget(null)
+      return
+    }
 
+    const result = await deleteVehicle(deleteTarget.id)
     if (!result.success) {
       setDeleteError(result.error)
       setIsDeleting(false)
       return
     }
-
     setVehicles((current) => current.filter((vehicle) => vehicle.id !== deleteTarget.id))
     setDeleteTarget(null)
     setIsDeleting(false)
@@ -227,171 +191,159 @@ export default function VehicleList() {
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-neutral-900">Vehicles</h1>
+          <p className="mt-1 text-sm text-neutral-500">Your delivery fleet — who each vehicle is assigned to and whether it can be used.</p>
+        </div>
+        <Button type="button" onClick={() => openForm()}>
+          <Plus className="size-4" aria-hidden="true" />
+          Add Vehicle
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard icon={Truck} iconVariant="primary" label="Total Vehicles" value={stats.total} />
+        <StatCard icon={CheckCircle2} iconVariant="success" label="Active Vehicles" value={stats.active} />
+        <StatCard icon={CarFront} iconVariant="info" label="Assigned Vehicles" value={stats.assigned} />
+        <StatCard icon={CarFront} iconVariant="warning" label="Available Vehicles" value={stats.available} />
+      </div>
+
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-4 py-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-neutral-900">Vehicles</h2>
-              <p className="mt-1 text-sm text-neutral-500">Register and manage the delivery vehicles used to fulfil orders.</p>
-            </div>
-            <Button type="button" size="sm" onClick={() => openForm()}>
-              <Plus className="size-4" aria-hidden="true" />
-              Register Vehicle
-            </Button>
+        <div className="flex flex-wrap items-center gap-3 border-b border-neutral-100 px-4 py-4">
+          <div className="relative min-w-56 flex-1">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search Vehicle / Number / Delivery Partner"
+              className="w-full rounded-full border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            />
           </div>
+          <Select options={VEHICLE_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-40" triggerClassName="bg-white" />
+          <Select options={AVAILABILITY_FILTER_OPTIONS} value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)} className="w-40" triggerClassName="bg-white" />
+          <Select options={VEHICLE_TYPE_FILTER_OPTIONS} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-36" triggerClassName="bg-white" />
+          <Select options={VEHICLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-40" triggerClassName="bg-white" />
         </div>
 
-        <div className="border-b border-neutral-100 px-4 py-3">
-          <div className="flex justify-end">
-            <div className="relative w-full sm:w-96">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search vehicles"
-                className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto bg-neutral-50/35 py-4">
+        <div className="overflow-x-auto">
           {listError ? (
-            <div className="py-8 text-center">
+            <div className="p-10 text-center">
               <p className="text-sm text-red-600">{listError}</p>
-              <Button type="button" variant="outline" className="mt-4" onClick={loadVehicles}>
+              <Button type="button" variant="outline" className="mt-4" onClick={load}>
                 <RotateCw className="size-4" aria-hidden="true" />
                 Retry
               </Button>
             </div>
           ) : isLoading ? (
-            <LoadingSpinner label="Loading vehicles..." />
+            <div className="p-10"><LoadingSpinner label="Loading vehicles..." /></div>
           ) : vehicles.length === 0 ? (
-            <div className="py-8 text-center">
+            <div className="p-10 text-center">
               <p className="text-sm font-medium text-neutral-900">No vehicles yet</p>
-              <p className="mt-1 text-sm text-neutral-500">Register your first delivery vehicle to start assigning deliveries.</p>
-              <Button type="button" className="mt-4" onClick={() => openForm()}>
-                <Plus className="size-4" aria-hidden="true" />
-                Register Vehicle
-              </Button>
+              <p className="mt-1 text-sm text-neutral-500">Add your first delivery vehicle to start assigning deliveries.</p>
             </div>
-          ) : filteredVehicles.length === 0 ? (
-            <p className="py-8 text-center text-sm text-neutral-500">No vehicles match this search.</p>
+          ) : rows.length === 0 ? (
+            <p className="py-10 text-center text-sm text-neutral-500">No vehicles match the selected filters.</p>
           ) : (
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  <th className="whitespace-nowrap px-4 py-3">Vehicle Number</th>
-                  <th className="whitespace-nowrap px-4 py-3">Type</th>
-                  <th className="whitespace-nowrap px-4 py-3">Capacity</th>
-                  <th className="whitespace-nowrap px-4 py-3">Default Driver</th>
-                  <th className="whitespace-nowrap px-4 py-3">Status</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredVehicles.map((vehicle) => (
-                  <tr key={vehicle.id} className="bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35">
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-9 items-center justify-center rounded-full bg-primary-50 text-primary-700 ring-1 ring-primary-100">
-                          <CarFront className="size-4" aria-hidden="true" />
+            <>
+              {/* Mobile cards */}
+              <div className="space-y-3 p-4 md:hidden">
+                {rows.map((vehicle) => {
+                  const status = vehicleStatusMeta(vehicle)
+                  const availability = deriveAvailability(vehicle)
+                  return (
+                    <div key={vehicle.id} className="rounded-xl border border-neutral-100 bg-white p-4 shadow-(--shadow-xs)" onClick={() => navigate(`/admin/vehicles/${vehicle.id}`)}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-neutral-900">
+                            {vehicleDisplayName(vehicle)}
+                            {isDemoVehicle(vehicle.id) && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>}
+                          </p>
+                          <p className="truncate text-xs text-neutral-500">{vehicle.vehicleNumber} · {vehicle.vehicleType || '—'}</p>
                         </div>
-                        <span className="font-medium text-neutral-900">{vehicle.vehicleNumber}</span>
+                        <Badge variant={status.variant} dot>{status.label}</Badge>
                       </div>
-                    </td>
-                    <td className="px-4 py-3.5 text-neutral-600">{vehicle.vehicleType || '-'}</td>
-                    <td className="px-4 py-3.5 text-neutral-600">
-                      {vehicle.capacityKg !== null && vehicle.capacityKg !== undefined ? `${vehicle.capacityKg} kg` : '-'}
-                    </td>
-                    <td className="px-4 py-3.5 text-neutral-600">
-                      <span className="inline-flex items-center gap-1.5">
-                        {vehicle.defaultDriverId && <User className="size-3.5 shrink-0 text-neutral-400" aria-hidden="true" />}
-                        {driverNameById.get(vehicle.defaultDriverId) || '-'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <Badge variant={vehicle.isActive ? 'success' : 'neutral'} dot>
-                        {vehicle.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <ActionMenu
-                        items={[
-                          { label: 'Edit', icon: Edit, onClick: () => openForm(vehicle) },
-                          {
-                            label: 'Delete',
-                            icon: Trash2,
-                            danger: true,
-                            onClick: () => setDeleteTarget(vehicle),
-                          },
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                        <div><p className="text-xs text-neutral-400">Assigned To</p><p className="text-neutral-700">{assignedName(vehicle)}</p></div>
+                        <div><p className="text-xs text-neutral-400">Availability</p><p className="text-neutral-700">{availability.label}</p></div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
 
-        <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-xs text-neutral-400">
-          <span>
-            {filteredVehicles.length === 0 ? '0' : `1 to ${filteredVehicles.length}`} of {vehicles.length}
-          </span>
-          <span>Vehicles</span>
+              {/* Desktop table */}
+              <table className="hidden w-full min-w-4xl text-left text-sm md:table">
+                <thead>
+                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                    <th className="whitespace-nowrap px-4 py-3.5">Vehicle</th>
+                    <th className="whitespace-nowrap px-4 py-3.5">Vehicle Number</th>
+                    <th className="whitespace-nowrap px-4 py-3.5">Type</th>
+                    <th className="whitespace-nowrap px-4 py-3.5">Capacity</th>
+                    <th className="whitespace-nowrap px-4 py-3.5">Assigned To</th>
+                    <th className="whitespace-nowrap px-4 py-3.5">Status</th>
+                    <th className="whitespace-nowrap px-4 py-3.5">Availability</th>
+                    <th className="w-12 px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-50">
+                  {rows.map((vehicle) => {
+                    const status = vehicleStatusMeta(vehicle)
+                    const availability = deriveAvailability(vehicle)
+                    return (
+                      <tr key={vehicle.id} className="cursor-pointer transition-colors hover:bg-primary-50/30" onClick={() => navigate(`/admin/vehicles/${vehicle.id}`)}>
+                        <td className="whitespace-nowrap px-4 py-3.5">
+                          <span className="font-medium text-neutral-900">{vehicleDisplayName(vehicle)}</span>
+                          {isDemoVehicle(vehicle.id) && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-neutral-600">{vehicle.vehicleNumber}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-neutral-600">{vehicle.vehicleType || '—'}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-neutral-600">{capacityLabel(vehicle)}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-neutral-700">{assignedName(vehicle)}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5"><Badge variant={status.variant} dot>{status.label}</Badge></td>
+                        <td className="whitespace-nowrap px-4 py-3.5"><Badge variant={availability.variant}>{availability.label}</Badge></td>
+                        <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
+                          <ActionMenu
+                            items={[
+                              { label: 'View', icon: Eye, onClick: () => navigate(`/admin/vehicles/${vehicle.id}`) },
+                              { label: 'Edit', icon: Edit, onClick: () => openForm(vehicle) },
+                              { label: 'Delete', icon: Trash2, danger: true, onClick: () => setDeleteTarget(vehicle) },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </>
+          )}
         </div>
       </Card>
 
-      <Modal
-        isOpen={isFormOpen}
-        onClose={closeForm}
-        title={editingVehicle ? 'Edit Vehicle' : 'Register Vehicle'}
-        className="max-w-lg"
-      >
+      <Modal isOpen={isFormOpen} onClose={() => !isSaving && (setIsFormOpen(false), setEditingVehicle(null))} title={editingVehicle ? 'Edit Vehicle' : 'Add Vehicle'} size="2xl">
         <VehicleForm
           vehicle={editingVehicle}
+          demoMode={editingVehicle ? isDemoVehicle(editingVehicle.id) : demoOn}
           drivers={drivers}
+          existingNumbers={vehicles.filter((vehicle) => vehicle.id !== editingVehicle?.id).map((vehicle) => vehicle.vehicleNumber)}
           saving={isSaving}
           formError={formError}
-          onClose={closeForm}
+          onClose={() => { setIsFormOpen(false); setEditingVehicle(null) }}
           onSave={handleSave}
         />
       </Modal>
 
-      <Modal
-        isOpen={Boolean(deleteTarget)}
-        onClose={() => {
-          if (isDeleting) return
-          setDeleteError('')
-          setDeleteTarget(null)
-        }}
-        title="Delete Vehicle"
-      >
+      <Modal isOpen={Boolean(deleteTarget)} onClose={() => !isDeleting && setDeleteTarget(null)} title="Remove Vehicle">
         <div className="space-y-5">
           <p className="text-sm leading-6 text-neutral-600">
-            Delete {deleteTarget?.vehicleNumber || 'this vehicle'}? This cannot be undone. Vehicles referenced by an active
-            delivery can't be deleted - deactivate them instead.
+            Remove {deleteTarget?.vehicleNumber || 'this vehicle'}? Vehicles with delivery, loading or vehicle-stock history can&apos;t be removed — set them to Inactive instead.
           </p>
-          {deleteError && (
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</div>
-          )}
+          {deleteError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</div>}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={isDeleting}
-              onClick={() => {
-                setDeleteError('')
-                setDeleteTarget(null)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="button" variant="danger" loading={isDeleting} onClick={handleDelete}>
-              Delete
-            </Button>
+            <Button type="button" variant="secondary" disabled={isDeleting} onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button type="button" variant="danger" loading={isDeleting} onClick={handleDelete}>Remove</Button>
           </div>
         </div>
       </Modal>

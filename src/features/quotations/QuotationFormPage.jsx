@@ -17,7 +17,7 @@ import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
 import { formatLeadStatus } from '../leads/leadActivity'
-import { demoLeads, isDemoRecord } from '../leads/demoData'
+import { DEMO_RECORDS_ENABLED, demoLeads, isDemoRecord } from '../leads/demoData'
 import ProductPickerList from '../orders/ProductPickerList'
 import {
   canEditQuotation,
@@ -117,7 +117,12 @@ export default function QuotationFormPage() {
       if (customersResult.success) setCustomers(customersResult.customers)
       if (leadsResult.success) {
         const active = leadsResult.leads.filter((lead) => ['new', 'contacted', 'qualified'].includes(lead.leadStatus))
-        setLeads([...active, ...demoLeads.filter((lead) => ['new', 'contacted', 'qualified'].includes(lead.leadStatus))])
+        // Demo leads only in explicit demo mode - never mixed into the real backend-scoped list.
+        setLeads(
+          DEMO_RECORDS_ENABLED
+            ? [...active, ...demoLeads.filter((lead) => ['new', 'contacted', 'qualified'].includes(lead.leadStatus))]
+            : active,
+        )
       }
       if (productsResult.success) setProducts(productsResult.products)
       if (isSalesOfficer) {

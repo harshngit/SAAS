@@ -8,7 +8,6 @@ import EmptyState from '../../components/ui/EmptyState'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
-import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs'
 import { useToast } from '../../components/ui/toastContext'
@@ -18,13 +17,34 @@ import {
   cancelPurchase,
   deletePurchase,
   getPurchase,
-  PURCHASE_PAYMENT_STATUS_OPTIONS,
   returnPurchaseItems,
   updatePurchasePaymentStatus,
   uploadPurchaseDocument,
 } from '../../api/purchases'
-import { deriveReceivingStatus, derivePaymentStatus, derivePurchaseOutstanding, derivePurchaseStatus, getPurchaseActions } from './purchaseHelpers'
+import {
+  deriveReceivingStatus,
+  derivePaymentStatus,
+  derivePaymentStatusFromAmount,
+  derivePurchaseOutstanding,
+  derivePurchaseStatus,
+  derivePurchaseTax,
+  getPurchaseActions,
+  validatePurchasePaymentAmount,
+} from './purchaseHelpers'
 import { getDemoPurchase, isDemoPurchase, patchDemoPurchase } from './purchaseDemoData'
+import { deriveReceivingStatusFromGrns } from './purchaseGrnHelpers'
+import { getDemoGrns } from './purchaseGrnDemoData'
+import PurchaseGrnPanel from './PurchaseGrnPanel'
+import { getDemoSupplierInvoicesForPurchase } from '../supplierInvoices/supplierInvoiceDemoData'
+import {
+  PURCHASE_RETURNS_DEMO_ENABLED,
+  demoReturnablePurchases,
+  getDemoPurchaseReturnsForPurchase,
+} from '../purchaseReturns/purchaseReturnDemoData'
+import { prStatusMeta, totalReturnQty } from '../purchaseReturns/purchaseReturnHelpers'
+import { invoiceStatusMeta, paymentStatusMeta, resolveSupplierInvoice } from '../supplierInvoices/supplierInvoiceHelpers'
+import SupplierInvoiceQuickView from '../supplierInvoices/SupplierInvoiceQuickView'
+import { useAuthStore } from '../../store/authStore'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -46,10 +66,69 @@ function DetailField({ label, value, className = '' }) {
   )
 }
 
+// Demo-only cross-link: purchase returns raised against this purchase + a start point for a
+// new one. Real mode never renders this (no backend Purchase Return module).
+function PurchaseReturnsCrossLink({ purchaseId, navigate, refreshTick }) {
+  // refreshTick re-reads the localStorage demo store after a GRN / return change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const returns = useMemo(() => getDemoPurchaseReturnsForPurchase(purchaseId), [purchaseId, refreshTick])
+  const returnable = useMemo(
+    () => demoReturnablePurchases().find((entry) => entry.id === purchaseId)?.hasReturnable,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [purchaseId, refreshTick],
+  )
+  if (returns.length === 0 && !returnable) return null
+  return (
+    <Card
+      title="Returns to Supplier"
+      subtitle="Goods returned to the supplier against this purchase"
+      actions={
+        returnable ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/admin/purchase-returns/new?purchase=${encodeURIComponent(purchaseId)}`)}
+          >
+            <RotateCcw className="size-4" aria-hidden="true" />
+            Create Purchase Return
+          </Button>
+        ) : null
+      }
+    >
+      {returns.length === 0 ? (
+        <p className="text-sm text-neutral-400">No returns raised against this purchase yet.</p>
+      ) : (
+        <ul className="divide-y divide-neutral-100">
+          {returns.map((pr) => {
+            const meta = prStatusMeta(pr.status)
+            return (
+              <li key={pr.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
+                <button
+                  type="button"
+                  className="font-medium text-primary-700 hover:underline"
+                  onClick={() => navigate(`/admin/purchase-returns/${encodeURIComponent(pr.id)}`)}
+                >
+                  {pr.returnNumber}
+                </button>
+                <div className="flex items-center gap-3">
+                  <span className="text-neutral-500">Qty {totalReturnQty(pr)}</span>
+                  <span className="text-neutral-400">{formatDate(pr.returnDate)}</span>
+                  <Badge variant={meta.variant}>{meta.label}</Badge>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
 export default function PurchaseInvoiceDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const currentUser = useAuthStore((state) => state.currentUser)
   const isSalesPath = window.location.pathname.startsWith('/sales')
   const basePath = isSalesPath ? '/sales/purchases' : '/admin/purchases'
   const isDemo = isDemoPurchase(id)
@@ -65,7 +144,6 @@ export default function PurchaseInvoiceDetail() {
   const [cancelError, setCancelError] = useState('')
 
   const [paymentOpen, setPaymentOpen] = useState(false)
-  const [paymentStatus, setPaymentStatus] = useState('unpaid')
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentError, setPaymentError] = useState('')
 
@@ -76,6 +154,8 @@ export default function PurchaseInvoiceDetail() {
 
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [grnRefresh, setGrnRefresh] = useState(0)
+  const [quickViewInvoiceId, setQuickViewInvoiceId] = useState(null)
 
   const loadPurchase = async () => {
     setIsLoading(true)
@@ -107,9 +187,30 @@ export default function PurchaseInvoiceDetail() {
 
   const actions = useMemo(() => getPurchaseActions(purchase), [purchase])
   const purchaseStatus = useMemo(() => derivePurchaseStatus(purchase), [purchase])
-  const receiving = useMemo(() => deriveReceivingStatus(purchase), [purchase])
+  // grnRefresh is bumped by the Goods Receipts panel after a demo GRN is added, so the
+  // Receiving card / tab count re-read the local demo store.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const demoGrns = useMemo(() => (isDemo && purchase ? getDemoGrns(purchase.id) : []), [isDemo, purchase, grnRefresh])
+  const receiving = useMemo(() => {
+    if (isDemo && demoGrns.length > 0) return deriveReceivingStatusFromGrns(purchase?.items, demoGrns)
+    return deriveReceivingStatus(purchase)
+  }, [isDemo, demoGrns, purchase])
+  const linkedSupplierInvoices = useMemo(
+    () =>
+      isDemo && purchase
+        ? getDemoSupplierInvoicesForPurchase(purchase.id).map((invoice) =>
+            resolveSupplierInvoice(invoice, { purchase, grns: demoGrns }),
+          )
+        : [],
+    [isDemo, purchase, demoGrns],
+  )
   const payment = useMemo(() => derivePaymentStatus(purchase), [purchase])
   const outstanding = useMemo(() => derivePurchaseOutstanding(purchase), [purchase])
+  const tax = useMemo(() => derivePurchaseTax(purchase), [purchase])
+  const paymentPreview = useMemo(
+    () => derivePaymentStatus({ paymentStatus: derivePaymentStatusFromAmount(paymentAmount, purchase?.total) }),
+    [paymentAmount, purchase],
+  )
 
   const applyDemo = (partial) => {
     patchDemoPurchase(id, partial)
@@ -165,27 +266,31 @@ export default function PurchaseInvoiceDetail() {
 
   const openPaymentModal = () => {
     setPaymentError('')
-    setPaymentStatus(purchase.paymentStatus || 'unpaid')
     setPaymentAmount(String(purchase.amountPaid ?? 0))
     setPaymentOpen(true)
   }
 
   const handleUpdatePayment = async () => {
-    setIsActing(true)
     setPaymentError('')
+    const grandTotal = purchase.total
+    const validationError = validatePurchasePaymentAmount(paymentAmount, grandTotal)
+    if (validationError) {
+      setPaymentError(validationError)
+      return
+    }
+
+    setIsActing(true)
+    const amountPaid = Number(paymentAmount) || 0
+    const paymentStatus = derivePaymentStatusFromAmount(amountPaid, grandTotal)
 
     if (isDemo) {
-      const amountPaid = paymentAmount === '' ? purchase.amountPaid : Number(paymentAmount) || 0
-      applyDemo({ paymentStatus, amountPaid, outstandingAmount: derivePurchaseOutstanding({ total: purchase.total, amountPaid }) })
+      applyDemo({ paymentStatus, amountPaid, outstandingAmount: derivePurchaseOutstanding({ total: grandTotal, amountPaid }) })
       setIsActing(false)
       setPaymentOpen(false)
       return
     }
 
-    const result = await updatePurchasePaymentStatus(id, {
-      paymentStatus,
-      amountPaid: paymentAmount === '' ? undefined : paymentAmount,
-    })
+    const result = await updatePurchasePaymentStatus(id, { paymentStatus, amountPaid })
     setIsActing(false)
     if (!result.success) {
       setPaymentError(result.error)
@@ -387,7 +492,7 @@ export default function PurchaseInvoiceDetail() {
           <TabsList className="min-w-max">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="items">Items</TabsTrigger>
-            <TabsTrigger value="receipts">Goods Receipts</TabsTrigger>
+            <TabsTrigger value="receipts">Goods Receipts{demoGrns.length > 0 ? ` (${demoGrns.length})` : ''}</TabsTrigger>
             <TabsTrigger value="invoices">Invoices</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
             <TabsTrigger value="documents">Documents / Notes</TabsTrigger>
@@ -416,7 +521,7 @@ export default function PurchaseInvoiceDetail() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
               <DetailField label="Subtotal" value={formatCurrency(purchase.subtotal)} />
               <DetailField label="Discount" value={formatCurrency(purchase.discount)} />
-              <DetailField label="Tax" value={formatCurrency(purchase.tax)} />
+              <DetailField label="Tax" value={formatCurrency(tax)} />
               <DetailField label="Grand Total" value={formatCurrency(purchase.total)} />
               <DetailField label="Amount Paid" value={formatCurrency(purchase.amountPaid)} />
               <DetailField label="Outstanding" value={formatCurrency(outstanding)} />
@@ -457,14 +562,17 @@ export default function PurchaseInvoiceDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="receipts" className="mt-4">
-          <Card>
-            <EmptyState
-              icon={PackageSearch}
-              title="No goods receipts yet"
-              description="Goods receipt tracking will appear here once receiving is enabled."
-            />
-          </Card>
+        <TabsContent value="receipts" className="mt-4 space-y-4">
+          <PurchaseGrnPanel
+            purchase={purchase}
+            isDemo={isDemo}
+            currentUserName={currentUser?.name}
+            purchaseStatusKey={purchaseStatus.key}
+            onGrnChange={() => setGrnRefresh((tick) => tick + 1)}
+          />
+          {isDemo && PURCHASE_RETURNS_DEMO_ENABLED && (
+            <PurchaseReturnsCrossLink purchaseId={purchase.id} navigate={navigate} refreshTick={grnRefresh} />
+          )}
         </TabsContent>
 
         <TabsContent value="invoices" className="mt-4 space-y-4">
@@ -474,13 +582,57 @@ export default function PurchaseInvoiceDetail() {
               <DetailField label="Invoice Date" value={formatDate(purchase.invoiceDate)} />
             </div>
           </Card>
-          <Card>
-            <EmptyState
-              icon={FileText}
-              title="No additional invoices"
-              description="Matching multiple supplier invoices to one purchase will be available in a future update."
-            />
-          </Card>
+
+          {linkedSupplierInvoices.length > 0 ? (
+            <Card title="Linked Supplier Invoices" className="p-0" bodyClassName="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-4xl text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                      <th className="px-5 py-3">Supplier Invoice #</th>
+                      <th className="px-5 py-3">Invoice Date</th>
+                      <th className="px-5 py-3 text-right">Invoice Total</th>
+                      <th className="px-5 py-3 text-right">Outstanding</th>
+                      <th className="px-5 py-3">Payment Status</th>
+                      <th className="px-5 py-3">Invoice Status</th>
+                      <th className="px-5 py-3">Verification</th>
+                      <th className="px-5 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-50">
+                    {linkedSupplierInvoices.map((invoice) => {
+                      const invStatus = invoiceStatusMeta(invoice.invoiceStatus)
+                      const payStatus = paymentStatusMeta(invoice.paymentStatus)
+                      return (
+                        <tr key={invoice.id} className="hover:bg-primary-50/35">
+                          <td className="px-5 py-3.5 font-medium text-primary-700">{invoice.supplierInvoiceNumber}</td>
+                          <td className="px-5 py-3.5 text-neutral-600">{formatDate(invoice.invoiceDate)}</td>
+                          <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(invoice.invoiceTotal)}</td>
+                          <td className="px-5 py-3.5 text-right text-neutral-700">{formatCurrency(invoice.outstanding)}</td>
+                          <td className="px-5 py-3.5"><Badge variant={payStatus.variant} dot>{payStatus.label}</Badge></td>
+                          <td className="px-5 py-3.5"><Badge variant={invStatus.variant}>{invStatus.label}</Badge></td>
+                          <td className="px-5 py-3.5">{invoice.match ? <Badge variant={invoice.match.variant}>{invoice.match.label}</Badge> : <span className="text-neutral-400">—</span>}</td>
+                          <td className="px-5 py-3.5 text-right">
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setQuickViewInvoiceId(invoice.id)}>
+                              Quick View
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : (
+            <Card>
+              <EmptyState
+                icon={FileText}
+                title="No supplier invoices linked"
+                description="Supplier invoices raised against this purchase will appear here once supplier invoicing is enabled."
+              />
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="payments" className="mt-4">
@@ -554,8 +706,12 @@ export default function PurchaseInvoiceDetail() {
       <Modal isOpen={paymentOpen} onClose={() => !isActing && setPaymentOpen(false)} title="Record / Update Payment">
         <div className="space-y-4">
           {paymentError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{paymentError}</div>}
-          <Select label="Payment Status" options={PURCHASE_PAYMENT_STATUS_OPTIONS} value={paymentStatus} onChange={(event) => setPaymentStatus(event.target.value)} />
-          <Input label="Amount Paid" type="number" min="0" step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
+          <p className="text-sm text-neutral-500">Grand Total: <span className="font-medium text-neutral-800">{formatCurrency(purchase.total)}</span></p>
+          <Input label="Amount Paid" type="number" min="0" max={purchase.total} step="1" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
+          <div className="flex items-center gap-2 text-sm text-neutral-500">
+            Payment Status: <Badge variant={paymentPreview.variant}>{paymentPreview.label}</Badge>
+            <span className="text-xs text-neutral-400">(derived from amount)</span>
+          </div>
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" disabled={isActing} onClick={() => setPaymentOpen(false)}>Cancel</Button>
             <Button type="button" loading={isActing} onClick={handleUpdatePayment}>Save</Button>
@@ -613,6 +769,13 @@ export default function PurchaseInvoiceDetail() {
           </div>
         </div>
       </Modal>
+
+      <SupplierInvoiceQuickView
+        invoiceId={quickViewInvoiceId}
+        isOpen={Boolean(quickViewInvoiceId)}
+        onClose={() => setQuickViewInvoiceId(null)}
+        onOpenFull={() => navigate(`/admin/supplier-invoices/${quickViewInvoiceId}`)}
+      />
     </div>
   )
 }

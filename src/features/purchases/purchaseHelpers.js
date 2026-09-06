@@ -69,6 +69,49 @@ export function derivePurchaseOutstanding(purchase) {
   return Math.max(total - amountPaid, 0)
 }
 
+// Tax: prefer the backend's own value when it is a finite number. Otherwise derive it from the
+// item lines (same net*rate formula the Create/Edit form itself uses to build taxTotal), so a
+// purchase saved without an aggregate tax field (e.g. an older demo record) still shows a real
+// number instead of NaN/undefined. Falls back to 0 when neither is available.
+export function derivePurchaseTax(purchase) {
+  const backend = Number(purchase?.tax)
+  if (Number.isFinite(backend)) return Math.max(backend, 0)
+  const items = Array.isArray(purchase?.items) ? purchase.items : []
+  const derived = items.reduce((sum, item) => {
+    const quantity = safeNumber(item?.quantity)
+    const price = safeNumber(item?.purchasePrice)
+    const discount = safeNumber(item?.discount)
+    const taxRate = safeNumber(item?.tax)
+    const net = quantity * price * (1 - discount / 100)
+    return sum + net * (taxRate / 100)
+  }, 0)
+  return Number.isFinite(derived) ? Math.max(derived, 0) : 0
+}
+
+// Payment status is DERIVED from the amount, never trusted from a manual dropdown that could
+// contradict it (amount=0 selected as "Paid" would be an impossible state). Matches the backend's
+// own unpaid|partial|paid vocabulary so the derived value can be sent straight to
+// PATCH .../payment-status.
+export function derivePaymentStatusFromAmount(amountPaid, grandTotal) {
+  const paid = safeNumber(amountPaid)
+  const total = safeNumber(grandTotal)
+  if (paid <= 0) return 'unpaid'
+  if (paid >= total) return 'paid'
+  return 'partial'
+}
+
+// Aggregate purchase payment must satisfy 0 <= amountPaid <= grandTotal - overpayment (e.g.
+// paying 100 against a 36 total) is rejected outright rather than silently clamped, so the user
+// sees exactly why Save was blocked.
+export function validatePurchasePaymentAmount(amountPaidRaw, grandTotal) {
+  const amountPaid = Number(amountPaidRaw)
+  if (!Number.isFinite(amountPaid)) return 'Enter a valid amount.'
+  if (amountPaid < 0) return 'Amount paid cannot be negative.'
+  const total = safeNumber(grandTotal)
+  if (amountPaid > total) return `Amount paid cannot exceed the grand total (₹${total.toLocaleString('en-IN')}).`
+  return ''
+}
+
 export function deriveReceivingStatus(purchase) {
   const raw = String(purchase?.receivingStatus || '').toLowerCase()
   return RECEIVING_STATUS_MAP[raw] || RECEIVING_STATUS_MAP.pending

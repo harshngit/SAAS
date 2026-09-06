@@ -2,9 +2,11 @@
 // Objects match normalizeExpense() output so the page renders them directly.
 // Only consulted when config/demoMode.DEMO_MODE is explicitly on (VITE_DEMO_DATA).
 
-import { DEMO_EMPTY } from '../../config/demoMode'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 
-const KEY = 'saas.expenseDemo.v1' // { created: [expense], cancelled: [id] }
+export const DEMO_EXPENSES_ENABLED = DEMO_MODE && !DEMO_EMPTY
+
+const KEY = 'saas.expenseDemo.v1' // { created: [expense], cancelled: [id], overrides: { id: {...} } }
 
 const DEMO_USER = { id: 'demo-user-ravi', name: 'Ravi Kumar' }
 
@@ -36,9 +38,10 @@ const stamp = (offsetDays) => {
 
 function read() {
   try {
-    return JSON.parse(window.localStorage.getItem(KEY)) || { created: [], cancelled: [] }
+    const parsed = JSON.parse(window.localStorage.getItem(KEY)) || {}
+    return { created: parsed.created || [], cancelled: parsed.cancelled || [], overrides: parsed.overrides || {} }
   } catch {
-    return { created: [], cancelled: [] }
+    return { created: [], cancelled: [], overrides: {} }
   }
 }
 function write(value) {
@@ -62,6 +65,8 @@ function expense({ id, category, description, amount, paymentMode, expenseDate, 
     receiptUrl: receipt ? DEMO_RECEIPT : '',
     expenseStatus: 'Submitted',
     approvalStatus: status,
+    statusKey: String(status).toLowerCase(),
+    statusLabel: status,
     paymentStatus: status === 'Approved' ? paymentStatus : 'Pending',
     submittedBy: DEMO_USER.id,
     submittedByName: DEMO_USER.name,
@@ -78,22 +83,103 @@ function expense({ id, category, description, amount, paymentMode, expenseDate, 
 const STATIC = [
   expense({ id: 'demo-exp-1', category: 'Fuel', description: 'Diesel refill before the Baner route', amount: 1500, paymentMode: 'Cash', expenseDate: iso(-1), receipt: true, status: 'Pending', createdOffset: -1 }),
   expense({ id: 'demo-exp-2', category: 'Toll', description: 'Mumbai–Pune expressway toll', amount: 350, paymentMode: 'UPI', expenseDate: iso(-3), receipt: true, status: 'Approved', approverName: 'Operations Manager', paymentStatus: 'Paid', createdOffset: -3 }),
-  expense({ id: 'demo-exp-3', category: 'Vehicle Repair', description: 'Rear tyre puncture + tube replacement', amount: 4500, paymentMode: 'Card', expenseDate: iso(-5), receipt: true, status: 'Rejected', rejectionReason: 'Receipt total does not match the claimed amount.', createdOffset: -6 }),
+  expense({ id: 'demo-exp-3', category: 'Vehicle Repair', description: 'Rear tyre puncture + tube replacement', amount: 4500, paymentMode: 'Card', expenseDate: iso(-5), receipt: true, status: 'Rejected', approverName: 'Operations Manager', rejectionReason: 'Receipt total does not match the claimed amount.', createdOffset: -6 }),
   expense({ id: 'demo-exp-4', category: 'Parking', description: 'Market yard parking, no printed slip available', amount: 120, paymentMode: 'Cash', expenseDate: iso(-2), receipt: false, status: 'Pending', createdOffset: -2 }),
   expense({ id: 'demo-exp-5', category: 'Food / Travel', description: 'Lunch during the long Nashik run', amount: 260, paymentMode: 'Bank Transfer', expenseDate: iso(-8), receipt: true, status: 'Approved', approverName: 'Operations Manager', paymentStatus: 'Pending', createdOffset: -9 }),
   expense({ id: 'demo-exp-6', category: 'Miscellaneous', description: 'Replacement cargo straps and rope', amount: 12750, paymentMode: 'UPI', expenseDate: iso(-4), receipt: true, status: 'Pending', createdOffset: -4 }),
+  {
+    ...expense({ id: 'demo-exp-7', category: 'Fuel', description: 'Diesel top-up, Pune depot', amount: 2100, paymentMode: 'UPI', expenseDate: iso(-3), receipt: false, status: 'Pending', createdOffset: -3 }),
+    approvalStatus: 'Clarification Required',
+    statusKey: 'clarification_requested',
+    statusLabel: 'Clarification Required',
+    approvedBy: 'demo-mgr',
+    approverName: 'Operations Manager',
+    reviewedAt: stamp(-2),
+    clarificationNote: 'Please attach the fuel bill / GST receipt.',
+    rejectReason: 'Please attach the fuel bill / GST receipt.',
+  },
 ]
+
+const now = () => new Date().toISOString()
 
 export function demoExpensesResolved() {
   if (DEMO_EMPTY) return []
-  const { created, cancelled } = read()
+  const { created, cancelled, overrides } = read()
   return [...created, ...STATIC]
     .filter((e) => !cancelled.includes(e.id))
+    .map((e) => (overrides[e.id] ? { ...e, ...overrides[e.id] } : e))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 }
 
+export function getDemoExpense(id) {
+  return demoExpensesResolved().find((e) => e.id === id) || null
+}
+
+function patchOverride(id, partial) {
+  const store = read()
+  store.overrides[id] = { ...(store.overrides[id] || {}), ...partial, updatedAt: now() }
+  write(store)
+  return getDemoExpense(id)
+}
+
+export function simulateDemoApproveExpense(id) {
+  return patchOverride(id, {
+    approvalStatus: 'Approved',
+    statusKey: 'approved',
+    statusLabel: 'Approved',
+    expenseStatus: 'Approved',
+    reviewedAt: now(),
+    approverName: 'Operations Manager',
+    paymentStatus: 'Pending',
+  })
+}
+
+export function simulateDemoRejectExpense(id, reason) {
+  return patchOverride(id, {
+    approvalStatus: 'Rejected',
+    statusKey: 'rejected',
+    statusLabel: 'Rejected',
+    expenseStatus: 'Rejected',
+    reviewedAt: now(),
+    approverName: 'Operations Manager',
+    clarificationNote: reason || 'Rejected.',
+    rejectReason: reason || 'Rejected.',
+  })
+}
+
+export function simulateDemoClarifyExpense(id, reason) {
+  return patchOverride(id, {
+    approvalStatus: 'Clarification Required',
+    statusKey: 'clarification_requested',
+    statusLabel: 'Clarification Required',
+    expenseStatus: 'Submitted',
+    reviewedAt: now(),
+    approverName: 'Operations Manager',
+    clarificationNote: reason || 'Please add more detail.',
+    rejectReason: reason || 'Please add more detail.',
+  })
+}
+
+// Submitter corrects a clarification-requested demo expense -> back to Pending.
+export function simulateDemoUpdateExpense(id, patch) {
+  const current = getDemoExpense(id)
+  if (!current) return null
+  return patchOverride(id, {
+    ...patch,
+    approvalStatus: 'Pending',
+    statusKey: 'pending',
+    statusLabel: 'Pending',
+    clarificationNote: '',
+    rejectReason: '',
+  })
+}
+
+export function simulateDemoReimburseExpense(id, paymentMode) {
+  return patchOverride(id, { paymentStatus: 'Paid', paymentMode: paymentMode || 'Bank Transfer' })
+}
+
 export function simulateDemoCreateExpense({ category, description, amount, paymentMode, expenseDate, hasReceipt }) {
-  const { created, cancelled } = read()
+  const store = read()
   const record = expense({
     id: `demo-exp-${Date.now().toString(36)}`,
     category,
@@ -105,11 +191,11 @@ export function simulateDemoCreateExpense({ category, description, amount, payme
     status: 'Pending',
     createdOffset: 0,
   })
-  write({ created: [record, ...created], cancelled })
+  write({ ...store, created: [record, ...store.created] })
   return record
 }
 
 export function simulateDemoCancelExpense(id) {
-  const { created, cancelled } = read()
-  write({ created, cancelled: [...new Set([...cancelled, id])] })
+  const store = read()
+  write({ ...store, cancelled: [...new Set([...store.cancelled, id])] })
 }

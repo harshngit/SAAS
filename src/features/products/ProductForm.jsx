@@ -242,11 +242,11 @@ const productSections = [
     { name: 'variantInventory', label: 'Variant Inventory', input: 'variantInventory', wide: true },
   ]),
   section('Pricing Information', [
-    { name: 'purchasePrice', label: 'Purchase Price', input: 'number', step: '0.01', required: true },
-    { name: 'sellingPrice', label: 'Selling Price', input: 'number', step: '0.01', required: true },
-    { name: 'mrp', label: 'MSRP/MRP', input: 'number', step: '0.01' },
-    { name: 'wholesalePrice', label: 'Wholesale Price', input: 'number', step: '0.01' },
-    { name: 'dealerPrice', label: 'Dealer Price', input: 'number', step: '0.01' },
+    { name: 'purchasePrice', label: 'Purchase Price', input: 'number', step: '1', required: true },
+    { name: 'sellingPrice', label: 'Selling Price', input: 'number', step: '1', required: true },
+    { name: 'mrp', label: 'MSRP/MRP', input: 'number', step: '1' },
+    { name: 'wholesalePrice', label: 'Wholesale Price', input: 'number', step: '1' },
+    { name: 'dealerPrice', label: 'Dealer Price', input: 'number', step: '1' },
     { name: 'discountPercent', label: 'Discount (%)', input: 'number', step: '1' },
     { name: 'taxInclusivePrice', label: 'Tax Inclusive Price', input: 'checkbox' },
     { name: 'currency', label: 'Currency', input: 'select' },
@@ -265,12 +265,12 @@ const productSections = [
     { name: 'purchaseUnit', label: 'Purchase Unit', input: 'select' },
   ]),
   section('Physical Specifications', [
-    { name: 'weight', label: 'Weight', input: 'number', step: '0.01' },
+    { name: 'weight', label: 'Weight', input: 'number', step: '1' },
     { name: 'weightUnit', label: 'Weight Unit', input: 'select' },
-    { name: 'length', label: 'Length', input: 'number', step: '0.01' },
-    { name: 'width', label: 'Width', input: 'number', step: '0.01' },
-    { name: 'height', label: 'Height', input: 'number', step: '0.01' },
-    { name: 'volume', label: 'Volume', input: 'number', step: '0.01' },
+    { name: 'length', label: 'Length', input: 'number', step: '1' },
+    { name: 'width', label: 'Width', input: 'number', step: '1' },
+    { name: 'height', label: 'Height', input: 'number', step: '1' },
+    { name: 'volume', label: 'Volume', input: 'number', step: '1' },
     { name: 'color', label: 'Color' },
     { name: 'size', label: 'Size' },
     { name: 'material', label: 'Material' },
@@ -1221,7 +1221,7 @@ export default function ProductForm({
                           <input
                             type="number"
                             min="0"
-                            step="0.01"
+                            step="1"
                             value={variant.sellingPrice}
                             onChange={(event) => updateVariant(index, 'sellingPrice', event.target.value)}
                             className="h-9 w-24 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
@@ -1231,7 +1231,7 @@ export default function ProductForm({
                           <input
                             type="number"
                             min="0"
-                            step="0.01"
+                            step="1"
                             value={variant.mrp}
                             onChange={(event) => updateVariant(index, 'mrp', event.target.value)}
                             className="h-9 w-24 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"

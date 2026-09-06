@@ -69,7 +69,9 @@ function normalizeDeliveryItem(item) {
     // starts returning line pricing later. Falls back to the order lookup in the UI.
     unitPrice: item.unit_price ?? item.unitPrice ?? null,
     plannedQuantity: item.planned_quantity ?? item.quantity ?? 0,
-    pickedQuantity: item.picked_quantity ?? 0,
+    // `picked_quantity` is only on the newer DeliveryLineOut - absent on the legacy schema,
+    // where the UI falls back to planned quantity for the picking step.
+    pickedQuantity: item.picked_quantity ?? item.pickedQuantity ?? 0,
     loadedQuantity: item.loaded_quantity ?? 0,
     deliveredQuantity: item.delivered_quantity ?? 0,
     pendingQuantity: item.pending_quantity ?? Math.max((item.planned_quantity ?? item.quantity ?? 0) - (item.delivered_quantity ?? 0), 0),
@@ -108,6 +110,14 @@ function normalizeDelivery(delivery) {
     customerEmail: delivery.customer?.email || delivery.customer_email || '',
     customerDeliveryAddress: delivery.customer?.delivery_address || delivery.delivery_address || '',
     status: delivery.status || 'planned',
+    // NEW contract only: the exact lifecycle stage (planned | accepted | picking | ready |
+    // loaded | in_transit | ...). Empty string on the legacy schema -> deliveryStage.js
+    // derives the stage from status + picking_status + dispatched_at instead.
+    internalStatus: delivery.internal_status || delivery.internalStatus || '',
+    // NEW contract only: server-authored event log from GET /deliveries/by-id/{id}. The list
+    // endpoint and the legacy schema return nothing here - the UI shows no timeline rather
+    // than fabricating one.
+    timeline: Array.isArray(delivery.timeline) ? delivery.timeline : [],
     deliveryPartnerId: delivery.delivery_partner_id || delivery.delivery_partner?.id || '',
     deliveryPartnerName: delivery.delivery_partner?.name || '',
     deliveryPartnerPhone: delivery.delivery_partner?.phone || delivery.delivery_partner_phone || '',
@@ -448,6 +458,8 @@ export async function downloadDeliveryChallan(deliveryId) {
 }
 
 // Order-shaped convenience list for a delivery partner's "what's on my plate today" view.
+// GET /deliveries/assigned intentionally returns OrderOut[] (NOT DeliveryOut[]) - it is the
+// driver's order-level worklist, kept distinct from the delivery lifecycle endpoints.
 function normalizeAssignedOrder(order) {
   if (!order) return order
 

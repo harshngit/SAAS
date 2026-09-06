@@ -166,9 +166,11 @@ function normalizeSalesReturnItem(item) {
     sku: item.sku || item.product_sku || '',
     quantityReturned: item.quantity_returned ?? item.quantity ?? 0,
     receivedQuantity: item.received_quantity ?? null,
+    restockedQuantity: item.restocked_quantity ?? null,
     condition: item.condition || '',
     restock: Boolean(item.restock),
     unitPrice: item.unit_price ?? item.price ?? 0,
+    taxRate: item.tax_rate ?? 0,
     lineTotal: item.line_total ?? item.total ?? 0,
   }
 }
@@ -230,6 +232,29 @@ export async function listSalesReturns(params = {}) {
 
     return { success: false, error: message }
   }
+}
+
+// Sum of quantity already returned per invoice_item_id across every non-rejected return on an
+// invoice. Used by the create form to cap the returnable quantity (§5) so the same delivered
+// units can't be sent back twice. Real API only - returns {} on failure (the form then falls
+// back to the invoiced quantity as the cap, and the backend still validates).
+export async function getInvoiceReturnedQuantities(invoiceReferenceId) {
+  if (!invoiceReferenceId) return { success: true, returnedByItem: {}, returns: [] }
+  const result = await listSalesReturns({ invoice_reference_id: invoiceReferenceId })
+  if (!result.success) return { success: false, error: result.error, returnedByItem: {}, returns: [] }
+
+  const returnedByItem = {}
+  result.salesReturns
+    .filter((salesReturn) => String(salesReturn.status).toLowerCase() !== 'rejected')
+    .forEach((salesReturn) => {
+      ;(salesReturn.items || []).forEach((item) => {
+        const key = item.invoiceItemId
+        if (!key) return
+        returnedByItem[key] = (returnedByItem[key] || 0) + (Number(item.quantityReturned) || 0)
+      })
+    })
+
+  return { success: true, returnedByItem, returns: result.salesReturns }
 }
 
 export async function getSalesReturn(returnId) {

@@ -9,6 +9,7 @@ import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useToast } from '../../components/ui/toastContext'
 import { createInvoice, invoiceOrder, listInvoices } from '../../api/invoices'
+import { INVOICE_DEMO_ENABLED } from './invoiceDemoData'
 import { listCustomers } from '../../api/customers'
 import { getDelivery, listDeliveries } from '../../api/deliveries'
 import { listOrders, getOrder } from '../../api/orders'
@@ -49,6 +50,13 @@ function todayIso() {
 // server-side) - no manual item entry, just a summary + confirm. Invoice quantity is always
 // the actual delivered quantity, never the ordered quantity.
 const billableDeliveryStatuses = ['delivered', 'partially_delivered']
+
+// From Sales Order card: say why an order can't be invoiced yet instead of a bare "Not Available".
+function ineligibleOrderReason(order) {
+  if (order.fulfilmentMethod === 'pickup') return 'Awaiting Pickup'
+  if (!billableDeliveryStatuses.includes(order.fulfilmentStatus)) return 'Not Delivered'
+  return 'No Delivered Quantity'
+}
 
 const invoiceErrorHints = [
   { match: 'no delivered quantity', hint: 'This order has no delivered quantity to invoice yet.' },
@@ -351,9 +359,9 @@ function OrderInvoicePanel({ orderId }) {
                         {isSelected ? 'Selected' : 'Create Invoice'}
                       </Button>
                     ) : (
-                      <Button type="button" size="sm" variant="secondary" disabled title="This delivery has not been delivered yet">
-                        Not Available
-                      </Button>
+                      <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                        Not delivered yet
+                      </span>
                     )}
                   </div>
                 </div>
@@ -535,7 +543,6 @@ function FromOrderFlow({ onBack }) {
                     </div>
                     <p className="mt-1 text-xs text-neutral-400">
                       {formatOrderDate(order.orderDate)} · Total {formatCurrency(order.total)} · Delivered {deliveredQty}
-                      {!hasDelivered && orderInvoices.length === 0 && ' · No delivered quantity'}
                     </p>
                   </div>
                   <div className="mt-3 flex shrink-0 flex-wrap items-center gap-2 sm:mt-0">
@@ -560,15 +567,9 @@ function FromOrderFlow({ onBack }) {
                       </Button>
                     )}
                     {orderInvoices.length === 0 && !hasDelivered && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        disabled
-                        title="No delivered quantity is available for invoicing"
-                      >
-                        Not Available
-                      </Button>
+                      <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                        {ineligibleOrderReason(order)}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -581,13 +582,59 @@ function FromOrderFlow({ onBack }) {
   )
 }
 
+// Demo mode has a fixed, coherent set of sample invoices; creating new ones is not simulated
+// (it needs live customers / products / orders). Recording payments against the seeded
+// invoices IS fully interactive - see Sales Invoices / Receivables.
+function DemoCreateNotice() {
+  const navigate = useNavigate()
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/admin/invoices')}
+          aria-label="Back to invoices"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 hover:bg-neutral-50"
+        >
+          <ArrowLeft className="size-4" />
+        </button>
+        <div>
+          <h1 className="text-2xl font-semibold text-neutral-900">New Invoice</h1>
+          <p className="mt-1 text-sm text-neutral-500">Demo data mode</p>
+        </div>
+      </div>
+      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5 text-sm text-amber-800">
+        <p className="font-semibold">Invoice creation is simulated in demo mode.</p>
+        <p className="mt-2">
+          The demo carries a fixed set of coherent sample invoices — unpaid, partially paid, overdue and paid.
+          Recording payments against them is fully interactive: open{' '}
+          <button type="button" className="font-medium underline" onClick={() => navigate('/admin/invoices')}>Sales Invoices</button>{' '}
+          or{' '}
+          <button type="button" className="font-medium underline" onClick={() => navigate('/admin/receivables')}>Receivables</button>{' '}
+          and use <span className="font-medium">Record Payment</span>.
+        </p>
+        <p className="mt-2">New invoices are created against the live backend when demo data is turned off.</p>
+      </div>
+    </div>
+  )
+}
+
 export default function CreateSalesInvoice() {
+  if (INVOICE_DEMO_ENABLED) return <DemoCreateNotice />
+  return <CreateSalesInvoiceForm />
+}
+
+function CreateSalesInvoiceForm() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const [searchParams] = useSearchParams()
   const orderId = searchParams.get('orderId')
-
-  const [createMode, setCreateMode] = useState('choice')
+  // The list's "New Invoice" button opens a small choice modal and lands here with ?mode=,
+  // so the full-page choice step only shows on a bare /admin/invoices/new visit.
+  const modeParam = searchParams.get('mode')
+  const [createMode, setCreateMode] = useState(
+    modeParam === 'from-order' || modeParam === 'direct' ? modeParam : 'choice',
+  )
 
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
@@ -889,12 +936,12 @@ export default function CreateSalesInvoice() {
           </button>
         </div>
       ) : createMode === 'from-order' ? (
-        <FromOrderFlow onBack={() => setCreateMode('choice')} />
+        <FromOrderFlow onBack={() => (modeParam ? navigate('/admin/invoices') : setCreateMode('choice'))} />
       ) : (
         <>
         <button
           type="button"
-          onClick={() => setCreateMode('choice')}
+          onClick={() => (modeParam ? navigate('/admin/invoices') : setCreateMode('choice'))}
           className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-800"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
@@ -1012,7 +1059,7 @@ export default function CreateSalesInvoice() {
                           <input
                             type="number"
                             min="0"
-                            step="0.01"
+                            step="1"
                             value={item.unitPrice}
                             onChange={(event) => updateItem(index, 'unitPrice', event.target.value)}
                             className="w-24 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
@@ -1035,7 +1082,7 @@ export default function CreateSalesInvoice() {
                             type="number"
                             min="0"
                             max="100"
-                            step="0.01"
+                            step="1"
                             value={item.taxRate}
                             onChange={(event) => updateItem(index, 'taxRate', event.target.value)}
                             className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
@@ -1110,8 +1157,8 @@ export default function CreateSalesInvoice() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input label="Additional Charges (₹)" type="number" min="0" step="0.01" value={additionalCharges} onChange={(event) => setAdditionalCharges(event.target.value)} />
-              <Input label="Extra Discount (₹)" type="number" min="0" step="0.01" value={discount} onChange={(event) => setDiscount(event.target.value)} />
+              <Input label="Additional Charges (₹)" type="number" min="0" step="1" value={additionalCharges} onChange={(event) => setAdditionalCharges(event.target.value)} />
+              <Input label="Extra Discount (₹)" type="number" min="0" step="1" value={discount} onChange={(event) => setDiscount(event.target.value)} />
             </div>
 
             <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
@@ -1235,7 +1282,7 @@ export default function CreateSalesInvoice() {
                   label={paymentType === 'cod' ? 'Amount Collected Now (Optional)' : 'Amount Paid Now (Optional)'}
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="1"
                   value={amountPaid}
                   onChange={(event) => setAmountPaid(event.target.value)}
                 />
