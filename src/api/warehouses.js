@@ -37,12 +37,33 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
+// Trim a string field; return null (not '') so PATCH can clear it and empty stays out of POST.
+function trimmedOrNull(...candidates) {
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null) continue
+    const value = String(candidate).trim()
+    return value || null
+  }
+  return null
+}
+
+// Backend canonical master fields (all persisted now):
+//   name, code, address, city, state, pincode, country, contact_person,
+//   contact_number, email, notes, is_default, is_active
+// The UI keeps its own field names (managerName, contactNumber, pinCode) - map here so the
+// backend naming never leaks into components.
 function buildWarehouseBody(payload) {
   const body = {
     name: payload.name?.trim() || '',
-    address: payload.address?.trim() || null,
-    city: payload.city?.trim() || null,
-    contact_number: payload.contactNumber?.trim() || payload.contact_number?.trim() || null,
+    address: trimmedOrNull(payload.address),
+    city: trimmedOrNull(payload.city),
+    state: trimmedOrNull(payload.state),
+    pincode: trimmedOrNull(payload.pinCode, payload.pincode),
+    country: trimmedOrNull(payload.country),
+    contact_person: trimmedOrNull(payload.managerName, payload.contactPerson, payload.contact_person),
+    contact_number: trimmedOrNull(payload.contactNumber, payload.contact_number),
+    email: trimmedOrNull(payload.email),
+    notes: trimmedOrNull(payload.notes),
   }
 
   const code = payload.code?.trim() || ''
@@ -68,7 +89,13 @@ function normalizeWarehouse(warehouse) {
     code: warehouse.code || '',
     address: warehouse.address || '',
     city: warehouse.city || '',
+    state: warehouse.state || '',
+    pinCode: warehouse.pincode || warehouse.pin_code || '',
+    country: warehouse.country || '',
+    managerName: warehouse.contact_person || '',
     contactNumber: warehouse.contact_number || '',
+    email: warehouse.email || '',
+    notes: warehouse.notes || '',
     isDefault: Boolean(warehouse.is_default),
     isActive: warehouse.is_active !== false,
     createdAt: warehouse.created_at,
@@ -224,4 +251,190 @@ export async function adjustWarehouseStock(warehouseId, payload) {
 
     return { success: false, error: message }
   }
+}
+
+// -----------------------------------------------------------------------------
+// Stock movement ledger.  GET /warehouses/{warehouse_id}/movements
+// query: product_id, variant_id, movement_type, limit, offset
+// -----------------------------------------------------------------------------
+function normalizeMovement(row) {
+  if (!row) return row
+  return {
+    id: row.id,
+    warehouseId: row.warehouse_id || null,
+    productId: row.product_id || null,
+    variantId: row.variant_id || null,
+    productName: row.product_name || row.variant_name || 'Product',
+    variantName: row.variant_name || '',
+    movementType: row.movement_type || '',
+    // Signed: positive = stock added, negative = stock removed.
+    quantity: Number(row.quantity) || 0,
+    balanceAfter: row.balance_after ?? row.balance ?? null,
+    note: row.note || row.notes || '',
+    createdBy: row.created_by_name || row.created_by || '',
+    createdAt: row.created_at || null,
+  }
+}
+
+export async function getWarehouseMovements(warehouseId, params = {}) {
+  try {
+    const queryParams = { limit: params.limit ?? 50, offset: params.offset ?? 0 }
+    if (params.product_id || params.productId) queryParams.product_id = params.product_id || params.productId
+    if (params.variant_id || params.variantId) queryParams.variant_id = params.variant_id || params.variantId
+    if (params.movement_type || params.movementType) {
+      queryParams.movement_type = params.movement_type || params.movementType
+    }
+
+    const { data } = await apiClient.get(`/warehouses/${warehouseId}/movements`, {
+      headers: authHeader(),
+      params: queryParams,
+    })
+
+    const rows = Array.isArray(data) ? data : data?.movements || data?.items || []
+    return { success: true, movements: rows.map(normalizeMovement) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load warehouse movements. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Warehouse transfers.  Lifecycle: draft -> in_transit -> received (or draft -> cancelled)
+//   GET  /transfers                     (status, source_warehouse_id, destination_warehouse_id)
+//   POST /transfers
+//   GET  /transfers/{id}
+//   POST /transfers/{id}/dispatch | /receive | /cancel   (no request body)
+// -----------------------------------------------------------------------------
+function nestedWarehouse(value, idFallback) {
+  if (value && typeof value === 'object') {
+    return { id: value.id || idFallback || null, name: value.name || '', code: value.code || '', isActive: value.is_active !== false }
+  }
+  return { id: idFallback || value || null, name: '', code: '', isActive: true }
+}
+
+function normalizeTransferItem(item) {
+  if (!item) return item
+  return {
+    id: item.id,
+    productId: item.product_id || null,
+    variantId: item.variant_id || null,
+    productName: item.product_name || '',
+    variantName: item.variant_name || '',
+    quantity: Number(item.quantity) || 0,
+  }
+}
+
+function normalizeTransfer(raw) {
+  if (!raw) return raw
+  const source = nestedWarehouse(raw.source_warehouse, raw.source_warehouse_id)
+  const destination = nestedWarehouse(raw.destination_warehouse, raw.destination_warehouse_id)
+  return {
+    id: raw.id,
+    transferNumber: raw.transfer_number || raw.number || raw.id,
+    status: String(raw.status || 'draft').toLowerCase(),
+    notes: raw.notes || raw.note || '',
+    sourceWarehouseId: source.id,
+    sourceWarehouseName: source.name,
+    destinationWarehouseId: destination.id,
+    destinationWarehouseName: destination.name,
+    items: Array.isArray(raw.items) ? raw.items.map(normalizeTransferItem) : [],
+    createdBy: raw.created_by_name || raw.created_by || '',
+    dispatchedBy: raw.dispatched_by_name || raw.dispatched_by || '',
+    dispatchedAt: raw.dispatched_at || null,
+    receivedBy: raw.received_by_name || raw.received_by || '',
+    receivedAt: raw.received_at || null,
+    createdAt: raw.created_at || null,
+    updatedAt: raw.updated_at || null,
+  }
+}
+
+function transferError(error, fallback) {
+  const status = error.response?.status
+  const data = error.response?.data
+  const detail = data?.detail || data?.message || data?.error || data
+  if (status === 404) return 'This transfer is no longer available (404). Please refresh.'
+  if (status === 403) return 'You do not have permission to perform this action.'
+  if (status === 409) return formatApiError(detail, 'This transfer has already moved to the next stage. Refreshing…')
+  return formatApiError(detail, fallback)
+}
+
+export async function listTransfers(params = {}) {
+  try {
+    const queryParams = {}
+    if (params.status && params.status !== 'all') queryParams.status = params.status
+    if (params.source_warehouse_id || params.sourceWarehouseId) {
+      queryParams.source_warehouse_id = params.source_warehouse_id || params.sourceWarehouseId
+    }
+    if (params.destination_warehouse_id || params.destinationWarehouseId) {
+      queryParams.destination_warehouse_id = params.destination_warehouse_id || params.destinationWarehouseId
+    }
+
+    const { data } = await apiClient.get('/transfers', { headers: authHeader(), params: queryParams })
+    const rows = Array.isArray(data) ? data : data?.transfers || data?.items || []
+    return { success: true, transfers: rows.map(normalizeTransfer) }
+  } catch (error) {
+    return { success: false, error: transferError(error, 'Unable to load transfers. Please try again.') }
+  }
+}
+
+export async function getTransfer(transferId) {
+  try {
+    const { data } = await apiClient.get(`/transfers/${transferId}`, { headers: authHeader() })
+    return { success: true, transfer: normalizeTransfer(data) }
+  } catch (error) {
+    return { success: false, error: transferError(error, 'Unable to load this transfer.') }
+  }
+}
+
+export async function createTransfer(payload) {
+  try {
+    const body = {
+      source_warehouse_id: payload.sourceWarehouseId || payload.source_warehouse_id,
+      destination_warehouse_id: payload.destinationWarehouseId || payload.destination_warehouse_id,
+      items: (payload.items || [])
+        .filter((item) => Number(item.quantity) > 0)
+        .map((item) => {
+          const line = {
+            product_id: item.productId || item.product_id,
+            quantity: Math.round(Number(item.quantity)) || 0,
+          }
+          const variantId = item.variantId || item.variant_id
+          if (variantId) line.variant_id = variantId
+          return line
+        }),
+    }
+    const notes = (payload.notes || '').trim?.() ?? payload.notes
+    if (notes) body.notes = notes
+
+    const { data } = await apiClient.post('/transfers', body, { headers: authHeader() })
+    return { success: true, transfer: normalizeTransfer(data) }
+  } catch (error) {
+    return { success: false, error: transferError(error, 'Unable to create this transfer. Please try again.') }
+  }
+}
+
+async function transferAction(transferId, action, fallback) {
+  try {
+    const { data } = await apiClient.post(`/transfers/${transferId}/${action}`, {}, { headers: authHeader() })
+    return { success: true, transfer: normalizeTransfer(data) }
+  } catch (error) {
+    return { success: false, error: transferError(error, fallback) }
+  }
+}
+
+export function dispatchTransfer(transferId) {
+  return transferAction(transferId, 'dispatch', 'Unable to dispatch this transfer. Please try again.')
+}
+
+export function receiveTransfer(transferId) {
+  return transferAction(transferId, 'receive', 'Unable to receive this transfer. Please try again.')
+}
+
+export function cancelTransfer(transferId) {
+  return transferAction(transferId, 'cancel', 'Unable to cancel this transfer. Please try again.')
 }

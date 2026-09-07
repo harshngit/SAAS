@@ -24,18 +24,14 @@ const EMPTY = {
   notes: '',
 }
 
-const REAL_STATUS_OPTIONS = [
-  { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
-]
-const DEMO_STATUS_OPTIONS = [
+const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
   { value: 'maintenance', label: 'Maintenance' },
 ]
 
-// `demoMode` unlocks the fields the live /vehicles API cannot persist
-// (name/model, capacity unit, Maintenance state, notes, make/model/year).
+// The live /vehicles API persists the full master now. `demoMode` only still gates the
+// demo-only free-text `name` field (real vehicles are named by make + model).
 export default function VehicleForm({ vehicle, demoMode = false, drivers = [], existingNumbers = [], saving, formError, error, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY)
   const [fieldErrors, setFieldErrors] = useState({})
@@ -91,17 +87,14 @@ export default function VehicleForm({ vehicle, demoMode = false, drivers = [], e
         )}
         <Input label="Vehicle Number" required value={form.vehicleNumber} error={fieldErrors.vehicleNumber} onChange={(event) => update({ vehicleNumber: event.target.value })} placeholder="MH-02-AB-1234" />
         <Select label="Vehicle Type" required options={[{ value: '', label: 'Select type' }, ...VEHICLE_TYPE_OPTIONS]} value={form.vehicleType} onChange={(event) => update({ vehicleType: event.target.value })} />
+        <Input label="Make" value={form.make} onChange={(event) => update({ make: event.target.value })} placeholder="e.g. Tata" />
+        <Input label="Model" value={form.model} onChange={(event) => update({ model: event.target.value })} placeholder="e.g. Ace Gold" />
+        <Input label="Year" type="number" min="0" step="1" value={form.year} onChange={(event) => update({ year: event.target.value })} />
         <Input label="Capacity" type="number" min="0" step="1" value={form.capacityKg} error={fieldErrors.capacityKg} onChange={(event) => update({ capacityKg: event.target.value })} />
-        {demoMode ? (
-          <Select label="Capacity Unit" options={CAPACITY_UNIT_OPTIONS} value={form.capacityUnit} onChange={(event) => update({ capacityUnit: event.target.value })} />
-        ) : (
-          <Input label="Capacity Unit" value="kg" disabled />
-        )}
-        {demoMode && <Input label="Make" value={form.make} onChange={(event) => update({ make: event.target.value })} />}
-        {demoMode && <Input label="Year" type="number" min="0" step="1" value={form.year} onChange={(event) => update({ year: event.target.value })} />}
+        <Select label="Capacity Unit" options={CAPACITY_UNIT_OPTIONS} value={form.capacityUnit} onChange={(event) => update({ capacityUnit: event.target.value })} />
         <Select label="Assigned Delivery Partner" options={driverOptions} value={form.defaultDriverId} onChange={(event) => update({ defaultDriverId: event.target.value })} />
-        <Select label="Status" required options={demoMode ? DEMO_STATUS_OPTIONS : REAL_STATUS_OPTIONS} value={form.status} onChange={(event) => update({ status: event.target.value })} />
-        {demoMode && <Input as="textarea" label="Notes" className="sm:col-span-2" value={form.notes} onChange={(event) => update({ notes: event.target.value })} />}
+        <Select label="Status" required options={STATUS_OPTIONS} value={form.status} onChange={(event) => update({ status: event.target.value })} />
+        <Input as="textarea" label="Notes" className="sm:col-span-2" value={form.notes} onChange={(event) => update({ notes: event.target.value })} />
       </div>
 
       {warning && (

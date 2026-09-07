@@ -484,10 +484,12 @@ export default function EndOfDayReturn() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
-  // The stock return (endOfDayReturn) and the physical reconciliation are two separate real
-  // calls. If the return posts but the reconciliation fails, `returnPosted` stays true so a
-  // retry only re-sends the reconciliation - never a second return. Backend idempotency TBD.
-  const [returnPosted, setReturnPosted] = useState(false)
+  // The physical reconciliation and the stock return (endOfDayReturn) are two separate real
+  // calls, run in that order. If the reconciliation posts but the return fails,
+  // `reconciliationPosted` stays true so a retry only re-sends the return - never a second
+  // reconciliation (which would create a duplicate audit record).
+  const [reconciliationPosted, setReconciliationPosted] = useState(false)
+  const [postedReconciliation, setPostedReconciliation] = useState(null)
   const [partialFailure, setPartialFailure] = useState(false)
 
   const mapRealReconciliation = useCallback(
@@ -608,7 +610,8 @@ export default function EndOfDayReturn() {
     if (!currentUser?.id) return
     setIsLoading(true)
     setLoadError('')
-    setReturnPosted(false)
+    setReconciliationPosted(false)
+    setPostedReconciliation(null)
     setPartialFailure(false)
     setSubmitError('')
 
@@ -728,23 +731,12 @@ export default function EndOfDayReturn() {
       return
     }
 
-    // Real: record the good-return quantities, then the physical count reconciliation. The
-    // damaged / variance detail (no structured backend field) is folded into the notes.
-    // These are two separate calls - `returnPosted` guards against re-sending the first one
-    // on a retry after the reconciliation fails.
-    if (!returnPosted) {
-      const returnResult = await endOfDayReturn(
-        session.id,
-        normalisedLines.map((l) => ({ productId: l.productId, returnedQty: goodReturnOf(l) })),
-      )
-      if (!returnResult.success) {
-        setSubmitError(returnResult.error)
-        setIsSubmitting(false)
-        return
-      }
-      setReturnPosted(true)
-    }
-
+    // Real, canonical sequence:
+    //   1. /reconcile  - physical-count variance audit against the still-open session
+    //   2. /end-of-day - return the good stock to the warehouse and close the session
+    // The damaged / variance detail (no structured backend field) is folded into the notes.
+    // `reconciliationPosted` guards against re-sending step 1 on a retry after step 2 fails -
+    // a second reconcile would create a duplicate audit record.
     const notes = normalisedLines
       .filter((l) => l.damaged > 0 || varianceOf(l) !== 0)
       .map((l) => {
@@ -757,26 +749,41 @@ export default function EndOfDayReturn() {
       })
       .join(' | ')
 
-    // /reconcile runs AFTER /end-of-day has already moved the good stock back to the
-    // warehouse. So the physical count to send is what is LEFT ON THE VEHICLE after that
-    // return - the pre-return count the partner entered minus what was handed back. The
-    // backend's expected_closing_qty is also post-return, so variance stays correct.
-    //   exact:    physical 4, returned 4 -> 0 ; expected 0 -> variance 0
-    //   shortage: physical 3, returned 3 -> 0 ; expected 1 -> variance -1
-    //   excess:   physical 5, returned 4 -> 1 ; expected 0 -> variance +1
-    //   damaged:  physical 4, returned 2 -> 2 ; expected 2 -> variance 0 (damage stays in notes)
-    const reconResult = await reconcileVehicleStock(session.id, {
-      notes: notes || undefined,
-      items: normalisedLines.map((l) => ({
-        loadingItemId: l.lineId,
-        productId: l.productId,
-        variantId: l.variantId,
-        physicalQty: Math.max(l.physicalCount - goodReturnOf(l), 0),
-      })),
-    })
-    if (!reconResult.success) {
+    // Step 1: reconcile. Send the partner's actual pre-return physical count as-is - the
+    // backend calculates variance against its own expected_closing_qty. Do NOT pre-adjust
+    // for the stock about to be returned.
+    let reconciliation = postedReconciliation
+    if (!reconciliationPosted) {
+      const reconResult = await reconcileVehicleStock(session.id, {
+        notes: notes || undefined,
+        items: normalisedLines.map((l) => ({
+          loadingItemId: l.lineId,
+          productId: l.productId,
+          variantId: l.variantId,
+          physicalQty: l.physicalCount,
+        })),
+      })
+      // Reconcile failed: the session stays active, nothing was returned. Show the error and
+      // allow a full retry - end-of-day is not attempted.
+      if (!reconResult.success) {
+        setSubmitError(reconResult.error)
+        setIsSubmitting(false)
+        return
+      }
+      reconciliation = reconResult.reconciliation
+      setReconciliationPosted(true)
+      setPostedReconciliation(reconciliation)
+    }
+
+    // Step 2: end-of-day return - hand the good stock back to the warehouse; the backend
+    // then closes the loading session.
+    const returnResult = await endOfDayReturn(
+      session.id,
+      normalisedLines.map((l) => ({ productId: l.productId, returnedQty: goodReturnOf(l) })),
+    )
+    if (!returnResult.success) {
       setPartialFailure(true)
-      setSubmitError(reconResult.error)
+      setSubmitError(returnResult.error)
       setIsSubmitting(false)
       setShowConfirm(false)
       return
@@ -786,14 +793,15 @@ export default function EndOfDayReturn() {
     // success/read-only summary NOW from what we just submitted + the reconcile response, and
     // keep the closed session as a local context snapshot - do NOT re-fetch active stock to
     // recover it. A later manual reload correctly shows the empty state + Previous Returns.
-    const record = buildSubmittedRecord(reconResult.reconciliation, session, normalisedLines)
+    const record = buildSubmittedRecord(reconciliation, session, normalisedLines)
     setSubmittedRecord(record)
     setHistory((current) =>
       [record, ...current.filter((r) => r.id !== record.id)].sort(
         (a, b) => new Date(b.date || 0) - new Date(a.date || 0),
       ),
     )
-    setReturnPosted(false)
+    setReconciliationPosted(false)
+    setPostedReconciliation(null)
     setPartialFailure(false)
     setIsSubmitting(false)
     setShowConfirm(false)
@@ -872,15 +880,15 @@ export default function EndOfDayReturn() {
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                   <p className="flex items-center gap-2 text-sm font-medium text-amber-900">
                     <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
-                    Stock return was recorded, but physical reconciliation could not be saved.
+                    Stock count was reconciled, but the end-of-day return could not be completed.
                   </p>
                   <p className="mt-1 text-xs text-amber-700">{submitError}</p>
                   <p className="mt-1 text-xs text-amber-700">
-                    The return itself is already posted — retry only the reconciliation. Do not re-submit the return.
+                    The stock count is already reconciled — retry only the return. It will not be reconciled again.
                   </p>
                   <Button type="button" className="mt-3" loading={isSubmitting} onClick={doSubmit}>
                     <RotateCw className="size-4" aria-hidden="true" />
-                    Retry Reconciliation
+                    Retry End of Day Return
                   </Button>
                 </div>
               ) : (

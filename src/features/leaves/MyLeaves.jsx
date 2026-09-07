@@ -279,7 +279,11 @@ export default function MyLeaves() {
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {filtered.map((l) => (
-                    <tr key={l.id}>
+                    <tr
+                      key={l.id}
+                      onClick={() => setDetailLeave(l)}
+                      className="cursor-pointer transition-colors hover:bg-primary-50/35"
+                    >
                       <td className="px-4 py-3 font-medium text-neutral-900">{typeLabel(l.leaveType)}</td>
                       <td className="px-4 py-3 text-neutral-600">
                         {formatDate(l.startDate)} – {formatDate(l.endDate)}
@@ -288,7 +292,7 @@ export default function MyLeaves() {
                       <td className="max-w-64 truncate px-4 py-3 text-neutral-600" title={l.reason}>{l.reason || '—'}</td>
                       <td className="px-4 py-3"><Badge variant={STATUS_VARIANT[l.status] || 'neutral'} dot>{l.status}</Badge></td>
                       <td className="px-4 py-3 text-neutral-500">{l.createdAt ? formatDate(l.createdAt) : '—'}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                         <div className="flex justify-end gap-1">
                           <Button type="button" variant="ghost" size="sm" onClick={() => setDetailLeave(l)}>
                             <Eye className="size-4" aria-hidden="true" />

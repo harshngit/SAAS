@@ -7,25 +7,33 @@ import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
+import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs'
-import { getVehicle, updateVehicle } from '../../api/vehicles'
-import { listDeliveryPartners } from '../../api/deliveries'
 import {
+  assignVehicleDriver,
+  getVehicle,
+  getVehicleActivity,
+  getVehicleAssignments,
+  updateVehicle,
+} from '../../api/vehicles'
+import { listDeliveryPartners } from '../../api/deliveries'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
+import {
+  assignedPartnerName,
   capacityLabel,
   deriveAvailability,
+  isOperationallyUsable,
   partnerDisplayName,
+  vehicleActivityLabel,
   vehicleDisplayName,
   vehicleStatusMeta,
-  VEHICLE_ACTIVITY_NOTE,
-  VEHICLE_ASSIGNMENT_HISTORY_NOTE,
 } from './vehicleHelpers'
 import {
   getDemoDeliveryPartners,
   getDemoVehicle,
   getDemoVehicleActivity,
   getDemoVehicleAssignments,
-  isDemoVehicle,
   patchDemoVehicle,
 } from './vehicleDemoData'
 import VehicleForm from './VehicleForm'
@@ -46,13 +54,18 @@ function Field({ label, value }) {
   )
 }
 
+// Explicit demo split (task section 26): DEMO_MODE is the network boundary; DEMO_EMPTY = demo
+// mode with zero fixtures.
 export default function VehicleDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const isDemo = isDemoVehicle(id)
+  const isDemo = DEMO_MODE
+  const demoHasFixtures = DEMO_MODE && !DEMO_EMPTY
 
   const [vehicle, setVehicle] = useState(null)
   const [drivers, setDrivers] = useState([])
+  const [assignments, setAssignments] = useState([])
+  const [activity, setActivity] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [refresh, setRefresh] = useState(0)
@@ -61,20 +74,38 @@ export default function VehicleDetail() {
   const [isSaving, setIsSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [assignDriverId, setAssignDriverId] = useState('')
+  const [isAssigning, setIsAssigning] = useState(false)
+  const [assignError, setAssignError] = useState('')
+
   const load = useCallback(async () => {
     setIsLoading(true)
     setLoadError('')
 
     if (isDemo) {
+      if (!demoHasFixtures) {
+        setVehicle(null)
+        setLoadError('Demo vehicle not found.')
+        setIsLoading(false)
+        return
+      }
       const record = getDemoVehicle(id)
       setVehicle(record)
       setDrivers(getDemoDeliveryPartners())
+      setAssignments(record ? getDemoVehicleAssignments(id) : [])
+      setActivity(record ? getDemoVehicleActivity(id) : [])
       setLoadError(record ? '' : 'Demo vehicle not found.')
       setIsLoading(false)
       return
     }
 
-    const [vehicleResult, partnersResult] = await Promise.all([getVehicle(id), listDeliveryPartners()])
+    const [vehicleResult, partnersResult, assignmentsResult, activityResult] = await Promise.all([
+      getVehicle(id),
+      listDeliveryPartners(),
+      getVehicleAssignments(id),
+      getVehicleActivity(id),
+    ])
     if (!vehicleResult.success) {
       setLoadError(vehicleResult.error)
       setIsLoading(false)
@@ -82,30 +113,24 @@ export default function VehicleDetail() {
     }
     setVehicle(vehicleResult.vehicle)
     setDrivers(partnersResult.success ? partnersResult.partners : [])
+    setAssignments(assignmentsResult.success ? assignmentsResult.assignments : [])
+    setActivity(activityResult.success ? activityResult.activity : [])
     setIsLoading(false)
-  }, [id, isDemo])
+  }, [id, isDemo, demoHasFixtures])
 
   useEffect(() => {
     load()
   }, [load, refresh])
 
-  const driverName = useMemo(() => {
-    if (!vehicle?.defaultDriverId) return ''
-    return partnerDisplayName(drivers.find((driver) => driver.id === vehicle.defaultDriverId)) || 'Delivery Partner'
-  }, [drivers, vehicle])
-  const assignments = useMemo(() => {
-    if (isDemo) return getDemoVehicleAssignments(id)
-    if (vehicle?.defaultDriverId) {
-      return {
-        current: { driverName: driverName || 'Delivery Partner', assignedOn: vehicle.assignedOn || '', status: 'Active' },
-        history: [],
-      }
-    }
-    return { current: null, history: [] }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDemo, id, refresh, vehicle, driverName])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const activity = useMemo(() => (isDemo ? getDemoVehicleActivity(id) : []), [isDemo, id, refresh])
+  const reloadAll = () => setRefresh((value) => value + 1)
+
+  const driverName = vehicle ? assignedPartnerName(vehicle) : 'Unassigned'
+  const hasDriver = driverName && driverName !== 'Unassigned'
+
+  const driverOptions = useMemo(
+    () => [{ value: '', label: 'Unassigned' }, ...drivers.map((driver) => ({ value: driver.id, label: partnerDisplayName(driver) }))],
+    [drivers],
+  )
 
   const handleEditSave = async (formData) => {
     setIsSaving(true)
@@ -114,18 +139,48 @@ export default function VehicleDetail() {
       patchDemoVehicle(id, formData)
       setIsSaving(false)
       setEditOpen(false)
-      setRefresh((value) => value + 1)
+      reloadAll()
       return
     }
     const result = await updateVehicle(id, formData)
     if (!result.success) {
+      // Surfaces backend guards verbatim, e.g. the active-loading-session block on a
+      // status change to inactive / maintenance (task section 18).
       setEditError(result.error)
       setIsSaving(false)
       return
     }
     setIsSaving(false)
     setEditOpen(false)
-    setRefresh((value) => value + 1)
+    reloadAll()
+  }
+
+  const openAssign = () => {
+    setAssignError('')
+    setAssignDriverId(vehicle?.defaultDriverId || '')
+    setAssignOpen(true)
+  }
+
+  // One PATCH /vehicles/{id} { default_driver_id }. The backend opens/closes the assignment
+  // history atomically - the frontend just refreshes server state afterwards.
+  const submitAssign = async (driverId) => {
+    setIsAssigning(true)
+    setAssignError('')
+    if (isDemo) {
+      patchDemoVehicle(id, { defaultDriverId: driverId || '' })
+      setIsAssigning(false)
+      setAssignOpen(false)
+      reloadAll()
+      return
+    }
+    const result = await assignVehicleDriver(id, driverId || null)
+    setIsAssigning(false)
+    if (!result.success) {
+      setAssignError(result.error)
+      return
+    }
+    setAssignOpen(false)
+    reloadAll()
   }
 
   if (isLoading) return <LoadingSpinner label="Loading vehicle..." />
@@ -145,6 +200,7 @@ export default function VehicleDetail() {
 
   const status = vehicleStatusMeta(vehicle)
   const availability = deriveAvailability(vehicle)
+  const operational = isOperationallyUsable(vehicle)
 
   return (
     <div className="space-y-5 pb-10">
@@ -173,7 +229,7 @@ export default function VehicleDetail() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard icon={CheckCircle2} iconVariant={status.variant === 'success' ? 'success' : 'neutral'} label="Status" value={status.label} />
         <StatCard icon={CarFront} iconVariant="info" label="Availability" value={availability.label} />
-        <StatCard icon={UserRound} iconVariant="primary" label="Current Assignee" value={driverName || 'Unassigned'} />
+        <StatCard icon={UserRound} iconVariant="primary" label="Current Assignee" value={driverName} />
       </div>
 
       <Tabs defaultValue="overview">
@@ -188,60 +244,73 @@ export default function VehicleDetail() {
         <TabsContent value="overview" className="mt-4 space-y-4">
           <Card title="Vehicle Information">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Field label="Vehicle Name / Model" value={vehicleDisplayName(vehicle)} />
               <Field label="Vehicle Number" value={vehicle.vehicleNumber} />
               <Field label="Type" value={vehicle.vehicleType} />
               <Field label="Capacity" value={capacityLabel(vehicle)} />
+              <Field label="Make" value={vehicle.make} />
+              <Field label="Model" value={vehicle.model} />
+              <Field label="Year" value={vehicle.year} />
               <Field label="Status" value={status.label} />
-              {vehicle.make && <Field label="Make" value={[vehicle.make, vehicle.year].filter(Boolean).join(' · ')} />}
+              <Field label="Created At" value={formatDate(vehicle.createdAt)} />
+              <Field label="Updated At" value={formatDate(vehicle.updatedAt)} />
+              {vehicle.notes && <Field label="Notes" value={vehicle.notes} />}
             </div>
           </Card>
 
-          <Card title="Assignment">
+          <Card
+            title="Assignment"
+            actions={
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={openAssign}>
+                  {hasDriver ? 'Change Driver' : 'Assign Driver'}
+                </Button>
+                {hasDriver && (
+                  <Button type="button" size="sm" variant="ghost" loading={isAssigning} onClick={() => submitAssign('')}>
+                    Unassign
+                  </Button>
+                )}
+              </div>
+            }
+          >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Field label="Assigned Delivery Partner" value={driverName || 'Unassigned'} />
+              <Field label="Assigned Delivery Partner" value={driverName} />
               <Field label="Assignment Status" value={availability.label} />
-              {vehicle.notes && <Field label="Notes" value={vehicle.notes} />}
+              {vehicle.assignedDeliveryPartner?.phone && <Field label="Contact" value={vehicle.assignedDeliveryPartner.phone} />}
+              {vehicle.assignedDeliveryPartner?.email && <Field label="Email" value={vehicle.assignedDeliveryPartner.email} />}
             </div>
+            {assignError && <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{assignError}</div>}
+            {!operational && (
+              <p className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                This vehicle is {status.label} — it is not available for vehicle loading or delivery assignment.
+              </p>
+            )}
           </Card>
         </TabsContent>
 
         <TabsContent value="assignments" className="mt-4 space-y-4">
-          <Card title="Current Assignment">
-            {assignments.current ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <Field label="Delivery Partner" value={assignments.current.driverName} />
-                <Field label="Assigned Date" value={formatDate(assignments.current.assignedOn)} />
-                <Field label="Status" value={assignments.current.status} />
-              </div>
-            ) : (
-              <p className="text-sm text-neutral-500">This vehicle is not assigned to a delivery partner.</p>
-            )}
-          </Card>
-
-          {!isDemo ? (
-            <Card><p className="py-6 text-center text-sm text-neutral-500">{VEHICLE_ASSIGNMENT_HISTORY_NOTE}</p></Card>
-          ) : assignments.history.length === 0 ? (
-            <Card><p className="py-6 text-center text-sm text-neutral-500">No assignment changes recorded yet.</p></Card>
+          {assignments.length === 0 ? (
+            <Card><p className="py-6 text-center text-sm text-neutral-500">No assignment history for this vehicle yet.</p></Card>
           ) : (
             <Card title="Assignment History" className="p-0" bodyClassName="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-2xl text-left text-sm">
                   <thead>
                     <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                      <th className="px-5 py-3">Date</th>
-                      <th className="px-5 py-3">Delivery Partner</th>
-                      <th className="px-5 py-3">Action</th>
-                      <th className="px-5 py-3">Performed By</th>
+                      <th className="px-5 py-3">Driver</th>
+                      <th className="px-5 py-3">Assigned At</th>
+                      <th className="px-5 py-3">Unassigned At</th>
+                      <th className="px-5 py-3">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-50">
-                    {assignments.history.map((entry) => (
+                    {assignments.map((entry) => (
                       <tr key={entry.id} className="hover:bg-primary-50/35">
-                        <td className="px-5 py-3.5 text-neutral-600">{formatDate(entry.date)}</td>
-                        <td className="px-5 py-3.5 font-medium text-neutral-900">{entry.driverName}</td>
-                        <td className="px-5 py-3.5"><Badge variant={entry.action === 'Assigned' ? 'info' : 'neutral'}>{entry.action}</Badge></td>
-                        <td className="px-5 py-3.5 text-neutral-500">{entry.performedBy}</td>
+                        <td className="px-5 py-3.5 font-medium text-neutral-900">{entry.driverName || '—'}</td>
+                        <td className="px-5 py-3.5 text-neutral-600">{formatDate(entry.assignedAt)}</td>
+                        <td className="px-5 py-3.5 text-neutral-600">{entry.isCurrent ? '—' : formatDate(entry.unassignedAt)}</td>
+                        <td className="px-5 py-3.5">
+                          <Badge variant={entry.isCurrent ? 'success' : 'neutral'}>{entry.isCurrent ? 'Current' : 'Previous'}</Badge>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -252,31 +321,25 @@ export default function VehicleDetail() {
         </TabsContent>
 
         <TabsContent value="activity" className="mt-4">
-          {!isDemo ? (
-            <Card><EmptyState icon={Activity} title="Activity not available" description={VEHICLE_ACTIVITY_NOTE} /></Card>
-          ) : activity.length === 0 ? (
-            <Card><p className="py-8 text-center text-sm text-neutral-500">No operational activity recorded for this vehicle yet.</p></Card>
+          {activity.length === 0 ? (
+            <Card><EmptyState icon={Activity} title="No activity yet" description="Vehicle events will appear here as the vehicle is used." /></Card>
           ) : (
             <Card title="Activity" className="p-0" bodyClassName="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-4xl text-left text-sm">
+                <table className="w-full min-w-3xl text-left text-sm">
                   <thead>
                     <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
                       <th className="px-5 py-3">Date</th>
-                      <th className="px-5 py-3">Activity</th>
-                      <th className="px-5 py-3">Reference</th>
-                      <th className="px-5 py-3">Warehouse</th>
-                      <th className="px-5 py-3">Delivery Partner</th>
+                      <th className="px-5 py-3">Event</th>
+                      <th className="px-5 py-3">Details</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-50">
                     {activity.map((entry) => (
                       <tr key={entry.id} className="hover:bg-primary-50/35">
-                        <td className="px-5 py-3.5 text-neutral-600">{formatDate(entry.date)}</td>
-                        <td className="px-5 py-3.5 font-medium text-neutral-900">{entry.activity}</td>
-                        <td className="px-5 py-3.5 text-neutral-500">{entry.reference || '—'}</td>
-                        <td className="px-5 py-3.5 text-neutral-500">{entry.warehouse || '—'}</td>
-                        <td className="px-5 py-3.5 text-neutral-500">{entry.deliveryPartner || '—'}</td>
+                        <td className="px-5 py-3.5 text-neutral-600">{formatDate(entry.createdAt)}</td>
+                        <td className="px-5 py-3.5 font-medium text-neutral-900">{vehicleActivityLabel(entry.type)}</td>
+                        <td className="px-5 py-3.5 text-neutral-500">{entry.description || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -289,6 +352,22 @@ export default function VehicleDetail() {
 
       <Modal isOpen={editOpen} onClose={() => !isSaving && setEditOpen(false)} title="Edit Vehicle" size="2xl">
         <VehicleForm vehicle={vehicle} demoMode={isDemo} drivers={drivers} saving={isSaving} error={editError} onClose={() => setEditOpen(false)} onSave={handleEditSave} />
+      </Modal>
+
+      <Modal isOpen={assignOpen} onClose={() => !isAssigning && setAssignOpen(false)} title={hasDriver ? 'Change Driver' : 'Assign Driver'} size="md">
+        <div className="space-y-4">
+          <Select
+            label="Delivery Partner"
+            options={driverOptions}
+            value={assignDriverId}
+            onChange={(event) => setAssignDriverId(event.target.value)}
+          />
+          {assignError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{assignError}</div>}
+          <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" disabled={isAssigning} onClick={() => setAssignOpen(false)}>Cancel</Button>
+            <Button type="button" loading={isAssigning} onClick={() => submitAssign(assignDriverId)}>Save</Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

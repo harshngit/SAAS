@@ -376,8 +376,12 @@ export default function AdminAttendance() {
                     const hours = workHoursLabel(row.checkIn, row.checkOut)
 
                     return (
-                      <tr key={row.key} className="bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35">
-                        <td className="px-4 py-3.5">
+                      <tr
+                        key={row.key}
+                        onClick={() => navigate(`/admin/attendance/${row.userId}`)}
+                        className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                      >
+                        <td className="px-4 py-3.5" onClick={(event) => event.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={selectedKeys.includes(row.key)}
@@ -431,7 +435,7 @@ export default function AdminAttendance() {
                         </td>
                         <td className="px-4 py-3.5 text-neutral-600">{formatTimeLabel(row.checkOut) || '-'}</td>
                         <td className="px-4 py-3.5 font-medium text-primary-700">{hours || '-'}</td>
-                        <td className="px-4 py-3.5 text-right">
+                        <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
                           <ActionMenu
                             items={[
                               { label: 'View Details', onClick: () => navigate(`/admin/attendance/${row.userId}`) },

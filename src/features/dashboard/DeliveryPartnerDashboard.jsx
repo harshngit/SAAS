@@ -9,15 +9,14 @@ import {
   Eye,
   MapPin,
   Package,
-  PackageCheck,
   PackageX,
   Phone,
   RotateCw,
-  ThumbsUp,
   Truck,
   Undo2,
   Wallet,
 } from 'lucide-react'
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import DataTable from '../../components/ui/DataTable'
@@ -92,14 +91,83 @@ function PriorityRow({ icon: Icon, iconClassName, label, description, count }) {
   )
 }
 
-function StatusTile({ icon: Icon, iconClassName, label, count }) {
+// Distinct hue per delivery lifecycle stage - kept in step with the tile tones below.
+const DELIVERY_STATUS_COLORS = {
+  Assigned: '#ef4444',
+  Accepted: '#14b8a6',
+  Picking: '#f59e0b',
+  'Vehicle Loaded': '#94a3b8',
+  'In Transit': '#3b82f6',
+  Delivered: '#22c55e',
+}
+
+// Grey placeholder ring drawn when there are no deliveries to chart.
+const EMPTY_DONUT = [{ label: 'No deliveries', value: 1, color: '#e5e7eb' }]
+
+function DonutTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const item = payload[0]
   return (
-    <div className="flex min-w-[5.75rem] flex-1 flex-col items-center gap-2 rounded-2xl border border-neutral-100 bg-neutral-50/60 px-2 py-3 text-center">
-      <div className={`flex size-9 items-center justify-center rounded-full ${iconClassName}`}>
-        <Icon className="size-4" aria-hidden="true" />
+    <div className="rounded-xl bg-white px-3 py-2 text-xs shadow-(--shadow-popover) ring-1 ring-black/5">
+      <p className="font-semibold text-neutral-900">{item.name}</p>
+      <p className="mt-1 text-neutral-500">
+        {item.value} {item.value === 1 ? 'delivery' : 'deliveries'}
+      </p>
+    </div>
+  )
+}
+
+function DeliveryStatusDonut({ segments }) {
+  const total = segments.reduce((sum, entry) => sum + entry.value, 0)
+  const hasData = total > 0
+  const pieData = hasData ? segments.filter((entry) => entry.value > 0) : EMPTY_DONUT
+
+  return (
+    <div className="@container flex flex-col items-center gap-4 @[18rem]:flex-row @[18rem]:items-center @[18rem]:gap-3">
+      <div className="relative size-32 shrink-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              nameKey="label"
+              innerRadius="64%"
+              outerRadius="94%"
+              paddingAngle={hasData ? 2 : 0}
+              stroke="none"
+            >
+              {pieData.map((entry) => (
+                <Cell key={entry.label} fill={entry.color} />
+              ))}
+            </Pie>
+            {hasData && <Tooltip content={<DonutTooltip />} />}
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <p className="font-(--font-display) text-[1.4rem] font-semibold leading-none tracking-tight text-neutral-900">
+            {total}
+          </p>
+          <p className="mt-1 text-[0.62rem] text-neutral-400">Deliveries</p>
+        </div>
       </div>
-      <p className="text-[0.7rem] text-neutral-500">{label}</p>
-      <p className="text-base font-semibold text-neutral-900">{count}</p>
+
+      <div className="w-full flex-1 space-y-2">
+        {segments.map((entry) => {
+          const pct = total > 0 ? Math.round((entry.value / total) * 100) : 0
+          return (
+            <div key={entry.label} className="flex items-start justify-between gap-2">
+              <span className="flex min-w-0 flex-1 items-start gap-2 text-[0.72rem] leading-tight text-neutral-600">
+                <span className="mt-0.5 size-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} aria-hidden="true" />
+                <span className="min-w-0">{entry.label}</span>
+              </span>
+              <span className="shrink-0 whitespace-nowrap text-right text-[0.72rem]">
+                <span className="font-semibold text-neutral-900">{entry.value}</span>
+                {total > 0 && <span className="ml-1 text-[0.6rem] text-neutral-400">({pct}%)</span>}
+              </span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -351,15 +419,16 @@ export default function DeliveryPartnerDashboard() {
   ]
 
   // Primary delivery lifecycle only - exceptions (Failed / Partial / Cancelled) live in
-  // Today's Priorities, not here.
-  const deliveryStatusTiles = [
-    { label: 'Assigned', value: assignedCount, icon: Clock, iconClassName: 'bg-red-50 text-red-500' },
-    { label: 'Accepted', value: acceptedCount, icon: ThumbsUp, iconClassName: 'bg-primary-50 text-primary-600' },
-    { label: 'Picking', value: pickingCount, icon: Package, iconClassName: 'bg-amber-50 text-amber-600' },
-    { label: 'Vehicle Loaded', value: loadedCount, icon: PackageCheck, iconClassName: 'bg-neutral-50 text-neutral-500' },
-    { label: 'In Transit', value: inTransitCount, icon: Truck, iconClassName: 'bg-blue-50 text-blue-600' },
-    { label: 'Delivered', value: deliveredCount, icon: CheckCircle2, iconClassName: 'bg-green-50 text-green-600' },
-  ]
+  // Today's Priorities, not here. Rendered as a donut: slice value = stage count,
+  // centre = total across these stages.
+  const deliveryStatusSegments = [
+    { label: 'Assigned', value: assignedCount },
+    { label: 'Accepted', value: acceptedCount },
+    { label: 'Picking', value: pickingCount },
+    { label: 'Vehicle Loaded', value: loadedCount },
+    { label: 'In Transit', value: inTransitCount },
+    { label: 'Delivered', value: deliveredCount },
+  ].map((entry) => ({ ...entry, color: DELIVERY_STATUS_COLORS[entry.label] }))
 
   // Current Vehicle Load. Demo mode uses the demo van; real mode uses the real active session
   // only (null when GET /vehicle-stock/current 404s). Rows are the stock CURRENTLY on the
@@ -510,10 +579,8 @@ export default function DeliveryPartnerDashboard() {
 
         <ShellCard title="Delivery Status">
           <p className="text-xs text-neutral-400">Today at a glance</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {deliveryStatusTiles.map((item) => (
-              <StatusTile key={item.label} {...item} />
-            ))}
+          <div className="mt-4">
+            <DeliveryStatusDonut segments={deliveryStatusSegments} />
           </div>
         </ShellCard>
       </div>

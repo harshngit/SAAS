@@ -509,7 +509,11 @@ export default function MyExpenses() {
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {visible.map((e) => (
-                    <tr key={e.id}>
+                    <tr
+                      key={e.id}
+                      onClick={() => setDetailExpense(e)}
+                      className="cursor-pointer transition-colors hover:bg-primary-50/35"
+                    >
                       <td className="px-4 py-3 font-medium text-neutral-900">{formatDate(e.expenseDate)}</td>
                       <td className="px-4 py-3 text-neutral-600">{e.category || '—'}</td>
                       <td className="max-w-64 truncate px-4 py-3 text-neutral-600" title={e.description}>{e.description || '—'}</td>
@@ -522,7 +526,7 @@ export default function MyExpenses() {
                       </td>
                       <td className="px-4 py-3"><Badge variant={STATUS_VARIANT[claimStatus(e)] || 'neutral'} dot>{claimStatus(e)}</Badge></td>
                       <td className="px-4 py-3 text-neutral-500">{e.createdAt ? formatDate(e.createdAt) : '—'}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                         <div className="flex justify-end gap-1">
                           <Button type="button" variant="ghost" size="sm" onClick={() => setDetailExpense(e)}>
                             <Eye className="size-4" aria-hidden="true" />

@@ -142,7 +142,11 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
                   const status = stockStatus(item)
                   const name = friendly(item.productName)
                   return (
-                    <tr key={item.id || item.productId || idx}>
+                    <tr
+                      key={item.id || item.productId || idx}
+                      onClick={() => onViewDetails(item)}
+                      className="cursor-pointer transition-colors hover:bg-primary-50/35"
+                    >
                       <td className="px-4 py-3 font-medium text-neutral-900">{name || '—'}</td>
                       <td className="px-4 py-3 text-neutral-500">{skuVariantLabel(item)}</td>
                       <td className="px-4 py-3 text-neutral-500">{item.uom || '—'}</td>
@@ -164,7 +168,7 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
                       <td className="px-4 py-3">
                         <Badge variant={status.variant}>{status.label}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                         <Button type="button" variant="ghost" size="sm" onClick={() => onViewDetails(item)}>
                           View Details
                         </Button>
@@ -182,7 +186,19 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
               const status = stockStatus(item)
               const name = friendly(item.productName)
               return (
-                <div key={item.id || item.productId || idx} className="p-4">
+                <div
+                  key={item.id || item.productId || idx}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onViewDetails(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      onViewDetails(item)
+                    }
+                  }}
+                  className="cursor-pointer p-4 transition-colors hover:bg-primary-50/35"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-medium text-neutral-900">{name || '—'}</p>
@@ -212,7 +228,10 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
                     variant="outline"
                     size="sm"
                     className="mt-3 w-full"
-                    onClick={() => onViewDetails(item)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onViewDetails(item)
+                    }}
                   >
                     View Details
                   </Button>

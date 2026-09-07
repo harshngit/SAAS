@@ -65,7 +65,10 @@ function collectionError(error, fallback) {
 
 function normalizeCollection(raw) {
   if (!raw) return raw
-  const status = String(raw.status || raw.state || 'recorded').toLowerCase()
+  // Backend canonical lifecycle field is `reconciliation_status`; keep older fallbacks.
+  const status = String(
+    raw.reconciliation_status || raw.status || raw.state || 'recorded',
+  ).toLowerCase()
   return {
     id: raw.id,
     collectionNumber: raw.collection_number || raw.number || raw.id,
@@ -84,7 +87,7 @@ function normalizeCollection(raw) {
     status: status === 'reconciled' || status === 'voided' ? status : 'recorded',
     recordedById: raw.recorded_by_id || raw.created_by_id || raw.recorded_by?.id || '',
     recordedByName: raw.recorded_by_name || raw.recorded_by?.name || raw.created_by?.name || '',
-    recordedAt: raw.recorded_at || raw.created_at || null,
+    recordedAt: raw.collected_at || raw.recorded_at || raw.created_at || null,
     reconciledAt: raw.reconciled_at || null,
     reconciledById: raw.reconciled_by_id || raw.reconciled_by?.id || '',
     reconciledByName: raw.reconciled_by_name || raw.reconciled_by?.name || '',
@@ -112,8 +115,10 @@ function buildCollectionBody(payload) {
   if (mode) body.payment_mode = mode
   const reference = (payload.reference || '').trim?.() ?? payload.reference
   if (reference) body.reference = reference
-  const note = (payload.note || '').trim?.() ?? payload.note
-  if (note) body.note = note
+  // Backend canonical request field is `notes`. Components may still pass `note` internally.
+  const rawNotes = payload.notes ?? payload.note ?? ''
+  const notes = rawNotes.trim?.() ?? rawNotes
+  if (notes) body.notes = notes
   return body
 }
 

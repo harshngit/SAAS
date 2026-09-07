@@ -1,15 +1,17 @@
 // =============================================================================
 // Warehouse - shared derivation helpers.
 // -----------------------------------------------------------------------------
-// Warehouse CRUD and stock aggregation are REAL backend features:
+// All REAL backend features now:
 //   GET/POST   /warehouses
 //   GET/PATCH/DELETE /warehouses/{id}
-//   GET        /warehouses/stock            (on_hand / reserved / available / minimum_stock_level)
+//   GET        /warehouses/stock                      (on_hand / reserved / available / minimum_stock_level)
+//   POST       /warehouses/{id}/stock/adjust
+//   GET        /warehouses/{id}/movements             (stock movement ledger)
+//   GET/POST   /transfers                             (warehouse -> warehouse)
+//   GET        /transfers/{id}
+//   POST       /transfers/{id}/dispatch | /receive | /cancel
 //
-// NOT yet backed by an endpoint (demo-only / future-state):
-//   - warehouse-scoped stock movement history
-//   - warehouse-to-warehouse transfers (entity + lifecycle + stock transaction)
-//   - dedicated warehouse permissions (mapped to the `inventory` module for now)
+// Warehouse permissions are mapped to the `inventory` module (Admin/Org Admin).
 //
 // This file only holds pure UI logic - no API calls, no persistence.
 // =============================================================================
@@ -38,19 +40,24 @@ export const STOCK_STATUS_FILTER_OPTIONS = [
   { value: 'out_of_stock', label: 'Out of Stock' },
 ]
 
-// Available = On Hand - Reserved. Status (task section 11):
-//   Available <= 0                         -> Out of Stock
-//   0 < Available <= Reorder Level         -> Low Stock
-//   Available > Reorder Level              -> In Stock
+// Prefer the backend-provided `available`; otherwise Available = On Hand - Reserved.
 export function availableQty(row) {
+  if (row?.available !== undefined && row?.available !== null && row?.available !== '') {
+    return safeNumber(row.available)
+  }
   return safeNumber(row?.onHand) - safeNumber(row?.reserved)
 }
 
+// Stock status is driven by AVAILABLE stock, never On Hand:
+//   available <= 0                              -> Out of Stock
+//   minimum > 0 AND available <= minimum        -> Low Stock
+//   otherwise                                   -> In Stock
+// A missing / zero minimum_stock_level never marks stock as Low.
 export function deriveStockStatus(row) {
   const available = availableQty(row)
-  const reorder = safeNumber(row?.reorderLevel)
+  const minimum = safeNumber(row?.reorderLevel)
   if (available <= 0) return STOCK_STATUS_META.out_of_stock
-  if (available <= reorder) return STOCK_STATUS_META.low_stock
+  if (minimum > 0 && available <= minimum) return STOCK_STATUS_META.low_stock
   return STOCK_STATUS_META.in_stock
 }
 
@@ -91,18 +98,31 @@ export const WAREHOUSE_STATUS_FILTER_OPTIONS = [
 ]
 
 export const MOVEMENT_TYPE_LABEL = {
+  // Canonical backend movement types.
+  opening: 'Opening',
+  purchase_in: 'Purchase In',
+  sale_out: 'Sale Out',
+  delivery_out: 'Vehicle Loading / Delivery Out',
+  sales_return: 'Sales Return',
+  purchase_return: 'Purchase Return',
+  damaged: 'Damaged',
+  expired: 'Expired',
+  adjustment: 'Adjustment',
+  transfer_out: 'Transfer Out',
+  transfer_in: 'Transfer In',
+  // Legacy / demo-only labels kept so demo movement rows still render.
   goods_received: 'Goods Received',
   reservation: 'Reservation',
   reservation_released: 'Reservation Released',
   vehicle_loading: 'Vehicle Loading',
   delivery_return: 'Delivery Return',
-  transfer_in: 'Transfer In',
-  transfer_out: 'Transfer Out',
-  adjustment: 'Adjustment',
 }
 
 export function movementTypeLabel(value) {
-  return MOVEMENT_TYPE_LABEL[value] || value || '—'
+  if (MOVEMENT_TYPE_LABEL[value]) return MOVEMENT_TYPE_LABEL[value]
+  if (!value) return '—'
+  // Fallback: turn an unknown snake_case type into Title Case rather than showing the raw value.
+  return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 export const TRANSFER_STATUS_META = {
@@ -116,14 +136,25 @@ export function transferStatusMeta(key) {
   return TRANSFER_STATUS_META[String(key || '').toLowerCase()] || TRANSFER_STATUS_META.draft
 }
 
-// Create Transfer validation (task section 15).
-export function validateTransfer({ fromWarehouse, toWarehouse, transferDate, items }) {
+// Stock-changing / lifecycle actions allowed per status (task sections 15-18).
+export function canDispatchTransfer(transfer) {
+  return String(transfer?.status || '').toLowerCase() === 'draft'
+}
+export function canReceiveTransfer(transfer) {
+  return String(transfer?.status || '').toLowerCase() === 'in_transit'
+}
+export function canCancelTransfer(transfer) {
+  return String(transfer?.status || '').toLowerCase() === 'draft'
+}
+
+// Create Transfer validation (task section 13). `transferDate` is UI-only (demo) and never
+// sent to the backend, so it is not validated here.
+export function validateTransfer({ fromWarehouse, toWarehouse, items }) {
   if (!fromWarehouse?.id) return 'Select the source warehouse.'
   if (!toWarehouse?.id) return 'Select the destination warehouse.'
   if (fromWarehouse.id === toWarehouse.id) return 'Source and destination warehouses must be different.'
   if (fromWarehouse.isActive === false) return 'Stock cannot be transferred out of an inactive warehouse.'
   if (toWarehouse.isActive === false) return 'Stock cannot be transferred into an inactive warehouse.'
-  if (!transferDate) return 'Enter a transfer date.'
   const lines = (items || []).filter((item) => safeNumber(item.quantity) > 0)
   if (lines.length === 0) return 'Add at least one item with a transfer quantity.'
   for (const item of lines) {
@@ -133,10 +164,3 @@ export function validateTransfer({ fromWarehouse, toWarehouse, transferDate, ite
   }
   return ''
 }
-
-export const WAREHOUSE_REAL_MODE_STOCK_NOTE =
-  'Warehouse inventory integration will be available once stock integration is enabled.'
-export const WAREHOUSE_MOVEMENTS_NOTE =
-  'Warehouse movement history will appear here once movement tracking is enabled.'
-export const WAREHOUSE_TRANSFERS_NOTE =
-  'Warehouse transfers will be available once transfer posting is enabled.'

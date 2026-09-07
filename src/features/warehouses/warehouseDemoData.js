@@ -290,12 +290,43 @@ function writeTransfers(list) {
   }
 }
 
+// Local status overrides for the seed + custom transfers (lifecycle flips only - the demo
+// layer never simulates a stock transaction).
+const TRANSFER_STATUS_KEY = 'saas.warehouseTransferDemoStatus.v1'
+const readTransferStatus = () => readJson(TRANSFER_STATUS_KEY, {})
+
+function applyTransferStatus(list) {
+  const overrides = readTransferStatus()
+  return list.map((transfer) => (overrides[transfer.id] ? { ...transfer, ...overrides[transfer.id] } : transfer))
+}
+
 export function getDemoTransfers(warehouseId) {
-  const all = [...SEED_TRANSFERS, ...readTransfers()].sort(
+  const all = applyTransferStatus([...SEED_TRANSFERS, ...readTransfers()]).sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   )
   if (!warehouseId) return all
   return all.filter((transfer) => transfer.fromWarehouseId === warehouseId || transfer.toWarehouseId === warehouseId)
+}
+
+export function getDemoTransfer(id) {
+  return getDemoTransfers().find((transfer) => transfer.id === id) || null
+}
+
+function setDemoTransferStatus(id, patch) {
+  const map = readTransferStatus()
+  map[id] = { ...(map[id] || {}), ...patch }
+  writeJson(TRANSFER_STATUS_KEY, map)
+  return getDemoTransfer(id)
+}
+
+export function dispatchDemoTransfer(id) {
+  return setDemoTransferStatus(id, { status: 'in_transit', dispatchedAt: new Date().toISOString() })
+}
+export function receiveDemoTransfer(id) {
+  return setDemoTransferStatus(id, { status: 'received', receivedAt: new Date().toISOString() })
+}
+export function cancelDemoTransfer(id) {
+  return setDemoTransferStatus(id, { status: 'cancelled' })
 }
 
 export function nextTransferNumber() {

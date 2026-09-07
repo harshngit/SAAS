@@ -174,6 +174,7 @@ export default function OrganizationsList() {
           loading={isLoadingOrganizations}
           emptyTitle={listError ? 'Unable to load organizations' : 'No organizations found'}
           emptyDescription={listError || undefined}
+          onRowClick={(row) => navigate(`/superadmin/organizations/${row.id}`)}
           actions={(row) => [
             { label: 'View Details', icon: Eye, onClick: () => navigate(`/superadmin/organizations/${row.id}`) },
           ]}

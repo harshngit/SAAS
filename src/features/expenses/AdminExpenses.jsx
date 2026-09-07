@@ -213,6 +213,7 @@ export default function AdminExpenses() {
           data={rows}
           searchKeys={['expenseNumber', 'expenseId', 'category', 'description', 'submittedByName']}
           searchPlaceholder="Search expenses…"
+          onRowClick={(row) => setDetailTarget(row)}
           actions={(row) => {
             const list = [{ label: 'Details', icon: Eye, onClick: () => setDetailTarget(row) }]
             const reviewable = row.approvalStatus === 'Pending' || row.approvalStatus === 'Clarification Required'

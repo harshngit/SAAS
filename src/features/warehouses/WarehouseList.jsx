@@ -19,6 +19,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { safeNumber } from '../purchases/purchaseHelpers'
 import {
   warehouseStatusMeta,
@@ -26,7 +27,6 @@ import {
   WAREHOUSE_STATUS_FILTER_OPTIONS,
 } from './warehouseHelpers'
 import {
-  WAREHOUSES_DEMO_ENABLED,
   createDemoWarehouse,
   getDemoWarehouses,
   isDemoWarehouse,
@@ -83,7 +83,10 @@ function StockAdjustForm({ warehouse, saving, formError, onClose, onSave }) {
 
 export default function WarehouseList() {
   const navigate = useNavigate()
-  const demoOn = WAREHOUSES_DEMO_ENABLED
+  // Explicit demo split (task section 27): demo mode -> demo fixtures only, no real API call;
+  // real mode -> real API only, an empty response is a real empty state (never a demo fallback).
+  const isDemo = DEMO_MODE
+  const demoHasFixtures = DEMO_MODE && !DEMO_EMPTY
 
   const [warehouses, setWarehouses] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -111,6 +114,13 @@ export default function WarehouseList() {
     setIsLoading(true)
     setListError('')
 
+    // Demo mode: local fixtures only, no real API call.
+    if (isDemo) {
+      setWarehouses(demoHasFixtures ? getDemoWarehouses() : [])
+      setIsLoading(false)
+      return
+    }
+
     const [result, stockResult] = await Promise.all([listWarehouses(), getWarehouseStock()])
     const stockByWarehouse = {}
     if (stockResult.success) {
@@ -120,27 +130,28 @@ export default function WarehouseList() {
         stockByWarehouse[wid].productCount += 1
         stockByWarehouse[wid].stockUnits += safeNumber(row.on_hand)
         const available = safeNumber(row.available ?? safeNumber(row.on_hand) - safeNumber(row.reserved))
-        // Low Stock only: Available > 0 AND Available <= reorder level (Out of Stock is separate).
-        if (available > 0 && available <= safeNumber(row.minimum_stock_level)) stockByWarehouse[wid].lowStockCount += 1
+        // Low Stock only: minimum > 0 AND 0 < Available <= minimum (Out of Stock is separate).
+        const minimum = safeNumber(row.minimum_stock_level)
+        if (minimum > 0 && available > 0 && available <= minimum) stockByWarehouse[wid].lowStockCount += 1
       })
     }
 
-    const demoRows = demoOn ? getDemoWarehouses() : []
-
+    // Real mode: a failure is a real error; an empty list is a truthful empty state.
     if (!result.success) {
-      setWarehouses(demoRows)
-      setListError(demoRows.length ? '' : result.error)
+      setWarehouses([])
+      setListError(result.error)
       setIsLoading(false)
       return
     }
 
-    const realRows = result.warehouses.map((warehouse) => ({
-      ...warehouse,
-      ...(stockByWarehouse[warehouse.id] || { productCount: 0, stockUnits: 0, lowStockCount: 0 }),
-    }))
-    setWarehouses([...realRows, ...demoRows])
+    setWarehouses(
+      result.warehouses.map((warehouse) => ({
+        ...warehouse,
+        ...(stockByWarehouse[warehouse.id] || { productCount: 0, stockUnits: 0, lowStockCount: 0 }),
+      })),
+    )
     setIsLoading(false)
-  }, [demoOn])
+  }, [isDemo, demoHasFixtures])
 
   useEffect(() => {
     loadWarehouses()
@@ -186,19 +197,13 @@ export default function WarehouseList() {
     setIsSaving(true)
     setFormError('')
 
-    if (editingWarehouse && isDemoWarehouse(editingWarehouse.id)) {
-      patchDemoWarehouse(editingWarehouse.id, formData)
+    if (isDemo || (editingWarehouse && isDemoWarehouse(editingWarehouse.id))) {
+      if (editingWarehouse) patchDemoWarehouse(editingWarehouse.id, formData)
+      else createDemoWarehouse(formData)
       await loadWarehouses()
       setIsSaving(false)
       setIsFormOpen(false)
       setEditingWarehouse(null)
-      return
-    }
-    if (!editingWarehouse && demoOn) {
-      createDemoWarehouse(formData)
-      await loadWarehouses()
-      setIsSaving(false)
-      setIsFormOpen(false)
       return
     }
 
@@ -397,7 +402,7 @@ export default function WarehouseList() {
       <Modal isOpen={isFormOpen} onClose={() => !isSaving && (setIsFormOpen(false), setEditingWarehouse(null))} title={editingWarehouse ? 'Edit Warehouse' : 'Add Warehouse'} size="2xl">
         <WarehouseForm
           warehouse={editingWarehouse}
-          demoMode={editingWarehouse ? isDemoWarehouse(editingWarehouse.id) : demoOn}
+          demoMode={editingWarehouse ? isDemoWarehouse(editingWarehouse.id) : isDemo}
           saving={isSaving}
           formError={formError}
           onClose={() => { setIsFormOpen(false); setEditingWarehouse(null) }}

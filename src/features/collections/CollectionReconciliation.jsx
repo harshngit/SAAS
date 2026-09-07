@@ -216,6 +216,7 @@ export default function CollectionReconciliation() {
                     data={rows}
                     searchKeys={['collectionNumber', 'deliveryNumber', 'orderNumber', 'customerName', 'reference']}
                     searchPlaceholder="Search collections..."
+                    onRowClick={(row) => setDetail(row)}
                     emptyTitle={
                       statusFilter === 'recorded'
                         ? 'No collections waiting for reconciliation.'

@@ -255,7 +255,11 @@ export default function MyAttendance() {
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {records.map((record) => (
-                    <tr key={record.date}>
+                    <tr
+                      key={record.date}
+                      onClick={() => setDetailRecord(record)}
+                      className="cursor-pointer transition-colors hover:bg-primary-50/35"
+                    >
                       <td className="px-4 py-3 font-medium text-neutral-900">{fullDate(record.date)}</td>
                       <td className="px-4 py-3">
                         <Badge variant={LIFECYCLE_VARIANT[record.lifecycle]} dot>{attendanceLifecycleLabel(record.lifecycle)}</Badge>
@@ -263,7 +267,7 @@ export default function MyAttendance() {
                       <td className="px-4 py-3 text-neutral-600">{formatTime(record.checkIn) || '—'}</td>
                       <td className="px-4 py-3 text-neutral-600">{formatTime(record.checkOut) || '—'}</td>
                       <td className="px-4 py-3 font-medium text-primary-700">{durationLabel(record.checkIn, record.checkOut) || '—'}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                         <Button type="button" variant="ghost" size="sm" onClick={() => setDetailRecord(record)}>View Details</Button>
                       </td>
                     </tr>

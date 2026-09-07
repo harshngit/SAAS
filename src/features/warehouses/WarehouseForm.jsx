@@ -25,9 +25,9 @@ const STATUS_OPTIONS = [
   { value: 'inactive', label: 'Inactive' },
 ]
 
-// `demoMode` unlocks the richer address / manager / notes fields that only the demo layer can
-// persist - the live /warehouses API stores name, code, address, city, contact_number, is_active,
-// is_default only (see the BACKEND LATER notes in warehouseHelpers.js).
+// The live /warehouses API now persists the full master: name, code, address, city, state,
+// pincode, country, contact_person (Manager / In-Charge), contact_number, email, notes,
+// is_default, is_active. `demoMode` only still gates `addressLine2` (no backend field for it).
 export default function WarehouseForm({ warehouse, demoMode = false, saving, formError, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY)
   const [errors, setErrors] = useState({})
@@ -46,8 +46,6 @@ export default function WarehouseForm({ warehouse, demoMode = false, saving, for
     if (!form.code.trim()) next.code = 'Enter a warehouse code.'
     if (!form.address.trim()) next.address = 'Enter address line 1.'
     if (!form.city.trim()) next.city = 'Enter a city.'
-    if (demoMode && !form.state.trim()) next.state = 'Enter a state.'
-    if (demoMode && !form.pinCode.trim()) next.pinCode = 'Enter a PIN code.'
     setErrors(next)
     if (Object.keys(next).length > 0) return
     onSave(form)
@@ -65,21 +63,19 @@ export default function WarehouseForm({ warehouse, demoMode = false, saving, for
           <Input label="Address Line 2" className="sm:col-span-2" value={form.addressLine2} onChange={(event) => update({ addressLine2: event.target.value })} />
         )}
         <Input label="City" required value={form.city} error={errors.city} onChange={(event) => update({ city: event.target.value })} />
-        {demoMode && <Input label="State" required value={form.state} error={errors.state} onChange={(event) => update({ state: event.target.value })} />}
-        {demoMode && <Input label="PIN Code" required value={form.pinCode} error={errors.pinCode} onChange={(event) => update({ pinCode: event.target.value })} />}
-        {demoMode && <Input label="Country" value={form.country} onChange={(event) => update({ country: event.target.value })} />}
-        {demoMode && <Input label="Manager / In-Charge" value={form.managerName} onChange={(event) => update({ managerName: event.target.value })} />}
+        <Input label="State" value={form.state} error={errors.state} onChange={(event) => update({ state: event.target.value })} />
+        <Input label="PIN Code" value={form.pinCode} error={errors.pinCode} onChange={(event) => update({ pinCode: event.target.value })} />
+        <Input label="Country" value={form.country} onChange={(event) => update({ country: event.target.value })} />
+        <Input label="Manager / In-Charge" value={form.managerName} onChange={(event) => update({ managerName: event.target.value })} />
         <Input label="Phone" value={form.contactNumber} onChange={(event) => update({ contactNumber: event.target.value })} />
-        {demoMode && <Input label="Email" type="email" value={form.email} onChange={(event) => update({ email: event.target.value })} />}
+        <Input label="Email" type="email" value={form.email} onChange={(event) => update({ email: event.target.value })} />
         <Select
           label="Status"
           options={STATUS_OPTIONS}
           value={form.isActive ? 'active' : 'inactive'}
           onChange={(event) => update({ isActive: event.target.value === 'active' })}
         />
-        {demoMode && (
-          <Input as="textarea" label="Notes" className="sm:col-span-2" value={form.notes} onChange={(event) => update({ notes: event.target.value })} />
-        )}
+        <Input as="textarea" label="Notes" className="sm:col-span-2" value={form.notes} onChange={(event) => update({ notes: event.target.value })} />
       </div>
 
       <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">

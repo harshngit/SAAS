@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowLeftRight, Boxes, CheckCircle2, Lock, PackageSearch, Pencil, Search, Warehouse as WarehouseIcon, X } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, Ban, Boxes, CheckCircle2, Eye, Lock, PackageCheck, PackageSearch, Pencil, Search, Send, Warehouse as WarehouseIcon, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -12,10 +13,27 @@ import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs'
-import { getWarehouse, getWarehouseStock, updateWarehouse } from '../../api/warehouses'
+import {
+  cancelTransfer,
+  createTransfer,
+  dispatchTransfer,
+  getTransfer,
+  getWarehouse,
+  getWarehouseMovements,
+  getWarehouseStock,
+  listTransfers,
+  listWarehouses,
+  receiveTransfer,
+  updateWarehouse,
+} from '../../api/warehouses'
+import { listProducts } from '../../api/products'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { safeNumber } from '../purchases/purchaseHelpers'
 import {
   availableQty,
+  canCancelTransfer,
+  canDispatchTransfer,
+  canReceiveTransfer,
   deriveStockStatus,
   movementTypeLabel,
   STOCK_STATUS_FILTER_OPTIONS,
@@ -23,18 +41,18 @@ import {
   transferStatusMeta,
   validateTransfer,
   warehouseStatusMeta,
-  WAREHOUSE_MOVEMENTS_NOTE,
-  WAREHOUSE_TRANSFERS_NOTE,
 } from './warehouseHelpers'
 import {
+  cancelDemoTransfer,
   createDemoTransfer,
+  dispatchDemoTransfer,
   getDemoTransfers,
   getDemoWarehouse,
   getDemoWarehouseMovements,
   getDemoWarehouses,
   getDemoWarehouseStock,
-  isDemoWarehouse,
   patchDemoWarehouse,
+  receiveDemoTransfer,
 } from './warehouseDemoData'
 import WarehouseForm from './WarehouseForm'
 
@@ -48,14 +66,72 @@ function formatDate(value) {
 function normalizeRealStockRow(row) {
   const onHand = safeNumber(row.on_hand)
   const reserved = safeNumber(row.reserved)
+  const hasAvailable = row.available !== undefined && row.available !== null && row.available !== ''
   return {
     productId: row.product_id,
+    variantId: row.variant_id || null,
     productName: row.product_name || row.variant_name || 'Product',
-    sku: row.sku || '',
+    sku: row.sku || row.variant_name || '',
     category: row.category || '—',
     onHand,
     reserved,
+    // Prefer the backend's own available figure; fall back to On Hand − Reserved.
+    available: hasAvailable ? safeNumber(row.available) : onHand - reserved,
     reorderLevel: safeNumber(row.minimum_stock_level),
+  }
+}
+
+// Unified movement shape for the Movements table: { id, date, productName, type, quantity,
+// balanceAfter, note, performedBy }.
+function realMovementRow(m) {
+  return {
+    id: m.id,
+    date: m.createdAt,
+    productName: m.productName,
+    type: m.movementType,
+    quantity: m.quantity,
+    balanceAfter: m.balanceAfter,
+    note: m.note || '',
+    performedBy: m.createdBy || '—',
+  }
+}
+
+function demoMovementRow(m) {
+  const noteBits = [m.reference, m.fromTo].filter(Boolean)
+  return {
+    id: m.id,
+    date: m.date,
+    productName: m.productName,
+    type: m.type,
+    quantity: m.quantity,
+    balanceAfter: null,
+    note: noteBits.join(' · '),
+    performedBy: m.performedBy || '—',
+  }
+}
+
+// Demo transfers use fromWarehouseName / toWarehouseName / date - map to the same shape the
+// real /transfers normalizer produces so the table + detail render one way.
+function demoTransferToView(t) {
+  return {
+    id: t.id,
+    transferNumber: t.transferNumber,
+    status: String(t.status || 'draft').toLowerCase(),
+    notes: t.notes || '',
+    sourceWarehouseName: t.fromWarehouseName || '',
+    destinationWarehouseName: t.toWarehouseName || '',
+    items: (t.items || []).map((item) => ({
+      productId: item.productId,
+      productName: item.productName || '',
+      quantity: safeNumber(item.quantity),
+    })),
+    createdBy: '',
+    dispatchedBy: '',
+    dispatchedAt: t.dispatchedAt || null,
+    receivedBy: '',
+    receivedAt: t.receivedAt || null,
+    createdAt: t.createdAt || t.date || null,
+    updatedAt: t.updatedAt || null,
   }
 }
 
@@ -68,13 +144,20 @@ function Field({ label, value }) {
   )
 }
 
+// Explicit demo split (task section 27): VITE_DEMO_DATA=true -> demo only; false -> real API
+// only. DEMO_MODE is the network boundary; DEMO_EMPTY = demo mode with zero fixtures.
 export default function WarehouseDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const isDemo = isDemoWarehouse(id)
+  const isDemo = DEMO_MODE
+  const demoHasFixtures = DEMO_MODE && !DEMO_EMPTY
 
   const [warehouse, setWarehouse] = useState(null)
   const [stock, setStock] = useState([])
+  const [movements, setMovements] = useState([])
+  const [transfers, setTransfers] = useState([])
+  const [activeWarehouses, setActiveWarehouses] = useState([])
+  const [productNameById, setProductNameById] = useState({})
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [refresh, setRefresh] = useState(0)
@@ -88,21 +171,43 @@ export default function WarehouseDetail() {
   const [stockStatusFilter, setStockStatusFilter] = useState('all')
 
   const [transferOpen, setTransferOpen] = useState(false)
+  const [transferBusyId, setTransferBusyId] = useState('')
+  const [transferError, setTransferError] = useState('')
+  const [transferDetailId, setTransferDetailId] = useState('')
 
   const load = useCallback(async () => {
     setIsLoading(true)
     setLoadError('')
+    setTransferError('')
 
     if (isDemo) {
+      if (!demoHasFixtures) {
+        setWarehouse(null)
+        setLoadError('Demo warehouse not found.')
+        setIsLoading(false)
+        return
+      }
       const record = getDemoWarehouse(id)
       setWarehouse(record)
       setStock(record ? getDemoWarehouseStock(id) : [])
+      setMovements(record ? getDemoWarehouseMovements(id).map(demoMovementRow) : [])
+      setTransfers(record ? getDemoTransfers(id).map(demoTransferToView) : [])
+      setActiveWarehouses(getDemoWarehouses().filter((w) => w.id !== id && w.isActive !== false))
       setLoadError(record ? '' : 'Demo warehouse not found.')
       setIsLoading(false)
       return
     }
 
-    const [warehouseResult, stockResult] = await Promise.all([getWarehouse(id), getWarehouseStock({ warehouse_id: id })])
+    const [warehouseResult, stockResult, movementResult, srcTransfers, destTransfers, warehousesResult, productsResult] =
+      await Promise.all([
+        getWarehouse(id),
+        getWarehouseStock({ warehouse_id: id }),
+        getWarehouseMovements(id, { limit: 50, offset: 0 }),
+        listTransfers({ source_warehouse_id: id }),
+        listTransfers({ destination_warehouse_id: id }),
+        listWarehouses({ is_active: true }),
+        listProducts(),
+      ])
     if (!warehouseResult.success) {
       setLoadError(warehouseResult.error)
       setIsLoading(false)
@@ -110,8 +215,28 @@ export default function WarehouseDetail() {
     }
     setWarehouse(warehouseResult.warehouse)
     setStock(stockResult.success ? (stockResult.stock || []).map(normalizeRealStockRow) : [])
+    setMovements(movementResult.success ? movementResult.movements.map(realMovementRow) : [])
+
+    // Section 12: this warehouse as source OR destination - fetched separately, deduped by id.
+    const byId = new Map()
+    ;(srcTransfers.success ? srcTransfers.transfers : []).forEach((t) => byId.set(t.id, t))
+    ;(destTransfers.success ? destTransfers.transfers : []).forEach((t) => byId.set(t.id, t))
+    setTransfers(
+      [...byId.values()].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)),
+    )
+    setActiveWarehouses(
+      warehousesResult.success ? warehousesResult.warehouses.filter((w) => w.id !== id && w.isActive !== false) : [],
+    )
+    // Catalog fallback for transfer items whose response omits product_name (task section 20).
+    if (productsResult.success) {
+      const map = {}
+      productsResult.products.forEach((product) => {
+        map[product.id] = product.name
+      })
+      setProductNameById(map)
+    }
     setIsLoading(false)
-  }, [id, isDemo])
+  }, [id, isDemo, demoHasFixtures])
 
   useEffect(() => {
     load()
@@ -133,11 +258,7 @@ export default function WarehouseDetail() {
     })
   }, [stock, stockSearch, categoryFilter, stockStatusFilter])
 
-  // refresh is bumped after edit / transfer so these re-read the demo store.
-  /* eslint-disable react-hooks/exhaustive-deps */
-  const movements = useMemo(() => (isDemo ? getDemoWarehouseMovements(id) : []), [isDemo, id, refresh])
-  const transfers = useMemo(() => (isDemo ? getDemoTransfers(id) : []), [isDemo, id, refresh])
-  /* eslint-enable react-hooks/exhaustive-deps */
+  const reloadAll = () => setRefresh((value) => value + 1)
 
   const handleEditSave = async (formData) => {
     setIsSaving(true)
@@ -146,7 +267,7 @@ export default function WarehouseDetail() {
       patchDemoWarehouse(id, formData)
       setIsSaving(false)
       setEditOpen(false)
-      setRefresh((value) => value + 1)
+      reloadAll()
       return
     }
     const result = await updateWarehouse(id, formData)
@@ -157,8 +278,31 @@ export default function WarehouseDetail() {
     }
     setIsSaving(false)
     setEditOpen(false)
-    setRefresh((value) => value + 1)
+    reloadAll()
   }
+
+  // Transfer lifecycle. Backend is authoritative for every stock movement - the frontend only
+  // triggers the action then reloads Stock + Movements + the transfer list from the server.
+  const runTransferAction = async (transfer, demoFn, realFn) => {
+    setTransferBusyId(transfer.id)
+    setTransferError('')
+    let result
+    if (isDemo) {
+      demoFn(transfer.id)
+      result = { success: true }
+    } else {
+      result = await realFn(transfer.id)
+    }
+    setTransferBusyId('')
+    if (!result.success) {
+      setTransferError(result.error)
+      return
+    }
+    reloadAll()
+  }
+  const handleDispatch = (transfer) => runTransferAction(transfer, dispatchDemoTransfer, dispatchTransfer)
+  const handleReceive = (transfer) => runTransferAction(transfer, receiveDemoTransfer, receiveTransfer)
+  const handleCancelTransfer = (transfer) => runTransferAction(transfer, cancelDemoTransfer, cancelTransfer)
 
   if (isLoading) return <LoadingSpinner label="Loading warehouse..." />
 
@@ -223,7 +367,7 @@ export default function WarehouseDetail() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field label="Warehouse Name" value={warehouse.name} />
               <Field label="Code" value={warehouse.code} />
-              <Field label="Address" value={[warehouse.address, warehouse.addressLine2, warehouse.city, warehouse.state, warehouse.pinCode].filter(Boolean).join(', ')} />
+              <Field label="Address" value={[warehouse.address, warehouse.addressLine2, warehouse.city, warehouse.state, warehouse.pinCode, warehouse.country].filter(Boolean).join(', ')} />
               <Field label="Manager / In-Charge" value={warehouse.managerName} />
               <Field label="Phone" value={warehouse.contactNumber} />
               <Field label="Email" value={warehouse.email} />
@@ -318,12 +462,10 @@ export default function WarehouseDetail() {
         </TabsContent>
 
         <TabsContent value="movements" className="mt-4">
-          {!isDemo ? (
-            <Card><EmptyState icon={ArrowLeftRight} title="Movement history not available" description={WAREHOUSE_MOVEMENTS_NOTE} /></Card>
-          ) : movements.length === 0 ? (
-            <Card><p className="py-8 text-center text-sm text-neutral-500">No movements recorded for this warehouse.</p></Card>
+          {movements.length === 0 ? (
+            <Card><p className="py-8 text-center text-sm text-neutral-500">No stock movements recorded for this warehouse yet.</p></Card>
           ) : (
-            <Card title="Movements" className="p-0" bodyClassName="p-0">
+            <Card title="Stock Movements" subtitle="Most recent 50. Positive = stock in, negative = stock out." className="p-0" bodyClassName="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-4xl text-left text-sm">
                   <thead>
@@ -332,9 +474,9 @@ export default function WarehouseDetail() {
                       <th className="px-5 py-3">Product</th>
                       <th className="px-5 py-3">Type</th>
                       <th className="px-5 py-3 text-right">Quantity</th>
-                      <th className="px-5 py-3">Reference</th>
-                      <th className="px-5 py-3">From / To</th>
-                      <th className="px-5 py-3">Performed By</th>
+                      <th className="px-5 py-3 text-right">Balance After</th>
+                      <th className="px-5 py-3">Note</th>
+                      <th className="px-5 py-3">By</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-50">
@@ -343,9 +485,11 @@ export default function WarehouseDetail() {
                         <td className="px-5 py-3.5 text-neutral-600">{formatDate(movement.date)}</td>
                         <td className="px-5 py-3.5 font-medium text-neutral-900">{movement.productName}</td>
                         <td className="px-5 py-3.5 text-neutral-600">{movementTypeLabel(movement.type)}</td>
-                        <td className={`px-5 py-3.5 text-right font-medium ${movement.quantity < 0 ? 'text-red-600' : 'text-neutral-900'}`}>{movement.quantity}</td>
-                        <td className="px-5 py-3.5 text-neutral-500">{movement.reference || '—'}</td>
-                        <td className="px-5 py-3.5 text-neutral-500">{movement.fromTo || '—'}</td>
+                        <td className={`px-5 py-3.5 text-right font-medium ${movement.quantity < 0 ? 'text-red-600' : 'text-neutral-900'}`}>
+                          {movement.quantity > 0 ? `+${movement.quantity}` : movement.quantity}
+                        </td>
+                        <td className="px-5 py-3.5 text-right text-neutral-600">{movement.balanceAfter ?? '—'}</td>
+                        <td className="px-5 py-3.5 text-neutral-500">{movement.note || '—'}</td>
                         <td className="px-5 py-3.5 text-neutral-500">{movement.performedBy || '—'}</td>
                       </tr>
                     ))}
@@ -357,85 +501,177 @@ export default function WarehouseDetail() {
         </TabsContent>
 
         <TabsContent value="transfers" className="mt-4 space-y-4">
-          {!isDemo ? (
-            <Card><EmptyState icon={ArrowLeftRight} title="Transfers not available" description={WAREHOUSE_TRANSFERS_NOTE} /></Card>
-          ) : (
-            <Card
-              title="Warehouse Transfers"
-              subtitle="Warehouse → warehouse stock moves (separate from vehicle loading)."
-              className="p-0"
-              bodyClassName="p-0"
-              actions={
-                <Button type="button" size="sm" disabled={warehouse.isActive === false} title={warehouse.isActive === false ? 'Inactive warehouses cannot start a transfer.' : undefined} onClick={() => setTransferOpen(true)}>
-                  <ArrowLeftRight className="size-4" aria-hidden="true" />
-                  Create Transfer
-                </Button>
-              }
-            >
-              {transfers.length === 0 ? (
-                <p className="px-5 py-8 text-center text-sm text-neutral-500">No transfers involving this warehouse yet.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-4xl text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                        <th className="px-5 py-3">Transfer #</th>
-                        <th className="px-5 py-3">Date</th>
-                        <th className="px-5 py-3">From</th>
-                        <th className="px-5 py-3">To</th>
-                        <th className="px-5 py-3">Products</th>
-                        <th className="px-5 py-3 text-right">Quantity</th>
-                        <th className="px-5 py-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-50">
-                      {transfers.map((transfer) => {
-                        const st = transferStatusMeta(transfer.status)
-                        const qty = (transfer.items || []).reduce((sum, item) => sum + safeNumber(item.quantity), 0)
-                        return (
-                          <tr key={transfer.id} className="hover:bg-primary-50/35">
-                            <td className="px-5 py-3.5 font-medium text-primary-700">{transfer.transferNumber}</td>
-                            <td className="px-5 py-3.5 text-neutral-600">{formatDate(transfer.date)}</td>
-                            <td className="px-5 py-3.5 text-neutral-600">{transfer.fromWarehouseName}</td>
-                            <td className="px-5 py-3.5 text-neutral-600">{transfer.toWarehouseName}</td>
-                            <td className="px-5 py-3.5 text-neutral-600">{(transfer.items || []).length}</td>
-                            <td className="px-5 py-3.5 text-right text-neutral-700">{qty}</td>
-                            <td className="px-5 py-3.5"><Badge variant={st.variant}>{st.label}</Badge></td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </Card>
+          {transferError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{transferError}</div>
           )}
+          <Card
+            title="Warehouse Transfers"
+            subtitle="Warehouse → warehouse stock moves (separate from vehicle loading)."
+            className="p-0"
+            bodyClassName="p-0"
+            actions={
+              <Button type="button" size="sm" disabled={warehouse.isActive === false} title={warehouse.isActive === false ? 'Inactive warehouses cannot start a transfer.' : undefined} onClick={() => setTransferOpen(true)}>
+                <ArrowLeftRight className="size-4" aria-hidden="true" />
+                Create Transfer
+              </Button>
+            }
+          >
+            {transfers.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-neutral-500">No transfers involving this warehouse yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-4xl text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                      <th className="px-5 py-3">Transfer #</th>
+                      <th className="px-5 py-3">Date</th>
+                      <th className="px-5 py-3">From</th>
+                      <th className="px-5 py-3">To</th>
+                      <th className="px-5 py-3">Products</th>
+                      <th className="px-5 py-3 text-right">Quantity</th>
+                      <th className="px-5 py-3">Status</th>
+                      <th className="w-12 px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-50">
+                    {transfers.map((transfer) => {
+                      const st = transferStatusMeta(transfer.status)
+                      const qty = (transfer.items || []).reduce((sum, item) => sum + safeNumber(item.quantity), 0)
+                      const busy = transferBusyId === transfer.id
+                      const actionItems = [{ label: 'View Details', icon: Eye, onClick: () => setTransferDetailId(transfer.id) }]
+                      if (canDispatchTransfer(transfer)) {
+                        actionItems.push({ label: busy ? 'Dispatching…' : 'Dispatch', icon: Send, onClick: () => handleDispatch(transfer) })
+                      }
+                      if (canReceiveTransfer(transfer)) {
+                        actionItems.push({ label: busy ? 'Receiving…' : 'Receive', icon: PackageCheck, onClick: () => handleReceive(transfer) })
+                      }
+                      if (canCancelTransfer(transfer)) {
+                        actionItems.push({ label: 'Cancel Transfer', icon: Ban, danger: true, onClick: () => handleCancelTransfer(transfer) })
+                      }
+                      return (
+                        <tr
+                          key={transfer.id}
+                          className="cursor-pointer transition-colors hover:bg-primary-50/35"
+                          onClick={() => setTransferDetailId(transfer.id)}
+                        >
+                          <td className="px-5 py-3.5 font-medium text-primary-700">{transfer.transferNumber}</td>
+                          <td className="px-5 py-3.5 text-neutral-600">{formatDate(transfer.createdAt)}</td>
+                          <td className="px-5 py-3.5 text-neutral-600">{transfer.sourceWarehouseName || '—'}</td>
+                          <td className="px-5 py-3.5 text-neutral-600">{transfer.destinationWarehouseName || '—'}</td>
+                          <td className="px-5 py-3.5 text-neutral-600">{(transfer.items || []).length}</td>
+                          <td className="px-5 py-3.5 text-right text-neutral-700">{qty}</td>
+                          <td className="px-5 py-3.5"><Badge variant={st.variant}>{st.label}</Badge></td>
+                          <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
+                            <ActionMenu items={actionItems} />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </TabsContent>
       </Tabs>
 
       <Modal isOpen={editOpen} onClose={() => !isSaving && setEditOpen(false)} title="Edit Warehouse" size="2xl">
-        <WarehouseForm warehouse={warehouse} demoMode={isDemo} saving={isSaving} formError={editError} onClose={() => setEditOpen(false)} onSave={handleEditSave} />
+        <WarehouseForm warehouse={warehouse} demoMode={demoHasFixtures} saving={isSaving} formError={editError} onClose={() => setEditOpen(false)} onSave={handleEditSave} />
       </Modal>
 
-      {isDemo && (
-        <CreateTransferDrawer
-          isOpen={transferOpen}
-          fromWarehouse={warehouse}
-          stock={stock}
-          onClose={() => setTransferOpen(false)}
-          onCreated={() => {
-            setTransferOpen(false)
-            setRefresh((value) => value + 1)
-          }}
-        />
-      )}
+      <CreateTransferDrawer
+        isOpen={transferOpen}
+        isDemo={isDemo}
+        fromWarehouse={warehouse}
+        stock={stock}
+        destinations={activeWarehouses}
+        onClose={() => setTransferOpen(false)}
+        onCreated={() => {
+          setTransferOpen(false)
+          reloadAll()
+        }}
+      />
+
+      <TransferDetailModal
+        transferId={transferDetailId}
+        isDemo={isDemo}
+        fallback={transfers.find((t) => t.id === transferDetailId) || null}
+        productNameById={productNameById}
+        onClose={() => setTransferDetailId('')}
+      />
     </div>
   )
 }
 
-function CreateTransferDrawer({ isOpen, fromWarehouse, stock, onClose, onCreated }) {
+function TransferDetailModal({ transferId, isDemo, fallback, productNameById = {}, onClose }) {
+  const [transfer, setTransfer] = useState(fallback)
+  const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!transferId) return undefined
+    let active = true
+    setTransfer(fallback)
+    if (isDemo) return undefined
+    setIsLoading(true)
+    getTransfer(transferId).then((result) => {
+      if (!active) return
+      if (result.success) setTransfer(result.transfer)
+      setIsLoading(false)
+    })
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transferId, isDemo])
+
+  const st = transferStatusMeta(transfer?.status)
+
+  return (
+    <Modal isOpen={Boolean(transferId)} onClose={onClose} title={transfer?.transferNumber || 'Transfer'} size="2xl">
+      {!transfer ? (
+        <LoadingSpinner label="Loading transfer..." />
+      ) : (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+            <Field label="Status" value={<Badge variant={st.variant}>{st.label}</Badge>} />
+            <Field label="From" value={transfer.sourceWarehouseName} />
+            <Field label="To" value={transfer.destinationWarehouseName} />
+            <Field label="Created" value={formatDate(transfer.createdAt)} />
+            <Field label="Dispatched" value={transfer.dispatchedAt ? formatDate(transfer.dispatchedAt) : '—'} />
+            <Field label="Received" value={transfer.receivedAt ? formatDate(transfer.receivedAt) : '—'} />
+            {transfer.notes && <Field label="Notes" value={transfer.notes} />}
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-neutral-100">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.62rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <th className="px-3 py-2">Product</th>
+                  <th className="px-3 py-2 text-right">Quantity</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-50">
+                {(transfer.items || []).map((item, index) => (
+                  <tr key={item.id || item.productId || index}>
+                    <td className="px-3 py-2 font-medium text-neutral-900">
+                      {item.productName || productNameById[item.productId] || item.productId || '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right text-neutral-700">{safeNumber(item.quantity)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {isLoading && <p className="text-xs text-neutral-400">Refreshing…</p>}
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+function CreateTransferDrawer({ isOpen, isDemo, fromWarehouse, stock, destinations, onClose, onCreated }) {
   const [toWarehouseId, setToWarehouseId] = useState('')
   const [transferDate, setTransferDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [notes, setNotes] = useState('')
   const [quantities, setQuantities] = useState({})
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -452,41 +688,67 @@ function CreateTransferDrawer({ isOpen, fromWarehouse, stock, onClose, onCreated
     if (isOpen) {
       setToWarehouseId('')
       setTransferDate(new Date().toISOString().slice(0, 10))
+      setNotes('')
       setQuantities({})
       setError('')
     }
   }, [isOpen])
 
-  const destinationOptions = useMemo(() => {
-    const others = getDemoWarehouses().filter((w) => w.id !== fromWarehouse.id && w.isActive !== false)
-    return [{ value: '', label: 'Select destination' }, ...others.map((w) => ({ value: w.id, label: w.name }))]
-  }, [fromWarehouse.id])
+  // Only active warehouses (other than this one) are selectable - already filtered by the parent.
+  const destinationOptions = useMemo(
+    () => [{ value: '', label: 'Select destination' }, ...(destinations || []).map((w) => ({ value: w.id, label: w.name }))],
+    [destinations],
+  )
 
   const transferItems = stock
     .filter((row) => availableQty(row) > 0)
-    .map((row) => ({ productId: row.productId, productName: row.productName, available: availableQty(row), quantity: safeNumber(quantities[row.productId]) }))
+    .map((row) => ({
+      productId: row.productId,
+      variantId: row.variantId || null,
+      productName: row.productName,
+      available: availableQty(row),
+      quantity: safeNumber(quantities[row.productId]),
+    }))
 
   if (!isOpen) return null
 
-  const toWarehouse = getDemoWarehouses().find((w) => w.id === toWarehouseId) || null
+  const toWarehouse = (destinations || []).find((w) => w.id === toWarehouseId) || null
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     setError('')
-    const validationError = validateTransfer({ fromWarehouse, toWarehouse, transferDate, items: transferItems })
+    const validationError = validateTransfer({ fromWarehouse, toWarehouse, items: transferItems })
     if (validationError) {
       setError(validationError)
       return
     }
+    const lines = transferItems.filter((item) => item.quantity > 0)
     setIsSaving(true)
-    createDemoTransfer({
-      fromWarehouseId: fromWarehouse.id,
-      fromWarehouseName: fromWarehouse.name,
-      toWarehouseId: toWarehouse.id,
-      toWarehouseName: toWarehouse.name,
-      date: transferDate,
-      items: transferItems.filter((item) => item.quantity > 0),
+
+    if (isDemo) {
+      createDemoTransfer({
+        fromWarehouseId: fromWarehouse.id,
+        fromWarehouseName: fromWarehouse.name,
+        toWarehouseId: toWarehouse.id,
+        toWarehouseName: toWarehouse.name,
+        date: transferDate,
+        items: lines,
+      })
+      setIsSaving(false)
+      onCreated()
+      return
+    }
+
+    const result = await createTransfer({
+      sourceWarehouseId: fromWarehouse.id,
+      destinationWarehouseId: toWarehouse.id,
+      notes,
+      items: lines.map((item) => ({ productId: item.productId, variantId: item.variantId, quantity: item.quantity })),
     })
     setIsSaving(false)
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
     onCreated()
   }
 
@@ -508,7 +770,11 @@ function CreateTransferDrawer({ isOpen, fromWarehouse, stock, onClose, onCreated
 
           <Input label="From Warehouse" value={fromWarehouse.name} disabled />
           <Select label="To Warehouse" required options={destinationOptions} value={toWarehouseId} onChange={(event) => setToWarehouseId(event.target.value)} />
-          <Input label="Transfer Date" type="date" required value={transferDate} onChange={(event) => setTransferDate(event.target.value)} />
+          {isDemo ? (
+            <Input label="Transfer Date" type="date" value={transferDate} onChange={(event) => setTransferDate(event.target.value)} />
+          ) : (
+            <Input label="Notes" placeholder="Optional" value={notes} onChange={(event) => setNotes(event.target.value)} />
+          )}
 
           <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">Items</p>

@@ -1,17 +1,16 @@
 // =============================================================================
 // Vehicles - shared derivation helpers.
 // -----------------------------------------------------------------------------
-// Vehicle CRUD is a REAL backend feature:
-//   GET/POST  /vehicles
+// All REAL backend features now:
+//   GET/POST         /vehicles                       (skip, limit, status, search)
 //   GET/PATCH/DELETE /vehicles/{id}
-//   Fields: vehicle_number (required), vehicle_type, capacity_kg,
-//           default_driver_id, is_active
-//
-// NOT backed by the API (demo-only / future-state):
-//   - vehicle name / model, capacity unit, notes
-//   - a "Maintenance" state (backend only has is_active true/false)
-//   - assignment history, vehicle activity/history
-//   - server-side "don't use inactive/maintenance vehicles operationally" validation
+//   GET              /vehicles/{id}/assignments      (assignment history)
+//   GET              /vehicles/{id}/activity         (vehicle event timeline)
+//   Master fields: vehicle_number, vehicle_type, capacity, capacity_unit, make,
+//                  model, year, status (active|inactive|maintenance), default_driver_id, notes
+//   `assigned_delivery_partner` = { id, name, email, phone } brief on list + detail.
+//   Assignment = PATCH /vehicles/{id} { default_driver_id }; backend opens/closes history.
+//   Backend blocks status->inactive/maintenance while an active loading session exists.
 //
 // This file only holds pure UI logic - no API calls, no persistence.
 // =============================================================================
@@ -43,9 +42,16 @@ export const AVAILABILITY_META = {
   unavailable: { key: 'unavailable', label: 'Unavailable', variant: 'neutral' },
 }
 
+// Availability (task section 6): not-active -> Unavailable; active + a driver -> Assigned;
+// active + no driver -> Available. A driver is present if `assigned_delivery_partner` exists
+// or `default_driver_id` is set.
+export function vehicleHasDriver(vehicle) {
+  return Boolean(vehicle?.assignedDeliveryPartner?.id || vehicle?.assignedDeliveryPartner?.name || vehicle?.defaultDriverId)
+}
+
 export function deriveAvailability(vehicle) {
   if (vehicleStatus(vehicle) !== 'active') return AVAILABILITY_META.unavailable
-  return vehicle?.defaultDriverId ? AVAILABILITY_META.assigned : AVAILABILITY_META.available
+  return vehicleHasDriver(vehicle) ? AVAILABILITY_META.assigned : AVAILABILITY_META.available
 }
 
 // A vehicle is operationally usable (loading / delivery) only while Active.
@@ -88,8 +94,32 @@ export const VEHICLE_SORT_OPTIONS = [
   { value: 'name', label: 'Name A–Z' },
 ]
 
+// Display name (task section 4): make + model, then vehicle_type, then number. `name` is a
+// demo-only field; never a persisted real field.
 export function vehicleDisplayName(vehicle) {
-  return vehicle?.name?.trim() || vehicle?.vehicleType || vehicle?.vehicleNumber || 'Vehicle'
+  const makeModel = [vehicle?.make, vehicle?.model].map((value) => String(value || '').trim()).filter(Boolean).join(' ')
+  return vehicle?.name?.trim() || makeModel || vehicle?.vehicleType || vehicle?.vehicleNumber || 'Vehicle'
+}
+
+// The human-readable assigned driver - straight from the backend `assigned_delivery_partner`
+// brief. Never a role slug, never a raw id.
+export function assignedPartnerName(vehicle) {
+  return vehicle?.assignedDeliveryPartner?.name?.trim() || 'Unassigned'
+}
+
+export const VEHICLE_ACTIVITY_LABEL = {
+  vehicle_created: 'Vehicle Created',
+  status_changed: 'Status Changed',
+  driver_assigned: 'Driver Assigned',
+  driver_unassigned: 'Driver Unassigned',
+  loading_session_started: 'Loading Session Started',
+  loading_session_closed: 'Loading Session Closed',
+}
+
+export function vehicleActivityLabel(type) {
+  if (VEHICLE_ACTIVITY_LABEL[type]) return VEHICLE_ACTIVITY_LABEL[type]
+  if (!type) return 'Activity'
+  return String(type).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 // Resolve a delivery-partner record to a human-readable name. The /deliveries/partners payload
@@ -115,15 +145,15 @@ export function partnerDisplayName(partner) {
 }
 
 export function capacityLabel(vehicle) {
-  const value = safeNumber(vehicle?.capacityKg ?? vehicle?.capacity)
+  const value = safeNumber(vehicle?.capacity ?? vehicle?.capacityKg)
   if (value <= 0) return '—'
-  const unit = vehicle?.capacityUnit === 'ton' ? 'ton' : 'kg'
+  const unit = String(vehicle?.capacityUnit || 'kg').trim() || 'kg'
   return `${value} ${unit}`
 }
 
-// Add / Edit validation (task sections 8 + 10). `existingNumbers` = other vehicles' numbers.
-export function validateVehicle(form, { existingNumbers = [] } = {}) {
-  if (!form.name?.trim()) return 'Enter the vehicle name / model.'
+// Add / Edit validation. `existingNumbers` = other vehicles' numbers.
+export function validateVehicle(form, { existingNumbers = [], requireName = false } = {}) {
+  if (requireName && !form.name?.trim()) return 'Enter the vehicle name / model.'
   if (!form.vehicleNumber?.trim()) return 'Enter the vehicle number.'
   if (!form.vehicleType?.trim()) return 'Select a vehicle type.'
   const capacity = Number(form.capacityKg)
@@ -145,6 +175,3 @@ export function assignmentWarning(form) {
   }
   return ''
 }
-
-export const VEHICLE_ACTIVITY_NOTE = 'Vehicle activity history will appear here once operations tracking is enabled.'
-export const VEHICLE_ASSIGNMENT_HISTORY_NOTE = 'Assignment history will appear here once assignment tracking is enabled.'

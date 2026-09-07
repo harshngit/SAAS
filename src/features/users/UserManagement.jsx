@@ -1415,7 +1415,8 @@ export default function UserManagement() {
                   {paginatedUsers.map((user) => (
                     <tr
                       key={user.id}
-                      className="bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                      onClick={() => navigate(`/admin/users/${user.id}`)}
+                      className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
                     >
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
@@ -1441,7 +1442,7 @@ export default function UserManagement() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3.5 text-neutral-500">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-3.5 text-right">
+                      <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"

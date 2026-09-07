@@ -112,6 +112,7 @@ export default function AdminDeliveries() {
               data={filteredDeliveries}
               searchKeys={['deliveryNumber', 'orderNumber', 'customerName', 'deliveryPartnerName', 'vehicleNumber', 'status']}
               searchPlaceholder="Search deliveries…"
+              onRowClick={(row) => navigate(`/admin/deliveries/${row.id}`)}
               actions={(row) => [
                 {
                   label: 'View Details',

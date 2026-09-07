@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { CarFront, CheckCircle2, Edit, Eye, Plus, RotateCw, Search, Trash2, Truck } from 'lucide-react'
 import { createVehicle, deleteVehicle, listVehicles, updateVehicle } from '../../api/vehicles'
 import { listDeliveryPartners } from '../../api/deliveries'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -13,10 +14,11 @@ import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
 import {
   AVAILABILITY_FILTER_OPTIONS,
+  assignedPartnerName,
   capacityLabel,
   deriveAvailability,
-  partnerDisplayName,
   vehicleDisplayName,
+  vehicleHasDriver,
   vehicleStatus,
   vehicleStatusMeta,
   VEHICLE_SORT_OPTIONS,
@@ -24,7 +26,6 @@ import {
   VEHICLE_TYPE_FILTER_OPTIONS,
 } from './vehicleHelpers'
 import {
-  VEHICLES_DEMO_ENABLED,
   createDemoVehicle,
   getDemoDeliveryPartners,
   getDemoVehicles,
@@ -35,7 +36,10 @@ import VehicleForm from './VehicleForm'
 
 export default function VehicleList() {
   const navigate = useNavigate()
-  const demoOn = VEHICLES_DEMO_ENABLED
+  // Explicit demo split (task section 26): demo mode -> demo fixtures only, no real API call;
+  // real mode -> real API only, empty response is a real empty state (never a demo fallback).
+  const isDemo = DEMO_MODE
+  const demoHasFixtures = DEMO_MODE && !DEMO_EMPTY
 
   const [vehicles, setVehicles] = useState([])
   const [drivers, setDrivers] = useState([])
@@ -61,42 +65,42 @@ export default function VehicleList() {
     setIsLoading(true)
     setListError('')
 
-    const [vehiclesResult, partnersResult] = await Promise.all([listVehicles(), listDeliveryPartners()])
-    const realDrivers = partnersResult.success ? partnersResult.partners : []
-    const demoDrivers = demoOn ? getDemoDeliveryPartners() : []
-    setDrivers([...realDrivers, ...demoDrivers.filter((demo) => !realDrivers.some((real) => real.id === demo.id))])
-
-    const demoRows = demoOn ? getDemoVehicles() : []
-
-    if (!vehiclesResult.success) {
-      setVehicles(demoRows)
-      setListError(demoRows.length ? '' : vehiclesResult.error)
+    // Demo mode: local fixtures only, no real API call.
+    if (isDemo) {
+      setVehicles(demoHasFixtures ? getDemoVehicles() : [])
+      setDrivers(demoHasFixtures ? getDemoDeliveryPartners() : [])
       setIsLoading(false)
       return
     }
 
-    setVehicles([...vehiclesResult.vehicles, ...demoRows])
+    const [vehiclesResult, partnersResult] = await Promise.all([listVehicles(), listDeliveryPartners()])
+    setDrivers(partnersResult.success ? partnersResult.partners : [])
+
+    // Real mode: a failure is a real error; an empty list is a truthful empty state.
+    if (!vehiclesResult.success) {
+      setVehicles([])
+      setListError(vehiclesResult.error)
+      setIsLoading(false)
+      return
+    }
+
+    setVehicles(vehiclesResult.vehicles)
     setIsLoading(false)
-  }, [demoOn])
+  }, [isDemo, demoHasFixtures])
 
   useEffect(() => {
     load()
   }, [load])
 
-  const driverNameById = useMemo(() => {
-    const map = new Map()
-    drivers.forEach((driver) => map.set(driver.id, partnerDisplayName(driver)))
-    return map
-  }, [drivers])
-
-  const assignedName = (vehicle) =>
-    vehicle.defaultDriverId ? driverNameById.get(vehicle.defaultDriverId) || 'Delivery Partner' : '—'
+  // Driver name comes straight from the backend `assigned_delivery_partner` brief - no per-row
+  // lookup, no role slugs (task section 3).
+  const assignedName = (vehicle) => assignedPartnerName(vehicle)
 
   const stats = useMemo(() => {
     return vehicles.reduce(
       (acc, vehicle) => {
         const active = vehicleStatus(vehicle) === 'active'
-        const assigned = active && Boolean(vehicle.defaultDriverId)
+        const assigned = active && vehicleHasDriver(vehicle)
         return {
           total: acc.total + 1,
           active: acc.active + (active ? 1 : 0),
@@ -111,10 +115,11 @@ export default function VehicleList() {
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
     const filtered = vehicles.filter((vehicle) => {
-      const driverName = driverNameById.get(vehicle.defaultDriverId) || ''
       const matchesSearch =
         !query ||
-        [vehicleDisplayName(vehicle), vehicle.vehicleNumber, driverName].filter(Boolean).some((value) => String(value).toLowerCase().includes(query))
+        [vehicleDisplayName(vehicle), vehicle.vehicleNumber, assignedPartnerName(vehicle)]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query))
       const matchesStatus = statusFilter === 'all' || vehicleStatus(vehicle) === statusFilter
       const matchesAvailability = availabilityFilter === 'all' || deriveAvailability(vehicle).key === availabilityFilter
       const matchesType = typeFilter === 'all' || vehicle.vehicleType === typeFilter
@@ -126,7 +131,7 @@ export default function VehicleList() {
       if (sortFilter === 'name') return vehicleDisplayName(left).localeCompare(vehicleDisplayName(right))
       return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()
     })
-  }, [vehicles, search, statusFilter, availabilityFilter, typeFilter, sortFilter, driverNameById])
+  }, [vehicles, search, statusFilter, availabilityFilter, typeFilter, sortFilter])
 
   const openForm = (vehicle = null) => {
     setEditingVehicle(vehicle)
@@ -138,19 +143,13 @@ export default function VehicleList() {
     setIsSaving(true)
     setFormError('')
 
-    if (editingVehicle && isDemoVehicle(editingVehicle.id)) {
-      patchDemoVehicle(editingVehicle.id, formData)
+    if (isDemo || (editingVehicle && isDemoVehicle(editingVehicle.id))) {
+      if (editingVehicle) patchDemoVehicle(editingVehicle.id, formData)
+      else createDemoVehicle(formData)
       await load()
       setIsSaving(false)
       setIsFormOpen(false)
       setEditingVehicle(null)
-      return
-    }
-    if (!editingVehicle && demoOn) {
-      createDemoVehicle(formData)
-      await load()
-      setIsSaving(false)
-      setIsFormOpen(false)
       return
     }
 
@@ -325,7 +324,7 @@ export default function VehicleList() {
       <Modal isOpen={isFormOpen} onClose={() => !isSaving && (setIsFormOpen(false), setEditingVehicle(null))} title={editingVehicle ? 'Edit Vehicle' : 'Add Vehicle'} size="2xl">
         <VehicleForm
           vehicle={editingVehicle}
-          demoMode={editingVehicle ? isDemoVehicle(editingVehicle.id) : demoOn}
+          demoMode={editingVehicle ? isDemoVehicle(editingVehicle.id) : isDemo}
           drivers={drivers}
           existingNumbers={vehicles.filter((vehicle) => vehicle.id !== editingVehicle?.id).map((vehicle) => vehicle.vehicleNumber)}
           saving={isSaving}

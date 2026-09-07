@@ -256,7 +256,7 @@ export function createDemoCollection(deliveryId, payload) {
     amount: Math.max(0, Number(payload.amount) || 0),
     paymentMode: payload.paymentMode || 'cash',
     reference: (payload.reference || '').trim(),
-    note: (payload.note || '').trim(),
+    note: (payload.note || payload.notes || '').trim(),
     status: 'recorded',
     recordedById: context.deliveryPartnerId || DEMO_ACTOR.partner.id,
     recordedByName: context.deliveryPartnerName || DEMO_ACTOR.partner.name,

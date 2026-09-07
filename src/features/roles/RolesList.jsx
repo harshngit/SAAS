@@ -160,7 +160,8 @@ export default function RolesList() {
                 {filteredRoles.map((role) => (
                   <tr
                     key={role.id}
-                    className="bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                    onClick={() => navigate(`/admin/roles/edit/${role.id}`)}
+                    className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
                   >
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
@@ -187,7 +188,7 @@ export default function RolesList() {
                         {role.is_default ? 'Default' : 'Active'}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3.5 text-right">
+                    <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
                       <ActionMenu
                         triggerClassName="bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200 hover:bg-primary-50 hover:text-primary-700 hover:ring-primary-200"
                         items={[

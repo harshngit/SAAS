@@ -186,6 +186,7 @@ export default function AssignedDeliveries() {
               searchPlaceholder="Search delivery #, order # or customer..."
               emptyTitle="No deliveries"
               emptyDescription={statusFilter === 'all' ? 'Deliveries assigned to you will show up here.' : 'No deliveries in this status.'}
+              onRowClick={(row) => navigate(`/delivery/deliveries/${row.id}`)}
               actions={(row) => {
                 const phone = row.customerPhone || ''
                 const address = row.customerDeliveryAddress || row.deliveryAddress || ''

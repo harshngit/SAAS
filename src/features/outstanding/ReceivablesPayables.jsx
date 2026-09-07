@@ -135,6 +135,7 @@ export default function ReceivablesPayables() {
           searchKeys={['customerName', 'invoiceNumber']}
           searchPlaceholder="Search customer or invoice #..."
           emptyTitle="No outstanding receivables."
+          onRowClick={(row) => navigate(`${invoiceBase}/${row.id}`)}
           actions={(row) => [
             ...(canRecordPayment
               ? [{ label: 'Record Payment', icon: Wallet, onClick: () => setPaymentInvoice(row) }]

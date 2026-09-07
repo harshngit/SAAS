@@ -205,8 +205,12 @@ function SalesInvoicesPanel() {
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {paginated.map((invoice) => (
-                    <tr key={invoice.id} className="transition-colors hover:bg-primary-50/30">
-                      <td className="cursor-pointer whitespace-nowrap px-4 py-3.5 font-medium text-primary-700" onClick={() => navigate(`/admin/invoices/${invoice.id}`)}>
+                    <tr
+                      key={invoice.id}
+                      onClick={() => navigate(`/admin/invoices/${invoice.id}`)}
+                      className="cursor-pointer transition-colors hover:bg-primary-50/30"
+                    >
+                      <td className="whitespace-nowrap px-4 py-3.5 font-medium text-primary-700">
                         {invoice.invoiceNumber}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3.5 text-neutral-500">
@@ -237,7 +241,7 @@ function SalesInvoicesPanel() {
                       <td className="whitespace-nowrap px-4 py-3.5">
                         <Badge variant={invoiceStatusVariant[invoice.invoiceStatus] || 'neutral'}>{invoice.invoiceStatus}</Badge>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3.5">
+                      <td className="whitespace-nowrap px-4 py-3.5" onClick={(event) => event.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
                           {canRecordPayment && invoice.outstandingAmount > 0 && (
                             <button

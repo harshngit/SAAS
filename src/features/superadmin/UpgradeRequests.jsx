@@ -218,6 +218,7 @@ export default function UpgradeRequests() {
             }))}
             searchKeys={['name', 'currentPlan', 'requestedPlan']}
             searchPlaceholder="Search organizations..."
+            onRowClick={(row) => navigate(`/superadmin/organizations/${row.id}`)}
             actions={(row) => [
               { label: 'View organization', icon: Eye, onClick: () => navigate(`/superadmin/organizations/${row.id}`) },
             ]}

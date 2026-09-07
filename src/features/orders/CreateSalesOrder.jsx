@@ -168,8 +168,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       }
       if (warehousesResult.success) {
         setWarehouses(warehousesResult.warehouses)
-        const defaultWarehouse = warehousesResult.warehouses.find((warehouse) => warehouse.isDefault)
-        setWarehouseId(defaultWarehouse?.id || warehousesResult.warehouses[0]?.id || '')
+        const activeWarehouses = warehousesResult.warehouses.filter((warehouse) => warehouse.isActive !== false)
+        const defaultWarehouse = activeWarehouses.find((warehouse) => warehouse.isDefault)
+        setWarehouseId((current) => current || defaultWarehouse?.id || activeWarehouses[0]?.id || '')
       }
       if (partnersResult.success) setDeliveryPartners(partnersResult.partners)
 
@@ -793,7 +794,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 <Select
                   label="Warehouse"
                   required
-                  options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
+                  options={warehouses
+                    // Only active warehouses are selectable for a new order; an already-chosen
+                    // inactive one (edit / prefill) stays visible so historical data is intact.
+                    .filter((warehouse) => warehouse.isActive !== false || warehouse.id === warehouseId)
+                    .map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
                   value={warehouseId}
                   onChange={(event) => setWarehouseId(event.target.value)}
                   placeholder={isLoadingOptions ? 'Loading...' : 'Select warehouse'}

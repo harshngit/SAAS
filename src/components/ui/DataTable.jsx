@@ -21,6 +21,7 @@ export default function DataTable({
   searchKeys,
   pageSize = 10,
   actions,
+  onRowClick,
   loading = false,
   emptyTitle = 'No records found',
   emptyDescription,
@@ -138,20 +139,27 @@ export default function DataTable({
                 </td>
               </tr>
             ) : (
-              paginated.map((row) => (
-                <tr key={row[rowKey]} className="transition-colors hover:bg-primary-50/35">
-                  {columns.map((column) => (
-                    <td key={column.key} className={`px-4 py-2.5 text-neutral-700 ${alignClass(column.align)}`}>
-                      {column.render ? column.render(row) : row[column.key]}
-                    </td>
-                  ))}
-                  {actions && (
-                    <td className="px-4 py-2.5 text-right">
-                      <ActionMenu items={actions(row)} />
-                    </td>
-                  )}
-                </tr>
-              ))
+              paginated.map((row) => {
+                const clickable = typeof onRowClick === 'function'
+                return (
+                  <tr
+                    key={row[rowKey]}
+                    onClick={clickable ? () => onRowClick(row) : undefined}
+                    className={`transition-colors hover:bg-primary-50/35 ${clickable ? 'cursor-pointer' : ''}`}
+                  >
+                    {columns.map((column) => (
+                      <td key={column.key} className={`px-4 py-2.5 text-neutral-700 ${alignClass(column.align)}`}>
+                        {column.render ? column.render(row) : row[column.key]}
+                      </td>
+                    ))}
+                    {actions && (
+                      <td className="px-4 py-2.5 text-right" onClick={(event) => event.stopPropagation()}>
+                        <ActionMenu items={actions(row)} />
+                      </td>
+                    )}
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>

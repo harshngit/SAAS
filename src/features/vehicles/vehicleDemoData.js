@@ -106,11 +106,18 @@ function driverName(driverId) {
   return getDemoDeliveryPartners().find((partner) => partner.id === driverId)?.name || '—'
 }
 
+function partnerBrief(driverId) {
+  const partner = getDemoDeliveryPartners().find((entry) => entry.id === driverId)
+  return partner ? { id: partner.id, name: partner.name, email: '', phone: '' } : null
+}
+
 export function getDemoVehicles() {
   const overrides = readOverrides()
-  return [...SEED_VEHICLES, ...readCustom()].map((vehicle) =>
-    overrides[vehicle.id] ? { ...vehicle, ...overrides[vehicle.id] } : vehicle,
-  )
+  return [...SEED_VEHICLES, ...readCustom()].map((vehicle) => {
+    const merged = overrides[vehicle.id] ? { ...vehicle, ...overrides[vehicle.id] } : vehicle
+    // Mirror the real `assigned_delivery_partner` brief so the UI has one code path.
+    return { ...merged, assignedDeliveryPartner: partnerBrief(merged.defaultDriverId) }
+  })
 }
 
 export function getDemoVehicle(id) {
@@ -155,34 +162,63 @@ export function createDemoVehicle(data) {
   return record
 }
 
-// Current assignment + any logged history for one vehicle.
+// Assignment history for one vehicle, in the same shape the real
+// GET /vehicles/{id}/assignments returns: { id, driverName, assignedAt, unassignedAt, isCurrent }.
+// Derived by folding the local Assigned/Unassigned log into open/closed spans.
 export function getDemoVehicleAssignments(vehicleId) {
   const vehicle = getDemoVehicle(vehicleId)
-  const history = readAssignmentLog()
+  const log = readAssignmentLog()
     .filter((entry) => entry.vehicleId === vehicleId)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+  const rows = []
+  let open = null
+  log.forEach((entry) => {
+    if (entry.action === 'Assigned') {
+      if (open) open.unassignedAt = entry.date
+      open = { id: entry.id, driverName: entry.driverName, assignedAt: entry.date, unassignedAt: null, isCurrent: false }
+      rows.push(open)
+    } else if (entry.action === 'Unassigned' && open) {
+      open.unassignedAt = entry.date
+      open = null
+    }
+  })
 
   // Seed the initial assignment for demo-veh-1 so history is never empty when it matters.
-  if (vehicleId === 'demo-veh-1' && !history.some((entry) => entry.action === 'Assigned')) {
-    history.push({ id: 'demo-va-seed-1', vehicleId, date: '2026-06-01', driverName: 'Ravi Kumar', action: 'Assigned', performedBy: 'Admin User' })
+  if (vehicleId === 'demo-veh-1' && rows.length === 0 && vehicle?.defaultDriverId) {
+    rows.push({ id: 'demo-va-seed-1', driverName: driverName(vehicle.defaultDriverId), assignedAt: '2026-06-01', unassignedAt: null, isCurrent: false })
   }
 
-  return {
-    current: vehicle?.defaultDriverId
-      ? { driverName: driverName(vehicle.defaultDriverId), assignedOn: vehicle.assignedOn || '', status: 'Active' }
-      : null,
-    history: history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+  // Mark the still-open span as current (or add one from the vehicle's current driver).
+  if (vehicle?.defaultDriverId) {
+    const current = rows.find((row) => !row.unassignedAt)
+    if (current) {
+      current.isCurrent = true
+      current.driverName = driverName(vehicle.defaultDriverId)
+    } else {
+      rows.push({ id: `demo-va-cur-${vehicleId}`, driverName: driverName(vehicle.defaultDriverId), assignedAt: vehicle.assignedOn || vehicle.updatedAt || '', unassignedAt: null, isCurrent: true })
+    }
   }
+
+  return rows.sort((a, b) => new Date(b.assignedAt || 0).getTime() - new Date(a.assignedAt || 0).getTime())
 }
 
-// Demo vehicle activity - illustrative operational references (loading / dispatch / EOD).
+// Vehicle activity in the shape GET /vehicles/{id}/activity returns:
+// { id, type, description, createdAt }.
 export function getDemoVehicleActivity(vehicleId) {
+  const vehicle = getDemoVehicle(vehicleId)
+  const events = [
+    { id: `demo-vact-${vehicleId}-created`, type: 'vehicle_created', description: `${vehicle?.name || 'Vehicle'} added to the fleet`, createdAt: vehicle?.createdAt || null },
+  ]
   if (vehicleId === 'demo-veh-1') {
-    return [
-      { id: 'demo-vact-1', date: '2026-08-19', activity: 'Vehicle Loaded', reference: 'VL-2026-041', warehouse: 'Central Mumbai Warehouse', deliveryPartner: 'Ravi Kumar' },
-      { id: 'demo-vact-2', date: '2026-08-19', activity: 'Delivery Dispatched', reference: 'DLV-2026-118', warehouse: 'Central Mumbai Warehouse', deliveryPartner: 'Ravi Kumar' },
-      { id: 'demo-vact-3', date: '2026-08-19', activity: 'EOD Return Completed', reference: 'EOD-2026-041', warehouse: 'Central Mumbai Warehouse', deliveryPartner: 'Ravi Kumar' },
-    ]
+    events.push(
+      { id: 'demo-vact-1', type: 'driver_assigned', description: 'Ravi Kumar assigned as default driver', createdAt: '2026-06-01T09:00:00.000Z' },
+      { id: 'demo-vact-2', type: 'loading_session_started', description: 'Loading session VL-2026-041 started', createdAt: '2026-08-19T07:10:00.000Z' },
+      { id: 'demo-vact-3', type: 'loading_session_closed', description: 'End-of-day return EOD-2026-041 completed', createdAt: '2026-08-19T19:30:00.000Z' },
+    )
   }
-  return []
+  if (vehicleId === 'demo-veh-3') {
+    events.push({ id: 'demo-vact-m1', type: 'status_changed', description: 'Status changed to Maintenance', createdAt: '2026-08-28T09:00:00.000Z' })
+  }
+  return events.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
 }

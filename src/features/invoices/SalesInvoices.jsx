@@ -81,6 +81,7 @@ export default function SalesInvoices() {
           data={invoices}
           searchKeys={['invoiceNumber', 'customerName', 'paymentStatus']}
           searchPlaceholder="Search sales invoices..."
+          onRowClick={(row) => navigate(`/accounts/invoices/sales/${row.id}`)}
           actions={(row) => [
             ...(canRecordPayment && isOpenReceivable(row)
               ? [{ label: 'Record Payment', icon: Wallet, onClick: () => setPaymentInvoice(row) }]

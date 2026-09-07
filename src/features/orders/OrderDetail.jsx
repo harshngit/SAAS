@@ -399,7 +399,14 @@ export default function OrderDetail() {
 
   // Plan Delivery modal pick-lists - demo orders use fixed demo lists, real orders use the fetched ones.
   const planPartnerOptions = (isDemo ? DEMO_DELIVERY_PARTNERS : deliveryPartners).map((p) => ({ value: p.id, label: p.name }))
-  const planVehicleOptions = (isDemo ? DEMO_VEHICLES : vehicles).map((v) => ({ value: v.id, label: v.vehicleNumber }))
+  // Only operationally-usable (active) vehicles can be picked for a delivery - inactive /
+  // maintenance vehicles are excluded (backend also blocks them).
+  const planVehicleOptions = (isDemo ? DEMO_VEHICLES : vehicles)
+    .filter((v) => {
+      const status = String(v.status || (v.isActive === false ? 'inactive' : 'active')).toLowerCase()
+      return status === 'active'
+    })
+    .map((v) => ({ value: v.id, label: v.vehicleNumber }))
   const planWarehouseOptions = (isDemo ? DEMO_WAREHOUSES : warehouses).map((w) => ({ value: w.id, label: w.name }))
   const demoInvoice = isDemo ? orderInvoices[0]?.demo || (order.invoiceId ? buildDemoInvoice(order) : null) : null
   const demoDelivery = isDemo ? buildDemoDelivery(order) : null
