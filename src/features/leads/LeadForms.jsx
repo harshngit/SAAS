@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { LocateFixed } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { LocateFixed, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
@@ -12,7 +13,7 @@ export const customerCategoryOptions = ['Retail', 'Wholesale', 'Corporate', 'VIP
   label: value,
 }))
 
-export function LeadEditForm({ lead, salespersonOptions, saving, formError, onClose, onSave, lockAssignee = false }) {
+export function LeadEditForm({ isOpen = true, lead, salespersonOptions, saving, formError, onClose, onSave, lockAssignee = false }) {
   const [formData, setFormData] = useState(() => (lead ? { ...lead, interestedProductList: leadInterestedProductList(lead) } : lead))
   const [errors, setErrors] = useState({})
 
@@ -20,6 +21,21 @@ export function LeadEditForm({ lead, salespersonOptions, saving, formError, onCl
     setFormData(lead ? { ...lead, interestedProductList: leadInterestedProductList(lead) } : lead)
     setErrors({})
   }, [lead])
+
+  // Own the overlay so the header/footer stay fixed and only the field area scrolls. Esc to
+  // close + lock the background scroll while open (same behaviour the shared Modal provided).
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const onKey = (event) => {
+      if (event.key === 'Escape') onClose?.()
+    }
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [isOpen, onClose])
 
   // Manual status options follow the backend workflow, keyed off the lead's ORIGINAL status
   // (so a `lost` lead can be reopened to Contacted/Qualified, and no backward jumps).
@@ -53,10 +69,38 @@ export function LeadEditForm({ lead, salespersonOptions, saving, formError, onCl
     onSave(formData)
   }
 
-  if (!formData) return null
+  if (!isOpen || !formData) return null
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/35 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-lead-title"
+        onSubmit={handleSubmit}
+        onClick={(event) => event.stopPropagation()}
+        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-neutral-200 bg-[#fbfbfa] shadow-[0_1px_0_rgba(0,0,0,0.02)]"
+      >
+        {/* Fixed header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-5 py-4">
+          <h2 id="edit-lead-title" className="text-sm font-semibold tracking-[-0.01em] text-neutral-900">
+            Edit Lead
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
       {formError && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
       )}
@@ -142,11 +186,16 @@ export function LeadEditForm({ lead, salespersonOptions, saving, formError, onCl
           className="sm:col-span-2"
         />
       </div>
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>Cancel</Button>
-        <Button type="submit" loading={saving}>Save Lead</Button>
-      </div>
-    </form>
+        </div>
+
+        {/* Fixed footer */}
+        <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-neutral-200 px-5 py-4 sm:flex-row sm:justify-end">
+          <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>Cancel</Button>
+          <Button type="submit" loading={saving}>Save Lead</Button>
+        </div>
+      </form>
+    </div>,
+    document.body,
   )
 }
 
@@ -221,7 +270,7 @@ export function ConvertLeadForm({ lead, salespersonOptions, saving, formError, o
       {formError && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
       )}
-      <div className="max-h-[60vh] overflow-y-auto pr-1">
+      <div className="pr-1">
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
             label="Business / Customer Name"

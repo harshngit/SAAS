@@ -37,10 +37,20 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
+// Canonical Purchase lifecycle (backend `status`): draft -> confirmed -> closed, or -> cancelled.
 export const PURCHASE_STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'closed', label: 'Closed' },
   { value: 'cancelled', label: 'Cancelled' },
+]
+
+// Canonical receiving status - independent of `status`, rolled up by the backend from
+// confirmed GRNs. Never transitioned by Purchase confirm/close.
+export const PURCHASE_RECEIVING_STATUS_CANONICAL = [
+  { value: 'not_received', label: 'Not Received' },
+  { value: 'partially_received', label: 'Partially Received' },
+  { value: 'fully_received', label: 'Fully Received' },
 ]
 
 export const PURCHASE_PAYMENT_STATUS_OPTIONS = [
@@ -89,6 +99,9 @@ function buildPurchaseItemBody(item) {
   return body
 }
 
+// Commercial/procurement fields only. Server-managed receiving fields (received_qty,
+// remaining_qty, receiving_status) and lifecycle status are NEVER sent - a Purchase is a
+// commercial order, and only a confirmed GRN moves stock or advances receiving.
 function buildPurchaseBody(payload) {
   const body = {
     invoice_number: (payload.invoiceNumber || payload.invoice_number || '').trim(),
@@ -114,23 +127,14 @@ function buildPurchaseBody(payload) {
   const financialYear = payload.financialYear || payload.financial_year
   if (financialYear) body.financial_year = financialYear
 
-  const purchaseStatus = payload.purchaseStatus || payload.purchase_status
-  if (purchaseStatus) body.purchase_status = purchaseStatus
-
   const billingAddress = payload.billingAddress || payload.billing_address
   if (billingAddress) body.billing_address = billingAddress
 
   const warehouseId = payload.warehouseId || payload.warehouse_id
   if (warehouseId) body.warehouse_id = warehouseId
 
-  const receivingStatus = payload.receivingStatus || payload.receiving_status
-  if (receivingStatus) body.receiving_status = receivingStatus
-
   const purchaseAccountId = payload.purchaseAccountId || payload.purchase_account_id
   if (purchaseAccountId) body.purchase_account_id = purchaseAccountId
-
-  const approvalStatus = payload.approvalStatus || payload.approval_status
-  if (approvalStatus) body.approval_status = approvalStatus
 
   return body
 }
@@ -155,13 +159,21 @@ function buildReturnBody(payload) {
 function normalizePurchaseItem(item) {
   if (!item) return item
 
-  const quantity = Number(item.quantity) || 0
+  const orderedQty = Number(item.ordered_qty ?? item.quantity) || 0
   const purchasePrice = Number(item.purchase_price ?? item.purchasePrice) || 0
   const discount = Number(item.discount) || 0
   const tax = Number(item.tax) || 0
-  const subtotal = quantity * purchasePrice
+  const subtotal = orderedQty * purchasePrice
   const discounted = subtotal - subtotal * (discount / 100)
   const fallbackLineTotal = discounted + discounted * (tax / 100)
+
+  // Backend-controlled GRN rollups. `remaining_qty` is authoritative when present; otherwise
+  // derive it (clamped) so a stale/partial response never renders NaN.
+  const receivedQty = Number(item.received_qty) || 0
+  const remainingQty =
+    item.remaining_qty !== undefined && item.remaining_qty !== null
+      ? Math.max(Number(item.remaining_qty) || 0, 0)
+      : Math.max(orderedQty - receivedQty, 0)
 
   return {
     id: item.id,
@@ -169,7 +181,11 @@ function normalizePurchaseItem(item) {
     variantId: item.variant_id || item.variantId || '',
     productName: item.product_name || item.product?.name || item.name || '',
     sku: item.sku || item.product_sku || '',
-    quantity,
+    // `quantity` kept as an alias for the ordered quantity (existing readers).
+    quantity: orderedQty,
+    orderedQty,
+    receivedQty,
+    remainingQty,
     purchasePrice,
     discount,
     tax,
@@ -195,8 +211,10 @@ function normalizePurchase(purchase) {
     supplierId: purchase.supplier_id || purchase.supplier?.id || '',
     supplierName: purchase.supplier?.name || purchase.supplier_name || '',
     supplier: purchase.supplier || null,
+    warehouseName: purchase.warehouse?.name || purchase.warehouse_name || '',
     invoiceDate: purchase.invoice_date,
-    status: purchase.status || 'pending',
+    // Canonical lifecycle status - draft | confirmed | closed | cancelled.
+    status: String(purchase.status || 'draft').toLowerCase(),
     paymentStatus: purchase.payment_status || 'unpaid',
     subtotal: purchase.subtotal ?? fallbackSubtotal,
     discount: purchase.discount ?? 0,
@@ -210,50 +228,65 @@ function normalizePurchase(purchase) {
     purchaseType: purchase.purchase_type || '',
     purchaseDate: purchase.purchase_date,
     financialYear: purchase.financial_year || '',
-    purchaseStatus: purchase.purchase_status || '',
     billingAddress: purchase.billing_address || '',
     warehouseId: purchase.warehouse_id || '',
-    receivingStatus: purchase.receiving_status || '',
+    // Canonical receiving status - not_received | partially_received | fully_received.
+    receivingStatus: String(purchase.receiving_status || 'not_received').toLowerCase(),
+    receivedQty: Number(purchase.received_qty ?? purchase.total_received_qty) || items.reduce((sum, i) => sum + i.receivedQty, 0),
+    orderedQty: Number(purchase.ordered_qty ?? purchase.total_ordered_qty) || items.reduce((sum, i) => sum + i.orderedQty, 0),
+    remainingQty:
+      purchase.remaining_qty !== undefined && purchase.remaining_qty !== null
+        ? Math.max(Number(purchase.remaining_qty) || 0, 0)
+        : items.reduce((sum, i) => sum + i.remainingQty, 0),
     purchaseAccountId: purchase.purchase_account_id || '',
-    approvalStatus: purchase.approval_status || '',
+    grnCount: Number(purchase.grn_count ?? purchase.grns_count) || 0,
+    confirmedAt: purchase.confirmed_at || null,
+    closedAt: purchase.closed_at || null,
+    cancelledAt: purchase.cancelled_at || null,
     createdAt: purchase.created_at,
     updatedAt: purchase.updated_at,
   }
 }
 
+// Canonical Purchase list - GET /purchases (the `/purchase-invoices` alias is legacy).
 export async function listPurchases(params = {}) {
   try {
     const queryParams = {}
 
     const supplierId = params.supplier_id || params.supplierId
     if (supplierId) queryParams.supplier_id = supplierId
-    if (params.status) queryParams.status = params.status
+    const warehouseId = params.warehouse_id || params.warehouseId
+    if (warehouseId) queryParams.warehouse_id = warehouseId
+    if (params.status && params.status !== 'all') queryParams.status = params.status
+    const receivingStatus = params.receiving_status || params.receivingStatus
+    if (receivingStatus && receivingStatus !== 'all') queryParams.receiving_status = receivingStatus
     const paymentStatus = params.payment_status || params.paymentStatus
-    if (paymentStatus) queryParams.payment_status = paymentStatus
+    if (paymentStatus && paymentStatus !== 'all') queryParams.payment_status = paymentStatus
     if (params.search) queryParams.search = params.search
+    if (params.tag) queryParams.tag = params.tag
+    if (params.skip !== undefined) queryParams.skip = params.skip
+    if (params.limit !== undefined) queryParams.limit = params.limit
 
-    const { data } = await apiClient.get('/purchase-invoices', {
+    const { data } = await apiClient.get('/purchases', {
       headers: authHeader(),
       params: queryParams,
     })
 
-    const purchases = Array.isArray(data) ? data : data?.purchases || data?.purchase_invoices || []
+    const purchases = Array.isArray(data) ? data : data?.purchases || data?.items || []
     return { success: true, purchases: purchases.map(normalizePurchase) }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to load purchase invoices. Please try again.',
+      'Unable to load purchases. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
-// Canonical Purchase list route (GET /purchases) filtered by supplier - used by the Supplier
-// Detail Purchases tab per the verified Supplier contract. The shared `listPurchases` above
-// keeps calling the legacy `/purchase-invoices` alias that the Purchase module relies on;
-// both routes are identical in shape and re-use the same normalizer.
+// Purchases filtered by supplier - used by the Supplier Detail Purchases tab. Same canonical
+// route + normalizer as listPurchases.
 export async function listSupplierPurchases(supplierId) {
   try {
     const { data } = await apiClient.get('/purchases', {
@@ -261,7 +294,7 @@ export async function listSupplierPurchases(supplierId) {
       params: supplierId ? { supplier_id: supplierId } : {},
     })
 
-    const purchases = Array.isArray(data) ? data : data?.purchases || data?.purchase_invoices || []
+    const purchases = Array.isArray(data) ? data : data?.purchases || data?.items || []
     return { success: true, purchases: purchases.map(normalizePurchase) }
   } catch (error) {
     const errorData = error.response?.data
@@ -276,7 +309,7 @@ export async function listSupplierPurchases(supplierId) {
 
 export async function getPurchase(purchaseId) {
   try {
-    const { data } = await apiClient.get(`/purchase-invoices/${encodeURIComponent(purchaseId)}`, {
+    const { data } = await apiClient.get(`/purchases/${encodeURIComponent(purchaseId)}`, {
       headers: authHeader(),
     })
 
@@ -285,7 +318,7 @@ export async function getPurchase(purchaseId) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to load purchase invoice details. Please try again.',
+      'Unable to load purchase details. Please try again.',
     )
 
     return { success: false, error: message }
@@ -294,7 +327,7 @@ export async function getPurchase(purchaseId) {
 
 export async function createPurchase(payload) {
   try {
-    const { data } = await apiClient.post('/purchase-invoices', buildPurchaseBody(payload), {
+    const { data } = await apiClient.post('/purchases', buildPurchaseBody(payload), {
       headers: authHeader(),
     })
 
@@ -303,16 +336,17 @@ export async function createPurchase(payload) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to create purchase invoice. Please try again.',
+      'Unable to create purchase. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
+// Draft only (canonical). Commercial fields; never receiving/lifecycle fields.
 export async function updatePurchase(purchaseId, payload) {
   try {
-    const { data } = await apiClient.put(`/purchase-invoices/${encodeURIComponent(purchaseId)}`, buildPurchaseBody(payload), {
+    const { data } = await apiClient.patch(`/purchases/${encodeURIComponent(purchaseId)}`, buildPurchaseBody(payload), {
       headers: authHeader(),
     })
 
@@ -321,29 +355,37 @@ export async function updatePurchase(purchaseId, payload) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to update purchase invoice. Please try again.',
+      'Unable to update purchase. Please try again.',
     )
 
     return { success: false, error: message }
   }
 }
 
-export async function approvePurchase(purchaseId) {
+async function purchaseLifecycleAction(purchaseId, action, fallback) {
   try {
-    const { data } = await apiClient.patch(`/purchase-invoices/${encodeURIComponent(purchaseId)}/approve`, {}, {
+    const { data } = await apiClient.post(`/purchases/${encodeURIComponent(purchaseId)}/${action}`, {}, {
       headers: authHeader(),
     })
-
     return { success: true, purchase: normalizePurchase(data) }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to approve purchase invoice. Please try again.',
+      fallback,
     )
-
     return { success: false, error: message }
   }
+}
+
+// draft -> confirmed. ZERO stock movement (only a confirmed GRN moves stock).
+export function confirmPurchase(purchaseId) {
+  return purchaseLifecycleAction(purchaseId, 'confirm', 'Unable to confirm this purchase. Please try again.')
+}
+
+// confirmed + fully_received -> closed. ZERO stock movement. Backend blocks an early close.
+export function closePurchase(purchaseId) {
+  return purchaseLifecycleAction(purchaseId, 'close', 'Unable to close this purchase. Please try again.')
 }
 
 export async function updatePurchasePaymentStatus(purchaseId, payload) {
@@ -352,7 +394,7 @@ export async function updatePurchasePaymentStatus(purchaseId, payload) {
     const amountPaid = payload.amountPaid ?? payload.amount_paid
     if (amountPaid !== undefined && amountPaid !== '') body.amount_paid = Number(amountPaid) || 0
 
-    const { data } = await apiClient.patch(`/purchase-invoices/${encodeURIComponent(purchaseId)}/payment-status`, body, {
+    const { data } = await apiClient.patch(`/purchases/${encodeURIComponent(purchaseId)}/payment-status`, body, {
       headers: authHeader(),
     })
 
@@ -370,7 +412,7 @@ export async function updatePurchasePaymentStatus(purchaseId, payload) {
 
 export async function cancelPurchase(purchaseId, reason) {
   try {
-    const { data } = await apiClient.patch(`/purchase-invoices/${encodeURIComponent(purchaseId)}/cancel`, { reason: reason || undefined }, {
+    const { data } = await apiClient.post(`/purchases/${encodeURIComponent(purchaseId)}/cancel`, { reason: reason || undefined }, {
       headers: authHeader(),
     })
 
@@ -379,7 +421,7 @@ export async function cancelPurchase(purchaseId, reason) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to cancel purchase invoice. Please try again.',
+      'Unable to cancel this purchase. Please try again.',
     )
 
     return { success: false, error: message }
@@ -391,7 +433,7 @@ export async function uploadPurchaseDocument(purchaseId, file) {
     const formData = new FormData()
     formData.append('file', file)
 
-    const { data } = await apiClient.post(`/purchase-invoices/${encodeURIComponent(purchaseId)}/documents`, formData, {
+    const { data } = await apiClient.post(`/purchases/${encodeURIComponent(purchaseId)}/documents`, formData, {
       headers: {
         ...authHeader(),
         'Content-Type': 'multipart/form-data',
@@ -412,7 +454,7 @@ export async function uploadPurchaseDocument(purchaseId, file) {
 
 export async function returnPurchaseItems(purchaseId, payload) {
   try {
-    const { data } = await apiClient.post(`/purchase-invoices/${encodeURIComponent(purchaseId)}/returns`, buildReturnBody(payload), {
+    const { data } = await apiClient.post(`/purchases/${encodeURIComponent(purchaseId)}/returns`, buildReturnBody(payload), {
       headers: authHeader(),
     })
 
@@ -430,7 +472,7 @@ export async function returnPurchaseItems(purchaseId, payload) {
 
 export async function deletePurchase(purchaseId) {
   try {
-    await apiClient.delete(`/purchase-invoices/${encodeURIComponent(purchaseId)}`, {
+    await apiClient.delete(`/purchases/${encodeURIComponent(purchaseId)}`, {
       headers: authHeader(),
     })
 
@@ -439,7 +481,7 @@ export async function deletePurchase(purchaseId) {
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to delete purchase invoice. Please try again.',
+      'Unable to delete this purchase. Please try again.',
     )
 
     return { success: false, error: message }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -6,10 +6,15 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
   Clock,
+  Mail,
   MapPin,
+  Package,
   Pencil,
+  Phone,
   Plus,
   RefreshCw,
   StickyNote,
@@ -18,6 +23,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -132,29 +138,44 @@ function parseNoteEntries(notes) {
     })
 }
 
-// A compact label/value cell used in the summary strip and the info sections.
-function SummaryItem({ label, children }) {
+// --- Text-hierarchy tokens (applied consistently across the page) ---------------------------
+//   heading / section title / body value  -> near-black  (text-neutral-900)
+//   subtitle / label / helper / timestamp -> medium grey (text-neutral-500)
+//   low-priority metadata / placeholder   -> light grey  (text-neutral-400)
+//   green -> actions, active/current, success/status only
+
+// A compact icon + label/value cell used in the summary strip.
+function SummaryItem({ icon: Icon, label, children }) {
   return (
-    <div className="min-w-0">
-      <p className="text-xs text-neutral-400">{label}</p>
-      <div className="mt-1 truncate text-sm font-medium text-neutral-900">{children}</div>
+    <div className="flex min-w-0 items-start gap-3">
+      {Icon && (
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500">
+          <Icon className="size-4" aria-hidden="true" />
+        </span>
+      )}
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-neutral-500">{label}</p>
+        <div className="mt-1 truncate text-sm font-medium text-neutral-900">{children}</div>
+      </div>
     </div>
   )
 }
 
-function Section({ title, icon: Icon, actions, children, className = '' }) {
+function Section({ title, icon: Icon, actions, children, className = '', bodyClassName = 'mt-4' }) {
   return (
     <div className={`rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) ${className}`}>
       <div className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-4">
         <div className="flex items-center gap-2.5">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
-            <Icon className="size-4" aria-hidden="true" />
-          </div>
+          {Icon && (
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+              <Icon className="size-4" aria-hidden="true" />
+            </div>
+          )}
           <p className="text-sm font-semibold text-neutral-900">{title}</p>
         </div>
         {actions}
       </div>
-      <div className="mt-4">{children}</div>
+      <div className={bodyClassName}>{children}</div>
     </div>
   )
 }
@@ -162,7 +183,7 @@ function Section({ title, icon: Icon, actions, children, className = '' }) {
 function Field({ label, value }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs text-neutral-400">{label}</p>
+      <p className="text-xs font-medium text-neutral-500">{label}</p>
       <p className="mt-1 truncate text-sm font-medium text-neutral-900" title={value || '—'}>{value || '—'}</p>
     </div>
   )
@@ -180,11 +201,79 @@ function TimelineItem({ icon: Icon, iconClass, title, subtitle, timestamp, isLas
       <div className={`min-w-0 flex-1 ${isLast ? '' : 'pb-5'}`}>
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
           <p className="text-sm font-semibold text-neutral-900">{title}</p>
-          <p className="text-xs text-neutral-400">{formatDateTime(timestamp)}</p>
+          <p className="text-xs text-neutral-500">{formatDateTime(timestamp)}</p>
         </div>
         {subtitle && <p className="mt-0.5 text-xs text-neutral-500">{subtitle}</p>}
       </div>
     </div>
+  )
+}
+
+// Green "+ Add Activity" split-style menu button used in the activity area header.
+function AddActivityMenu({ items }) {
+  const [open, setOpen] = useState(false)
+  const triggerRef = useRef(null)
+  const menuRef = useRef(null)
+  const [pos, setPos] = useState(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    const place = () => {
+      const rect = triggerRef.current?.getBoundingClientRect()
+      if (rect) setPos({ top: rect.bottom + 6, left: rect.right - 208 })
+    }
+    place()
+    const onDoc = (event) => {
+      if (
+        !triggerRef.current?.contains(event.target) &&
+        !menuRef.current?.contains(event.target)
+      ) {
+        setOpen(false)
+      }
+    }
+    const onKey = (event) => event.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
+  }, [open])
+
+  return (
+    <>
+      <Button ref={triggerRef} type="button" size="sm" onClick={() => setOpen((v) => !v)}>
+        <Plus className="size-4" aria-hidden="true" />
+        Add Activity
+        <ChevronDown className="size-4" aria-hidden="true" />
+      </Button>
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          role="menu"
+          style={{ position: 'fixed', top: pos.top, left: Math.max(8, pos.left), width: 208 }}
+          className="z-50 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-(--shadow-popover)"
+        >
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              onClick={() => { setOpen(false); item.onClick?.() }}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-100"
+            >
+              {item.icon && <item.icon className="size-4 text-neutral-500" aria-hidden="true" />}
+              {item.label}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
   )
 }
 
@@ -195,19 +284,22 @@ function LeadJourneyNode({ index, label, state, isLast }) {
       : state === 'done'
         ? 'bg-primary-600 text-white'
         : state === 'current'
-          ? 'bg-primary-50 text-primary-700 ring-2 ring-primary-500'
+          ? 'bg-primary-600 text-white ring-4 ring-primary-100'
           : 'bg-neutral-100 text-neutral-400'
 
   return (
-    <div className="flex flex-1 items-start gap-0">
+    <div className={`flex items-start gap-0 ${isLast ? 'shrink-0' : 'flex-1'}`}>
       <div className="flex flex-col items-center">
         <div className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${circleClass}`}>
           {state === 'lost' ? <X className="size-4" /> : state === 'done' ? <Check className="size-4" /> : index}
         </div>
-        <p className={`mt-2 max-w-24 text-center text-xs font-medium ${state === 'pending' ? 'text-neutral-400' : 'text-neutral-800'}`}>
+        <p className={`mt-2 max-w-24 text-center text-xs font-semibold ${state === 'pending' ? 'text-neutral-500' : 'text-neutral-900'}`}>
           {label}
         </p>
-        {state === 'current' && <p className="text-[0.65rem] font-medium text-primary-600">Current Stage</p>}
+        {/* Reserve the sub-label line on every node so all nodes stay the same height. */}
+        <p className="mt-0.5 h-3.5 text-[0.65rem] font-semibold leading-none text-primary-600">
+          {state === 'current' ? 'Current Stage' : ' '}
+        </p>
       </div>
       {!isLast && <div className={`mt-4 h-0.5 flex-1 ${state === 'done' || state === 'lost' ? 'bg-primary-500' : 'bg-neutral-100'}`} />}
     </div>
@@ -265,7 +357,7 @@ export default function LeadDetail() {
   const [directFollowUps, setDirectFollowUps] = useState([])
   const [isLoadingFollowUps, setIsLoadingFollowUps] = useState(true)
   const [followUpsError, setFollowUpsError] = useState('')
-  const [activitiesTab, setActivitiesTab] = useState('followups')
+  const [activitiesTab, setActivitiesTab] = useState('activity')
 
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false)
   const [followUpFormData, setFollowUpFormData] = useState(emptyFollowUpFormData)
@@ -461,6 +553,14 @@ export default function LeadDetail() {
       .map((item) => item.trim())
       .filter(Boolean)
   }, [lead?.interestedProducts, lead?.interestedProduct])
+
+  // "A and B" for two, "A, B and N more" for longer lists - shown in the Product Interest strip.
+  const productInterestSummary = useMemo(() => {
+    const list = interestedProducts
+    if (list.length <= 1) return list[0] || ''
+    if (list.length === 2) return `${list[0]} and ${list[1]}`
+    return `${list.slice(0, 2).join(', ')} and ${list.length - 2} more`
+  }, [interestedProducts])
 
   const handleSaveLead = async (formData) => {
     setIsSaving(true)
@@ -756,15 +856,18 @@ export default function LeadDetail() {
         Back to Leads
       </button>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="font-(--font-display) text-2xl font-semibold tracking-tight text-neutral-900">
               {lead.name || lead.customerName || 'New prospect'}
             </h1>
             <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLeadStatus(lead.leadStatus)}</Badge>
           </div>
-          <p className="mt-1 text-sm text-neutral-500">{lead.leadId}</p>
+          <p className="mt-1 text-sm text-neutral-500">
+            {lead.leadId}
+            {lead.createdAt ? <span className="text-neutral-400"> · Created on {formatDate(lead.createdAt)}</span> : null}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {!isReadOnlyLead && (
@@ -812,16 +915,31 @@ export default function LeadDetail() {
 
       {/* Compact summary strip - the facts a rep needs at a glance, shown once. */}
       <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-        <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-5">
-          <SummaryItem label="Phone">
+        <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-5">
+          <SummaryItem icon={Phone} label="Phone">
             {lead.mobileNumber ? (
               <a href={`tel:${lead.mobileNumber}`} className="text-primary-700 hover:underline">{lead.mobileNumber}</a>
             ) : '—'}
           </SummaryItem>
-          <SummaryItem label="Source">{lead.leadSource || '—'}</SummaryItem>
-          <SummaryItem label="Assigned To">{lead.assignedSalespersonName || 'Unassigned'}</SummaryItem>
-          <SummaryItem label="Interested Products">{interestedProducts.length ? interestedProducts.join(', ') : '—'}</SummaryItem>
-          <SummaryItem label="Created Date">{formatDate(lead.createdAt)}</SummaryItem>
+          <SummaryItem icon={Tag} label="Source">{lead.leadSource || '—'}</SummaryItem>
+          <SummaryItem icon={UserRound} label="Assigned To">{lead.assignedSalespersonName || 'Unassigned'}</SummaryItem>
+          <SummaryItem icon={Package} label="Interested Products">
+            {interestedProducts.length === 0 ? (
+              '—'
+            ) : isReadOnlyLead ? (
+              `${interestedProducts.length} product${interestedProducts.length === 1 ? '' : 's'}`
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setFormError(''); setIsEditOpen(true) }}
+                className="inline-flex items-center gap-1 text-primary-700 hover:underline"
+              >
+                {interestedProducts.length} product{interestedProducts.length === 1 ? '' : 's'}
+                <ChevronRight className="size-3.5" aria-hidden="true" />
+              </button>
+            )}
+          </SummaryItem>
+          <SummaryItem icon={Calendar} label="Created Date">{formatDateTime(lead.createdAt)}</SummaryItem>
         </div>
       </div>
 
@@ -856,116 +974,175 @@ export default function LeadDetail() {
         )}
       </Section>
 
-      <Section title="Contact Information" icon={UserRound}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Prospect / Business Name" value={lead.name || lead.customerName} />
-          <Field label="Contact Person" value={lead.contactPerson} />
-          <Field label="Mobile" value={lead.mobileNumber} />
-          <Field label="Email" value={lead.email} />
-        </div>
-      </Section>
-
-      <Section title="Lead Information" icon={Tag}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Source" value={lead.leadSource} />
-          <Field label="Assigned Salesperson" value={lead.assignedSalespersonName} />
-          <div>
-            <p className="text-xs text-neutral-400">Status</p>
-            <div className="mt-1">
-              <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLeadStatus(lead.leadStatus)}</Badge>
+      {/* Contact Information + Lead Information side by side */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Section
+          title="Contact Information"
+          icon={UserRound}
+          actions={
+            isReadOnlyLead ? null : (
+              <Button type="button" variant="outline" size="sm" onClick={() => { setFormError(''); setIsEditOpen(true) }}>
+                <Pencil className="size-4" aria-hidden="true" />
+                Edit
+              </Button>
+            )
+          }
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Business / Prospect Name" value={lead.name || lead.customerName} />
+            <Field label="Contact Person" value={lead.contactPerson} />
+            <div className="flex items-end justify-between gap-2">
+              <Field label="Phone" value={lead.mobileNumber} />
+              {lead.mobileNumber && (
+                <a
+                  href={`tel:${lead.mobileNumber}`}
+                  aria-label="Call"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700"
+                >
+                  <Phone className="size-4" aria-hidden="true" />
+                </a>
+              )}
+            </div>
+            <div className="flex items-end justify-between gap-2">
+              <Field label="Email" value={lead.email} />
+              {lead.email && (
+                <a
+                  href={`mailto:${lead.email}`}
+                  aria-label="Email"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700"
+                >
+                  <Mail className="size-4" aria-hidden="true" />
+                </a>
+              )}
             </div>
           </div>
-          <Field label="Lead Type" value={lead.leadType} />
-          <Field label="Segment" value={lead.segment} />
-          <Field label="Created Date" value={formatDateTime(lead.createdAt)} />
-          <div className="sm:col-span-2 lg:col-span-3">
-            <p className="text-xs text-neutral-400">Interested Products</p>
-            {interestedProducts.length === 0 ? (
-              <p className="mt-1 text-sm font-medium text-neutral-900">—</p>
-            ) : (
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {interestedProducts.map((product) => (
-                  <span
-                    key={product}
-                    className="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700"
-                  >
-                    {product}
-                  </span>
-                ))}
+        </Section>
+
+        <Section
+          title="Lead Information"
+          icon={Tag}
+          actions={
+            isReadOnlyLead ? null : (
+              <Button type="button" variant="outline" size="sm" onClick={() => { setFormError(''); setIsEditOpen(true) }}>
+                <Pencil className="size-4" aria-hidden="true" />
+                Edit
+              </Button>
+            )
+          }
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Source" value={lead.leadSource} />
+            <Field label="Assigned Salesperson" value={lead.assignedSalespersonName} />
+            <Field label="Lead Type" value={lead.leadType} />
+            <Field label="Segment" value={lead.segment} />
+            <div>
+              <p className="text-xs font-medium text-neutral-500">Status</p>
+              <div className="mt-1">
+                <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLeadStatus(lead.leadStatus)}</Badge>
               </div>
+            </div>
+            <Field label="Created Date" value={formatDateTime(lead.createdAt)} />
+          </div>
+        </Section>
+      </div>
+
+      {/* Product interest - full-width strip */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-neutral-100 bg-primary-50/40 p-5 shadow-(--shadow-card) sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-primary-600 ring-1 ring-primary-100">
+            <Package className="size-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-neutral-500">Product Interest</p>
+            <p className="mt-0.5 text-sm font-semibold text-neutral-900">
+              {interestedProducts.length === 0
+                ? 'No products captured for this lead'
+                : `${interestedProducts.length} product${interestedProducts.length === 1 ? '' : 's'} captured for this lead`}
+            </p>
+            {interestedProducts.length > 0 && (
+              <p className="mt-0.5 truncate text-xs text-neutral-500">{productInterestSummary}</p>
             )}
           </div>
         </div>
-      </Section>
+        {!isReadOnlyLead && (
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => { setFormError(''); setIsEditOpen(true) }}>
+            {interestedProducts.length === 0 ? 'Add Products' : 'View Products'}
+            <ChevronRight className="size-4" aria-hidden="true" />
+          </Button>
+        )}
+      </div>
 
-      <Section
-        title="Notes / Requirements"
-        icon={StickyNote}
-        actions={
-          isReadOnlyLead ? null : (
-            <Button type="button" variant="outline" size="sm" onClick={openNoteModal}>
-              <Plus className="size-4" aria-hidden="true" />
-              Add Note
-            </Button>
-          )
-        }
-      >
-        {noteEntries.length === 0 ? (
-          <div className="min-h-20 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/60 p-4 text-center text-sm text-neutral-400">
-            No notes added yet.
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {noteEntries.map((entry) => (
-              <div key={entry.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
-                {entry.timestamp && (
-                  <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-400">
-                    <Clock className="size-3.5 shrink-0" aria-hidden="true" />
-                    {entry.timestamp}
-                  </p>
+      {/* Activity area (tabs) + right rail */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <Section
+          title="Lead Activity"
+          icon={Clock}
+          bodyClassName="mt-4"
+          actions={
+            isReadOnlyLead ? null : (
+              <AddActivityMenu
+                items={[
+                  { label: 'Add Note', icon: StickyNote, onClick: openNoteModal },
+                  { label: 'Add Follow-up', icon: ClipboardList, onClick: openAddFollowUp },
+                  { label: 'Schedule Visit', icon: MapPin, onClick: openVisitModal },
+                ]}
+              />
+            )
+          }
+        >
+          <Tabs value={activitiesTab} onValueChange={setActivitiesTab}>
+            <div className="overflow-x-auto pb-1">
+              <TabsList className="mb-4">
+                <TabsTrigger value="activity">Activity Timeline</TabsTrigger>
+                <TabsTrigger value="followups">Follow-ups ({allLeadFollowUps.length})</TabsTrigger>
+                <TabsTrigger value="visits">Visits ({visits.length})</TabsTrigger>
+                <TabsTrigger value="notes">Notes ({noteEntries.length})</TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="activity">
+              {timelineEvents.length === 0 ? (
+                <p className="py-6 text-center text-sm text-neutral-400">No activity recorded yet.</p>
+              ) : (
+                <div>
+                  {timelineEvents.map((event, index) => (
+                    <TimelineItem key={event.id} {...event} isLast={index === timelineEvents.length - 1} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="notes">
+              <div className="mb-3 flex justify-end">
+                {!isReadOnlyLead && (
+                  <Button type="button" variant="outline" size="sm" onClick={openNoteModal}>
+                    <Plus className="size-4" aria-hidden="true" />
+                    Add Note
+                  </Button>
                 )}
-                <p className={`whitespace-pre-line text-sm text-neutral-700 ${entry.timestamp ? 'mt-1.5' : ''}`}>
-                  {entry.text}
-                </p>
               </div>
-            ))}
-          </div>
-        )}
-      </Section>
-
-      <Section title="Activity Timeline" icon={Clock}>
-        {timelineEvents.length === 0 ? (
-          <p className="text-sm text-neutral-400">No activity recorded yet.</p>
-        ) : (
-          <div>
-            {timelineEvents.map((event, index) => (
-              <TimelineItem key={event.id} {...event} isLast={index === timelineEvents.length - 1} />
-            ))}
-          </div>
-        )}
-      </Section>
-
-      <Section
-        title="Activities"
-        icon={MapPin}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={openAddFollowUp}>
-              <Plus className="size-4" aria-hidden="true" />
-              Add Follow-up
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={openVisitModal}>
-              <Plus className="size-4" aria-hidden="true" />
-              Schedule Visit
-            </Button>
-          </div>
-        }
-      >
-        <Tabs value={activitiesTab} onValueChange={setActivitiesTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="followups">Follow-ups ({allLeadFollowUps.length})</TabsTrigger>
-            <TabsTrigger value="visits">Visits ({visits.length})</TabsTrigger>
-          </TabsList>
+              {noteEntries.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50/60 p-6 text-center text-sm text-neutral-400">
+                  No notes added yet.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {noteEntries.map((entry) => (
+                    <div key={entry.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
+                      {entry.timestamp && (
+                        <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-500">
+                          <Clock className="size-3.5 shrink-0" aria-hidden="true" />
+                          {entry.timestamp}
+                        </p>
+                      )}
+                      <p className={`whitespace-pre-line text-sm text-neutral-700 ${entry.timestamp ? 'mt-1.5' : ''}`}>
+                        {entry.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
 
           <TabsContent value="followups">
             {followUpsError ? (
@@ -991,7 +1168,7 @@ export default function LeadDetail() {
                         <Badge variant={fuStatus.variant} dot>{fuStatus.label}</Badge>
                       </div>
 
-                      <p className="mt-2 text-[0.7rem] text-neutral-400">
+                      <p className="mt-2 text-[0.7rem] font-medium text-neutral-500">
                         {task.origin
                           ? `From visit · ${formatLabel(task.origin.visitType)} · ${formatDate(task.origin.visitDate)}`
                           : 'Direct follow-up on this lead'}
@@ -1017,7 +1194,7 @@ export default function LeadDetail() {
                             </span>
                           )
                         ) : (
-                          <span className="text-neutral-400">Manage from the visit or Follow-ups page</span>
+                          <span className="text-neutral-500">Manage from the visit or Follow-ups page</span>
                         )}
                       </div>
                     </div>
@@ -1097,20 +1274,117 @@ export default function LeadDetail() {
               </div>
             )}
           </TabsContent>
-        </Tabs>
-      </Section>
+          </Tabs>
+        </Section>
 
-      <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Lead" className="max-w-2xl">
-        <LeadEditForm
-          lead={lead}
-          salespersonOptions={salespersonOptions}
-          saving={isSaving}
-          formError={formError}
-          lockAssignee={isSalesOfficer}
-          onClose={() => setIsEditOpen(false)}
-          onSave={handleSaveLead}
-        />
-      </Modal>
+        {/* Right rail */}
+        <div className="flex flex-col gap-4">
+          <Section
+            className="flex-1"
+            title="Upcoming Follow-ups"
+            icon={ClipboardList}
+            actions={
+              <button
+                type="button"
+                onClick={() => setActivitiesTab('followups')}
+                className="text-xs font-medium text-primary-700 hover:underline"
+              >
+                View All
+              </button>
+            }
+          >
+            {(() => {
+              const upcoming = allLeadFollowUps.filter((task) => task.status !== 'completed').slice(0, 3)
+              if (upcoming.length === 0) {
+                return <p className="text-sm text-neutral-400">No upcoming follow-ups.</p>
+              }
+              return (
+                <div className="space-y-3">
+                  {upcoming.map((task) => {
+                    const due = describeDueDate(task.dueDate)
+                    const fuStatus = deriveFollowUpStatus(task)
+                    return (
+                      <div key={task.id} className="flex items-start gap-3">
+                        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500">
+                          <ClipboardList className="size-4" aria-hidden="true" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="truncate text-sm font-medium text-neutral-900">{task.title}</p>
+                            <Badge variant={fuStatus.variant} dot>{fuStatus.label}</Badge>
+                          </div>
+                          <p className={`mt-0.5 text-xs ${due.tone === 'danger' ? 'font-medium text-red-600' : 'text-neutral-500'}`}>
+                            {formatDateTime(task.dueDate)}
+                          </p>
+                          <p className="mt-0.5 text-xs text-neutral-500">
+                            Priority: {formatLabel(task.priority)}
+                            {task.assignedToName ? ` · ${task.assignedToName}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </Section>
+
+          <Section
+            className="flex-1"
+            title="Recent Notes"
+            icon={StickyNote}
+            actions={
+              noteEntries.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setActivitiesTab('notes')}
+                  className="text-xs font-medium text-primary-700 hover:underline"
+                >
+                  View All
+                </button>
+              ) : null
+            }
+          >
+            {noteEntries.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/60 p-5 text-center">
+                <StickyNote className="size-5 text-neutral-400" aria-hidden="true" />
+                <p className="text-sm text-neutral-400">No notes added yet.</p>
+                {!isReadOnlyLead && (
+                  <Button type="button" variant="outline" size="sm" onClick={openNoteModal}>
+                    <Plus className="size-4" aria-hidden="true" />
+                    Add Note
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {noteEntries.slice(0, 2).map((entry) => (
+                  <div key={entry.id} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3">
+                    {entry.timestamp && (
+                      <p className="text-[0.7rem] font-medium text-neutral-500">{entry.timestamp}</p>
+                    )}
+                    <p className={`line-clamp-3 whitespace-pre-line text-sm text-neutral-700 ${entry.timestamp ? 'mt-1' : ''}`}>
+                      {entry.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+        </div>
+      </div>
+
+      <LeadEditForm
+        isOpen={isEditOpen}
+        lead={lead}
+        salespersonOptions={salespersonOptions}
+        saving={isSaving}
+        formError={formError}
+        lockAssignee={isSalesOfficer}
+        onClose={() => setIsEditOpen(false)}
+        onSave={handleSaveLead}
+      />
 
       <ConvertLeadModal
         isOpen={isConvertOpen}
@@ -1256,7 +1530,7 @@ export default function LeadDetail() {
       </Modal>
 
       <Modal isOpen={isVisitOpen} onClose={() => { if (!isSavingVisit) setIsVisitOpen(false) }} title="Schedule Visit" className="max-w-lg">
-        <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
+        <div className="space-y-4">
           {visitFormError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{visitFormError}</div>
           )}

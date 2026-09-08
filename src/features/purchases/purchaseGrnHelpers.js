@@ -1,19 +1,38 @@
 // =============================================================================
-// Goods Receipt Note (GRN) - frontend structure only.
+// Goods Receipt Note (GRN) - shared frontend helpers.
 // -----------------------------------------------------------------------------
-// The final receiving flow is:
-//   Purchase Confirmed -> Receive Goods -> GRN -> accepted stock enters the
-//   warehouse -> Purchase Receiving Status updates.
+// The receiving flow:
+//   Purchase Confirmed -> Create GRN (Draft, no stock) -> Confirm GRN
+//   -> accepted_qty enters warehouse on_hand (StockMovement purchase_in)
+//   -> Purchase received_qty / receiving_status roll up (backend).
 //
-// The current backend has NO GRN entity, no partial-receipt persistence and no
-// stock movement on receipt (see the BACKEND LATER list in the Goods Receipts
-// tab). So this file only holds the pure client-side math and status derivation
-// that the UI needs. Nothing here calls an API. Real purchases never get a
-// fabricated GRN - only explicit demo mode simulates them (purchaseGrnDemoData.js).
+// The backend owns the GRN entity (GoodsReceiptNote / GoodsReceiptNoteItem) and
+// accepted_qty. This file holds only the client-side line preview math + status
+// derivation. The real API lives in src/api/grns.js. Demo mode simulates GRNs
+// locally (purchaseGrnDemoData.js) and never calls the API.
 // =============================================================================
 
 import { safeNumber } from './purchaseHelpers'
 
+// GRN lifecycle status (backend `status`): draft -> confirmed, or -> cancelled.
+const GRN_LIFECYCLE_META = {
+  draft: { key: 'draft', label: 'Draft', variant: 'neutral' },
+  confirmed: { key: 'confirmed', label: 'Confirmed', variant: 'success' },
+  cancelled: { key: 'cancelled', label: 'Cancelled', variant: 'danger' },
+}
+
+export function grnLifecycleMeta(key) {
+  return GRN_LIFECYCLE_META[String(key || 'draft').toLowerCase()] || GRN_LIFECYCLE_META.draft
+}
+
+// Actions per GRN lifecycle status. Confirmed / cancelled are immutable historical records.
+export function grnActions(grn) {
+  const status = String(grn?.status || 'draft').toLowerCase()
+  if (status === 'draft') return ['edit', 'confirm', 'cancel', 'delete']
+  return []
+}
+
+// Receiving-progress meta - used for the cumulative "through this GRN" column in demo history.
 const GRN_STATUS_META = {
   partially_received: { key: 'partially_received', label: 'Partially Received', variant: 'warning' },
   fully_received: { key: 'fully_received', label: 'Fully Received', variant: 'success' },
@@ -112,23 +131,10 @@ export function summarizeGrn(grn) {
 }
 
 export function grnLineHasTracking(line) {
-  return Boolean(line?.batchNumber || line?.serialNumber || line?.expiryDate)
+  return Boolean(
+    line?.batchNumber ||
+      line?.serialNumber ||
+      (Array.isArray(line?.serialNumbers) && line.serialNumbers.length) ||
+      line?.expiryDate,
+  )
 }
-
-// BACKEND LATER - everything a real GRN needs that the current API does not provide. Surfaced
-// verbatim in the Goods Receipts tab so the UI never implies these already work.
-export const GRN_BACKEND_LATER = [
-  'GRN entity / table',
-  'GRN number generation',
-  'Purchase -> GRN relationship',
-  'Partial receipt persistence',
-  'Per-item cumulative received quantity',
-  'Damaged / rejected quantity capture',
-  'Accepted quantity',
-  'Batch / serial / expiry tracking',
-  'Stock movement on accepted quantity',
-  'Warehouse inventory increase',
-  'Receiving status update from receipts',
-  'GRN audit trail',
-  'GRN cancellation / reversal',
-]

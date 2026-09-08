@@ -4,8 +4,9 @@
 // Gated behind the same explicit demo-mode flag as the rest of the Purchase
 // module. GRN ids are prefixed `demo-grn-` so they can never be mistaken for a
 // real backend id, and every caller checks demo mode before reaching this file.
-// Real purchases NEVER get a GRN from here - the backend has no GRN persistence,
-// so real mode shows a truthful empty state instead.
+// Real purchases NEVER get a GRN from here - real mode calls the backend `/grns`
+// API (src/api/grns.js); this local store exists only to simulate receiving in
+// demo mode and is never mixed with real records.
 //
 // Line quantities below are kept arithmetically consistent with the demo
 // purchase items in purchaseDemoData.js (the task's "ordered 100" sample numbers

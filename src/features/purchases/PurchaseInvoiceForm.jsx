@@ -133,6 +133,11 @@ export default function PurchaseInvoiceForm() {
         return
       }
       const purchase = result.purchase
+      // Canonical rule: only a Draft purchase is commercially editable. Anything else -> Detail.
+      if (String(purchase.status || '').toLowerCase() !== 'draft') {
+        navigate(`${basePath}/${id}`, { replace: true })
+        return
+      }
       setExistingPurchase(purchase)
       setFormState({
         supplierId: purchase.supplierId || '',
@@ -150,6 +155,7 @@ export default function PurchaseInvoiceForm() {
     }
 
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, id, isDemo])
 
   // Supplier snapshot - fetched fresh whenever the selected supplier changes, never re-typed by
@@ -184,7 +190,15 @@ export default function PurchaseInvoiceForm() {
         .map((supplier) => ({ value: supplier.id, label: supplier.name })),
     [suppliers, formState.supplierId],
   )
-  const warehouseOptions = useMemo(() => warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name })), [warehouses])
+  // Only active warehouses are selectable for a new purchase (backend also enforces this); an
+  // already-chosen warehouse on an existing record stays visible.
+  const warehouseOptions = useMemo(
+    () =>
+      warehouses
+        .filter((warehouse) => (warehouse.isActive ?? warehouse.is_active) !== false || warehouse.id === formState.warehouseId)
+        .map((warehouse) => ({ value: warehouse.id, label: warehouse.name })),
+    [warehouses, formState.warehouseId],
+  )
 
   // Products linked to the selected supplier (Product.preferred_supplier_id - the current
   // interim mechanism, see supplierProductUtils.js) are surfaced first in every item row.

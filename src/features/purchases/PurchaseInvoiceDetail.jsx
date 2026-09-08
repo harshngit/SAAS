@@ -13,8 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Ta
 import { useToast } from '../../components/ui/toastContext'
 import { formatCurrency } from '../../utils/format'
 import {
-  approvePurchase,
   cancelPurchase,
+  closePurchase,
+  confirmPurchase,
   deletePurchase,
   getPurchase,
   returnPurchaseItems,
@@ -32,7 +33,7 @@ import {
   validatePurchasePaymentAmount,
 } from './purchaseHelpers'
 import { getDemoPurchase, isDemoPurchase, patchDemoPurchase } from './purchaseDemoData'
-import { deriveReceivingStatusFromGrns } from './purchaseGrnHelpers'
+import { cumulativeAcceptedByProduct, deriveReceivingStatusFromGrns } from './purchaseGrnHelpers'
 import { getDemoGrns } from './purchaseGrnDemoData'
 import PurchaseGrnPanel from './PurchaseGrnPanel'
 import { getDemoSupplierInvoicesForPurchase } from '../supplierInvoices/supplierInvoiceDemoData'
@@ -206,6 +207,28 @@ export default function PurchaseInvoiceDetail() {
   )
   const payment = useMemo(() => derivePaymentStatus(purchase), [purchase])
   const outstanding = useMemo(() => derivePurchaseOutstanding(purchase), [purchase])
+
+  // Per-item Ordered / Received / Remaining. Real mode: backend-controlled item fields.
+  // Demo mode: cumulative accepted from local demo GRNs (never a fabricated field).
+  const demoAcceptedByProduct = useMemo(
+    () => (isDemo ? cumulativeAcceptedByProduct(demoGrns) : {}),
+    [isDemo, demoGrns],
+  )
+  // GRN count shown on the tab: demo count locally, real count from the backend Purchase.
+  const [realGrnCount, setRealGrnCount] = useState(0)
+  const grnTabCount = isDemo ? demoGrns.length : realGrnCount || purchase?.grnCount || 0
+  const itemQty = (item, which) => {
+    const ordered = Number(item.orderedQty ?? item.quantity) || 0
+    if (isDemo) {
+      const received = Number(demoAcceptedByProduct[item.productId]) || 0
+      if (which === 'ordered') return ordered
+      if (which === 'received') return received
+      return Math.max(ordered - received, 0)
+    }
+    if (which === 'ordered') return ordered
+    if (which === 'received') return Number(item.receivedQty) || 0
+    return item.remainingQty ?? Math.max(ordered - (Number(item.receivedQty) || 0), 0)
+  }
   const tax = useMemo(() => derivePurchaseTax(purchase), [purchase])
   const paymentPreview = useMemo(
     () => derivePaymentStatus({ paymentStatus: derivePaymentStatusFromAmount(paymentAmount, purchase?.total) }),
@@ -217,24 +240,49 @@ export default function PurchaseInvoiceDetail() {
     setPurchase((current) => ({ ...current, ...partial }))
   }
 
+  // Purchase confirm is a purely commercial transition - it moves NO stock. Only a confirmed
+  // GRN receives goods into the warehouse.
   const handleConfirm = async () => {
     setIsActing(true)
     setActionError('')
 
     if (isDemo) {
-      applyDemo({ status: 'approved' })
+      applyDemo({ status: 'confirmed' })
       setIsActing(false)
-      showToast({ title: 'Purchase confirmed', message: 'This purchase is now Confirmed.' })
+      showToast({ title: 'Purchase confirmed', message: 'This purchase is now Confirmed. Receive goods via a Goods Receipt.' })
       return
     }
 
-    const result = await approvePurchase(id)
+    const result = await confirmPurchase(id)
     setIsActing(false)
     if (!result.success) {
       setActionError(result.error)
       return
     }
     setPurchase(result.purchase)
+    showToast({ title: 'Purchase confirmed', message: 'This purchase is now Confirmed.' })
+  }
+
+  // Close is only valid once fully received (backend also blocks an early close). No stock move.
+  const handleClose = async () => {
+    setIsActing(true)
+    setActionError('')
+
+    if (isDemo) {
+      applyDemo({ status: 'closed' })
+      setIsActing(false)
+      showToast({ title: 'Purchase closed', message: 'This purchase is now Closed.' })
+      return
+    }
+
+    const result = await closePurchase(id)
+    setIsActing(false)
+    if (!result.success) {
+      setActionError(result.error)
+      return
+    }
+    setPurchase(result.purchase)
+    showToast({ title: 'Purchase closed', message: 'This purchase is now Closed.' })
   }
 
   const openCancelModal = () => {
@@ -449,6 +497,17 @@ export default function PurchaseInvoiceDetail() {
               Confirm Purchase
             </Button>
           )}
+          {actions.includes('close') && (
+            <Button variant="primary" size="sm" loading={isActing} onClick={handleClose}>
+              <Check className="size-4" aria-hidden="true" />
+              Close Purchase
+            </Button>
+          )}
+          {purchaseStatus.key === 'confirmed' && receiving.key !== 'fully_received' && !actions.includes('close') && (
+            <span className="rounded-full bg-neutral-50 px-3 py-1.5 text-xs font-medium text-neutral-500">
+              Close available once fully received
+            </span>
+          )}
           {actions.includes('return') && (
             <Button variant="outline" size="sm" onClick={openReturnModal}>
               <RotateCcw className="size-4" aria-hidden="true" />
@@ -492,7 +551,7 @@ export default function PurchaseInvoiceDetail() {
           <TabsList className="min-w-max">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="items">Items</TabsTrigger>
-            <TabsTrigger value="receipts">Goods Receipts{demoGrns.length > 0 ? ` (${demoGrns.length})` : ''}</TabsTrigger>
+            <TabsTrigger value="receipts">Goods Receipts{grnTabCount > 0 ? ` (${grnTabCount})` : ''}</TabsTrigger>
             <TabsTrigger value="invoices">Invoices</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
             <TabsTrigger value="documents">Documents / Notes</TabsTrigger>
@@ -537,7 +596,9 @@ export default function PurchaseInvoiceDetail() {
                   <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
                     <th className="px-5 py-3">Product</th>
                     <th className="px-5 py-3">SKU</th>
-                    <th className="px-5 py-3 text-right">Ordered Qty</th>
+                    <th className="px-5 py-3 text-right">Ordered</th>
+                    <th className="px-5 py-3 text-right">Received</th>
+                    <th className="px-5 py-3 text-right">Remaining</th>
                     <th className="px-5 py-3 text-right">Purchase Price</th>
                     <th className="px-5 py-3 text-right">Discount</th>
                     <th className="px-5 py-3 text-right">Tax</th>
@@ -545,17 +606,24 @@ export default function PurchaseInvoiceDetail() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
-                  {purchase.items.map((purchaseItem) => (
+                  {purchase.items.map((purchaseItem) => {
+                    const ordered = itemQty(purchaseItem, 'ordered')
+                    const received = itemQty(purchaseItem, 'received')
+                    const remaining = itemQty(purchaseItem, 'remaining')
+                    return (
                     <tr key={purchaseItem.id || purchaseItem.productId} className="hover:bg-primary-50/35">
                       <td className="px-5 py-3.5 font-medium text-neutral-900">{purchaseItem.productName || 'Item'}</td>
                       <td className="px-5 py-3.5 text-neutral-600">{displayValue(purchaseItem.sku)}</td>
-                      <td className="px-5 py-3.5 text-right text-neutral-600">{purchaseItem.quantity}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-600">{ordered}</td>
+                      <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{received}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-600">{remaining}</td>
                       <td className="px-5 py-3.5 text-right text-neutral-600">{formatCurrency(purchaseItem.purchasePrice)}</td>
                       <td className="px-5 py-3.5 text-right text-neutral-600">{purchaseItem.discount ? `${purchaseItem.discount}%` : '—'}</td>
                       <td className="px-5 py-3.5 text-right text-neutral-600">{purchaseItem.tax ? `${purchaseItem.tax}%` : '—'}</td>
                       <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(purchaseItem.lineTotal)}</td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -568,7 +636,14 @@ export default function PurchaseInvoiceDetail() {
             isDemo={isDemo}
             currentUserName={currentUser?.name}
             purchaseStatusKey={purchaseStatus.key}
-            onGrnChange={() => setGrnRefresh((tick) => tick + 1)}
+            receivingKey={receiving.key}
+            onGrnCount={setRealGrnCount}
+            onGrnChange={() => {
+              setGrnRefresh((tick) => tick + 1)
+              // Real mode: a confirmed GRN rolls up received_qty / receiving_status on the
+              // Purchase - refresh from the server so the Items tab + Receiving card update.
+              if (!isDemo) loadPurchase()
+            }}
           />
           {isDemo && PURCHASE_RETURNS_DEMO_ENABLED && (
             <PurchaseReturnsCrossLink purchaseId={purchase.id} navigate={navigate} refreshTick={grnRefresh} />

@@ -30,13 +30,14 @@ const RECOMMENDED_MODULES = {
     'dashboard', 'products', 'customers', 'deliveries', 'vehicle_stock', 'attendance', 'leaves', 'expenses',
   ],
   accounts: [
-    'dashboard', 'products', 'inventory', 'purchases', 'invoices', 'payments', 'payment_receipts',
+    'dashboard', 'products', 'inventory', 'purchases', 'grn', 'invoices', 'payments', 'payment_receipts',
     'expenses', 'gst', 'reports', 'leaves',
   ],
 }
 
 const moduleLabelOverrides = {
   products: 'Product & Categories',
+  grn: 'Goods Receipts (GRN)',
 }
 function moduleLabelFor(moduleKey, fallbackLabel) {
   return moduleLabelOverrides[moduleKey] || fallbackLabel

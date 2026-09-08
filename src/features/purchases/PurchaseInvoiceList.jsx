@@ -10,6 +10,7 @@ import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
 import { formatCurrency } from '../../utils/format'
+import { DEMO_MODE } from '../../config/demoMode'
 import { deletePurchase, listPurchases } from '../../api/purchases'
 import { deriveReceivingStatus, derivePaymentStatus, derivePurchaseOutstanding, derivePurchaseStatus, getPurchaseActions } from './purchaseHelpers'
 import { DEMO_PURCHASES_ENABLED, demoPurchasesResolved, isDemoPurchase } from './purchaseDemoData'
@@ -69,17 +70,23 @@ export default function PurchaseInvoiceList() {
     setIsLoading(true)
     setListError('')
 
-    const result = await listPurchases({})
-    const demoRows = DEMO_PURCHASES_ENABLED ? demoPurchasesResolved() : []
-
-    if (!result.success) {
-      setPurchases(demoRows)
-      setListError(demoRows.length ? '' : result.error)
+    // Explicit demo split: demo mode (true OR empty) never calls the real API and never
+    // appends demo rows to real results; empty demo mode is an intentional empty state.
+    if (DEMO_MODE) {
+      setPurchases(DEMO_PURCHASES_ENABLED ? demoPurchasesResolved() : [])
       setIsLoading(false)
       return
     }
 
-    setPurchases([...result.purchases, ...demoRows])
+    const result = await listPurchases({})
+    if (!result.success) {
+      setPurchases([])
+      setListError(result.error)
+      setIsLoading(false)
+      return
+    }
+
+    setPurchases(result.purchases)
     setIsLoading(false)
   }, [])
 

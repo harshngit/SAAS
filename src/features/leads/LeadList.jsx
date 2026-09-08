@@ -442,17 +442,16 @@ export default function LeadList() {
         </div>
       </Card>
 
-      <Modal isOpen={Boolean(editingLead)} onClose={() => setEditingLead(null)} title="Edit Lead" className="max-w-2xl">
-        <LeadEditForm
-          lead={editingLead}
-          salespersonOptions={salespersonOptions}
-          saving={isSaving}
-          formError={formError}
-          lockAssignee={isSalesOfficer}
-          onClose={() => setEditingLead(null)}
-          onSave={handleSaveLead}
-        />
-      </Modal>
+      <LeadEditForm
+        isOpen={Boolean(editingLead)}
+        lead={editingLead}
+        salespersonOptions={salespersonOptions}
+        saving={isSaving}
+        formError={formError}
+        lockAssignee={isSalesOfficer}
+        onClose={() => setEditingLead(null)}
+        onSave={handleSaveLead}
+      />
 
       <Modal
         isOpen={Boolean(deleteTarget)}

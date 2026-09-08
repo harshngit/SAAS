@@ -1322,7 +1322,7 @@ function CompanyProfileCompletionModal({
       title="Company Profile Completion"
       className="!max-w-md"
     >
-      <div className="max-h-[65vh] overflow-y-auto pr-1">
+      <div className="pr-1">
         <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 p-2.5">
           <div className="flex items-center gap-2.5">
             <div

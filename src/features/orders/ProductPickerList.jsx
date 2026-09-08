@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, Check, Minus, Package, Pencil, Plus, Search } from 'lucide-react'
+import { AlertTriangle, Minus, Package, Pencil, Plus, Search } from 'lucide-react'
 import { formatCurrency } from '../../utils/format'
 
 const productCategoryOf = (product) =>
@@ -88,7 +88,7 @@ export default function ProductPickerList({
         </div>
       )}
 
-      <div className={`mt-2 ${listMaxHeightClass} divide-y divide-neutral-50 overflow-y-auto rounded-xl border border-neutral-100`}>
+      <div className={`mt-2 ${listMaxHeightClass} divide-y divide-neutral-200 overflow-y-auto rounded-xl border border-neutral-100`}>
         {isLoading ? (
           <p className="px-3 py-6 text-center text-sm text-neutral-400">Loading products…</p>
         ) : filtered.length === 0 ? (
@@ -110,17 +110,12 @@ export default function ProductPickerList({
                 key={product.id}
                 className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${isSelected ? 'bg-primary-50/60' : ''}`}
               >
-                <div className="relative size-11 shrink-0">
+                <div className="size-11 shrink-0">
                   {product.cover_image ? (
                     <img src={product.cover_image} alt="" className="size-11 rounded-lg border border-neutral-100 object-cover" />
                   ) : (
                     <span className="flex size-11 items-center justify-center rounded-lg bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
                       <Package className="size-5" aria-hidden="true" />
-                    </span>
-                  )}
-                  {isSelected && (
-                    <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary-600 text-white ring-2 ring-white">
-                      <Check className="size-2.5" aria-hidden="true" />
                     </span>
                   )}
                 </div>
@@ -130,7 +125,13 @@ export default function ProductPickerList({
                   <p className="truncate text-[0.7rem] text-neutral-400">SKU: {product.sku || '—'}</p>
                   <p
                     className={`text-[0.7rem] font-medium ${
-                      isOutOfStock ? 'text-red-600' : isLowStock ? 'text-amber-600' : 'text-neutral-500'
+                      isOutOfStock
+                        ? 'text-red-600'
+                        : isLowStock
+                          ? 'text-amber-600'
+                          : stock === null
+                            ? 'text-neutral-400'
+                            : 'text-emerald-600'
                     }`}
                   >
                     {isOutOfStock
@@ -138,6 +139,12 @@ export default function ProductPickerList({
                       : stock === null
                         ? 'Stock not tracked'
                         : `${isLowStock ? 'Low stock · ' : ''}${stock} ${unit}${isLowStock ? '' : ' available'}`}
+                  </p>
+                  {/* Base (catalogue) price - always shown under the name. The right column
+                      holds the editable line price + stepper only once the row is selected. */}
+                  <p className="text-[0.7rem] font-medium text-neutral-500">
+                    {formatCurrency(product.price || 0)}
+                    <span className="ml-1 font-normal text-neutral-400">/ {unit}</span>
                   </p>
                   {shortStock && (
                     <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold text-amber-700">
@@ -148,7 +155,7 @@ export default function ProductPickerList({
                 </div>
 
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  {isSelected ? (
+                  {isSelected && (
                     <div className="flex items-center gap-1 rounded-md border border-neutral-200 bg-white pl-2 pr-1">
                       <span className="text-[0.7rem] text-neutral-400">₹</span>
                       <input
@@ -163,11 +170,6 @@ export default function ProductPickerList({
                       />
                       <Pencil className="size-3 text-neutral-300" aria-hidden="true" />
                     </div>
-                  ) : (
-                    <p className="text-right text-sm font-semibold text-neutral-900">
-                      {formatCurrency(product.price || 0)}
-                      <span className="ml-1 text-[0.64rem] font-normal text-neutral-400">/ {unit}</span>
-                    </p>
                   )}
 
                   <div

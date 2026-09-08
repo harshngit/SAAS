@@ -1,28 +1,23 @@
 // =============================================================================
 // Purchase module - single source of truth for status/action derivation.
 // -----------------------------------------------------------------------------
-// Backend reality (verified against scripts/openapi.json - PurchaseCreate / PurchaseUpdate /
-// PurchaseOut):
-//   - `status` is the REAL backend-managed lifecycle field: pending -> approved -> cancelled
-//     (via POST create, PATCH .../approve, PATCH .../cancel). Approve currently also adds stock
-//     and bumps the supplier's total_purchases - see PHASE 17 / BACKEND LATER notes below.
-//   - `purchase_status`, `receiving_status` are OPTIONAL free-text fields the backend stores but
-//     never transitions itself (no GRN/receiving endpoint exists) - they only ever change if a
-//     future PurchaseUpdate call sets them, which the current PurchaseUpdate schema does not
-//     even accept post-creation (PurchaseUpdate only accepts invoice_number/invoice_date/
-//     discount/tax/notes/attachment_url/items - warehouse/purchase_type/purchase_date/
-//     financial_year/purchase_status/billing_address/receiving_status/approval_status can only
-//     be set at CREATE time, never edited afterwards today).
-//   - `payment_status` is unpaid|partial|paid, changed via PATCH .../payment-status.
-// This file derives one truthful Purchase Status / Receiving Status / Payment Status from
-// whatever the backend actually returns, instead of scattering `status === 'pending'` checks
-// across every screen.
+// Canonical backend contract:
+//   - `status` is the backend-managed lifecycle: draft -> confirmed -> closed, or -> cancelled
+//     (POST /purchases, POST .../confirm, POST .../close, POST .../cancel, DELETE).
+//     Purchase create / confirm / close / cancel move NO stock.
+//   - `receiving_status` (not_received | partially_received | fully_received) is INDEPENDENT of
+//     `status` and is rolled up by the backend from CONFIRMED GRNs only. The frontend never
+//     sets it and never synthesizes it.
+//   - `payment_status` (unpaid | partial | paid) is separate again, changed via PATCH
+//     .../payment-status. It never drives Purchase status.
+//   - Purchase items carry backend-controlled received_qty / remaining_qty.
+//   - Physical stock inward happens only on GRN confirm (POST /grns/{id}/confirm).
+// This file derives one truthful Purchase Status / Receiving Status / Payment Status +
+// state-driven action keys from whatever the backend returns.
 // =============================================================================
 
-// Fields the current PurchaseUpdate (PATCH/PUT) schema actually accepts. Anything else set at
-// creation (supplier, purchase type, warehouse, purchase date, financial year, billing address,
-// receiving/approval status) cannot be changed via update today - the Edit page shows those as
-// read-only rather than silently dropping a change the backend would ignore.
+// A Draft purchase is commercially editable via PATCH /purchases/{id}. Once confirmed there is
+// no normal commercial editing. Only these fields are sent on update.
 export const PURCHASE_EDITABLE_ON_UPDATE = ['invoiceNumber', 'invoiceDate', 'discount', 'tax', 'notes', 'attachmentUrl', 'items']
 
 export const PURCHASE_TYPE_OPTIONS = [
@@ -40,10 +35,21 @@ const PURCHASE_STATUS_META = {
 }
 
 const RECEIVING_STATUS_MAP = {
+  not_received: { key: 'not_received', label: 'Not Received', variant: 'neutral' },
+  partially_received: { key: 'partially_received', label: 'Partially Received', variant: 'warning' },
+  fully_received: { key: 'fully_received', label: 'Fully Received', variant: 'success' },
+  // Tolerate legacy / stale free-text values from older records.
   pending: { key: 'not_received', label: 'Not Received', variant: 'neutral' },
   partial: { key: 'partially_received', label: 'Partially Received', variant: 'warning' },
   completed: { key: 'fully_received', label: 'Fully Received', variant: 'success' },
 }
+
+export const PURCHASE_RECEIVING_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Receiving' },
+  { value: 'not_received', label: 'Not Received' },
+  { value: 'partially_received', label: 'Partially Received' },
+  { value: 'fully_received', label: 'Fully Received' },
+]
 
 const PAYMENT_STATUS_MAP = {
   unpaid: { key: 'unpaid', label: 'Unpaid', variant: 'danger' },
@@ -114,7 +120,7 @@ export function validatePurchasePaymentAmount(amountPaidRaw, grandTotal) {
 
 export function deriveReceivingStatus(purchase) {
   const raw = String(purchase?.receivingStatus || '').toLowerCase()
-  return RECEIVING_STATUS_MAP[raw] || RECEIVING_STATUS_MAP.pending
+  return RECEIVING_STATUS_MAP[raw] || RECEIVING_STATUS_MAP.not_received
 }
 
 export function derivePaymentStatus(purchase) {
@@ -122,30 +128,45 @@ export function derivePaymentStatus(purchase) {
   return PAYMENT_STATUS_MAP[raw] || PAYMENT_STATUS_MAP.unpaid
 }
 
-// PURCHASE STATUS - derived from the real `status` field plus receiving/payment completeness.
-// pending -> Draft. approved -> Confirmed, or Closed once both fully received AND fully paid
-// (a purely frontend convenience label - the backend has no separate "closed" state).
-// cancelled -> Cancelled.
+// PURCHASE STATUS - straight from the canonical backend `status` (draft | confirmed | closed |
+// cancelled). Never synthesized from receiving/payment values; `closed` is a real backend state.
+// Legacy `pending`/`approved` responses (older records) are normalized safely.
 export function derivePurchaseStatus(purchase) {
-  const status = String(purchase?.status || '').toLowerCase()
-  if (status === 'cancelled') return PURCHASE_STATUS_META.cancelled
-  if (status !== 'approved') return PURCHASE_STATUS_META.draft
-  const receiving = deriveReceivingStatus(purchase)
-  const payment = derivePaymentStatus(purchase)
-  if (receiving.key === 'fully_received' && payment.key === 'paid') return PURCHASE_STATUS_META.closed
-  return PURCHASE_STATUS_META.confirmed
+  const status = String(purchase?.status || 'draft').toLowerCase()
+  if (PURCHASE_STATUS_META[status]) return PURCHASE_STATUS_META[status]
+  if (status === 'pending') return PURCHASE_STATUS_META.draft
+  if (status === 'approved') return PURCHASE_STATUS_META.confirmed
+  return PURCHASE_STATUS_META.draft
+}
+
+// True when any goods have been received - used to gate Cancel (backend also blocks it).
+export function purchaseHasReceipts(purchase) {
+  const total = safeNumber(purchase?.receivedQty)
+  if (total > 0) return true
+  return (Array.isArray(purchase?.items) ? purchase.items : []).some((item) => safeNumber(item?.receivedQty) > 0)
 }
 
 // State-driven action keys - the single source for List row menus + Detail header buttons.
-// Mirrors the exact same gating the previous modal UI used (canEdit/canApprove/canCancel/
-// canDelete/canReturn/canUpdatePayment), just consolidated: edit/confirm/delete only while
-// pending (Draft); cancel/return only while approved; recordPayment any time it isn't cancelled.
+//   draft                       -> edit, confirm, cancel, delete
+//   confirmed + not fully recv  -> createGrn, cancel (only if nothing received yet)
+//   confirmed + fully received  -> close
+//   closed / cancelled          -> read-only
+// recordPayment is available whenever the purchase is not cancelled (payment is independent).
 export function getPurchaseActions(purchase) {
   if (!purchase) return []
-  const status = String(purchase.status || '').toLowerCase()
+  const status = derivePurchaseStatus(purchase).key
+  const receiving = deriveReceivingStatus(purchase).key
+  const hasReceipts = purchaseHasReceipts(purchase)
   const actions = []
-  if (status === 'pending') actions.push('edit', 'confirm', 'delete')
-  if (status === 'approved') actions.push('cancel', 'return')
+
+  if (status === 'draft') {
+    actions.push('edit', 'confirm', 'cancel', 'delete')
+  } else if (status === 'confirmed') {
+    if (receiving !== 'fully_received') actions.push('createGrn')
+    if (receiving === 'fully_received') actions.push('close')
+    if (!hasReceipts) actions.push('cancel')
+    actions.push('return')
+  }
   if (status !== 'cancelled') actions.push('recordPayment')
   return actions
 }

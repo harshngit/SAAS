@@ -39,14 +39,16 @@ export default function Modal({ isOpen, onClose, title, children, footer, size =
       className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/35 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
+      {/* Flex column: fixed header + fixed footer, only the middle body scrolls, and the
+          whole dialog stays within the viewport. */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'modal-title' : undefined}
-        className={`max-h-[calc(100vh-2rem)] w-full overflow-y-auto rounded-xl border border-neutral-200 bg-[#fbfbfa] shadow-[0_1px_0_rgba(0,0,0,0.02)] ${hasWidthOverride ? '' : sizeClass} ${className}`}
+        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-xl border border-neutral-200 bg-[#fbfbfa] shadow-[0_1px_0_rgba(0,0,0,0.02)] ${hasWidthOverride ? '' : sizeClass} ${className}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-5 py-4">
           <h2 id="modal-title" className="text-sm font-semibold tracking-[-0.01em] text-neutral-900">
             {title}
           </h2>
@@ -59,8 +61,8 @@ export default function Modal({ isOpen, onClose, title, children, footer, size =
             <X className="size-5" />
           </button>
         </div>
-        <div className="px-5 py-5">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-neutral-200 px-5 py-5">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
+        {footer && <div className="flex shrink-0 justify-end gap-2 border-t border-neutral-200 px-5 py-5">{footer}</div>}
       </div>
     </div>,
     document.body,
