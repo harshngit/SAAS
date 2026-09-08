@@ -11,6 +11,7 @@ import Select from '../../components/ui/Select'
 import {
   createSupplier,
   deleteSupplier,
+  getSupplierProductLinks,
   listSuppliers,
   updateSupplier,
   updateSupplierStatus,
@@ -21,7 +22,7 @@ import { formatCurrency } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
 import SupplierForm from './SupplierForm'
 import { normalizeApiSupplier, supplierFormFallback } from './supplierUtils'
-import { getSupplierProducts, syncSupplierProductLinks } from './supplierProductUtils'
+import { getSupplierProducts, syncSupplierProductM2M } from './supplierProductUtils'
 import { normalizeApiProduct } from '../products/productUtils'
 import { demoProducts, demoSuppliers } from './supplierDemoData'
 
@@ -49,6 +50,7 @@ export default function SupplierList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState(null)
+  const [isPreparingEdit, setIsPreparingEdit] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [statusSupplier, setStatusSupplier] = useState(null)
@@ -65,8 +67,9 @@ export default function SupplierList() {
     setIsLoading(true)
     setListError('')
 
-    if (useDemoSuppliers) {
-      setSuppliers(demoSuppliers)
+    // Explicit demo split: DEMO_MODE (true OR empty) never calls the real API.
+    if (DEMO_MODE) {
+      setSuppliers(useDemoSuppliers ? demoSuppliers : [])
       setIsLoading(false)
       return
     }
@@ -89,8 +92,10 @@ export default function SupplierList() {
   }, [categoryFilter, searchTerm, statusFilter, useDemoSuppliers])
 
   const loadSupplierCategoryOptions = useCallback(async () => {
-    if (useDemoSuppliers) {
-      setSupplierCategoryOptions([...new Set(demoSuppliers.map((supplier) => supplier.category).filter(Boolean))])
+    if (DEMO_MODE) {
+      setSupplierCategoryOptions(
+        useDemoSuppliers ? [...new Set(demoSuppliers.map((supplier) => supplier.category).filter(Boolean))] : [],
+      )
       return
     }
 
@@ -118,8 +123,8 @@ export default function SupplierList() {
   }, [loadSupplierCategoryOptions])
 
   const loadProducts = useCallback(async () => {
-    if (useDemoSuppliers) {
-      setProducts(demoProducts)
+    if (DEMO_MODE) {
+      setProducts(useDemoSuppliers ? demoProducts : [])
       return
     }
 
@@ -131,10 +136,16 @@ export default function SupplierList() {
     loadProducts()
   }, [loadProducts])
 
+  // Truthful count only. Supplier <-> Product is many-to-many; preferred_supplier_id is an
+  // independent single reference and is NOT used to estimate here, and no per-row
+  // GET /suppliers/{id}/products is made. Real mode shows the backend `products_count` when
+  // present, otherwise "—" (Supplier Detail -> Products is the authoritative linked view).
   const getProductCount = (supplier) => {
-    if (supplier.productsSupplied?.length) return supplier.productsSupplied.length
-    const associatedProducts = getSupplierProducts(supplier, products, { demoMode: useDemoSuppliers })
-    return products.length > 0 ? associatedProducts.length : '—'
+    if (supplier.productCount != null) return supplier.productCount
+    if (useDemoSuppliers) {
+      return getSupplierProducts(supplier, products, { demoMode: true }).length
+    }
+    return '—'
   }
 
   const filteredSuppliers = useMemo(() => {
@@ -163,15 +174,35 @@ export default function SupplierList() {
     })
   }, [categoryFilter, searchTerm, sortFilter, statusFilter, suppliers])
 
-  const handleOpenForm = (supplier = null) => {
-    // Preselect the products actually linked to this supplier today (real suppliers derive this
-    // from Product.preferred_supplier_id - the backend never echoes `productsSupplied` back on
-    // the supplier record itself), so Edit doesn't open with an empty picker.
-    const withProducts = supplier
-      ? { ...supplier, productsSupplied: getSupplierProducts(supplier, products, { demoMode: useDemoSuppliers }).map((product) => ({ id: product.id, name: product.name })) }
-      : null
-    setEditingSupplier(withProducts)
+  const handleOpenForm = async (supplier = null) => {
     setFormError('')
+
+    if (!supplier) {
+      setEditingSupplier(null)
+      setIsFormOpen(true)
+      return
+    }
+
+    // Demo mode: keep the local by-name / productsSupplied mapping.
+    if (useDemoSuppliers) {
+      const productsSupplied = getSupplierProducts(supplier, products, { demoMode: true }).map((product) => ({ id: product.id, name: product.name }))
+      setEditingSupplier({ ...supplier, productsSupplied })
+      setIsFormOpen(true)
+      return
+    }
+
+    // Real mode: the authoritative "Products Supplied" selection is the Supplier <-> Product
+    // M2M link list, never Product.preferred_supplier_id. Fetch it before opening the form so
+    // the picker (and the save-time `previousProducts` diff) reflect real links.
+    setIsPreparingEdit(true)
+    const linksResult = await getSupplierProductLinks(supplier.id)
+    setIsPreparingEdit(false)
+    if (!linksResult.success) {
+      showToast({ title: 'Unable to load linked products', message: linksResult.error, variant: 'error' })
+      return
+    }
+    const productsSupplied = linksResult.links.map((link) => ({ id: link.productId, name: link.productName }))
+    setEditingSupplier({ ...supplier, productsSupplied })
     setIsFormOpen(true)
   }
 
@@ -240,12 +271,11 @@ export default function SupplierList() {
     )
     handleCloseForm()
 
-    // Products Supplied -> Product.preferred_supplier_id (the one real backend-supported link -
-    // see supplierProductUtils.js). Demo suppliers are handled above and never reach here.
-    const syncResult = await syncSupplierProductLinks(savedId, {
+    // Products Supplied -> Supplier <-> Product M2M links (POST/DELETE /suppliers/{id}/products).
+    // Demo suppliers are handled above and never reach here.
+    const syncResult = await syncSupplierProductM2M(savedId, {
       previousProducts: editingSupplier?.productsSupplied || [],
       nextProducts: supplierData.productsSupplied || [],
-      allProducts: products,
     })
     if (syncResult.attempted > 0) {
       await loadProducts()
@@ -314,6 +344,14 @@ export default function SupplierList() {
 
     setSuppliers((current) => current.filter((supplier) => supplier.id !== deleteTarget.id))
     setDeleteTarget(null)
+  }
+
+  if (isPreparingEdit) {
+    return (
+      <div className="p-10">
+        <LoadingSpinner label="Loading supplier products..." />
+      </div>
+    )
   }
 
   if (isFormOpen) {

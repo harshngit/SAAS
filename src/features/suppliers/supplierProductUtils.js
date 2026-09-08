@@ -1,4 +1,4 @@
-import { updateProduct } from '../../api/products'
+import { linkSupplierProduct, unlinkSupplierProduct } from '../../api/suppliers'
 
 export const DEMO_SUPPLIER_PRODUCT_NAMES = {
   'reliance industries': ['Anchor Roma 6A One-Way Switch', 'Industrial Extension Board', 'Havells LED Batten'],
@@ -13,11 +13,22 @@ export function getProductId(product) {
   return product?.id || product?.productId || product?.product_id || product
 }
 
-export function getSupplierProducts(supplier, products = [], { demoMode = false } = {}) {
+// Which of `products` are linked to this supplier.
+//  - real mode: `linkedProductIds` comes from GET /suppliers/{id}/products (the M2M join)
+//  - demo mode: fall back to the by-name demo mapping + the supplier's own `productsSupplied`
+export function getSupplierProducts(supplier, products = [], { demoMode = false, linkedProductIds = null } = {}) {
+  if (Array.isArray(linkedProductIds)) {
+    const linked = new Set(linkedProductIds.map(String))
+    return products.filter((product) => linked.has(String(product.id)))
+  }
+
   const selectedIds = new Set((supplier?.productsSupplied || []).map(getProductId))
   const demoNames = new Set(getDemoSupplierProductNames(supplier?.name).map((name) => name.toLowerCase()))
 
   return products.filter((product) => {
+    // `preferredSupplierId` is still read here as a legacy signal so the Purchase form's
+    // "products from this supplier" hint keeps working - the Supplier module itself uses the
+    // real M2M list (`linkedProductIds`) above and never writes preferred_supplier_id.
     const isConfigured = selectedIds.has(product.id) || product.preferredSupplierId === supplier?.id
     const isDemoMatch = demoMode && demoNames.has(String(product.name || '').trim().toLowerCase())
     return isConfigured || isDemoMatch
@@ -25,19 +36,14 @@ export function getSupplierProducts(supplier, products = [], { demoMode = false 
 }
 
 // -----------------------------------------------------------------------------
-// REAL-SUPPLIER write side of the Supplier <-> Product relationship.
-//
-// The backend has no Supplier<->Product join table yet - the only relationship it persists is
-// Product.preferred_supplier_id, a single ("one preferred supplier per product") field already
-// writable via updateProduct(). This is an interim mapping, NOT true many-to-many support.
-// BACKEND LATER: a real Supplier <-> many Products / Product <-> many Suppliers relationship.
-//
-// Demo suppliers never call this - their productsSupplied selection stays local/demo state only.
+// REAL-SUPPLIER write side of the Supplier <-> Product many-to-many relationship.
+// Uses the canonical link endpoints only - it never touches Product master and never sets
+// Product.preferred_supplier_id (that field is managed independently by the Product module).
+// Demo suppliers never call this - their productsSupplied selection stays local demo state.
 // -----------------------------------------------------------------------------
-export async function syncSupplierProductLinks(supplierId, { previousProducts = [], nextProducts = [], allProducts = [] } = {}) {
-  const previousIds = new Set(previousProducts.map(getProductId).filter(Boolean))
-  const nextIds = new Set(nextProducts.map(getProductId).filter(Boolean))
-  const productIndex = new Map(allProducts.map((product) => [product.id, product]))
+export async function syncSupplierProductM2M(supplierId, { previousProducts = [], nextProducts = [] } = {}) {
+  const previousIds = new Set(previousProducts.map(getProductId).filter(Boolean).map(String))
+  const nextIds = new Set(nextProducts.map(getProductId).filter(Boolean).map(String))
 
   const toLink = [...nextIds].filter((id) => !previousIds.has(id))
   const toUnlink = [...previousIds].filter((id) => !nextIds.has(id))
@@ -47,18 +53,15 @@ export async function syncSupplierProductLinks(supplierId, { previousProducts = 
 
   for (const productId of toLink) {
     // eslint-disable-next-line no-await-in-loop
-    const result = await updateProduct(productId, { preferredSupplierId: supplierId })
-    if (result.success) succeeded += 1
+    const result = await linkSupplierProduct(supplierId, productId)
+    // An "already linked" 400 is not a real failure for a bulk sync - the desired state is met.
+    if (result.success || result.alreadyLinked) succeeded += 1
     else failed.push({ productId, action: 'link', error: result.error })
   }
 
   for (const productId of toUnlink) {
-    const current = productIndex.get(productId)
-    // Only clear the relationship if this supplier is still the one actually holding it - never
-    // steal/clear a link that has since been reassigned to a different supplier.
-    if (current && current.preferredSupplierId && current.preferredSupplierId !== supplierId) continue
     // eslint-disable-next-line no-await-in-loop
-    const result = await updateProduct(productId, { preferredSupplierId: '' })
+    const result = await unlinkSupplierProduct(supplierId, productId)
     if (result.success) succeeded += 1
     else failed.push({ productId, action: 'unlink', error: result.error })
   }

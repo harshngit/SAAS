@@ -29,13 +29,12 @@ import { demoProducts } from './supplierDemoData'
 
 const gstNumberPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-// Supplier TYPE (what kind of entity this is) - the backend's single `category` string field is
-// used to store this, since it's the only classification slot the Supplier model has.
-const SUPPLIER_TYPE_OPTIONS = ['Company', 'Individual', 'Manufacturer', 'Distributor', 'Wholesaler', 'Retailer', 'Service Provider', 'Other']
-// Supplier CATEGORY (what business categories they operate in) - a DIFFERENT concept from
-// Supplier Type. There is no backend field for this yet (Supplier only has one `category`
-// string, already spent on Type above), so this is demo-only / BACKEND LATER for real suppliers.
-const SUPPLIER_CATEGORY_OPTIONS = ['Raw Material', 'Packaging', 'Service', 'Transport', 'Maintenance', 'Contractor', 'Other']
+// Supplier TYPE - canonical single-select, saved as backend `supplier_type`.
+const SUPPLIER_TYPE_OPTIONS = ['Manufacturer', 'Distributor', 'Wholesaler', 'Importer', 'Service Provider', 'Company', 'Individual', 'Retailer', 'Other']
+// Supplier CATEGORIES - canonical multi-select array, saved as backend `supplier_categories`.
+// A DIFFERENT concept from Supplier Type, and from Product Categories Supplied (which is derived
+// from linked products, not stored here).
+const SUPPLIER_CATEGORY_OPTIONS = ['Raw Material', 'Packaging', 'Service', 'Transport', 'Maintenance', 'Contractor', 'Electronics', 'Accessories', 'Other']
 const CURRENCY_OPTIONS = [
   { value: 'INR', label: 'INR - Indian Rupee' },
   { value: 'USD', label: 'USD - US Dollar' },
@@ -45,8 +44,9 @@ const CURRENCY_OPTIONS = [
 
 const emptyForm = {
   name: '',
+  companyName: '',
   contactPerson: '',
-  category: '',
+  supplierType: '',
   phone: '',
   email: '',
   gstNumber: '',
@@ -62,6 +62,7 @@ const emptyForm = {
   paymentTerms: '30',
   creditLimit: '',
   purchaseCurrency: 'INR',
+  notes: '',
   productsSupplied: [],
   supplierCategories: [],
 }
@@ -252,6 +253,8 @@ export default function SupplierForm({
     setFormData({
       ...emptyForm,
       ...supplier,
+      supplierType: supplier?.supplierType ?? supplier?.category ?? '',
+      pan: supplier?.panNumber ?? supplier?.pan ?? '',
       gstRegistered: supplier?.gstRegistered ?? Boolean(supplier?.gstNumber),
       productsSupplied: supplier?.productsSupplied || [],
       supplierCategories: supplier?.supplierCategories || [],
@@ -296,7 +299,7 @@ export default function SupplierForm({
   const validate = () => {
     const nextErrors = {}
     if (!formData.name.trim()) nextErrors.name = 'Supplier name is required.'
-    if (!formData.category) nextErrors.category = 'Supplier type is required.'
+    if (!formData.supplierType) nextErrors.supplierType = 'Supplier type is required.'
     if (!formData.contactPerson.trim()) nextErrors.contactPerson = 'Contact person is required.'
     if (!formData.phone.trim()) nextErrors.phone = 'Phone number is required.'
     if (!formData.email.trim()) {
@@ -323,6 +326,13 @@ export default function SupplierForm({
 
     onSave({
       ...formData,
+      supplierType: formData.supplierType,
+      // `category` alias kept so demo-mode readers that still look at `supplier.category`
+      // (the legacy single field) keep working after an edit.
+      category: formData.supplierType,
+      // Canonical camelCase names the API adapter maps to gst_number / pan_number / etc.
+      panNumber: formData.pan ? formData.pan.trim().toUpperCase() : null,
+      supplierCategories: formData.supplierCategories,
       gstNumber: formData.gstRegistered && formData.gstNumber ? formData.gstNumber.trim().toUpperCase() : null,
       city: formData.city.trim(),
       openingBalance: Number(formData.openingBalance) || 0,
@@ -379,14 +389,15 @@ export default function SupplierForm({
           <FormSection number="1" icon={IdCard} title="Basic Information">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input label="Supplier Name" value={formData.name} onChange={(event) => updateField('name', event.target.value)} error={errors.name} required />
+              <Input label="Company Name" value={formData.companyName} onChange={(event) => updateField('companyName', event.target.value)} />
               <Input label="Contact Person" value={formData.contactPerson} onChange={(event) => updateField('contactPerson', event.target.value)} error={errors.contactPerson} required />
               <Select
                 label="Supplier Type"
                 options={[...SUPPLIER_TYPE_OPTIONS, ...categoryOptions.filter((option) => !SUPPLIER_TYPE_OPTIONS.includes(option))].map((option) => ({ value: option, label: option }))}
-                value={formData.category}
-                onChange={(event) => updateField('category', event.target.value)}
+                value={formData.supplierType}
+                onChange={(event) => updateField('supplierType', event.target.value)}
                 placeholder="Select supplier type"
-                error={errors.category}
+                error={errors.supplierType}
                 required
               />
               <PhoneField value={formData.phone} onChange={(event) => updateField('phone', event.target.value)} error={errors.phone} />
@@ -447,6 +458,9 @@ export default function SupplierForm({
               <Select label="Payment Terms" options={PAYMENT_TERMS_OPTIONS} value={formData.paymentTerms} onChange={(event) => updateField('paymentTerms', event.target.value)} />
               <CurrencyField label="Credit Limit" value={formData.creditLimit} onChange={(event) => updateField('creditLimit', event.target.value)} error={errors.creditLimit} />
               <Select label="Purchase Currency" options={CURRENCY_OPTIONS} value={formData.purchaseCurrency} onChange={(event) => updateField('purchaseCurrency', event.target.value)} />
+            </div>
+            <div className="mt-4">
+              <Input as="textarea" label="Notes" value={formData.notes} onChange={(event) => updateField('notes', event.target.value)} placeholder="Internal notes about this supplier (optional)" />
             </div>
           </FormSection>
 

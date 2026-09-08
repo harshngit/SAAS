@@ -175,7 +175,15 @@ export default function PurchaseInvoiceForm() {
     return () => { cancelled = true }
   }, [formState.supplierId])
 
-  const supplierOptions = useMemo(() => suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name })), [suppliers])
+  // Inactive suppliers can't be picked for a new purchase (backend also enforces this); an
+  // already-selected one stays visible so an existing purchase still shows its supplier.
+  const supplierOptions = useMemo(
+    () =>
+      suppliers
+        .filter((supplier) => supplier.is_active !== false || supplier.id === formState.supplierId)
+        .map((supplier) => ({ value: supplier.id, label: supplier.name })),
+    [suppliers, formState.supplierId],
+  )
   const warehouseOptions = useMemo(() => warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name })), [warehouses])
 
   // Products linked to the selected supplier (Product.preferred_supplier_id - the current

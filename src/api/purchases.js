@@ -250,6 +250,30 @@ export async function listPurchases(params = {}) {
   }
 }
 
+// Canonical Purchase list route (GET /purchases) filtered by supplier - used by the Supplier
+// Detail Purchases tab per the verified Supplier contract. The shared `listPurchases` above
+// keeps calling the legacy `/purchase-invoices` alias that the Purchase module relies on;
+// both routes are identical in shape and re-use the same normalizer.
+export async function listSupplierPurchases(supplierId) {
+  try {
+    const { data } = await apiClient.get('/purchases', {
+      headers: authHeader(),
+      params: supplierId ? { supplier_id: supplierId } : {},
+    })
+
+    const purchases = Array.isArray(data) ? data : data?.purchases || data?.purchase_invoices || []
+    return { success: true, purchases: purchases.map(normalizePurchase) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load purchases for this supplier. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function getPurchase(purchaseId) {
   try {
     const { data } = await apiClient.get(`/purchase-invoices/${encodeURIComponent(purchaseId)}`, {

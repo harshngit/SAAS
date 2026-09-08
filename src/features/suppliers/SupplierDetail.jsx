@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Edit, Eye, FileText, IndianRupee, Plus, Power, ShoppingBag, Tag, Trash2, Undo2, Wallet } from 'lucide-react'
+import { ArrowLeft, Edit, Eye, FileText, IndianRupee, Link2, Link2Off, Plus, Power, ShoppingBag, Tag, Trash2, Wallet } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -14,21 +14,24 @@ import StatCard from '../../components/ui/StatCard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs'
 import {
   deleteSupplier,
+  deleteSupplierPayment,
   getSupplier,
   getSupplierPayments,
+  getSupplierProductLinks,
+  linkSupplierProduct,
   recordSupplierPayment,
+  unlinkSupplierProduct,
   updateSupplier,
   updateSupplierStatus,
-  voidSupplierPayment,
 } from '../../api/suppliers'
 import { listProducts } from '../../api/products'
-import { listPurchases } from '../../api/purchases'
+import { listSupplierPurchases } from '../../api/purchases'
 import { formatCurrency } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
 import { formatPaymentTerms, normalizeApiPayment, normalizeApiSupplier, supplierFormFallback } from './supplierUtils'
 import { normalizeApiProduct } from '../products/productUtils'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
-import { getSupplierProducts, syncSupplierProductLinks } from './supplierProductUtils'
+import { getProductId, getSupplierProducts, syncSupplierProductM2M } from './supplierProductUtils'
 import {
   demoProducts,
   getDemoPaymentDisplayId,
@@ -136,7 +139,13 @@ export default function SupplierDetail() {
   const [isVoiding, setIsVoiding] = useState(false)
   const [voidError, setVoidError] = useState('')
   const [products, setProducts] = useState([])
+  const [productLinks, setProductLinks] = useState(null)
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
+  const [linkModalOpen, setLinkModalOpen] = useState(false)
+  const [linkProductId, setLinkProductId] = useState('')
+  const [isLinking, setIsLinking] = useState(false)
+  const [linkError, setLinkError] = useState('')
+  const [unlinkBusyId, setUnlinkBusyId] = useState('')
   const [purchases, setPurchases] = useState([])
   const [isLoadingPurchases, setIsLoadingPurchases] = useState(true)
   const [purchasesError, setPurchasesError] = useState('')
@@ -149,8 +158,9 @@ export default function SupplierDetail() {
     setIsLoading(true)
     setLoadError('')
 
-    if (useDemoSuppliers) {
-      setSupplier(getDemoSupplier(id))
+    if (DEMO_MODE) {
+      setSupplier(useDemoSuppliers ? getDemoSupplier(id) : null)
+      setLoadError(useDemoSuppliers ? '' : 'Demo supplier not found.')
       setIsLoading(false)
       return
     }
@@ -170,6 +180,12 @@ export default function SupplierDetail() {
   const loadPayments = async () => {
     setIsLoadingPayments(true)
     setPaymentsError('')
+
+    if (DEMO_MODE && !useDemoSuppliers) {
+      setPayments([])
+      setIsLoadingPayments(false)
+      return
+    }
 
     if (useDemoSuppliers) {
       // Canonical demo Supplier Payment ledger - same source as the Supplier Payments module.
@@ -200,18 +216,35 @@ export default function SupplierDetail() {
     setIsLoadingProducts(true)
     setIsLoadingPurchases(true)
     setPurchasesError('')
+
+    if (DEMO_MODE && !useDemoSuppliers) {
+      setProducts([])
+      setProductLinks(null)
+      setPurchases([])
+      setIsLoadingProducts(false)
+      setIsLoadingPurchases(false)
+      return
+    }
+
     if (useDemoSuppliers) {
       setProducts(demoProducts)
+      setProductLinks(null)
       setPurchases(getDemoSupplierPurchases(id))
       setIsLoadingProducts(false)
       setIsLoadingPurchases(false)
       return
     }
 
-    const [productsResult, purchasesResult] = await Promise.all([listProducts(), listPurchases({ supplierId: id })])
+    const [productsResult, purchasesResult, linksResult] = await Promise.all([
+      listProducts(),
+      listSupplierPurchases(id),
+      getSupplierProductLinks(id),
+    ])
     if (productsResult.success) setProducts(productsResult.products.map((product) => normalizeApiProduct(product)))
     if (purchasesResult.success) setPurchases(purchasesResult.purchases)
     else setPurchasesError(purchasesResult.error)
+    // Real Supplier <-> Product M2M list. `null` means "not loaded / demo"; [] is a real empty.
+    setProductLinks(linksResult.success ? linksResult.links : [])
     setIsLoadingProducts(false)
     setIsLoadingPurchases(false)
   }
@@ -227,10 +260,26 @@ export default function SupplierDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, useDemoSuppliers, paymentsRefresh])
 
-  const supplierProducts = useMemo(
-    () => getSupplierProducts(supplier, products, { demoMode: useDemoSuppliers }),
-    [products, supplier, useDemoSuppliers],
-  )
+  // Real mode: the Products tab is driven by the M2M link list (productLinks). Rows carry the
+  // backend's own product_name / product_sku / product_category so no UUIDs are shown even if
+  // the product isn't in the loaded `products` list. Demo mode keeps the by-name mapping.
+  const supplierProducts = useMemo(() => {
+    if (Array.isArray(productLinks)) {
+      return productLinks.map((link) => {
+        const product = products.find((entry) => String(entry.id) === String(link.productId))
+        return {
+          id: link.productId,
+          name: link.productName || product?.name || link.productId,
+          sku: link.productSku || product?.sku || '',
+          category: link.productCategory || product?.category || '',
+          categoryLabel: link.productCategory || product?.categoryLabel || '',
+          status: link.productStatus || product?.status || '',
+          variants: product?.variants || [],
+        }
+      })
+    }
+    return getSupplierProducts(supplier, products, { demoMode: useDemoSuppliers })
+  }, [productLinks, products, supplier, useDemoSuppliers])
   // Derived, not stored - the set of product categories among this supplier's linked products.
   // Reuses the real Product Category master; no separate category system is invented here.
   const supplierProductCategories = useMemo(
@@ -291,7 +340,7 @@ export default function SupplierDetail() {
     setIsSaving(true)
     setFormError('')
 
-    if (useDemoSuppliers) {
+    if (DEMO_MODE) {
       setSupplier((current) => ({ ...current, ...supplierData, id: current.id }))
       setIsSaving(false)
       setIsFormOpen(false)
@@ -321,14 +370,14 @@ export default function SupplierDetail() {
 
     setSupplier(normalizeApiSupplier(savedSupplier, supplierFormFallback(supplierData, supplier.id)))
     setIsFormOpen(false)
+    // Reload the supplier record from the backend so server-managed fields stay authoritative.
+    loadSupplier()
 
-    // Products Supplied -> Product.preferred_supplier_id (the one real backend-supported link -
-    // see supplierProductUtils.js). The supplier's own fields already saved above, so a failure
-    // here is reported separately rather than rolled back or hidden.
-    const syncResult = await syncSupplierProductLinks(supplier.id, {
+    // Products Supplied -> Supplier <-> Product M2M links. The supplier's own fields already
+    // saved above, so a link failure is reported separately rather than rolled back or hidden.
+    const syncResult = await syncSupplierProductM2M(supplier.id, {
       previousProducts: supplierProducts.map((product) => ({ id: product.id, name: product.name })),
       nextProducts: supplierData.productsSupplied || [],
-      allProducts: products,
     })
     if (syncResult.attempted > 0) {
       await loadRelatedData()
@@ -347,7 +396,7 @@ export default function SupplierDetail() {
     setIsUpdatingStatus(true)
     setStatusError('')
 
-    if (useDemoSuppliers) {
+    if (DEMO_MODE) {
       setSupplier((current) => ({ ...current, status: nextIsActive ? 'active' : 'inactive' }))
       setIsUpdatingStatus(false)
       setIsStatusModalOpen(false)
@@ -371,7 +420,7 @@ export default function SupplierDetail() {
     setIsDeleting(true)
     setDeleteError('')
 
-    if (useDemoSuppliers) {
+    if (DEMO_MODE) {
       setIsDeleting(false)
       navigate('/admin/suppliers')
       return
@@ -407,10 +456,10 @@ export default function SupplierDetail() {
 
     const amount = Number(paymentForm.amount)
     // The rich UPI / Card / COD sub-fields (and payment_status) below only exist for the demo
-    // simulation - the real PaymentCreate schema accepts amount, payment_mode, reference, note,
-    // paid_on and nothing else (verified against the backend OpenAPI spec). Real-mode validation
-    // and the payload sent to the server stick to those five fields only.
-    if (useDemoSuppliers) {
+    // simulation - the real basic-payment schema accepts amount, payment_mode, reference, note,
+    // paid_on and nothing else. Real-mode validation and the payload sent to the server stick to
+    // those five fields only.
+    if (DEMO_MODE) {
       const paymentFlags = getPaymentMethodFlags(paymentForm.paymentMode)
 
       if (paymentForm.paymentMode !== 'cod' && (!amount || amount <= 0)) {
@@ -488,7 +537,7 @@ export default function SupplierDetail() {
     await loadPayments()
   }
 
-  const handleVoidPayment = async () => {
+  const handleDeletePayment = async () => {
     if (!voidTarget) return
 
     setIsVoiding(true)
@@ -506,7 +555,9 @@ export default function SupplierDetail() {
       return
     }
 
-    const result = await voidSupplierPayment(supplier.id, voidTarget.id)
+    // Basic phase: the backend physically deletes the payment and reverses the supplier's
+    // aggregate balance. This is NOT an audited accounting void.
+    const result = await deleteSupplierPayment(supplier.id, voidTarget.id)
 
     setIsVoiding(false)
 
@@ -520,10 +571,56 @@ export default function SupplierDetail() {
     await loadPayments()
   }
 
+  // ---- Products tab M2M link management (real mode) ------------------------------------------
+  const linkedProductIdSet = new Set((supplierProducts || []).map((product) => String(product.id)))
+  const linkableProducts = products.filter((product) => !linkedProductIdSet.has(String(product.id)))
+
+  const handleLinkProduct = async () => {
+    if (!linkProductId) return
+    setIsLinking(true)
+    setLinkError('')
+    if (DEMO_MODE) {
+      showToast({ title: 'Demo mode', message: 'Product links are simulated in demo mode.' })
+      setIsLinking(false)
+      setLinkModalOpen(false)
+      setLinkProductId('')
+      return
+    }
+    const result = await linkSupplierProduct(supplier.id, linkProductId)
+    setIsLinking(false)
+    if (!result.success) {
+      if (result.alreadyLinked) {
+        setLinkError('This product is already linked to this supplier.')
+        return
+      }
+      setLinkError(result.error)
+      return
+    }
+    setLinkModalOpen(false)
+    setLinkProductId('')
+    await loadRelatedData()
+  }
+
+  const handleUnlinkProduct = async (product) => {
+    const productId = getProductId(product)
+    setUnlinkBusyId(productId)
+    if (DEMO_MODE) {
+      showToast({ title: 'Demo mode', message: 'Product links are simulated in demo mode.' })
+      setUnlinkBusyId('')
+      return
+    }
+    const result = await unlinkSupplierProduct(supplier.id, productId)
+    setUnlinkBusyId('')
+    if (!result.success) {
+      showToast({ title: 'Unable to unlink product', message: result.error, variant: 'error' })
+      return
+    }
+    await loadRelatedData()
+  }
+
   if (isFormOpen) {
-    // Preselect the products actually linked to this supplier today - real suppliers derive this
-    // from Product.preferred_supplier_id, since the backend never echoes `productsSupplied` back
-    // on the supplier record itself.
+    // Preselect the products currently linked to this supplier so Edit doesn't open with an
+    // empty picker. Real mode gets these from the Supplier <-> Product M2M list.
     const supplierForForm = {
       ...supplier,
       productsSupplied: supplierProducts.map((product) => ({ id: product.id, name: product.name })),
@@ -653,7 +750,18 @@ export default function SupplierDetail() {
         </TabsContent>
 
         <TabsContent value="products" className="mt-4">
-          <Card title="Products" subtitle="Products currently linked to this supplier as preferred supplier." className="p-0" bodyClassName="p-0">
+          <Card
+            title="Products"
+            subtitle="Products linked to this supplier. Managing links here does not change the product master."
+            className="p-0"
+            bodyClassName="p-0"
+            actions={
+              <Button type="button" size="sm" onClick={() => { setLinkError(''); setLinkProductId(''); setLinkModalOpen(true) }}>
+                <Link2 className="size-4" aria-hidden="true" />
+                Link Product
+              </Button>
+            }
+          >
             {supplierProductCategories.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 border-b border-neutral-100 px-5 py-3.5">
                 <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-neutral-400">
@@ -670,18 +778,21 @@ export default function SupplierDetail() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead><tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400"><th className="px-5 py-3">Product</th><th className="px-5 py-3">SKU</th><th className="px-5 py-3">Category</th><th className="px-5 py-3">Default Purchase Price</th><th className="px-5 py-3">Status</th></tr></thead>
+                  <thead><tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400"><th className="px-5 py-3">Product</th><th className="px-5 py-3">SKU</th><th className="px-5 py-3">Category</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Action</th></tr></thead>
                   <tbody className="divide-y divide-neutral-50">
                     {supplierProducts.map((product) => (
                       <tr key={product.id} className="hover:bg-primary-50/35">
                         <td className="px-5 py-3.5 font-medium text-neutral-900">{product.name}</td>
                         <td className="px-5 py-3.5 text-neutral-600">{displayValue(product.sku)}</td>
                         <td className="px-5 py-3.5 text-neutral-600">{displayValue(product.categoryLabel || product.category)}</td>
-                        <td className="px-5 py-3.5 text-neutral-600">
-                          {product.variants?.[0]?.purchasePrice ? formatCurrency(product.variants[0].purchasePrice) : '—'}
-                        </td>
                         <td className="px-5 py-3.5">
                           <Badge variant={product.status === 'active' ? 'success' : 'neutral'}>{product.status || '—'}</Badge>
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <Button type="button" variant="ghost" size="sm" loading={unlinkBusyId === getProductId(product)} onClick={() => handleUnlinkProduct(product)}>
+                            <Link2Off className="size-4" aria-hidden="true" />
+                            Unlink
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -811,7 +922,8 @@ export default function SupplierDetail() {
                 <tbody className="divide-y divide-neutral-50">
                   {payments.map((payment) => (
                     <tr key={payment.id} className="transition-colors hover:bg-primary-50/35">
-                      <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{(useDemoSuppliers ? payment.paymentNumber || getDemoPaymentDisplayId(payment.id) : payment.id) || '—'}</td>
+                      {/* Basic-phase payments have no payment number - only the demo ledger does. */}
+                      <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{useDemoSuppliers ? (payment.paymentNumber || getDemoPaymentDisplayId(payment.id) || '—') : '—'}</td>
                       <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">
                         {new Date(payment.paidOn).toLocaleDateString()}
                       </td>
@@ -839,8 +951,8 @@ export default function SupplierDetail() {
                           </Button>
                         ) : (
                           <Button type="button" variant="ghost" size="sm" onClick={() => setVoidTarget(payment)}>
-                            <Undo2 className="size-4" aria-hidden="true" />
-                            Void
+                            <Trash2 className="size-4" aria-hidden="true" />
+                            Delete
                           </Button>
                         )}
                       </td>
@@ -855,8 +967,25 @@ export default function SupplierDetail() {
 
         </TabsContent>
 
-        <TabsContent value="documents" className="mt-4">
-          <Card title="Documents / Notes" subtitle="Internal supplier records.">
+        <TabsContent value="documents" className="mt-4 space-y-4">
+          <Card
+            title="Notes"
+            subtitle="Internal notes on this supplier."
+            actions={
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsFormOpen(true)}>
+                <Edit className="size-4" aria-hidden="true" />
+                Edit
+              </Button>
+            }
+          >
+            {supplier.notes ? (
+              <p className="whitespace-pre-line text-sm leading-6 text-neutral-700">{supplier.notes}</p>
+            ) : (
+              <p className="text-sm text-neutral-500">No notes recorded. Use Edit Supplier to add notes.</p>
+            )}
+          </Card>
+
+          <Card title="Documents" subtitle="Supplier document storage.">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {['GST Certificate', 'PAN', 'Agreement', 'Other'].map((type) => (
                 <div key={type} className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 px-4 py-4">
@@ -866,7 +995,7 @@ export default function SupplierDetail() {
               ))}
             </div>
             <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Document and notes management will be available in a future update.
+              Supplier document management will be available after the Supplier Documents module is enabled.
             </div>
           </Card>
         </TabsContent>
@@ -1119,13 +1248,13 @@ export default function SupplierDetail() {
           setVoidError('')
           setVoidTarget(null)
         }}
-        title="Void Payment"
+        title="Delete Payment"
       >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-neutral-600">
-            Void the {formatCurrency(voidTarget?.amount)} payment recorded on{' '}
-            {voidTarget ? new Date(voidTarget.paidOn).toLocaleDateString() : ''}? This restores the supplier's
-            outstanding balance and cannot be undone.
+            Delete the {formatCurrency(voidTarget?.amount)} payment recorded on{' '}
+            {voidTarget ? new Date(voidTarget.paidOn).toLocaleDateString() : ''}? This removes the payment and
+            restores the supplier&apos;s outstanding balance. It cannot be undone.
           </p>
           {voidError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -1144,9 +1273,40 @@ export default function SupplierDetail() {
             >
               Cancel
             </Button>
-            <Button type="button" variant="danger" loading={isVoiding} onClick={handleVoidPayment}>
-              Void Payment
+            <Button type="button" variant="danger" loading={isVoiding} onClick={handleDeletePayment}>
+              Delete Payment
             </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={linkModalOpen}
+        onClose={() => {
+          if (isLinking) return
+          setLinkError('')
+          setLinkModalOpen(false)
+        }}
+        title="Link Product"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-neutral-600">
+            Link an existing product to this supplier. This only records the supplier–product relationship.
+          </p>
+          <Select
+            label="Product"
+            options={[
+              { value: '', label: linkableProducts.length ? 'Select a product' : 'All products are already linked' },
+              ...linkableProducts.map((product) => ({ value: product.id, label: product.sku ? `${product.name} · ${product.sku}` : product.name })),
+            ]}
+            value={linkProductId}
+            onChange={(event) => { setLinkProductId(event.target.value); setLinkError('') }}
+            disabled={linkableProducts.length === 0}
+          />
+          {linkError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{linkError}</div>}
+          <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" disabled={isLinking} onClick={() => setLinkModalOpen(false)}>Cancel</Button>
+            <Button type="button" loading={isLinking} disabled={!linkProductId} onClick={handleLinkProduct}>Link Product</Button>
           </div>
         </div>
       </Modal>
