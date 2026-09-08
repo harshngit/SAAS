@@ -4,9 +4,7 @@ import { ArrowLeft, Edit, Eye, FileText, IndianRupee, Link2, Link2Off, Plus, Pow
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
-import DatePicker from '../../components/ui/DatePicker'
 import EmptyState from '../../components/ui/EmptyState'
-import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
@@ -14,12 +12,9 @@ import StatCard from '../../components/ui/StatCard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs'
 import {
   deleteSupplier,
-  deleteSupplierPayment,
   getSupplier,
-  getSupplierPayments,
   getSupplierProductLinks,
   linkSupplierProduct,
-  recordSupplierPayment,
   unlinkSupplierProduct,
   updateSupplier,
   updateSupplierStatus,
@@ -28,38 +23,33 @@ import { listProducts } from '../../api/products'
 import { listSupplierPurchases } from '../../api/purchases'
 import { formatCurrency } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
-import { formatPaymentTerms, normalizeApiPayment, normalizeApiSupplier, supplierFormFallback } from './supplierUtils'
+import { formatPaymentTerms, normalizeApiSupplier, supplierFormFallback } from './supplierUtils'
 import { normalizeApiProduct } from '../products/productUtils'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { getProductId, getSupplierProducts, syncSupplierProductM2M } from './supplierProductUtils'
 import {
   demoProducts,
-  getDemoPaymentDisplayId,
   getDemoSupplier,
   getDemoSupplierDisplayId,
   getDemoSupplierPurchases,
 } from './supplierDemoData'
-import { getPaymentMethodFlags } from '../payments/paymentMethodUtils'
 import { getDemoPurchase } from '../purchases/purchaseDemoData'
 import { getDemoGrns } from '../purchases/purchaseGrnDemoData'
-import { getDemoSupplierInvoicesForSupplier, SUPPLIER_INVOICES_DEMO_ENABLED } from '../supplierInvoices/supplierInvoiceDemoData'
-import { invoiceStatusMeta, paymentStatusMeta, resolveSupplierInvoice } from '../supplierInvoices/supplierInvoiceHelpers'
+import { getDemoSupplierInvoicesForSupplier } from '../supplierInvoices/supplierInvoiceDemoData'
+import {
+  invoiceStatusMeta,
+  paymentStatusMeta,
+  resolveSupplierInvoice,
+  verificationMeta as realVerificationMeta,
+} from '../supplierInvoices/supplierInvoiceHelpers'
+import { listSupplierInvoices } from '../../api/supplierInvoices'
 import SupplierInvoiceQuickView from '../supplierInvoices/SupplierInvoiceQuickView'
 import { getSupplierPayments as getDemoSupplierPaymentLedger } from '../supplierPayments/supplierPaymentDemoData'
-import { paymentStatusMeta as supplierPaymentStatusMeta } from '../supplierPayments/supplierPaymentHelpers'
+import { paymentModeLabel, paymentStatusMeta as supplierPaymentStatusMeta } from '../supplierPayments/supplierPaymentHelpers'
+import { listSupplierPayments } from '../../api/supplierPayments'
 import RecordSupplierPaymentDrawer from '../supplierPayments/RecordSupplierPaymentDrawer'
 import SupplierPaymentQuickView from '../supplierPayments/SupplierPaymentQuickView'
 import SupplierForm from './SupplierForm'
-
-const paymentModeOptions = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'upi', label: 'UPI' },
-  { value: 'cod', label: 'Cash on Delivery' },
-  { value: 'cheque', label: 'Cheque' },
-]
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 function formatDate(value) {
   if (!value) return '—'
@@ -96,19 +86,6 @@ function DetailField({ label, value, className = '' }) {
   )
 }
 
-const emptyPaymentForm = {
-  amount: '',
-  paymentMode: 'cash',
-  reference: '',
-  upiId: '',
-  cardType: '',
-  cardLastFour: '',
-  collectionInstructions: '',
-  paymentStatus: 'pending',
-  note: '',
-  paidOn: today(),
-}
-
 export default function SupplierDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -131,13 +108,6 @@ export default function SupplierDetail() {
   const [payments, setPayments] = useState([])
   const [isLoadingPayments, setIsLoadingPayments] = useState(true)
   const [paymentsError, setPaymentsError] = useState('')
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-  const [paymentForm, setPaymentForm] = useState(emptyPaymentForm)
-  const [isSavingPayment, setIsSavingPayment] = useState(false)
-  const [paymentFormError, setPaymentFormError] = useState('')
-  const [voidTarget, setVoidTarget] = useState(null)
-  const [isVoiding, setIsVoiding] = useState(false)
-  const [voidError, setVoidError] = useState('')
   const [products, setProducts] = useState([])
   const [productLinks, setProductLinks] = useState(null)
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
@@ -177,6 +147,8 @@ export default function SupplierDetail() {
     setSupplier(normalizeApiSupplier(result.supplier))
   }
 
+  // Supplier Payments history - canonical `/supplier-payments?supplier_id={id}` (real) or the
+  // canonical demo ledger (demo). One shape for both: the Supplier Payments module vocabulary.
   const loadPayments = async () => {
     setIsLoadingPayments(true)
     setPaymentsError('')
@@ -188,19 +160,29 @@ export default function SupplierDetail() {
     }
 
     if (useDemoSuppliers) {
-      // Canonical demo Supplier Payment ledger - same source as the Supplier Payments module.
       setPayments(
-        getDemoSupplierPaymentLedger({ supplierId: id }).map((payment) => ({
-          ...payment,
-          paidOn: payment.paymentDate,
-          note: payment.notes,
-        })),
+        getDemoSupplierPaymentLedger({ supplierId: id }).map((payment) => {
+          const allocated =
+            payment.status === 'voided'
+              ? 0
+              : (payment.allocations || []).reduce((sum, line) => sum + (Number(line.amount) || 0), 0)
+          return {
+            id: payment.id,
+            paymentNumber: payment.paymentNumber,
+            paymentDate: payment.paymentDate,
+            amount: Number(payment.amount) || 0,
+            allocatedAmount: allocated,
+            unallocatedAmount: Math.max((Number(payment.amount) || 0) - allocated, 0),
+            paymentMethod: payment.paymentMode,
+            status: payment.status,
+          }
+        }),
       )
       setIsLoadingPayments(false)
       return
     }
 
-    const result = await getSupplierPayments(id)
+    const result = await listSupplierPayments({ supplierId: id })
 
     setIsLoadingPayments(false)
 
@@ -209,7 +191,18 @@ export default function SupplierDetail() {
       return
     }
 
-    setPayments(result.payments.map(normalizeApiPayment))
+    setPayments(
+      result.payments.map((payment) => ({
+        id: payment.id,
+        paymentNumber: payment.paymentNumber,
+        paymentDate: payment.paymentDate,
+        amount: payment.amount,
+        allocatedAmount: payment.allocatedAmount,
+        unallocatedAmount: payment.unallocatedAmount,
+        paymentMethod: payment.paymentMethod,
+        status: payment.status,
+      })),
+    )
   }
 
   const loadRelatedData = async () => {
@@ -295,6 +288,33 @@ export default function SupplierDetail() {
     }, null),
     [purchases],
   )
+  const [realSupplierInvoices, setRealSupplierInvoices] = useState([])
+  useEffect(() => {
+    if (useDemoSuppliers || !id) return
+    let active = true
+    listSupplierInvoices({ supplierId: id }).then((result) => {
+      if (active && result.success) {
+        setRealSupplierInvoices(
+          result.invoices.map((invoice) => ({
+            id: invoice.id,
+            supplierInvoiceNumber: invoice.supplierInvoiceNumber,
+            invoiceDate: invoice.invoiceDate,
+            purchaseNumber: invoice.purchaseNumber,
+            invoiceStatus: invoice.status,
+            paymentStatus: invoice.paymentStatus,
+            invoiceTotal: invoice.grandTotal,
+            amountPaid: invoice.amountPaid,
+            outstanding: invoice.outstandingAmount,
+            match: invoice.verificationStatus ? realVerificationMeta(invoice.verificationStatus) : null,
+          })),
+        )
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [id, useDemoSuppliers])
+
   const supplierInvoices = useMemo(
     () =>
       useDemoSuppliers
@@ -304,9 +324,9 @@ export default function SupplierDetail() {
               grns: invoice.purchaseId ? getDemoGrns(invoice.purchaseId) : [],
             }),
           )
-        : [],
+        : realSupplierInvoices,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [id, useDemoSuppliers, paymentsRefresh],
+    [id, useDemoSuppliers, paymentsRefresh, realSupplierInvoices],
   )
   // Demo only: keep the payable stat cards coherent with Accounts Payable / Supplier Invoices,
   // which are the source of truth for what has actually been paid. Baseline figures already
@@ -436,139 +456,6 @@ export default function SupplierDetail() {
     }
 
     navigate('/admin/suppliers')
-  }
-
-  const handleOpenPaymentModal = () => {
-    setPaymentForm(emptyPaymentForm)
-    setPaymentFormError('')
-    setIsPaymentModalOpen(true)
-  }
-
-  const handleClosePaymentModal = () => {
-    if (isSavingPayment) return
-    setIsPaymentModalOpen(false)
-    setPaymentFormError('')
-  }
-
-  const handleRecordPayment = async (event) => {
-    event.preventDefault()
-    setPaymentFormError('')
-
-    const amount = Number(paymentForm.amount)
-    // The rich UPI / Card / COD sub-fields (and payment_status) below only exist for the demo
-    // simulation - the real basic-payment schema accepts amount, payment_mode, reference, note,
-    // paid_on and nothing else. Real-mode validation and the payload sent to the server stick to
-    // those five fields only.
-    if (DEMO_MODE) {
-      const paymentFlags = getPaymentMethodFlags(paymentForm.paymentMode)
-
-      if (paymentForm.paymentMode !== 'cod' && (!amount || amount <= 0)) {
-        setPaymentFormError('Enter a valid payment amount.')
-        return
-      }
-      if (paymentFlags.showUpiFields && !paymentForm.upiId.trim()) {
-        setPaymentFormError('Enter a UPI ID.')
-        return
-      }
-      if (paymentFlags.showCardFields) {
-        if (!paymentForm.cardType.trim()) {
-          setPaymentFormError('Enter the card type.')
-          return
-        }
-        if (!/^\d{4}$/.test(paymentForm.cardLastFour.trim())) {
-          setPaymentFormError('Enter the last 4 digits of the card.')
-          return
-        }
-      }
-      if (paymentFlags.showReferenceField && !paymentForm.reference.trim()) {
-        setPaymentFormError('Enter a transaction/reference ID.')
-        return
-      }
-      if (paymentFlags.showCodFields && !paymentForm.collectionInstructions.trim()) {
-        setPaymentFormError('Add collection or delivery instructions.')
-        return
-      }
-
-      const newPayment = {
-        id: `demo-payment-${Date.now()}`,
-        supplierId: supplier.id,
-        amount,
-        paymentMode: paymentForm.paymentMode,
-        reference: paymentForm.reference.trim(),
-        note: paymentForm.note.trim(),
-        paidOn: paymentForm.paidOn,
-      }
-      setPayments((current) => [newPayment, ...current])
-      setSupplier((current) => ({
-        ...current,
-        totalPaid: Number(current.totalPaid || 0) + amount,
-        outstandingPayable: Math.max(0, Number(current.outstandingPayable || 0) - amount),
-      }))
-      setIsPaymentModalOpen(false)
-      return
-    }
-
-    // Real supplier: the backend's `amount` field requires a positive value on every payment
-    // mode (there is no "pending COD, amount TBD" concept server-side).
-    if (!amount || amount <= 0) {
-      setPaymentFormError('Enter a valid payment amount.')
-      return
-    }
-
-    setIsSavingPayment(true)
-
-    const result = await recordSupplierPayment(supplier.id, {
-      amount,
-      paymentMode: paymentForm.paymentMode,
-      reference: paymentForm.reference.trim() || undefined,
-      note: paymentForm.note.trim() || undefined,
-      paidOn: paymentForm.paidOn || undefined,
-    })
-
-    setIsSavingPayment(false)
-
-    if (!result.success) {
-      setPaymentFormError(result.error)
-      return
-    }
-
-    setSupplier(normalizeApiSupplier(result.supplier, supplier))
-    setIsPaymentModalOpen(false)
-    await loadPayments()
-  }
-
-  const handleDeletePayment = async () => {
-    if (!voidTarget) return
-
-    setIsVoiding(true)
-    setVoidError('')
-
-    if (DEMO_MODE) {
-      setPayments((current) => current.filter((payment) => payment.id !== voidTarget.id))
-      setSupplier((current) => ({
-        ...current,
-        totalPaid: Math.max(0, Number(current.totalPaid || 0) - Number(voidTarget.amount || 0)),
-        outstandingPayable: Number(current.outstandingPayable || 0) + Number(voidTarget.amount || 0),
-      }))
-      setIsVoiding(false)
-      setVoidTarget(null)
-      return
-    }
-
-    // Basic phase: the backend physically deletes the payment and reverses the supplier's
-    // aggregate balance. This is NOT an audited accounting void.
-    const result = await deleteSupplierPayment(supplier.id, voidTarget.id)
-
-    setIsVoiding(false)
-
-    if (!result.success) {
-      setVoidError(result.error)
-      return
-    }
-
-    setSupplier(normalizeApiSupplier(result.supplier, supplier))
-    setVoidTarget(null)
-    await loadPayments()
   }
 
   // ---- Products tab M2M link management (real mode) ------------------------------------------
@@ -821,19 +708,11 @@ export default function SupplierDetail() {
         <TabsContent value="supplier-invoices" className="mt-4">
           <Card
             title="Supplier Invoices"
-            subtitle={
-              SUPPLIER_INVOICES_DEMO_ENABLED
-                ? `${supplierInvoices.length} supplier invoice${supplierInvoices.length === 1 ? '' : 's'} on file.`
-                : undefined
-            }
+            subtitle={`${supplierInvoices.length} supplier invoice${supplierInvoices.length === 1 ? '' : 's'} on file.`}
             className="p-0"
             bodyClassName="p-0"
           >
-            {!SUPPLIER_INVOICES_DEMO_ENABLED ? (
-              <p className="px-5 py-8 text-center text-sm text-neutral-500">
-                Supplier invoice history will appear here once the supplier invoicing backend is enabled.
-              </p>
-            ) : supplierInvoices.length === 0 ? (
+            {supplierInvoices.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-neutral-500">No supplier invoices recorded for this supplier yet.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -866,8 +745,17 @@ export default function SupplierDetail() {
                           <td className="px-5 py-3.5"><Badge variant={invStatus.variant}>{invStatus.label}</Badge></td>
                           <td className="px-5 py-3.5">{invoice.match ? <Badge variant={invoice.match.variant}>{invoice.match.label}</Badge> : <span className="text-neutral-400">—</span>}</td>
                           <td className="px-5 py-3.5 text-right">
-                            <Button type="button" variant="ghost" size="sm" onClick={() => setQuickViewInvoiceId(invoice.id)}>
-                              <Eye className="size-4" aria-hidden="true" /> Quick View
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                useDemoSuppliers
+                                  ? setQuickViewInvoiceId(invoice.id)
+                                  : navigate(`/admin/supplier-invoices/${invoice.id}`)
+                              }
+                            >
+                              <Eye className="size-4" aria-hidden="true" /> {useDemoSuppliers ? 'Quick View' : 'Open'}
                             </Button>
                           </td>
                         </tr>
@@ -887,7 +775,7 @@ export default function SupplierDetail() {
         className="p-0"
         bodyClassName="p-0"
         actions={
-          <Button type="button" size="sm" onClick={useDemoSuppliers ? () => setRecordDrawerOpen(true) : handleOpenPaymentModal}>
+          <Button type="button" size="sm" onClick={() => setRecordDrawerOpen(true)}>
             <Plus className="size-4" aria-hidden="true" />
             Record Payment
           </Button>
@@ -904,60 +792,47 @@ export default function SupplierDetail() {
           ) : isLoadingPayments ? (
             <LoadingSpinner label="Loading payment history..." />
           ) : payments.length === 0 ? (
-            <p className="py-8 text-center text-sm text-neutral-500">No payments recorded for this supplier yet.</p>
+            <p className="py-8 text-center text-sm text-neutral-500">No supplier payments recorded for this supplier yet.</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-neutral-100">
-              <table className="w-full min-w-2xl text-left text-sm">
+              <table className="w-full min-w-3xl text-left text-sm">
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
                     <th className="whitespace-nowrap px-5 py-3">Payment #</th>
-                    <th className="whitespace-nowrap px-5 py-3">Date</th>
+                    <th className="whitespace-nowrap px-5 py-3">Payment Date</th>
                     <th className="whitespace-nowrap px-5 py-3 text-right">Amount</th>
-                    <th className="whitespace-nowrap px-5 py-3">Payment Mode</th>
-                    <th className="whitespace-nowrap px-5 py-3">Reference</th>
+                    <th className="whitespace-nowrap px-5 py-3 text-right">Allocated</th>
+                    <th className="whitespace-nowrap px-5 py-3 text-right">Unallocated</th>
+                    <th className="whitespace-nowrap px-5 py-3">Method</th>
                     <th className="whitespace-nowrap px-5 py-3">Status</th>
                     <th className="whitespace-nowrap px-5 py-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
-                  {payments.map((payment) => (
-                    <tr key={payment.id} className="transition-colors hover:bg-primary-50/35">
-                      {/* Basic-phase payments have no payment number - only the demo ledger does. */}
-                      <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{useDemoSuppliers ? (payment.paymentNumber || getDemoPaymentDisplayId(payment.id) || '—') : '—'}</td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">
-                        {new Date(payment.paidOn).toLocaleDateString()}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">
-                        {formatCurrency(payment.amount)}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5">
-                        <Badge variant="neutral">
-                          {paymentModeOptions.find((option) => option.value === payment.paymentMode)?.label || payment.paymentMode}
-                        </Badge>
-                      </td>
-                      <td className="px-5 py-3.5 text-neutral-500">{payment.reference || '—'}</td>
-                      <td className="px-5 py-3.5">
-                        {payment.status ? (
-                          <Badge variant={supplierPaymentStatusMeta(payment.status).variant}>{supplierPaymentStatusMeta(payment.status).label}</Badge>
-                        ) : (
-                          <Badge variant="neutral">Recorded</Badge>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-right">
-                        {useDemoSuppliers ? (
+                  {payments.map((payment) => {
+                    const status = supplierPaymentStatusMeta(payment.status)
+                    return (
+                      <tr
+                        key={payment.id}
+                        className="cursor-pointer transition-colors hover:bg-primary-50/35"
+                        onClick={() => setQuickViewPaymentId(payment.id)}
+                      >
+                        <td className="whitespace-nowrap px-5 py-3.5 font-medium text-primary-700">{payment.paymentNumber || '—'}</td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{formatDate(payment.paymentDate)}</td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(payment.amount)}</td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-700">{formatCurrency(payment.allocatedAmount)}</td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-700">{formatCurrency(payment.unallocatedAmount)}</td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{paymentModeLabel(payment.paymentMethod)}</td>
+                        <td className="px-5 py-3.5"><Badge variant={status.variant}>{status.label}</Badge></td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
                           <Button type="button" variant="ghost" size="sm" onClick={() => setQuickViewPaymentId(payment.id)}>
                             <Eye className="size-4" aria-hidden="true" />
-                            Quick View
+                            View
                           </Button>
-                        ) : (
-                          <Button type="button" variant="ghost" size="sm" onClick={() => setVoidTarget(payment)}>
-                            <Trash2 className="size-4" aria-hidden="true" />
-                            Delete
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1101,180 +976,6 @@ export default function SupplierDetail() {
             </Button>
             <Button type="button" variant="danger" loading={isDeleting} onClick={handleDelete}>
               Delete
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal isOpen={isPaymentModalOpen} onClose={handleClosePaymentModal} title="Record Payment">
-        <form onSubmit={handleRecordPayment} className="space-y-4">
-          {paymentFormError && (
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {paymentFormError}
-            </div>
-          )}
-          <Input
-            label="Amount"
-            type="number"
-            min="0"
-            step="1"
-            value={paymentForm.amount}
-            onChange={(event) => setPaymentForm((current) => ({ ...current, amount: event.target.value }))}
-            required={!useDemoSuppliers || paymentForm.paymentMode !== 'cod'}
-          />
-          <Select
-            label="Payment Mode"
-            options={paymentModeOptions}
-            value={paymentForm.paymentMode}
-            onChange={(event) =>
-              setPaymentForm((current) => ({
-                ...current,
-                paymentMode: event.target.value,
-                reference: '',
-                upiId: '',
-                cardType: '',
-                cardLastFour: '',
-                collectionInstructions: '',
-                paymentStatus: event.target.value === 'cod' ? 'pending' : '',
-              }))
-            }
-          />
-          <DatePicker
-            label="Paid On"
-            value={paymentForm.paidOn}
-            onChange={(value) => setPaymentForm((current) => ({ ...current, paidOn: value }))}
-          />
-          {useDemoSuppliers ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {getPaymentMethodFlags(paymentForm.paymentMode).showUpiFields && (
-                <>
-                  <Input
-                    label="UPI ID"
-                    value={paymentForm.upiId}
-                    onChange={(event) => setPaymentForm((current) => ({ ...current, upiId: event.target.value }))}
-                    required
-                  />
-                  <Input
-                    label="Transaction / Reference ID"
-                    value={paymentForm.reference}
-                    onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
-                    required
-                  />
-                </>
-              )}
-
-              {getPaymentMethodFlags(paymentForm.paymentMode).showCardFields && (
-                <>
-                  <Input
-                    label="Card Type"
-                    value={paymentForm.cardType}
-                    onChange={(event) => setPaymentForm((current) => ({ ...current, cardType: event.target.value }))}
-                    placeholder="Debit / Credit / RuPay"
-                    required
-                  />
-                  <Input
-                    label="Last 4 Digits"
-                    value={paymentForm.cardLastFour}
-                    onChange={(event) => setPaymentForm((current) => ({ ...current, cardLastFour: event.target.value }))}
-                    inputClassName="tracking-[0.25em]"
-                    maxLength={4}
-                    required
-                  />
-                  <Input
-                    label="Transaction / Reference ID"
-                    value={paymentForm.reference}
-                    onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
-                    required
-                  />
-                </>
-              )}
-
-              {getPaymentMethodFlags(paymentForm.paymentMode).showReferenceField &&
-                !getPaymentMethodFlags(paymentForm.paymentMode).showUpiFields &&
-                !getPaymentMethodFlags(paymentForm.paymentMode).showCardFields && (
-                  <Input
-                    label="Reference"
-                    placeholder="e.g. Cheque no. or transaction ID"
-                    value={paymentForm.reference}
-                    onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
-                  />
-                )}
-
-              {getPaymentMethodFlags(paymentForm.paymentMode).showCodFields && (
-                <div className="md:col-span-2 flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-neutral-700">Collection / Delivery Instructions</label>
-                  <textarea
-                    value={paymentForm.collectionInstructions}
-                    onChange={(event) =>
-                      setPaymentForm((current) => ({ ...current, collectionInstructions: event.target.value }))
-                    }
-                    className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                  />
-                  <p className="text-xs text-amber-700">Payment status stays pending until the cash is collected.</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            // Real supplier: only the fields the backend's PaymentCreate schema actually accepts
-            // (amount, payment_mode, reference, note, paid_on) - see handleRecordPayment.
-            <Input
-              label="Reference"
-              placeholder="e.g. Cheque no., UTR, transaction ID (optional)"
-              value={paymentForm.reference}
-              onChange={(event) => setPaymentForm((current) => ({ ...current, reference: event.target.value }))}
-            />
-          )}
-          <Input
-            label="Note"
-            as="textarea"
-            value={paymentForm.note}
-            onChange={(event) => setPaymentForm((current) => ({ ...current, note: event.target.value }))}
-          />
-          <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={handleClosePaymentModal} disabled={isSavingPayment}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={isSavingPayment}>
-              Record Payment
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        isOpen={Boolean(voidTarget)}
-        onClose={() => {
-          if (isVoiding) return
-          setVoidError('')
-          setVoidTarget(null)
-        }}
-        title="Delete Payment"
-      >
-        <div className="space-y-5">
-          <p className="text-sm leading-6 text-neutral-600">
-            Delete the {formatCurrency(voidTarget?.amount)} payment recorded on{' '}
-            {voidTarget ? new Date(voidTarget.paidOn).toLocaleDateString() : ''}? This removes the payment and
-            restores the supplier&apos;s outstanding balance. It cannot be undone.
-          </p>
-          {voidError && (
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {voidError}
-            </div>
-          )}
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={isVoiding}
-              onClick={() => {
-                setVoidError('')
-                setVoidTarget(null)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="button" variant="danger" loading={isVoiding} onClick={handleDeletePayment}>
-              Delete Payment
             </Button>
           </div>
         </div>

@@ -65,6 +65,7 @@ import {
 } from '../orders/orderDemoData'
 import { formatCurrency } from '../../utils/format'
 import { useAuthStore } from '../../store/authStore'
+import { usePermission } from '../../auth/usePermission'
 import { useToast } from '../../components/ui/toastContext'
 
 // The 7-step flow (Assigned -> Accepted -> Picking -> Ready -> Vehicle Loaded -> In Transit
@@ -273,6 +274,7 @@ export default function DeliveryDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const { can } = usePermission()
   const currentUser = useAuthStore((state) => state.currentUser)
   const isAdminView = window.location.pathname.startsWith('/admin')
   const basePath = isAdminView ? '/admin/deliveries' : '/delivery/deliveries'
@@ -538,10 +540,13 @@ export default function DeliveryDetail() {
     !parentOrderCancelled &&
     (deliveryCollections.length > 0 ||
       (COLLECTION_STAGES.includes(stageKey) && (totalAmountDue > 0 || collectedAmount > 0)))
-  // The button shows for both the DP and the admin - if the DP's account can't yet persist a
-  // receipt the real backend error is surfaced (never faked). Admin also respects the firm's
-  // delivery_collection_allowed setting.
-  const canRecordCollection = showCollectionSection && remainingReceivable > 0 && (!isAdminView || collectionAllowed)
+  // Gated on the canonical `delivery_collections:create` permission (no role check). Admin also
+  // respects the firm's delivery_collection_allowed setting; a real backend error is never faked.
+  const canRecordCollection =
+    showCollectionSection &&
+    remainingReceivable > 0 &&
+    can('delivery_collections', 'create') &&
+    (!isAdminView || collectionAllowed)
   // Never surface a raw UUID as the visible value - show the name, or nothing.
   const looksLikeUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''))
   const friendlyId = (value) => (value && !looksLikeUuid(value) ? value : '')

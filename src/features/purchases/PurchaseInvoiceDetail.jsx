@@ -43,8 +43,15 @@ import {
   getDemoPurchaseReturnsForPurchase,
 } from '../purchaseReturns/purchaseReturnDemoData'
 import { prStatusMeta, totalReturnQty } from '../purchaseReturns/purchaseReturnHelpers'
-import { invoiceStatusMeta, paymentStatusMeta, resolveSupplierInvoice } from '../supplierInvoices/supplierInvoiceHelpers'
+import {
+  invoiceStatusMeta,
+  lifecycleMeta,
+  paymentStatusMeta,
+  resolveSupplierInvoice,
+  verificationMeta,
+} from '../supplierInvoices/supplierInvoiceHelpers'
 import SupplierInvoiceQuickView from '../supplierInvoices/SupplierInvoiceQuickView'
+import { listSupplierInvoices } from '../../api/supplierInvoices'
 import { useAuthStore } from '../../store/authStore'
 
 function formatDate(value) {
@@ -157,6 +164,7 @@ export default function PurchaseInvoiceDetail() {
   const [isUploading, setIsUploading] = useState(false)
   const [grnRefresh, setGrnRefresh] = useState(0)
   const [quickViewInvoiceId, setQuickViewInvoiceId] = useState(null)
+  const [realSupplierInvoices, setRealSupplierInvoices] = useState([])
 
   const loadPurchase = async () => {
     setIsLoading(true)
@@ -205,6 +213,18 @@ export default function PurchaseInvoiceDetail() {
         : [],
     [isDemo, purchase, demoGrns],
   )
+
+  // Real mode: GET /supplier-invoices?purchase_id={id} (never Purchase.grn_number / legacy routes).
+  useEffect(() => {
+    if (isDemo || !purchase?.id) return
+    let active = true
+    listSupplierInvoices({ purchaseId: purchase.id }).then((result) => {
+      if (active && result.success) setRealSupplierInvoices(result.invoices)
+    })
+    return () => {
+      active = false
+    }
+  }, [isDemo, purchase?.id])
   const payment = useMemo(() => derivePaymentStatus(purchase), [purchase])
   const outstanding = useMemo(() => derivePurchaseOutstanding(purchase), [purchase])
 
@@ -658,56 +678,80 @@ export default function PurchaseInvoiceDetail() {
             </div>
           </Card>
 
-          {linkedSupplierInvoices.length > 0 ? (
-            <Card title="Linked Supplier Invoices" className="p-0" bodyClassName="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-4xl text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                      <th className="px-5 py-3">Supplier Invoice #</th>
-                      <th className="px-5 py-3">Invoice Date</th>
-                      <th className="px-5 py-3 text-right">Invoice Total</th>
-                      <th className="px-5 py-3 text-right">Outstanding</th>
-                      <th className="px-5 py-3">Payment Status</th>
-                      <th className="px-5 py-3">Invoice Status</th>
-                      <th className="px-5 py-3">Verification</th>
-                      <th className="px-5 py-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-50">
-                    {linkedSupplierInvoices.map((invoice) => {
-                      const invStatus = invoiceStatusMeta(invoice.invoiceStatus)
-                      const payStatus = paymentStatusMeta(invoice.paymentStatus)
-                      return (
+          {(() => {
+            const rows = isDemo
+              ? linkedSupplierInvoices.map((invoice) => ({
+                  id: invoice.id,
+                  number: invoice.supplierInvoiceNumber,
+                  invoiceDate: invoice.invoiceDate,
+                  total: invoice.invoiceTotal,
+                  outstanding: invoice.outstanding,
+                  payment: paymentStatusMeta(invoice.paymentStatus),
+                  lifecycle: invoiceStatusMeta(invoice.invoiceStatus),
+                  verification: invoice.match || null,
+                }))
+              : realSupplierInvoices.map((invoice) => ({
+                  id: invoice.id,
+                  number: invoice.supplierInvoiceNumber,
+                  invoiceDate: invoice.invoiceDate,
+                  total: invoice.grandTotal,
+                  outstanding: invoice.outstandingAmount,
+                  payment: paymentStatusMeta(invoice.paymentStatus),
+                  lifecycle: lifecycleMeta(invoice.status),
+                  verification: verificationMeta(invoice.verificationStatus),
+                }))
+            if (rows.length === 0) {
+              return (
+                <Card>
+                  <EmptyState
+                    icon={FileText}
+                    title="No supplier invoices linked"
+                    description="Supplier invoices billed against this purchase will appear here."
+                  />
+                </Card>
+              )
+            }
+            return (
+              <Card title="Linked Supplier Invoices" className="p-0" bodyClassName="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-4xl text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                        <th className="px-5 py-3">Supplier Invoice #</th>
+                        <th className="px-5 py-3">Invoice Date</th>
+                        <th className="px-5 py-3 text-right">Invoice Total</th>
+                        <th className="px-5 py-3 text-right">Outstanding</th>
+                        <th className="px-5 py-3">Payment Status</th>
+                        <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3">Verification</th>
+                        <th className="px-5 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-50">
+                      {rows.map((invoice) => (
                         <tr key={invoice.id} className="hover:bg-primary-50/35">
-                          <td className="px-5 py-3.5 font-medium text-primary-700">{invoice.supplierInvoiceNumber}</td>
+                          <td className="px-5 py-3.5 font-medium text-primary-700">{invoice.number}</td>
                           <td className="px-5 py-3.5 text-neutral-600">{formatDate(invoice.invoiceDate)}</td>
-                          <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(invoice.invoiceTotal)}</td>
+                          <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(invoice.total)}</td>
                           <td className="px-5 py-3.5 text-right text-neutral-700">{formatCurrency(invoice.outstanding)}</td>
-                          <td className="px-5 py-3.5"><Badge variant={payStatus.variant} dot>{payStatus.label}</Badge></td>
-                          <td className="px-5 py-3.5"><Badge variant={invStatus.variant}>{invStatus.label}</Badge></td>
-                          <td className="px-5 py-3.5">{invoice.match ? <Badge variant={invoice.match.variant}>{invoice.match.label}</Badge> : <span className="text-neutral-400">—</span>}</td>
+                          <td className="px-5 py-3.5"><Badge variant={invoice.payment.variant} dot>{invoice.payment.label}</Badge></td>
+                          <td className="px-5 py-3.5"><Badge variant={invoice.lifecycle.variant}>{invoice.lifecycle.label}</Badge></td>
+                          <td className="px-5 py-3.5">{invoice.verification ? <Badge variant={invoice.verification.variant}>{invoice.verification.label}</Badge> : <span className="text-neutral-400">—</span>}</td>
                           <td className="px-5 py-3.5 text-right">
-                            <Button type="button" variant="ghost" size="sm" onClick={() => setQuickViewInvoiceId(invoice.id)}>
-                              Quick View
-                            </Button>
+                            {isDemo ? (
+                              <Button type="button" variant="ghost" size="sm" onClick={() => setQuickViewInvoiceId(invoice.id)}>Quick View</Button>
+                            ) : (
+                              <Button type="button" variant="ghost" size="sm" onClick={() => navigate(`/admin/supplier-invoices/${invoice.id}`)}>Open</Button>
+                            )}
                           </td>
                         </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          ) : (
-            <Card>
-              <EmptyState
-                icon={FileText}
-                title="No supplier invoices linked"
-                description="Supplier invoices raised against this purchase will appear here once supplier invoicing is enabled."
-              />
-            </Card>
-          )}
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )
+          })()}
         </TabsContent>
 
         <TabsContent value="payments" className="mt-4">

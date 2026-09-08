@@ -1059,30 +1059,33 @@ export default function AdminDashboard() {
             >
               <div className="@container flex flex-1 flex-col justify-center">
                 <div className="flex flex-col items-center gap-4 @[18rem]:flex-row @[18rem]:items-center @[18rem]:gap-3">
-                  <div className="relative size-32 shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={arPieData}
-                          dataKey="value"
-                          nameKey="name"
-                          innerRadius="64%"
-                          outerRadius="94%"
-                          paddingAngle={arHasData ? 2 : 0}
-                          stroke="none"
-                        >
-                          {arPieData.map((segment) => (
-                            <Cell key={segment.name} fill={segment.color} />
-                          ))}
-                        </Pie>
-                        {arHasData && <Tooltip content={<DonutTooltip />} />}
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <div className="flex shrink-0 flex-col items-center gap-1.5">
+                    <div className="size-32">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={arPieData}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius="64%"
+                            outerRadius="94%"
+                            paddingAngle={arHasData ? 2 : 0}
+                            stroke="none"
+                          >
+                            {arPieData.map((segment) => (
+                              <Cell key={segment.name} fill={segment.color} />
+                            ))}
+                          </Pie>
+                          {arHasData && <Tooltip content={<DonutTooltip />} />}
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    {/* Center figure moved directly below the donut so it never overlaps the ring. */}
+                    <div className="text-center">
                       <p className="font-(--font-display) text-[1.25rem] font-semibold leading-none tracking-tight text-neutral-900">
                         {formatCompactCurrency(netOutstanding)}
                       </p>
-                      <p className="mt-1 text-[0.62rem] text-neutral-400">Net Outstanding</p>
+                      <p className="mt-0.5 text-[0.62rem] text-neutral-400">Net Outstanding</p>
                     </div>
                   </div>
 
@@ -1172,30 +1175,33 @@ export default function AdminDashboard() {
             >
               <div className="@container flex flex-1 flex-col justify-center">
                 <div className="flex flex-col items-center gap-4 @[18rem]:flex-row @[18rem]:items-center @[18rem]:gap-3">
-                  <div className="relative size-32 shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={expenseHasData ? expensePieData : EMPTY_DONUT}
-                          dataKey="value"
-                          nameKey="name"
-                          innerRadius="64%"
-                          outerRadius="94%"
-                          paddingAngle={expenseHasData ? 2 : 0}
-                          stroke="none"
-                        >
-                          {(expenseHasData ? expensePieData : EMPTY_DONUT).map((entry) => (
-                            <Cell key={entry.name} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        {expenseHasData && <Tooltip content={<DonutTooltip />} />}
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <div className="flex shrink-0 flex-col items-center gap-1.5">
+                    <div className="size-32">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={expenseHasData ? expensePieData : EMPTY_DONUT}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius="64%"
+                            outerRadius="94%"
+                            paddingAngle={expenseHasData ? 2 : 0}
+                            stroke="none"
+                          >
+                            {(expenseHasData ? expensePieData : EMPTY_DONUT).map((entry) => (
+                              <Cell key={entry.name} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          {expenseHasData && <Tooltip content={<DonutTooltip />} />}
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    {/* Center figure moved directly below the donut so it never overlaps the ring. */}
+                    <div className="text-center">
                       <p className="font-(--font-display) text-[1.25rem] font-semibold leading-none tracking-tight text-neutral-900">
                         {formatCompactCurrency(expenseTotal)}
                       </p>
-                      <p className="mt-1 text-[0.62rem] text-neutral-400">Total Expenses</p>
+                      <p className="mt-0.5 text-[0.62rem] text-neutral-400">Total Expenses</p>
                     </div>
                   </div>
 
@@ -1257,14 +1263,15 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               }
-              className="h-full min-h-[330px] [&>div:first-child]:mb-4"
+              className="flex h-full min-h-73 flex-col [&>div:first-child]:mb-4"
+              bodyClassName="flex flex-1 flex-col"
             >
-              <div className="flex h-full flex-col">
+              <div className="flex flex-1 flex-col">
                 {topProductsSorted.length === 0 ? (
                   <p className="text-[0.72rem] text-neutral-400">No product sales in this period yet.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {topProductsSorted.slice(0, 10).map((product, index) => {
+                  <div className="space-y-2.5">
+                    {topProductsSorted.slice(0, 5).map((product, index) => {
                       const value = product[topProductsValueKey] || 0
                       const width = Math.max(8, Math.round((value / topProductsPeak) * 100))
                       return (
@@ -1278,7 +1285,15 @@ export default function AdminDashboard() {
                           </div>
                           <div className="pl-7">
                             <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
-                              <div className="h-full rounded-full bg-blue-500" style={{ width: `${width}%` }} />
+                              {/* Dark -> light fill, anchored to the full track so shorter bars
+                                  stay darker (the gradient element is always track-width; the
+                                  middle wrapper clips it to the value width). */}
+                              <div className="h-full overflow-hidden rounded-full" style={{ width: `${width}%` }}>
+                                <div
+                                  className="h-full rounded-full bg-[linear-gradient(90deg,#1d4ed8_0%,#93c5fd_100%)]"
+                                  style={{ width: `${(100 / width) * 100}%` }}
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1286,7 +1301,7 @@ export default function AdminDashboard() {
                     })}
                   </div>
                 )}
-                <div className="mt-20 flex items-center justify-center pt-3 text-[0.7rem]">
+                <div className="mt-auto flex items-center justify-center pt-4 text-[0.7rem]">
                   <button className="inline-flex items-center gap-1.5 font-semibold text-primary-600">
                     View Product Report
                     <ChevronRight className="size-4 text-primary-600" />
@@ -1299,14 +1314,15 @@ export default function AdminDashboard() {
               title="Top Selling Customers"
               subtitle={rangeLabel}
               actions={<span className="rounded-full bg-neutral-50 px-3 py-1 text-[0.68rem] font-semibold text-neutral-500">{rangeLabel}</span>}
-              className="min-h-[300px] [&>div:first-child_h3]:text-[0.78rem]"
+              className="flex h-full min-h-73 flex-col [&>div:first-child_h3]:text-[0.78rem]"
+              bodyClassName="flex flex-1 flex-col"
             >
-              <div className="flex h-full flex-col">
+              <div className="flex flex-1 flex-col">
                 {topCustomers.length === 0 ? (
                   <p className="text-[0.72rem] text-neutral-400">No sales in this period yet.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {topCustomers.map((customer, index) => {
+                  <div className="space-y-2.5">
+                    {topCustomers.slice(0, 5).map((customer) => {
                       const width = Math.max(8, Math.round((customer.value / topCustomerPeak) * 100))
                       return (
                         <div key={customer.name} className="space-y-1">
@@ -1315,14 +1331,20 @@ export default function AdminDashboard() {
                             <span className="shrink-0 font-semibold text-neutral-900">{formatCurrency(customer.value)}</span>
                           </div>
                           <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
-                            <div className={`h-full rounded-full ${index === 0 ? 'bg-blue-500' : 'bg-blue-400'}`} style={{ width: `${width}%` }} />
+                            {/* Dark -> light fill, anchored to the full track (see Top Products). */}
+                            <div className="h-full overflow-hidden rounded-full" style={{ width: `${width}%` }}>
+                              <div
+                                className="h-full rounded-full bg-[linear-gradient(90deg,#1d4ed8_0%,#93c5fd_100%)]"
+                                style={{ width: `${(100 / width) * 100}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
                       )
                     })}
                   </div>
                 )}
-                <div className="mt-44 flex items-center justify-center pt-3 text-[0.7rem]">
+                <div className="mt-auto flex items-center justify-center pt-4 text-[0.7rem]">
                   <button className="inline-flex items-center gap-1.5 font-semibold text-primary-600">
                     View Customer Report
                     <ChevronRight className="size-4 text-primary-600" />

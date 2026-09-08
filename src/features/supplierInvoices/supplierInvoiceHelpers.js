@@ -1,26 +1,51 @@
 // =============================================================================
-// Supplier Invoice - frontend structure only.
+// Supplier Invoice - shared frontend helpers.
 // -----------------------------------------------------------------------------
-// A Supplier Invoice is what the supplier BILLED us - distinct from the Purchase
-// (what we ordered) and the GRN (what we received). The current backend has NO
-// Supplier Invoice entity: /purchase-invoices is the Purchase record itself and
-// /invoices is the customer Sales Invoice. So this whole module is:
-//   - demo mode  -> full local simulation (supplierInvoiceDemoData.js)
-//   - real mode  -> truthful future-state UI, no API writes
+// A Supplier Invoice is the actual vendor bill - distinct from the Purchase
+// (what we ordered), the GRN (what we received) and the Sales Invoice
+// (`/invoices`). The real API lives in src/api/supplierInvoices.js.
+//   - real mode  -> `/supplier-invoices` APIs (canonical lifecycle below)
+//   - demo mode  -> full local simulation (supplierInvoiceDemoData.js), never an API call
 //
-// BACKEND LATER (nothing below is live):
-//   Supplier Invoice entity/table, Supplier Invoice number/reference,
-//   Supplier <-> Invoice / Purchase <-> Invoice / GRN <-> Invoice relationships,
-//   invoice items, tax totals, due date, invoice status, payment status,
-//   outstanding, supplier payable ledger, itemized Supplier Payments,
-//   document persistence, three-way matching persistence, dispute workflow,
-//   invoice cancellation / reversal.
+// Canonical lifecycle (backend `status`):  draft -> recorded, or -> cancelled.
+// Verification (backend `verification_status`, INDEPENDENT of lifecycle):
+//   pending -> matched | mismatched.
+// Payment (backend `payment_status`, INDEPENDENT of both): unpaid / partially_paid / paid.
+// The three are never derived from one another.
 // =============================================================================
 
 import { safeNumber } from '../purchases/purchaseHelpers'
 
-// INVOICE STATUS is the lifecycle of the bill itself - kept strictly separate from MATCH STATUS
-// (the three-way verification result). A normal invoice is "Recorded" with match "Matched".
+// Canonical lifecycle of the bill itself. "Disputed" is NOT a lifecycle state - a mismatch is
+// a verification result, shown separately.
+export const LIFECYCLE_META = {
+  draft: { key: 'draft', label: 'Draft', variant: 'neutral' },
+  recorded: { key: 'recorded', label: 'Recorded', variant: 'success' },
+  cancelled: { key: 'cancelled', label: 'Cancelled', variant: 'neutral' },
+}
+
+export function lifecycleMeta(key) {
+  const normalized = String(key || 'draft').toLowerCase()
+  if (normalized === 'matched') return LIFECYCLE_META.recorded // legacy record safety
+  return LIFECYCLE_META[normalized] || LIFECYCLE_META.draft
+}
+
+// Canonical verification result (backend `verification_status`).
+export const VERIFICATION_META = {
+  pending: { key: 'pending', label: 'Pending Verification', variant: 'neutral' },
+  matched: { key: 'matched', label: 'Matched', variant: 'success' },
+  mismatched: { key: 'mismatched', label: 'Mismatch / Review Required', variant: 'warning' },
+}
+
+export function verificationMeta(key) {
+  return VERIFICATION_META[String(key || 'pending').toLowerCase()] || VERIFICATION_META.pending
+}
+
+export const LIFECYCLE_FILTER_OPTIONS = Object.values(LIFECYCLE_META).map(({ key, label }) => ({ value: key, label }))
+export const VERIFICATION_FILTER_OPTIONS = Object.values(VERIFICATION_META).map(({ key, label }) => ({ value: key, label }))
+
+// Legacy demo-mode lifecycle map (the demo simulation still models "disputed"). Real mode
+// never uses this - it uses LIFECYCLE_META.
 export const INVOICE_STATUS_META = {
   draft: { key: 'draft', label: 'Draft', variant: 'neutral' },
   recorded: { key: 'recorded', label: 'Recorded', variant: 'info' },
@@ -31,6 +56,7 @@ export const INVOICE_STATUS_META = {
 export const PAYMENT_STATUS_META = {
   unpaid: { key: 'unpaid', label: 'Unpaid', variant: 'danger' },
   partial: { key: 'partial', label: 'Partially Paid', variant: 'warning' },
+  partially_paid: { key: 'partial', label: 'Partially Paid', variant: 'warning' },
   paid: { key: 'paid', label: 'Paid', variant: 'success' },
 }
 

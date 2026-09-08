@@ -34,10 +34,9 @@ function formatDateTime(value) {
 export default function CollectionReconciliation() {
   const { showToast } = useToast()
   const { can } = usePermission()
-  // No dedicated `collections` permission module exists in the catalog - reconciling a
-  // collection creates a customer payment, so payments:create is the honest gate. (BACKEND/
-  // PERMISSION LATER: a dedicated collections:reconcile action.)
-  const canReconcile = can('payments', 'create')
+  // Canonical backend permission module: `delivery_collections`. Reconcile + Void both post to
+  // the collection lifecycle endpoints, so both are gated on the `approve` action.
+  const canReconcile = can('delivery_collections', 'approve')
 
   const [collections, setCollections] = useState([])
   const [isLoading, setIsLoading] = useState(true)

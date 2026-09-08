@@ -12,7 +12,7 @@ const MODAL_SIZE_CLASS = {
   '4xl': 'max-w-4xl',
 }
 
-export default function Modal({ isOpen, onClose, title, children, footer, size = 'md', className = '' }) {
+export default function Modal({ isOpen, onClose, title, children, footer, size = 'md', className = '', centerTitle = false }) {
   // A width class passed via `className` still wins; otherwise the `size` prop drives it.
   const hasWidthOverride = /(^|\s)(max-w-|w-\[)/.test(className)
   const sizeClass = MODAL_SIZE_CLASS[size] || MODAL_SIZE_CLASS.md
@@ -48,15 +48,24 @@ export default function Modal({ isOpen, onClose, title, children, footer, size =
         className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-xl border border-neutral-200 bg-[#fbfbfa] shadow-[0_1px_0_rgba(0,0,0,0.02)] ${hasWidthOverride ? '' : sizeClass} ${className}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-5 py-4">
-          <h2 id="modal-title" className="text-sm font-semibold tracking-[-0.01em] text-neutral-900">
+        <div
+          className={`relative flex shrink-0 items-center border-b border-neutral-200 px-5 py-4 ${
+            centerTitle ? 'justify-center' : 'justify-between'
+          }`}
+        >
+          <h2
+            id="modal-title"
+            className={`text-sm font-semibold tracking-[-0.01em] text-neutral-900 ${centerTitle ? 'text-center' : ''}`}
+          >
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800"
+            className={`rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 ${
+              centerTitle ? 'absolute right-4 top-1/2 -translate-y-1/2' : ''
+            }`}
           >
             <X className="size-5" />
           </button>

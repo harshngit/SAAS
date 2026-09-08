@@ -9,11 +9,13 @@ import {
   FileText,
   Info,
   Minus,
+  Package,
   Plus,
   Smartphone,
   Store,
   Trash2,
   Truck,
+  User,
   Wallet,
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
@@ -27,6 +29,7 @@ import { listWarehouses } from '../../api/warehouses'
 import { listDeliveryPartners } from '../../api/deliveries'
 import { createOrder, assignDeliveryPartner, getOrder, updateOrder } from '../../api/orders'
 import { getQuotation } from '../../api/quotations'
+import { getFileUrl } from '../../api/files'
 import { duplicateDemoOrder, getDemoOrder, isDemoOrder, patchDemoOrder } from './orderDemoData'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
@@ -333,6 +336,20 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const selectedCustomer = useMemo(
     () => customerRecords.find((customer) => customer.id === selectedCustomerId) || null,
     [customerRecords, selectedCustomerId],
+  )
+
+  // Customer profile photo — same file-id resolution chain the Customers list uses.
+  const customerPhotoUrl = useMemo(
+    () =>
+      getFileUrl(
+        selectedCustomer?.profileImage ||
+          selectedCustomer?.profile_image_id ||
+          selectedCustomer?.profile_image_url ||
+          selectedCustomer?.profile_image ||
+          selectedCustomer?.basic_information?.profile_image_id ||
+          '',
+      ),
+    [selectedCustomer],
   )
 
   // Auto-fill the delivery address from the selected customer (still editable). Picking or
@@ -1184,7 +1201,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
         isOpen={showPreview}
         onClose={() => setShowPreview(false)}
         title="Preview Sales Order"
-        className="max-w-5xl"
+        centerTitle
+        className="max-w-6xl"
         footer={
           <>
             <Button type="button" variant="secondary" onClick={() => setShowPreview(false)}>
@@ -1219,41 +1237,55 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
             </div>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
-          {/* LEFT: customer, products, add-a-product */}
-          <div className="min-w-0 space-y-5">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          {/* LEFT: customer + order items (read-only review) */}
+          <div className="min-w-0 space-y-6">
 
-          {/* Customer - read only */}
-          <div className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Customer</p>
-            <p className="mt-1 text-sm font-semibold text-neutral-900">{selectedCustomer?.name || '—'}</p>
-            {(deliveryAddress || customerDefaultAddress) && (
-              <p className="mt-0.5 text-xs text-neutral-500">{deliveryAddress || customerDefaultAddress}</p>
-            )}
+          {/* Customer */}
+          <div className="rounded-2xl border border-neutral-100 bg-neutral-50/50 p-3.5">
+            <h3 className="text-sm font-semibold text-neutral-900">Customer</h3>
+            <div className="mt-2.5 flex items-center gap-3">
+              {customerPhotoUrl ? (
+                <img
+                  src={customerPhotoUrl}
+                  alt={selectedCustomer?.name || ''}
+                  className="size-10 shrink-0 rounded-full border border-neutral-200 object-cover"
+                />
+              ) : (
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-50 text-sm font-semibold text-primary-600">
+                  {selectedCustomer?.name?.trim()?.[0]?.toUpperCase() || <User className="size-4" aria-hidden="true" />}
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-[0.8rem] font-semibold text-neutral-900">{selectedCustomer?.name || '—'}</p>
+                {(deliveryAddress || customerDefaultAddress) && (
+                  <p className="mt-0.5 text-[0.72rem] text-neutral-500">{deliveryAddress || customerDefaultAddress}</p>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Products on the order - quantity editable, unit price + discount read-only here */}
+          {/* Order Items - quantity editable, unit price + discount read-only here */}
           <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Products on this order</p>
-              <span className="text-xs text-neutral-400">Adjust quantity here — discount &amp; unit price are set on the order.</span>
-            </div>
-            <div className="overflow-x-auto rounded-xl border border-neutral-100">
-              <table className="w-full min-w-lg text-left text-sm">
-                <thead>
-                  <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                    <th className="px-4 py-3">Product</th>
-                    <th className="px-3 py-3 text-center">Qty</th>
-                    <th className="px-3 py-3 text-right">Unit Price</th>
-                    <th className="px-3 py-3 text-right">Line Total</th>
-                    <th className="w-10 px-3 py-3" />
+            <h3 className="text-sm font-semibold text-neutral-900">Order Items</h3>
+            <p className="mt-0.5 text-[0.72rem] text-neutral-500">Review the selected items in this order. Quantity can be adjusted here only.</p>
+            {/* Scrolls vertically once there are more than ~5 items. */}
+            <div className="mt-2.5 max-h-80 overflow-auto rounded-2xl border border-neutral-100">
+              <table className="w-full min-w-md text-left text-[0.8rem]">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-neutral-100 bg-neutral-50 text-[0.66rem] font-semibold uppercase tracking-wider text-neutral-400 [&>th]:bg-neutral-50">
+                    <th className="px-4 py-2.5">Product</th>
+                    <th className="px-3 py-2.5 text-right">Unit Price</th>
+                    <th className="px-3 py-2.5 text-center">Qty</th>
+                    <th className="px-3 py-2.5 text-right">Total</th>
+                    <th className="w-10 px-3 py-2.5" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {orderItems.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-sm text-neutral-400">
-                        No products left on this order. Add one below or cancel.
+                      <td colSpan={5} className="px-4 py-8 text-center text-[0.8rem] text-neutral-400">
+                        No products on this order. Close this preview to add items.
                       </td>
                     </tr>
                   ) : (
@@ -1265,13 +1297,37 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       const discountPercent = Math.min(Math.max(Number(item.discountPercent) || 0, 0), 100)
                       const lineTotal = unitPrice * quantity * (1 - discountPercent / 100)
                       const unit = product.sales_unit || product.uom || 'unit'
+                      const productImage = getFileUrl(
+                        product.cover_image_url ||
+                          product.cover_image ||
+                          product.coverImage ||
+                          product.image_url ||
+                          product.image ||
+                          (Array.isArray(product.images) ? product.images[0]?.url || product.images[0] : '') ||
+                          '',
+                      )
                       return (
                         <tr key={item.productId}>
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-neutral-900">{product.name}</p>
-                            <p className="text-xs text-neutral-400">SKU: {product.sku || '—'}</p>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2.5">
+                              {productImage ? (
+                                <img src={productImage} alt="" className="size-9 shrink-0 rounded-lg border border-neutral-100 object-cover" />
+                              ) : (
+                                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
+                                  <Package className="size-4" aria-hidden="true" />
+                                </span>
+                              )}
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-neutral-900">{product.name}</p>
+                                <p className="truncate text-[0.7rem] text-neutral-400">SKU: {product.sku || '—'}</p>
+                              </div>
+                            </div>
                           </td>
-                          <td className="px-3 py-3">
+                          <td className="px-3 py-2.5 text-right text-neutral-600">
+                            {formatCurrency(unitPrice)}
+                            <span className="ml-1 text-[0.62rem] text-neutral-400">/ {unit}</span>
+                          </td>
+                          <td className="px-3 py-2.5">
                             <div className="mx-auto flex w-fit items-center rounded-lg border border-neutral-200 p-0.5 text-neutral-500">
                               <button
                                 type="button"
@@ -1299,16 +1355,12 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               </button>
                             </div>
                           </td>
-                          <td className="px-3 py-3 text-right text-neutral-600">
-                            {formatCurrency(unitPrice)}
-                            <span className="ml-1 text-[0.64rem] text-neutral-400">/ {unit}</span>
-                          </td>
-                          <td className="px-3 py-3 text-right font-semibold text-neutral-900">{formatCurrency(lineTotal)}</td>
-                          <td className="px-3 py-3 text-right">
+                          <td className="px-3 py-2.5 text-right font-semibold text-neutral-900">{formatCurrency(lineTotal)}</td>
+                          <td className="px-3 py-2.5 text-right">
                             <button
                               type="button"
                               onClick={() => setPickerQuantity(product, 0)}
-                              className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
+                              className="rounded-lg p-1.5 text-red-600 transition-colors hover:bg-red-50"
                               aria-label={`Remove ${product.name}`}
                             >
                               <Trash2 className="size-4" aria-hidden="true" />
@@ -1321,101 +1373,101 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 </tbody>
               </table>
             </div>
-
-            <div className="mt-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Add a product</p>
-              <ProductPickerList
-                products={availableProducts}
-                orderItems={orderItems}
-                isLoading={isLoadingOptions}
-                onSetQuantity={setPickerQuantity}
-                onUpdateItem={updateOrderItem}
-                onRoundBlur={roundToWholeNumberOnBlur}
-                listMaxHeightClass="max-h-56"
-              />
-            </div>
           </div>
           </div>
 
-          {/* RIGHT: summary + order details rail */}
-          <div className="space-y-4 lg:self-start lg:border-l lg:border-neutral-100 lg:pl-6">
-            {/* Financial summary */}
-            <div className="space-y-2 rounded-xl border border-neutral-100 bg-neutral-50/60 p-4 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Subtotal</span>
-                <span className="font-medium text-neutral-900">{formatCurrency(totals.subtotal)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Discount</span>
-                <span className={`font-medium ${totals.discountAmount > 0 ? 'text-red-600' : 'text-neutral-900'}`}>
-                  {totals.discountAmount > 0 ? `-${formatCurrency(totals.discountAmount)}` : formatCurrency(0)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Tax / GST</span>
-                <span className="font-medium text-neutral-900">{formatCurrency(totals.gstAmount)}</span>
-              </div>
-              <div className="flex items-center justify-between border-t border-neutral-200 pt-2">
-                <span className="font-semibold text-neutral-900">Current Order Total</span>
-                <span className="font-semibold text-neutral-900">{formatCurrency(totals.total)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Previous Balance</span>
-                <span className="font-medium text-neutral-900">{formatCurrency(previousBalance)}</span>
-              </div>
-              <div className="flex items-center justify-between border-t border-neutral-200 pt-2">
-                <span className="font-semibold text-neutral-900">Grand Payable</span>
-                <span className="text-base font-bold text-primary-700">{formatCurrency(grandPayable)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 pt-1">
-                <span className="text-neutral-500">Paid Amount</span>
-                <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-white pl-2.5 pr-1">
-                  <span className="text-xs text-neutral-400">₹</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={paidAmount}
-                    onChange={(event) => setPaidAmount(event.target.value)}
-                    onBlur={(event) => {
-                      const next = Math.max(0, Math.round(Number(event.target.value) || 0))
-                      setPaidAmount(next ? String(next) : '')
-                    }}
-                    aria-label="Paid amount"
-                    className="h-8 w-24 bg-transparent text-right text-sm font-semibold text-neutral-900 focus:outline-none"
-                  />
+          {/* RIGHT: totals / payment / order-details cards (compact type) */}
+          <div className="space-y-3 text-xs lg:self-start">
+            {/* Order Totals */}
+            <div className="rounded-2xl border border-neutral-100 p-3.5">
+              <h3 className="text-[0.7rem] font-semibold uppercase tracking-wide text-neutral-400">Order Totals</h3>
+              <div className="mt-2.5 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500">Subtotal</span>
+                  <span className="font-medium text-neutral-900">{formatCurrency(totals.subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500">Discount</span>
+                  <span className={`font-medium ${totals.discountAmount > 0 ? 'text-red-600' : 'text-neutral-900'}`}>
+                    {totals.discountAmount > 0 ? `-${formatCurrency(totals.discountAmount)}` : formatCurrency(0)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500">Tax / GST</span>
+                  <span className="font-medium text-neutral-900">{formatCurrency(totals.gstAmount)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-neutral-100 pt-1.5">
+                  <span className="font-semibold text-neutral-900">Current Order Total</span>
+                  <span className="font-semibold text-neutral-900">{formatCurrency(totals.total)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500">Previous Balance</span>
+                  <span className="font-medium text-neutral-900">{formatCurrency(previousBalance)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-neutral-100 pt-1.5">
+                  <span className="font-semibold text-neutral-900">Grand Payable</span>
+                  <span className="text-sm font-bold text-primary-700">{formatCurrency(grandPayable)}</span>
                 </div>
               </div>
-              <div className="flex items-center justify-between border-t border-neutral-200 pt-2">
-                <span className="font-semibold text-neutral-900">Remaining Balance</span>
-                <span className={`font-bold ${remainingBalance > 0 ? 'text-red-600' : 'text-primary-700'}`}>
-                  {formatCurrency(Math.max(remainingBalance, 0))}
-                </span>
-              </div>
-              <p className="pt-1 text-[0.7rem] text-neutral-400">
-                Payment is recorded against the order after it is placed.
-              </p>
             </div>
 
-            {/* Order details - read only */}
-            <div className="space-y-2 rounded-xl border border-neutral-100 p-4 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Delivery Date</span>
-                <span className="font-medium text-neutral-900">
-                  {deliveryDate ? new Date(deliveryDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                </span>
+            {/* Payment Summary */}
+            <div className="rounded-2xl border border-neutral-100 p-3.5">
+              <h3 className="text-[0.7rem] font-semibold uppercase tracking-wide text-neutral-400">Payment Summary</h3>
+              <div className="mt-2.5 space-y-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-neutral-500">Paid Amount</span>
+                  <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-white pl-2 pr-1">
+                    <span className="text-[0.7rem] text-neutral-400">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={paidAmount}
+                      onChange={(event) => setPaidAmount(event.target.value)}
+                      onBlur={(event) => {
+                        const next = Math.max(0, Math.round(Number(event.target.value) || 0))
+                        setPaidAmount(next ? String(next) : '')
+                      }}
+                      aria-label="Paid amount"
+                      className="h-7 w-20 bg-transparent text-right text-xs font-semibold text-neutral-900 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-neutral-100 pt-2">
+                  <span className="font-semibold text-neutral-900">Remaining Balance</span>
+                  <span className={`text-sm font-bold ${remainingBalance > 0 ? 'text-red-600' : 'text-primary-700'}`}>
+                    {formatCurrency(Math.max(remainingBalance, 0))}
+                  </span>
+                </div>
+                <p className="text-[0.68rem] text-neutral-400">
+                  Payment is recorded against the order after it is placed.
+                </p>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Warehouse</span>
-                <span className="font-medium text-neutral-900">{warehouseName}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Payment Type</span>
-                <span className="font-medium text-neutral-900">{paymentTypeLabel}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Delivery Method</span>
-                <span className="font-medium text-neutral-900">Takeaway / Self Pickup</span>
+            </div>
+
+            {/* Order Details */}
+            <div className="rounded-2xl border border-neutral-100 p-3.5">
+              <h3 className="text-[0.7rem] font-semibold uppercase tracking-wide text-neutral-400">Order Details</h3>
+              <div className="mt-2.5 space-y-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-neutral-500">Delivery Date</span>
+                  <span className="text-right font-medium text-neutral-900">
+                    {deliveryDate ? new Date(deliveryDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-neutral-500">Warehouse</span>
+                  <span className="text-right font-medium text-neutral-900">{warehouseName}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-neutral-500">Payment Type</span>
+                  <span className="text-right font-medium text-neutral-900">{paymentTypeLabel}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-neutral-500">Delivery Method</span>
+                  <span className="text-right font-medium text-neutral-900">Takeaway / Self Pickup</span>
+                </div>
               </div>
             </div>
           </div>

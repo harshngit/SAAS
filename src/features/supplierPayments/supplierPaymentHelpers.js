@@ -1,17 +1,19 @@
 // =============================================================================
-// Supplier Payments - frontend structure only.
+// Supplier Payments - shared frontend helpers.
 // -----------------------------------------------------------------------------
-// Supplier Payments is PAYMENT HISTORY: when, how much, and against which
-// invoice(s) a supplier was paid. Accounts Payable answers "how much is still
-// owed"; this module answers "how much was actually paid".
+// Supplier Payments is PAYMENT HISTORY + INVOICE ALLOCATION: when, how much, and
+// against which invoice(s) a supplier was paid. Accounts Payable answers "how
+// much is still owed" (read-only); this module answers "how much was actually
+// paid" and is the ONLY place a supplier payment is created / voided.
 //
-// There is NO SupplierPayment / SupplierPaymentAllocation backend today, so:
-//   - demo mode  -> full local simulation (supplierPaymentDemoData.js), which is
-//                   the single canonical demo payment ledger (Accounts Payable
-//                   calls the same helpers)
-//   - real mode  -> truthful future-state, Record Payment disabled, no writes
+// The real API lives in src/api/supplierPayments.js
+// (GET/POST /supplier-payments, POST /{id}/void, GET /supplier-invoices/{id}/payments).
+//   - real mode  -> those APIs only
+//   - demo mode  -> full local simulation (supplierPaymentDemoData.js), the single
+//                   canonical demo payment ledger, never an API call
 //
-// BACKEND LATER (nothing below is live) - see the module report.
+// A supplier payment only affects the Supplier Invoice balance, Accounts Payable
+// visibility and the supplier financial summary - never stock / GRN / Purchase.
 // =============================================================================
 
 import { safeNumber } from '../purchases/purchaseHelpers'
@@ -111,3 +113,25 @@ export function validateSupplierPayment({ supplierId, paymentDate, paymentMode, 
 }
 
 export const REAL_MODE_NOTE = 'Supplier payment posting will be available once payment integration is enabled.'
+
+// Real-mode Record Payment validation. Unlike the demo (which requires the whole payment to be
+// allocated), the real backend allows an unallocated advance: allocated total <= payment amount.
+// Never silently reduces values - the backend is the final authority.
+export function validateRealSupplierPayment({ supplierId, paymentMethod, paymentAmount, allocations, invoices }) {
+  if (!supplierId) return 'Select a supplier.'
+  if (!paymentMethod) return 'Select a payment method.'
+  const amount = Number(paymentAmount)
+  if (!Number.isFinite(amount) || amount <= 0) return 'Enter a payment amount greater than 0.'
+
+  let allocated = 0
+  for (const invoice of invoices || []) {
+    const value = Number(allocations?.[invoice.id] ?? 0)
+    if (!Number.isFinite(value) || value < 0) return `${invoice.supplierInvoiceNumber}: allocation cannot be negative.`
+    if (value > safeNumber(invoice.outstanding) + 0.001) {
+      return `${invoice.supplierInvoiceNumber}: allocation cannot exceed its outstanding (₹${safeNumber(invoice.outstanding).toLocaleString('en-IN')}).`
+    }
+    allocated += value
+  }
+  if (allocated > amount + 0.001) return 'Allocated amount cannot exceed the payment amount.'
+  return ''
+}

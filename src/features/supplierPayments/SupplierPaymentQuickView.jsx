@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Ban, ExternalLink, X } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { formatCurrency } from '../../utils/format'
+import { usePermission } from '../../auth/usePermission'
+import { DEMO_MODE } from '../../config/demoMode'
 import { computeInvoiceTotals, invoiceOutstanding } from '../supplierInvoices/supplierInvoiceHelpers'
-import { getDemoSupplierInvoice } from '../supplierInvoices/supplierInvoiceDemoData'
+import { getDemoSupplierInvoice as getDemoInvoice } from '../supplierInvoices/supplierInvoiceDemoData'
 import { paymentModeLabel, paymentStatusMeta } from './supplierPaymentHelpers'
-import { getSupplierPayment, voidSupplierPaymentDemo } from './supplierPaymentDemoData'
+import { getSupplierPayment as getDemoPayment, voidSupplierPaymentDemo } from './supplierPaymentDemoData'
+import { getSupplierPayment, voidSupplierPayment } from '../../api/supplierPayments'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -29,11 +33,16 @@ function Detail({ label, value }) {
 // supplierBasePath is null when there is no valid supplier-detail route for the current
 // workspace (e.g. Accountant has no /accounts/suppliers), in which case "View Supplier" is hidden.
 export default function SupplierPaymentQuickView({ paymentId, isOpen, onClose, onVoided, invoiceBasePath, supplierBasePath = null }) {
-  const [tick, setTick] = useState(0)
+  const { can } = usePermission()
+  const canVoid = DEMO_MODE || can('supplier_payments', 'approve')
+
+  const [payment, setPayment] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
   const [mode, setMode] = useState('view')
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const [isVoiding, setIsVoiding] = useState(false)
+  const [tick, setTick] = useState(0)
 
   useEffect(() => {
     if (!isOpen) return undefined
@@ -51,13 +60,37 @@ export default function SupplierPaymentQuickView({ paymentId, isOpen, onClose, o
     }
   }, [isOpen, paymentId])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const payment = useMemo(() => (isOpen && paymentId ? getSupplierPayment(paymentId) : null), [isOpen, paymentId, tick])
+  const load = useCallback(async () => {
+    if (!isOpen || !paymentId) {
+      setPayment(null)
+      return
+    }
+    if (DEMO_MODE) {
+      setPayment(getDemoPayment(paymentId))
+      return
+    }
+    setIsLoading(true)
+    const result = await getSupplierPayment(paymentId)
+    setIsLoading(false)
+    setPayment(result.success ? result.payment : null)
+    if (!result.success) setError(result.error)
+  }, [isOpen, paymentId])
+
+  useEffect(() => {
+    load()
+  }, [load, tick])
 
   const allocationRows = useMemo(() => {
     if (!payment) return []
+    if (!DEMO_MODE) {
+      return (payment.allocations || []).map((allocation) => ({
+        invoiceId: allocation.supplierInvoiceId,
+        supplierInvoiceNumber: allocation.supplierInvoiceNumber || '—',
+        allocated: allocation.amount,
+      }))
+    }
     return (payment.allocations || []).map((allocation) => {
-      const invoice = getDemoSupplierInvoice(allocation.invoiceId)
+      const invoice = getDemoInvoice(allocation.invoiceId)
       const totals = invoice ? computeInvoiceTotals(invoice.items, invoice.charges) : { invoiceTotal: 0 }
       const outstanding = invoice
         ? invoiceOutstanding({ invoiceTotal: totals.invoiceTotal, amountPaid: invoice.amountPaid })
@@ -72,20 +105,38 @@ export default function SupplierPaymentQuickView({ paymentId, isOpen, onClose, o
     })
   }, [payment])
 
-  if (!isOpen || !payment) return null
+  if (!isOpen) return null
 
-  const status = paymentStatusMeta(payment.status)
+  const status = payment ? paymentStatusMeta(payment.status) : null
+  const allocatedTotal = payment
+    ? DEMO_MODE
+      ? (payment.allocations || []).reduce((sum, line) => sum + (Number(line.amount) || 0), 0)
+      : payment.allocatedAmount ?? (payment.allocations || []).reduce((sum, line) => sum + (Number(line.amount) || 0), 0)
+    : 0
+  const unallocated = payment ? (payment.unallocatedAmount ?? Math.max((Number(payment.amount) || 0) - allocatedTotal, 0)) : 0
 
-  const handleVoid = () => {
+  const handleVoid = async () => {
     setError('')
     if (!reason.trim()) {
       setError('A reason is required to void a payment.')
       return
     }
     setIsVoiding(true)
-    voidSupplierPaymentDemo(payment.id, reason)
+    if (DEMO_MODE) {
+      voidSupplierPaymentDemo(payment.id, reason)
+      setIsVoiding(false)
+      setMode('view')
+      setTick((value) => value + 1)
+      onVoided?.()
+      return
+    }
+    const result = await voidSupplierPayment(payment.id, reason)
     setIsVoiding(false)
-    setTick((value) => value + 1)
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
+    setPayment(result.payment)
     setMode('view')
     onVoided?.()
   }
@@ -99,25 +150,31 @@ export default function SupplierPaymentQuickView({ paymentId, isOpen, onClose, o
         <div className="flex items-start justify-between border-b border-neutral-100 px-6 py-5">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-neutral-900">{payment.paymentNumber}</h2>
-              <Badge variant={status.variant}>{status.label}</Badge>
+              <h2 className="text-lg font-semibold text-neutral-900">{payment?.paymentNumber || 'Supplier Payment'}</h2>
+              {status && <Badge variant={status.variant}>{status.label}</Badge>}
             </div>
-            <p className="mt-0.5 text-sm text-neutral-500">{payment.supplierName}</p>
+            <p className="mt-0.5 text-sm text-neutral-500">{payment?.supplierName || ''}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600">
             <X className="size-5" />
           </button>
         </div>
 
-        {mode === 'view' ? (
+        {isLoading ? (
+          <div className="flex-1 p-8"><LoadingSpinner label="Loading payment..." /></div>
+        ) : !payment ? (
+          <div className="flex-1 px-6 py-10 text-center text-sm text-neutral-500">{error || 'Payment not found.'}</div>
+        ) : mode === 'view' ? (
           <>
             <div className="flex-1 space-y-6 px-6 py-5">
               <div className="grid grid-cols-2 gap-4">
                 <Detail label="Payment Date" value={formatDate(payment.paymentDate)} />
                 <Detail label="Amount" value={formatCurrency(payment.amount)} />
-                <Detail label="Payment Mode" value={paymentModeLabel(payment.paymentMode)} />
+                <Detail label="Allocated Amount" value={formatCurrency(allocatedTotal)} />
+                <Detail label="Unallocated Amount" value={formatCurrency(unallocated)} />
+                <Detail label="Payment Method" value={paymentModeLabel(payment.paymentMethod || payment.paymentMode)} />
                 <Detail label="Reference" value={payment.reference} />
-                <Detail label="Status" value={status.label} />
+                <Detail label="Created" value={formatDate(payment.createdAt || payment.recordedAt)} />
                 <Detail label="Notes" value={payment.notes} />
               </div>
 
@@ -133,27 +190,27 @@ export default function SupplierPaymentQuickView({ paymentId, isOpen, onClose, o
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.62rem] font-semibold uppercase tracking-widest text-neutral-400">
-                        <th className="px-3 py-2">Invoice #</th>
-                        <th className="px-3 py-2 text-right">Allocated</th>
-                        <th className="px-3 py-2 text-right">Invoice Total</th>
-                        <th className="px-3 py-2 text-right">Outstanding After</th>
+                        <th className="px-3 py-2">Supplier Invoice</th>
+                        <th className="px-3 py-2 text-right">Allocated Amount</th>
                         <th className="px-3 py-2" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-50">
-                      {allocationRows.map((row) => (
-                        <tr key={row.invoiceId}>
-                          <td className="px-3 py-2 font-medium text-primary-700">{row.supplierInvoiceNumber}</td>
-                          <td className="px-3 py-2 text-right text-neutral-800">{formatCurrency(row.allocated)}</td>
-                          <td className="px-3 py-2 text-right text-neutral-600">{formatCurrency(row.invoiceTotal)}</td>
-                          <td className="px-3 py-2 text-right text-neutral-600">{formatCurrency(row.outstandingAfter)}</td>
-                          <td className="px-3 py-2 text-right">
-                            {invoiceBasePath && (
-                              <a href={`${invoiceBasePath}/${row.invoiceId}`} className="text-xs font-medium text-primary-600 hover:text-primary-700">View</a>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                      {allocationRows.length === 0 ? (
+                        <tr><td colSpan={3} className="px-3 py-4 text-center text-neutral-500">Unallocated advance — no invoice allocations.</td></tr>
+                      ) : (
+                        allocationRows.map((row) => (
+                          <tr key={row.invoiceId}>
+                            <td className="px-3 py-2 font-medium text-primary-700">{row.supplierInvoiceNumber}</td>
+                            <td className="px-3 py-2 text-right text-neutral-800">{formatCurrency(row.allocated)}</td>
+                            <td className="px-3 py-2 text-right">
+                              {invoiceBasePath && row.invoiceId && (
+                                <a href={`${invoiceBasePath}/${row.invoiceId}`} className="text-xs font-medium text-primary-600 hover:text-primary-700">View</a>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -161,13 +218,13 @@ export default function SupplierPaymentQuickView({ paymentId, isOpen, onClose, o
             </div>
 
             <div className="flex flex-wrap gap-3 border-t border-neutral-100 px-6 py-4">
-              {supplierBasePath && (
+              {supplierBasePath && payment.supplierId && (
                 <a href={`${supplierBasePath}/${payment.supplierId}`} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
                   <ExternalLink className="size-4" aria-hidden="true" />
                   View Supplier
                 </a>
               )}
-              {payment.status === 'recorded' && (
+              {payment.status === 'recorded' && canVoid && (
                 <Button type="button" variant="danger" className="flex-1" onClick={() => setMode('void')}>
                   <Ban className="size-4" aria-hidden="true" />
                   Void Payment
@@ -179,7 +236,9 @@ export default function SupplierPaymentQuickView({ paymentId, isOpen, onClose, o
           <>
             <div className="flex-1 space-y-4 px-6 py-5">
               {error && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-              <p className="text-sm leading-6 text-neutral-600">Void this supplier payment? The allocated amounts will be reversed on their invoices. The payment record stays visible as Voided.</p>
+              <p className="text-sm leading-6 text-neutral-600">
+                Void this supplier payment? Allocated amounts are reversed on their invoices and those may return to Accounts Payable. The payment record is retained as Voided.
+              </p>
               <Input as="textarea" label="Reason" required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why is this payment being voided?" />
             </div>
             <div className="flex gap-3 border-t border-neutral-100 px-6 py-4">

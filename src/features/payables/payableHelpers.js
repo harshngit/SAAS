@@ -1,19 +1,17 @@
 // =============================================================================
-// Accounts Payable - frontend structure only.
+// Accounts Payable - shared frontend helpers (demo simulation only).
 // -----------------------------------------------------------------------------
-// Accounts Payable answers one question: "how much do we still owe each supplier?"
-// It derives entirely from Supplier Invoice records (outstanding = invoiceTotal -
-// amountPaid). There is NO separate payable entity, NO supplier payment ledger and
-// NO payment-allocation backend today, so:
-//   - demo mode  -> full local simulation (payableDemoData.js)
-//   - real mode  -> truthful future-state, no writes
+// Accounts Payable is a DERIVED, READ-ONLY view over Supplier Invoices: "how much
+// do we still owe each supplier?". The real API lives in src/api/accountsPayable.js
+// (GET /accounts-payable, /summary, /supplier/{id}) and is authoritative for
+// overdue / days_overdue / ageing_bucket / every money total.
+//   - real mode  -> `/accounts-payable` APIs (read-only; no create/edit/delete)
+//   - demo mode  -> full local simulation (payableDemoData.js), never an API call
 //
-// BACKEND LATER (nothing below is live):
-//   Supplier Payable ledger/entity, payable generated from Supplier Invoice,
-//   Supplier Payment entity, payment number/reference, payment allocation to one
-//   or many invoices, partial payment persistence, outstanding recalculation,
-//   supplier balance update, payment reversal/void, ageing query, due/overdue
-//   query, payment history, audit trail, bank/cash accounting integration.
+// The maths below (ageingBucket / dueCondition / daysOverdue) is used ONLY by the
+// demo path to model what the backend returns. Real rows carry those fields ready-made.
+// There is no AccountsPayable mutation and no "pay via AP" endpoint - Supplier
+// Payment is a separate downstream module.
 // =============================================================================
 
 import { safeNumber } from '../purchases/purchaseHelpers'
