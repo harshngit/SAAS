@@ -1,19 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft,
   Ban,
   Camera,
   Check,
   Download,
   Info,
-  MapPin,
   Minus,
   Package,
   PackageCheck,
   PackageSearch,
   Pencil,
-  Phone,
   Plus,
   Trash2,
   Truck,
@@ -30,7 +27,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import { DELIVERY_STAGES, deliveryStageIndex, getDeliveryStage, getNextDeliveryAction } from './deliveryStage'
+import { getDeliveryStage, getNextDeliveryAction } from './deliveryStage'
 import RejectDeliveryModal from './RejectDeliveryModal'
 import RecordCollectionModal from './RecordCollectionModal'
 import CollectionDetailDrawer from '../collections/CollectionDetailDrawer'
@@ -67,66 +64,7 @@ import { formatCurrency } from '../../utils/format'
 import { useAuthStore } from '../../store/authStore'
 import { usePermission } from '../../auth/usePermission'
 import { useToast } from '../../components/ui/toastContext'
-
-// The 7-step flow (Assigned -> Accepted -> Picking -> Ready -> Vehicle Loaded -> In Transit
-// -> Delivered) and its badge vocabulary are derived in ./deliveryStage from the backend's
-// internal_status (with a legacy status-derivation fallback) - this file never maps raw
-// status values itself.
-
-function WorkflowTimeline({ delivery }) {
-  const stage = getDeliveryStage(delivery)
-
-  // rejected / failed / cancelled leave the linear flow; partially_delivered still shows it.
-  if (stage.offFlow && stage.key !== 'partially_delivered') {
-    return (
-      <div className="flex items-center gap-2 text-sm text-neutral-500">
-        <Badge variant={stage.variant} dot>{stage.label}</Badge>
-        <span>This delivery left the standard workflow.</span>
-      </div>
-    )
-  }
-
-  const currentIndex = deliveryStageIndex(delivery)
-
-  return (
-    <div className="flex items-start justify-center overflow-x-auto pb-1">
-      {DELIVERY_STAGES.map((step, index) => {
-        const isDone = index < currentIndex
-        const isCurrent = index === currentIndex
-        return (
-          <div key={step.key} className="flex items-start gap-0">
-            <div className="flex w-20 flex-col items-center">
-              <div
-                className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                  isDone
-                    ? 'bg-primary-600 text-white'
-                    : isCurrent
-                      ? 'bg-primary-50 text-primary-700 ring-2 ring-primary-500'
-                      : 'bg-neutral-100 text-neutral-400'
-                }`}
-              >
-                {isDone ? <Check className="size-3.5" /> : index + 1}
-              </div>
-              <p className={`mt-1.5 text-center text-[0.7rem] font-medium ${isDone || isCurrent ? 'text-neutral-800' : 'text-neutral-400'}`}>
-                {step.label}
-              </p>
-            </div>
-            {index < DELIVERY_STAGES.length - 1 && (
-              <div className={`mt-3.5 h-0.5 w-8 shrink-0 sm:w-12 ${isDone ? 'bg-primary-500' : 'bg-neutral-100'}`} />
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function formatDate(value) {
-  if (!value) return 'N/A'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+import DeliveryDetailView from './DeliveryDetailView'
 
 function getFileLabel(file, index) {
   return file?.name || file?.filename || file?.original_name || file?.file_name || `Photo ${index + 1}`
@@ -181,15 +119,6 @@ function PreviewGrid({ files }) {
         )
       })}
     </div>
-  )
-}
-
-function DetailCard({ title, value, subtitle }) {
-  return (
-    <Card title={title}>
-      <p className="text-sm font-medium text-neutral-900">{value}</p>
-      {subtitle && <p className="mt-1 text-xs text-neutral-500">{subtitle}</p>}
-    </Card>
   )
 }
 
@@ -284,6 +213,7 @@ export default function DeliveryDetail() {
   const [loadError, setLoadError] = useState('')
   const [isActing, setIsActing] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [isManagementOpen, setIsManagementOpen] = useState(false)
 
   // Delivery partner: reject
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
@@ -548,8 +478,6 @@ export default function DeliveryDetail() {
     can('delivery_collections', 'create') &&
     (!isAdminView || collectionAllowed)
   // Never surface a raw UUID as the visible value - show the name, or nothing.
-  const looksLikeUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''))
-  const friendlyId = (value) => (value && !looksLikeUuid(value) ? value : '')
   const warehouseName = delivery.warehouseName || warehouses.find((warehouse) => warehouse.id === delivery.warehouseId)?.name || ''
   const podPhotoFileIds = Array.isArray(delivery.pod?.photo_file_ids) ? delivery.pod.photo_file_ids.filter(Boolean) : []
   const podSignatureFileId = delivery.pod?.signature_file_id || ''
@@ -564,10 +492,6 @@ export default function DeliveryDetail() {
   const mapsHref = customerMapAddress
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customerMapAddress)}`
     : ''
-  const orderStatusLabel = delivery.order?.status || delivery.orderStatus || 'N/A'
-  const fulfilmentStatusLabel = delivery.order?.fulfilmentStatus || delivery.fulfilmentStatus || 'N/A'
-  const hasBatchTracking = delivery.items.some((item) => item.batchNumber || item.expiryDate)
-  const hasSerialTracking = delivery.items.some((item) => item.serialNumbers.length > 0)
 
   // ---- Delivery adjustment (partner, active delivery only) ----
   // `partially_delivered` is adjustable again - the partner re-attempts the balance still on
@@ -1115,24 +1039,30 @@ export default function DeliveryDetail() {
     if (!result.success) setActionError(result.error)
   }
 
+  const openManagement = () => {
+    setIsManagementOpen(true)
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="secondary" size="sm" onClick={() => navigate(basePath)}>
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Back to Deliveries
-          </Button>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold text-neutral-900">{delivery.deliveryNumber}</h1>
-              <Badge variant={deliveryStage.variant} dot>{deliveryStage.label}</Badge>
-            </div>
-            <p className="mt-1 text-sm text-neutral-500">
-              Order {delivery.orderNumber || 'N/A'} | {delivery.customerName || 'Customer not assigned'}
-            </p>
-          </div>
-        </div>
+    <div>
+      <DeliveryDetailView
+        delivery={delivery}
+        paidAmount={reconciledPaidAmount}
+        warehouseName={warehouseName}
+        customerLabel={customerLabel}
+        customerPhone={customerPhone}
+        mapsHref={mapsHref}
+        podFiles={podPreviewFiles}
+        signatureUrl={podSignatureFileId ? getFileUrl(podSignatureFileId) : ''}
+        onBack={() => navigate(basePath)}
+        onOrder={isAdminView ? () => navigate(`/admin/orders/${delivery.orderId}`) : undefined}
+        onManage={openManagement}
+        onPrint={handleDownloadChallan}
+      />
+      {actionError && !isManagementOpen && <div role="alert" className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>}
+      <Modal isOpen={isManagementOpen} onClose={() => setIsManagementOpen(false)} title="Delivery Actions" size="4xl">
+      <div className="space-y-6">
+      <div>
         <div className="flex flex-wrap items-center gap-2">
           {canReassign && (
             <Button variant="primary" size="sm" onClick={() => setIsReassignModalOpen(true)}>
@@ -1161,77 +1091,6 @@ export default function DeliveryDetail() {
 
       {actionError && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
-      )}
-
-      {/* Field quick actions - kept near the top so Call / Maps stay reachable in transit. */}
-      {(customerPhone || mapsHref) && (
-        <div className="flex flex-col gap-3 rounded-xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card) sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-neutral-900">{customerLabel}</p>
-            {customerMapAddress && <p className="truncate text-xs text-neutral-500" title={customerMapAddress}>{customerMapAddress}</p>}
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            {customerPhone && (
-              <a
-                href={`tel:${customerPhone}`}
-                className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3.5 py-2 text-sm font-medium text-neutral-700 transition-colors hover:border-primary-300 hover:text-primary-700"
-              >
-                <Phone className="size-4" aria-hidden="true" />
-                Call Customer
-              </a>
-            )}
-            {mapsHref && (
-              <a
-                href={mapsHref}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3.5 py-2 text-sm font-medium text-neutral-700 transition-colors hover:border-primary-300 hover:text-primary-700"
-              >
-                <MapPin className="size-4" aria-hidden="true" />
-                Open Maps
-              </a>
-            )}
-          </div>
-        </div>
-      )}
-
-      <Card title="Delivery Progress">
-        <WorkflowTimeline delivery={delivery} />
-      </Card>
-
-      {/* Server-authored event log (DeliveryHistoryOut) from GET /deliveries/by-id/{id}.
-          Primary fields: event_type / created_at / notes / actor.name / previous_status ->
-          new_status. Aliases are compatibility fallbacks only. Never fabricated; the list
-          endpoint returns [] here and the card is simply not rendered. */}
-      {Array.isArray(delivery.timeline) && delivery.timeline.length > 0 && (
-        <Card title="Activity">
-          <ol className="space-y-3">
-            {delivery.timeline.map((entry, index) => {
-              const label = entry?.event_type || entry?.label || entry?.event || entry?.title || entry?.status || entry?.action || ''
-              if (!label) return null
-              const at = entry?.created_at || entry?.at || entry?.timestamp || entry?.time || null
-              const note = entry?.notes || entry?.note || entry?.description || entry?.detail || entry?.reason || ''
-              const actorName = entry?.actor?.name || entry?.actor_name || ''
-              const prevStatus = entry?.previous_status || ''
-              const nextStatus = entry?.new_status || ''
-              const prettify = (value) => String(value).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-              return (
-                <li key={entry?.id || `${label}-${index}`} className="flex gap-3 text-sm">
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
-                  <div className="min-w-0">
-                    <p className="font-medium text-neutral-800">{prettify(label)}</p>
-                    {actorName && <p className="text-neutral-600">{actorName}</p>}
-                    {prevStatus && nextStatus && (
-                      <p className="text-xs text-neutral-500">{prettify(prevStatus)} → {prettify(nextStatus)}</p>
-                    )}
-                    {note && <p className="text-neutral-500">{note}</p>}
-                    {at && <p className="text-xs text-neutral-400">{formatDate(at)}</p>}
-                  </div>
-                </li>
-              )
-            })}
-          </ol>
-        </Card>
       )}
 
       {parentOrderCancelled && (
@@ -1797,125 +1656,8 @@ export default function DeliveryDetail() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <DetailCard title="Delivery Number" value={delivery.deliveryNumber} subtitle={deliveryStage.label} />
-        <DetailCard
-          title="Order Number"
-          value={delivery.orderNumber || 'N/A'}
-          subtitle={`${orderStatusLabel.replace(/_/g, ' ')} | ${fulfilmentStatusLabel.replace(/_/g, ' ')}`}
-        />
-        <DetailCard title="Customer" value={customerLabel} subtitle={customerPhone || undefined} />
-        <DetailCard
-          title="Delivery Partner"
-          value={delivery.deliveryPartnerName || 'Unassigned'}
-          subtitle={friendlyId(delivery.deliveryPartnerEmployeeId) || undefined}
-        />
       </div>
-
-      <Card title="Delivery Info">
-        <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 xl:grid-cols-4">
-          <InfoField label="Vehicle" value={delivery.vehicleNumber || 'N/A'} subtitle={delivery.vehicleType} />
-          <InfoField label="Vehicle Capacity" value={delivery.vehicleCapacityKg != null ? `${delivery.vehicleCapacityKg} kg` : 'N/A'} />
-          <InfoField label="Warehouse" value={warehouseName || 'N/A'} />
-          <InfoField label="Scheduled Date" value={formatDate(delivery.scheduledDate)} />
-          <InfoField label="Delivery Address" value={delivery.customerDeliveryAddress || delivery.deliveryAddress || 'N/A'} />
-          <InfoField label="Dispatched At" value={formatDate(delivery.dispatchedAt)} />
-          <InfoField label="Confirmed At" value={formatDate(delivery.confirmedAt)} />
-          {delivery.receiverName && <InfoField label="Received By" value={delivery.receiverName} />}
-          {delivery.previousPendingBalance != null && (
-            <InfoField label="Previous Pending Balance" value={formatCurrency(delivery.previousPendingBalance)} />
-          )}
-          <InfoField label="Amount Due" value={formatCurrency(delivery.amountDue)} />
-          {delivery.failureReason && <InfoField label="Failure Reason" value={delivery.failureReason} />}
-        </div>
-      </Card>
-
-      <Card title="Contacts">
-        <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-          <div>
-            <p className="text-xs text-neutral-400">Customer Phone</p>
-            {customerPhone ? (
-              <a href={`tel:${customerPhone}`} className="mt-1 inline-flex items-center gap-1.5 font-medium text-primary-700 hover:underline">
-                <Phone className="size-3.5" aria-hidden="true" />
-                {customerPhone}
-              </a>
-            ) : (
-              <p className="mt-1 font-medium text-neutral-900">N/A</p>
-            )}
-          </div>
-          <InfoField label="Customer Email" value={delivery.customerEmail || 'N/A'} />
-          <InfoField label="Partner Phone" value={delivery.deliveryPartnerPhone || 'N/A'} />
-          <InfoField label="Partner Email" value={delivery.deliveryPartnerEmail || 'N/A'} />
-        </div>
-      </Card>
-
-      <Card title="Delivery Items" className="p-0" bodyClassName="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-4xl text-left text-sm">
-            <thead>
-              <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                <th className="whitespace-nowrap px-4 py-3">Product</th>
-                <th className="whitespace-nowrap px-4 py-3">Variant</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Planned</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Picked</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Loaded</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Delivered</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Pending</th>
-                {hasBatchTracking && <th className="whitespace-nowrap px-4 py-3">Batch / Expiry</th>}
-                {hasSerialTracking && <th className="whitespace-nowrap px-4 py-3">Serial Numbers</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-50">
-              {delivery.items.map((item) => (
-                <tr key={item.id} className="transition-colors hover:bg-primary-50/35">
-                  <td className="px-4 py-3.5 font-medium text-neutral-900">{item.productName}</td>
-                  <td className="px-4 py-3.5 text-neutral-500">{item.variantId || '—'}</td>
-                  <td className="px-4 py-3.5 text-right text-neutral-700">{item.plannedQuantity}</td>
-                  <td className="px-4 py-3.5 text-right text-neutral-700">{item.pickedQuantity}</td>
-                  <td className="px-4 py-3.5 text-right text-neutral-700">{item.loadedQuantity}</td>
-                  <td className="px-4 py-3.5 text-right text-neutral-700">{item.deliveredQuantity}</td>
-                  <td className="px-4 py-3.5 text-right text-neutral-700">{item.pendingQuantity}</td>
-                  {hasBatchTracking && (
-                    <td className="px-4 py-3.5 text-neutral-500">
-                      {item.batchNumber || '—'}{item.expiryDate ? ` · exp ${formatDate(item.expiryDate)}` : ''}
-                    </td>
-                  )}
-                  {hasSerialTracking && (
-                    <td className="px-4 py-3.5 text-neutral-500">{item.serialNumbers.length ? item.serialNumbers.join(', ') : '—'}</td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {(podPhotoFileIds.length > 0 || podSignatureFileId) && (
-        <Card title="Proof of Delivery">
-          <div className="space-y-4">
-            {podPhotoFileIds.length > 0 && <PreviewGrid files={podPreviewFiles} />}
-            {podSignatureFileId && (
-              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                <p className="text-xs font-medium text-neutral-500">Signature</p>
-                <a
-                  href={getFileUrl(podSignatureFileId)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-flex text-sm font-medium text-primary-700 hover:underline"
-                >
-                  View signature
-                </a>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {delivery.notes && (
-        <Card title="Notes">
-          <p className="text-sm whitespace-pre-line text-neutral-700">{delivery.notes}</p>
-        </Card>
-      )}
+      </Modal>
 
       <Modal
         isOpen={isReassignModalOpen}

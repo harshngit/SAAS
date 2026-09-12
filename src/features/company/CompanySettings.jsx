@@ -1905,16 +1905,17 @@ function CompanyOverviewDashboard({
   };
 
   return (
-    <section className="space-y-4 pb-5">
-      <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
-          <div className="flex shrink-0 items-center gap-5 xl:w-[22rem]">
-            <div className="grid size-28 shrink-0 place-items-center rounded-full border border-neutral-100 bg-white text-2xl font-bold text-primary-700 shadow-sm">
+    <section className="min-w-0 max-w-full space-y-4 pb-5">
+      <div className="min-w-0 max-w-full rounded-xl border border-neutral-100 bg-white p-4 shadow-sm">
+        <div className="w-full min-w-0 overflow-x-auto pb-1">
+        <div className="grid min-w-[46rem] grid-cols-[minmax(0,1.7fr)_minmax(0,5fr)] items-center gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid size-16 shrink-0 place-items-center rounded-full border border-neutral-100 bg-white text-2xl font-bold text-primary-700 shadow-sm 2xl:size-20">
               {logoUrl ? (
                 <img
                   src={logoUrl}
                   alt={`${displayName} logo`}
-                  className="size-24 rounded-full object-contain"
+                  className="size-14 rounded-full object-contain 2xl:size-16"
                 />
               ) : (
                 getInitials(displayName)
@@ -1922,7 +1923,7 @@ function CompanyOverviewDashboard({
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-lg font-semibold text-neutral-900">
+                <h2 className="break-words text-sm font-semibold leading-5 text-neutral-900" title={companyName}>
                   {companyName}
                 </h2>
                 <span
@@ -1942,24 +1943,24 @@ function CompanyOverviewDashboard({
             </div>
           </div>
 
-          <div className="grid min-w-0 flex-1 grid-cols-1 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1.15fr_1.35fr_1fr]">
+          <div className="grid min-w-0 grid-cols-[1fr_1.2fr_1fr_1.3fr_.9fr] text-sm">
             {companyFacts.map((fact, index) => {
               const Icon = fact.icon;
 
               return (
                 <div
                   key={`${fact.label}-${index}`}
-                  className="min-w-0 border-neutral-100 px-0 sm:px-4 sm:[&:not(:first-child)]:border-l"
+                  className="min-w-0 border-l border-neutral-100 px-3 last:pr-0"
                 >
-                  <p className="whitespace-nowrap text-xs font-medium text-neutral-500">
+                  <p className="text-xs font-medium leading-5 text-neutral-500">
                     {fact.label}
                   </p>
                   <p
-                    className="mt-2 flex min-w-0 items-center gap-2 truncate font-semibold text-neutral-900"
+                    className="mt-1.5 flex min-w-0 items-start gap-2 font-semibold leading-6 text-neutral-900"
                     title={String(fact.value)}
                   >
-                    {Icon && <Icon className="size-4 shrink-0 text-neutral-500" />}
-                    <span className="truncate">{fact.value}</span>
+                    {Icon && <Icon className="mt-1 size-4 shrink-0 text-neutral-500" />}
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{fact.value}</span>
                   </p>
                 </div>
               );
@@ -1968,6 +1969,7 @@ function CompanyOverviewDashboard({
         </div>
       </div>
 
+      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {metricCards.map((metric, index) => {
           const Icon = metric.icon;

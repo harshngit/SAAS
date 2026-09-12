@@ -1,24 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import {
-  ArrowLeft,
   Ban,
   Check,
   Copy,
   FileText,
-  IndianRupee,
-  Package,
   PackageCheck,
   PackageSearch,
   Pencil,
   Store,
   Truck,
   Undo2,
-  User,
   Wallet,
-  Warehouse,
 } from 'lucide-react'
+import OrderDetailView from './OrderDetailView'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -62,11 +58,8 @@ import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import {
   CANCEL_REASONS,
-  ORDER_STATUS_VARIANT,
-  PAYMENT_STATUS_VARIANT,
   buildOrderTimeline,
   formatOrderStatus,
-  formatPaymentStatus,
   getDeliveryStatus,
   getFulfilmentLabel,
   getOrderActions,
@@ -99,40 +92,7 @@ const formatDate = (value) => {
   }
 }
 
-const formatDateTime = (value) => {
-  if (!value) return '—'
-  try {
-    return format(parseISO(value), 'dd MMM yyyy, h:mm a')
-  } catch {
-    return value
-  }
-}
-
 const roleName = (role) => roleLabels[role] || String(role || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-
-function StepperNode({ index, label, status, isLast }) {
-  return (
-    <div className="flex items-start gap-0">
-      <div className="flex w-24 flex-col items-center">
-        <div
-          className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-            status === 'done'
-              ? 'bg-primary-600 text-white'
-              : status === 'current'
-                ? 'bg-primary-50 text-primary-700 ring-2 ring-primary-500'
-                : 'bg-neutral-100 text-neutral-400'
-          }`}
-        >
-          {status === 'done' ? <Check className="size-4" /> : index}
-        </div>
-        <p className={`mt-2 text-center text-xs font-medium ${status === 'pending' ? 'text-neutral-400' : 'text-neutral-800'}`}>
-          {label}
-        </p>
-      </div>
-      {!isLast && <div className={`mt-4 h-0.5 w-10 shrink-0 sm:w-16 ${status === 'done' ? 'bg-primary-500' : 'bg-neutral-100'}`} />}
-    </div>
-  )
-}
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -735,67 +695,53 @@ export default function OrderDetail() {
   const canCreateInvoiceNow = invoiceMode === 'after_full_order' ? isDelivered : hasDeliveredQuantity
   const firstInvoice = orderInvoices[0]
 
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex items-start gap-4">
-          <Button variant="secondary" size="sm" onClick={() => navigate(basePath)}>
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Back to Orders
-          </Button>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold text-neutral-900">{order.orderNumber}</h1>
-              {isDemo && (
-                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
-              )}
-              {order.demoErrorState && (
-                <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-red-700">Demo Error State</span>
-              )}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
-              <span className="flex items-center gap-1.5 text-neutral-500">
-                Order Status
-                <Badge variant={ORDER_STATUS_VARIANT[order.status] || 'neutral'}>{formatOrderStatus(order.status)}</Badge>
-              </span>
-              <span className="flex items-center gap-1.5 text-neutral-500">
-                Fulfilment
-                <Badge variant={isPickupOrder ? 'neutral' : 'info'}>{fulfilmentLabel}</Badge>
-              </span>
-              {/* Delivery Status only applies to Home Delivery - a takeaway order has no delivery. */}
-              {!isPickupOrder && (
-                <span className="flex items-center gap-1.5 text-neutral-500">
-                  Delivery Status
-                  <Badge variant={delivery.variant}>{delivery.label}</Badge>
-                </span>
-              )}
-              <span className="flex items-center gap-1.5 text-neutral-500">
-                Order Source
-                {source.isQuotation ? (
-                  <button
-                    type="button"
-                    onClick={() => !isDemo && order.quotationId && navigate(`${quotationsBasePath}/${order.quotationId}`)}
-                    className="font-medium text-primary-600 hover:underline"
-                  >
-                    Quotation{order.quotationNumber ? ` ${order.quotationNumber}` : ''}
-                  </button>
-                ) : (
-                  <span className="font-medium text-neutral-700">Direct</span>
-                )}
-              </span>
-              {order.paymentStatus && (
-                <span className="flex items-center gap-1.5 text-neutral-500">
-                  Payment
-                  <Badge variant={PAYMENT_STATUS_VARIANT[order.paymentStatus] || 'neutral'}>
-                    {formatPaymentStatus(order.paymentStatus)}
-                  </Badge>
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
+  const primaryActions = (<>
+          {actions.includes('viewDelivery') && (
+            <Button variant="outline" size="sm" className="od-view-delivery-action" onClick={goToDelivery}>
+              <Truck className="size-4" aria-hidden="true" />
+              View Delivery
+            </Button>
+          )}
+          {!actions.includes('viewDelivery') && (
+            <Button variant="outline" size="sm" className="od-view-delivery-action" disabled title={isPickupOrder ? 'Takeaway orders do not have a delivery record' : 'No delivery is available yet'}>
+              <Truck className="size-4" aria-hidden="true" />
+              View Delivery
+            </Button>
+          )}
+          {!actions.includes('createInvoice') && !(actions.includes('viewInvoice') && hasMoreToInvoice) && (
+            <Button variant="primary" size="sm" className="od-invoice-action od-generate-action" disabled title={firstInvoice ? 'Invoice already generated. Open it from More Actions.' : 'Invoice generation is unavailable at this order stage'}>
+              <FileText className="size-4" aria-hidden="true" />
+              Generate Invoice
+            </Button>
+          )}
+          {actions.includes('viewInvoice') && hasMoreToInvoice && (
+            <Button variant="primary" size="sm" className="od-invoice-action od-generate-action" onClick={handleCreateInvoice}>
+              <FileText className="size-4" aria-hidden="true" />
+              Generate Invoice
+            </Button>
+          )}
+          {actions.includes('createInvoice') && (
+            <Button
+              variant="primary"
+              className="od-invoice-action od-generate-action"
+              size="sm"
+              disabled={!isDemo && !canCreateInvoiceNow}
+              title={!isDemo && !canCreateInvoiceNow ? 'Complete a delivery before invoicing this order' : undefined}
+              onClick={handleCreateInvoice}
+            >
+              <FileText className="size-4" aria-hidden="true" />
+              Generate Invoice
+            </Button>
+          )}
+  </>)
 
-        <div className="flex flex-wrap items-center gap-2">
+  const moreActions = (<>
+          {actions.includes('viewInvoice') && firstInvoice && (
+            <Button variant="outline" size="sm" title={firstInvoice.invoiceNumber || 'View invoice'} onClick={handleViewInvoice}>
+              <FileText className="size-4" aria-hidden="true" />
+              {orderInvoices.length > 1 ? `View Invoices (${orderInvoices.length})` : 'View Invoice'}
+            </Button>
+          )}
           {actions.includes('edit') && (
             <Button variant="secondary" size="sm" onClick={() => navigate(`${basePath}/${order.id}/edit`)}>
               <Pencil className="size-4" aria-hidden="true" />
@@ -812,12 +758,6 @@ export default function OrderDetail() {
             <Button variant="outline" size="sm" onClick={openPlanModal}>
               <Truck className="size-4" aria-hidden="true" />
               Plan Delivery
-            </Button>
-          )}
-          {actions.includes('viewDelivery') && (
-            <Button variant="outline" size="sm" onClick={goToDelivery}>
-              <Truck className="size-4" aria-hidden="true" />
-              View Delivery
             </Button>
           )}
           {actions.includes('pickupStart') && (
@@ -838,30 +778,6 @@ export default function OrderDetail() {
               Confirm Pickup
             </Button>
           )}
-          {actions.includes('viewInvoice') && firstInvoice && (
-            <Button variant="outline" size="sm" onClick={handleViewInvoice}>
-              <FileText className="size-4" aria-hidden="true" />
-              {orderInvoices.length > 1 ? `View Invoices (${orderInvoices.length})` : `View Invoice ${firstInvoice.invoiceNumber || ''}`.trim()}
-            </Button>
-          )}
-          {actions.includes('viewInvoice') && hasMoreToInvoice && (
-            <Button variant="primary" size="sm" onClick={handleCreateInvoice}>
-              <FileText className="size-4" aria-hidden="true" />
-              Create Next Invoice
-            </Button>
-          )}
-          {actions.includes('createInvoice') && (
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={!isDemo && !canCreateInvoiceNow}
-              title={!isDemo && !canCreateInvoiceNow ? 'Complete a delivery before invoicing this order' : undefined}
-              onClick={handleCreateInvoice}
-            >
-              <FileText className="size-4" aria-hidden="true" />
-              Create Invoice
-            </Button>
-          )}
           {canRecordPayment && order.paymentStatus && (order.remainingAmount || 0) > 0 && (
             <Button variant="outline" size="sm" onClick={() => setIsCollectPaymentOpen(true)}>
               <Wallet className="size-4" aria-hidden="true" />
@@ -880,9 +796,9 @@ export default function OrderDetail() {
               Duplicate Order
             </Button>
           )}
-        </div>
-      </div>
+  </>)
 
+  const alerts = (<>
       {actionError && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
       )}
@@ -923,65 +839,6 @@ export default function OrderDetail() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) sm:grid-cols-2 lg:grid-cols-6">
-        <div>
-          <p className="flex items-center gap-1.5 text-xs text-neutral-400"><User className="size-3.5" />Customer</p>
-          <Link to={`/admin/customers/${order.customerId}`} className="mt-1 block truncate text-sm font-medium text-primary-700 hover:underline">
-            {order.customerName}
-          </Link>
-        </div>
-        <div>
-          <p className="flex items-center gap-1.5 text-xs text-neutral-400">Order Date</p>
-          <p className="mt-1 text-sm font-medium text-neutral-900">{formatDate(order.orderDate)}</p>
-          <p className="text-xs text-neutral-400">{isPickupOrder ? 'Pickup' : 'Delivery'} {formatDate(order.deliveryDate)}</p>
-        </div>
-        <div>
-          <p className="flex items-center gap-1.5 text-xs text-neutral-400"><FileText className="size-3.5" />Order Source</p>
-          <p className="mt-1 text-sm font-medium text-neutral-900">
-            {source.isQuotation ? (
-              <button
-                type="button"
-                onClick={() => !isDemo && order.quotationId && navigate(`${quotationsBasePath}/${order.quotationId}`)}
-                className="text-primary-700 hover:underline"
-              >
-                {order.quotationNumber || 'Quotation'}
-              </button>
-            ) : (
-              'Direct'
-            )}
-          </p>
-        </div>
-        <div>
-          <p className="flex items-center gap-1.5 text-xs text-neutral-400"><Wallet className="size-3.5" />Payment Type</p>
-          <p className="mt-1 text-sm font-medium capitalize text-neutral-900">{order.paymentType || '—'}</p>
-          {order.paymentTermsDays > 0 && <p className="text-xs text-neutral-400">{order.paymentTermsDays} Days</p>}
-        </div>
-        <div>
-          <p className="flex items-center gap-1.5 text-xs text-neutral-400"><Warehouse className="size-3.5" />Warehouse</p>
-          <p className="mt-1 text-sm font-medium text-neutral-900">{order.warehouseName || '—'}</p>
-        </div>
-        <div>
-          <p className="flex items-center gap-1.5 text-xs text-neutral-400"><IndianRupee className="size-3.5" />Total Amount</p>
-          <p className="mt-1 text-sm font-semibold text-neutral-900">{formatCurrency(order.total)}</p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-x-8 gap-y-1.5 rounded-2xl border border-neutral-100 bg-white px-5 py-3.5 text-sm shadow-(--shadow-card)">
-        <span className="flex items-center gap-1.5">
-          <User className="size-3.5 text-neutral-400" aria-hidden="true" />
-          <span className="text-neutral-400">Created By</span>
-          <span className="font-medium text-neutral-900">{creator?.name || '—'}</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="text-neutral-400">Created Role</span>
-          <span className="font-medium text-neutral-900">{creator?.role ? roleName(creator.role) : '—'}</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="text-neutral-400">Created At</span>
-          <span className="font-medium text-neutral-900">{formatDateTime(order.createdAt)}</span>
-        </span>
-      </div>
-
       {order.warnings.length > 0 && (
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {order.warnings.map((warning, index) => (
@@ -990,129 +847,10 @@ export default function OrderDetail() {
         </div>
       )}
 
-      {progress.length > 0 && order.status !== 'cancelled' && (
-        <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-          <div className="flex items-start justify-center overflow-x-auto pb-1">
-            {progress.map((step, index) => (
-              <StepperNode key={step.label} index={index + 1} isLast={index === progress.length - 1} {...step} />
-            ))}
-          </div>
-        </div>
-      )}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
-        <Card title="Order Items" className="p-0" bodyClassName="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-3xl text-left text-sm">
-              <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                  <th className="whitespace-nowrap px-4 py-3">#</th>
-                  <th className="whitespace-nowrap px-4 py-3">Product</th>
-                  <th className="whitespace-nowrap px-3 py-3 text-right">Unit Price</th>
-                  <th className="whitespace-nowrap px-3 py-3 text-right">Disc %</th>
-                  <th className="whitespace-nowrap px-3 py-3 text-right">Ordered</th>
-                  <th className="whitespace-nowrap px-3 py-3 text-right">Reserved</th>
-                  <th className="whitespace-nowrap px-3 py-3 text-right">Delivered</th>
-                  <th className="whitespace-nowrap px-3 py-3 text-right">Invoiced</th>
-                  <th className="whitespace-nowrap px-3 py-3 text-right">Remaining</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">Line Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-50">
-                {order.items.map((item, index) => {
-                  const meta = productMeta[item.productId] || {}
-                  const image = meta.image || getFileUrl(item.productImage || '')
-                  const sku = item.sku || meta.sku || ''
-                  return (
-                  <tr key={item.id || item.productId} className="transition-colors hover:bg-primary-50/35">
-                    <td className="whitespace-nowrap px-4 py-3 text-neutral-400">{index + 1}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="relative size-10 shrink-0">
-                          <span className="flex size-10 items-center justify-center rounded-lg bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
-                            <Package className="size-4" aria-hidden="true" />
-                          </span>
-                          {image && (
-                            <img
-                              src={image}
-                              alt=""
-                              className="absolute inset-0 size-10 rounded-lg border border-neutral-100 object-cover"
-                              onError={(event) => {
-                                event.currentTarget.style.display = 'none'
-                              }}
-                            />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-neutral-800">{item.productName}</p>
-                          {sku && <p className="truncate text-xs text-neutral-400">SKU: {sku}</p>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">
-                      {formatCurrency(item.unitPrice)}
-                      {item.costPrice != null && (
-                        <p className="text-xs font-normal text-neutral-400">Cost: {formatCurrency(item.costPrice)}</p>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">
-                      {item.discountPercent > 0 ? `${item.discountPercent}%` : '—'}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">{item.quantity}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">{item.reservedQuantity}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">{item.deliveredQuantity}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">{invoicedByProduct[item.productId || item.id] || 0}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">{item.remainingQuantity}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
-                  </tr>
-                  )
-                })}
-                <tr className="bg-neutral-50/60 font-semibold text-neutral-900">
-                  <td colSpan={4} />
-                  <td className="px-3 py-3 text-right">{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
-                  <td colSpan={4} />
-                  <td className="px-4 py-3 text-right">{formatCurrency(order.total)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </Card>
+  </>)
 
-        <Card title="Payment Summary" className="xl:self-start">
-          <div className="space-y-2 text-[0.82rem]">
-            <div className="flex items-center justify-between"><span className="text-neutral-500">Subtotal</span><span className="font-medium text-neutral-900">{formatCurrency(order.subtotal)}</span></div>
-            <div className="flex items-center justify-between"><span className="text-neutral-500">Discount</span><span className="font-medium text-red-500">-{formatCurrency(order.discount)}</span></div>
-            <div className="flex items-center justify-between"><span className="text-neutral-500">Tax</span><span className="font-medium text-neutral-900">{formatCurrency(order.tax)}</span></div>
-            <div className="flex items-center justify-between border-t border-neutral-100 pt-2"><span className="font-semibold text-neutral-900">Total Amount</span><span className="font-semibold text-neutral-900">{formatCurrency(order.total)}</span></div>
-            {order.paymentStatus && (
-              <>
-                <div className="flex items-center justify-between"><span className="text-neutral-500">Paid Amount</span><span className="font-medium text-green-600">{formatCurrency(order.paidAmount || 0)}</span></div>
-                <div className="flex items-center justify-between"><span className="text-neutral-500">Remaining Amount</span><span className="font-medium text-neutral-900">{formatCurrency(order.remainingAmount || 0)}</span></div>
-                <div className="flex items-center justify-between border-t border-neutral-100 pt-2">
-                  <span className="font-semibold text-neutral-900">Payment Status</span>
-                  <Badge variant={PAYMENT_STATUS_VARIANT[order.paymentStatus] || 'neutral'}>{formatPaymentStatus(order.paymentStatus)}</Badge>
-                </div>
-              </>
-            )}
-            {order.demoPayment && (
-              <>
-                <div className="flex items-center justify-between"><span className="text-neutral-500">Previous Balance</span><span className="font-medium text-neutral-900">{formatCurrency(order.demoPayment.previousBalance)}</span></div>
-                <div className="flex items-center justify-between"><span className="text-neutral-500">Total Due</span><span className="font-medium text-neutral-900">{formatCurrency(order.demoPayment.totalDue)}</span></div>
-                <div className="flex items-center justify-between"><span className="text-neutral-500">Paid</span><span className="font-medium text-green-600">{formatCurrency(order.demoPayment.paid)}</span></div>
-                <div className="flex items-center justify-between border-t border-neutral-100 pt-2"><span className="font-semibold text-neutral-900">Remaining Balance</span><span className="font-semibold text-neutral-900">{formatCurrency(order.demoPayment.remaining)}</span></div>
-              </>
-            )}
-          </div>
-          <p className="mt-3 rounded-xl bg-neutral-50 px-3 py-2.5 text-[0.7rem] leading-4 text-neutral-500">
-            {order.demoPayment
-              ? 'Demo payment figures for manual testing — not persisted. Receivables are created once this order is invoiced, not at placement.'
-              : order.paymentStatus
-                ? 'Paid and remaining amounts are maintained by the backend from this order’s invoice and recorded payments.'
-                : 'Receivables are created once this order is invoiced, not at placement.'}
-          </p>
-        </Card>
-      </div>
-
+  const paymentHistory = (<>
       <Card title="Payment History" className="p-0" bodyClassName="p-0">
         {isLoadingOrderPayments ? (
           <div className="p-5">
@@ -1159,77 +897,10 @@ export default function OrderDetail() {
         )}
       </Card>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        {!isPickupOrder ? (
-          <Card title="Delivery Information">
-            {order.assignedDeliveryPartnerId ? (
-              <div className="space-y-3.5 text-sm">
-                <div className="flex items-center justify-between"><span className="text-neutral-500">Delivery Partner</span><span className="font-medium text-neutral-900">{order.assignedDeliveryPartnerName}</span></div>
-                <div className="flex items-center justify-between"><span className="text-neutral-500">Expected Delivery</span><span className="font-medium text-neutral-900">{formatDate(order.deliveryDate)}</span></div>
-                <div className="flex items-center justify-between">
-                  <span className="text-neutral-500">Delivery Status</span>
-                  <Badge variant={delivery.variant}>{delivery.label}</Badge>
-                </div>
-                {order.deliveryAddress && (
-                  <div className="border-t border-neutral-100 pt-3">
-                    <span className="text-neutral-500">Delivery Address</span>
-                    <p className="mt-1 whitespace-pre-line text-neutral-700">{order.deliveryAddress}</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <EmptyState icon={Truck} title="No delivery partner assigned" description="Use Plan Delivery to assign a partner and start fulfilment." />
-            )}
-          </Card>
-        ) : (
-          <Card title="Pickup Information">
-            <div className="space-y-3.5 text-sm">
-              <div className="flex items-center justify-between"><span className="text-neutral-500">Fulfilment Method</span><span className="font-medium text-neutral-900">Takeaway / Self Pickup</span></div>
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Pickup Status</span>
-                <Badge variant={delivery.variant}>{delivery.label}</Badge>
-              </div>
-              {order.collectedBy && (
-                <div className="flex items-center justify-between"><span className="text-neutral-500">Collected By</span><span className="font-medium text-neutral-900">{order.collectedBy}</span></div>
-              )}
-              {order.collectedAt && (
-                <div className="flex items-center justify-between"><span className="text-neutral-500">Collected At</span><span className="font-medium text-neutral-900">{formatDate(order.collectedAt)}</span></div>
-              )}
-              {order.pickupNotes && (
-                <div className="border-t border-neutral-100 pt-3">
-                  <span className="text-neutral-500">Pickup Notes</span>
-                  <p className="mt-1 whitespace-pre-line text-neutral-700">{order.pickupNotes}</p>
-                </div>
-              )}
-            </div>
-          </Card>
-        )}
 
-        <Card title="Activity Timeline">
-          {timeline.length === 0 ? (
-            <p className="text-sm text-neutral-400">No activity recorded yet.</p>
-          ) : (
-            <ol className="space-y-4">
-              {timeline.map((event) => {
-                const Icon = event.icon
-                return (
-                  <li key={event.id} className="flex gap-3">
-                    <span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${event.iconClass}`}>
-                      <Icon className="size-4" aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-neutral-800">{event.title}</p>
-                      {event.subtitle && <p className="text-xs text-neutral-500">{event.subtitle}</p>}
-                      <p className="text-[0.7rem] text-neutral-400">{formatDate(event.timestamp)}</p>
-                    </div>
-                  </li>
-                )
-              })}
-            </ol>
-          )}
-        </Card>
-      </div>
+  </>)
 
+  const returns = (<>
       {(() => {
         // Mirror the backend: no sales_returns:view -> no returns context on the order at all.
         if (!canViewReturns) return null
@@ -1294,13 +965,32 @@ export default function OrderDetail() {
         )
       })()}
 
-      {order.notes && (
-        <Card title="Notes">
-          <div className="rounded-xl bg-neutral-50 p-3">
-            <p className="text-sm text-neutral-700 whitespace-pre-line">{order.notes}</p>
-          </div>
-        </Card>
-      )}
+
+  </>)
+
+  return (
+    <div>
+      <OrderDetailView
+        order={order}
+        creator={creator}
+        creatorRole={creator?.role ? roleName(creator.role) : ''}
+        delivery={delivery}
+        progress={progress}
+        timeline={timeline}
+        source={source}
+        fulfilmentLabel={fulfilmentLabel}
+        isPickupOrder={isPickupOrder}
+        isDemo={isDemo}
+        productMeta={productMeta}
+        invoicedByProduct={invoicedByProduct}
+        primaryActions={primaryActions}
+        moreActions={moreActions}
+        alerts={alerts}
+        paymentHistory={paymentHistory}
+        returns={returns}
+        onBack={() => navigate(basePath)}
+        onQuotation={() => !isDemo && order.quotationId && navigate(`${quotationsBasePath}/${order.quotationId}`)}
+      />
 
       <Modal
         isOpen={isPlanModalOpen}
