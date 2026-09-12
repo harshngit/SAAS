@@ -8,6 +8,7 @@ import {
   Copy,
   FileText,
   IndianRupee,
+  Package,
   PackageCheck,
   PackageSearch,
   Pencil,
@@ -36,13 +37,23 @@ import {
   pickupStart,
 } from '../../api/orders'
 import { listDeliveries, listDeliveryPartners, planDelivery } from '../../api/deliveries'
+import { listCollections } from '../../api/deliveryCollections'
 import { listInvoices } from '../../api/invoices'
 import { listSalesReturns } from '../../api/salesReturns'
 import { SALES_RETURNS_DEMO_ENABLED, getDemoSalesReturns } from '../salesReturns/salesReturnDemoData'
 import { srStatusMeta, totalReturnQty } from '../salesReturns/salesReturnHelpers'
+import CollectPaymentDrawer from '../collections/CollectPaymentDrawer'
+import {
+  COLLECTION_STATUS_VARIANT,
+  formatCollectorRole,
+  formatPaymentMode,
+  formatStatus as formatCollectionStatus,
+} from '../collections/collectionHelpers'
 import { getSalesWorkflowSettings } from '../../api/settings'
 import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
+import { listProducts } from '../../api/products'
+import { getFileUrl } from '../../api/files'
 import { getUser, listAssignableStaff } from '../../api/users'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 import { ROLES, roleLabels } from '../../auth/roles'
@@ -52,8 +63,10 @@ import { formatCurrency } from '../../utils/format'
 import {
   CANCEL_REASONS,
   ORDER_STATUS_VARIANT,
+  PAYMENT_STATUS_VARIANT,
   buildOrderTimeline,
   formatOrderStatus,
+  formatPaymentStatus,
   getDeliveryStatus,
   getFulfilmentLabel,
   getOrderActions,
@@ -99,8 +112,8 @@ const roleName = (role) => roleLabels[role] || String(role || '').replace(/_/g, 
 
 function StepperNode({ index, label, status, isLast }) {
   return (
-    <div className="flex min-w-24 flex-1 items-start gap-0">
-      <div className="flex flex-col items-center">
+    <div className="flex items-start gap-0">
+      <div className="flex w-24 flex-col items-center">
         <div
           className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
             status === 'done'
@@ -112,11 +125,11 @@ function StepperNode({ index, label, status, isLast }) {
         >
           {status === 'done' ? <Check className="size-4" /> : index}
         </div>
-        <p className={`mt-2 max-w-26 text-center text-xs font-medium ${status === 'pending' ? 'text-neutral-400' : 'text-neutral-800'}`}>
+        <p className={`mt-2 text-center text-xs font-medium ${status === 'pending' ? 'text-neutral-400' : 'text-neutral-800'}`}>
           {label}
         </p>
       </div>
-      {!isLast && <div className={`mt-4 h-0.5 flex-1 ${status === 'done' ? 'bg-primary-500' : 'bg-neutral-100'}`} />}
+      {!isLast && <div className={`mt-4 h-0.5 w-10 shrink-0 sm:w-16 ${status === 'done' ? 'bg-primary-500' : 'bg-neutral-100'}`} />}
     </div>
   )
 }
@@ -129,6 +142,9 @@ export default function OrderDetail() {
   const { can } = usePermission()
   const canViewReturns = can('sales_returns', 'view')
   const canCreateReturns = can('sales_returns', 'create')
+  // Same permission the Invoice Detail "Record Payment" button uses - recording a customer
+  // payment is a financial transaction, not an order action.
+  const canRecordPayment = can('payments', 'create')
   const isSalesPath = window.location.pathname.startsWith('/sales')
   const basePath = isSalesPath ? '/sales/orders' : window.location.pathname.startsWith('/delivery') ? '/delivery/orders' : '/admin/orders'
   const quotationsBasePath = isSalesPath ? '/sales/quotations' : '/admin/quotations'
@@ -164,6 +180,11 @@ export default function OrderDetail() {
   const [isViewDeliveryOpen, setIsViewDeliveryOpen] = useState(false)
   const [isViewInvoiceOpen, setIsViewInvoiceOpen] = useState(false)
   const [creator, setCreator] = useState(null)
+  const [productMeta, setProductMeta] = useState({})
+  const [isCollectPaymentOpen, setIsCollectPaymentOpen] = useState(false)
+  const [orderPayments, setOrderPayments] = useState([])
+  const [isLoadingOrderPayments, setIsLoadingOrderPayments] = useState(false)
+  const [orderPaymentsError, setOrderPaymentsError] = useState('')
 
   const invoicedByProduct = useMemo(() => {
     const map = {}
@@ -205,6 +226,33 @@ export default function OrderDetail() {
     loadOrder()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // Order items carry no image / SKU - pull those from the product catalogue for the table.
+  useEffect(() => {
+    if (isDemo || !order?.items?.length) return
+    let active = true
+    listProducts().then((result) => {
+      if (!active || !result.success) return
+      const map = {}
+      result.products.forEach((product) => {
+        map[product.id] = {
+          image: getFileUrl(
+            product.cover_image ||
+              product.cover_image_url ||
+              product.image_url ||
+              (Array.isArray(product.images) ? product.images[0]?.url || product.images[0] : '') ||
+              '',
+          ),
+          sku: product.sku || '',
+        }
+      })
+      setProductMeta(map)
+    })
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDemo, order?.id])
 
   // Sales Returns raised against this order (via its invoices). Read-only cross-link (§20).
   useEffect(() => {
@@ -285,6 +333,32 @@ export default function OrderDetail() {
       isMounted = false
     }
   }, [order?.id, order?.invoiceId, isDemo]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Customer-based payment collection history (§ collections are customer-scoped, not tied
+  // to a specific order) - the same data source Customer Detail's Payments tab reads.
+  // listCollections() demo-gates internally, so this works for both demo and real orders.
+  const loadOrderPayments = async (customerId) => {
+    if (!customerId) {
+      setOrderPayments([])
+      setOrderPaymentsError('')
+      return
+    }
+    setIsLoadingOrderPayments(true)
+    setOrderPaymentsError('')
+    const result = await listCollections({ customer_id: customerId })
+    setIsLoadingOrderPayments(false)
+    if (!result.success) {
+      setOrderPayments([])
+      setOrderPaymentsError(result.error)
+      return
+    }
+    setOrderPayments(result.collections)
+  }
+
+  useEffect(() => {
+    loadOrderPayments(order?.customerId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.customerId])
 
   // Resolve "Created By" - the order only carries a `created_by` user id.
   useEffect(() => {
@@ -709,6 +783,14 @@ export default function OrderDetail() {
                   <span className="font-medium text-neutral-700">Direct</span>
                 )}
               </span>
+              {order.paymentStatus && (
+                <span className="flex items-center gap-1.5 text-neutral-500">
+                  Payment
+                  <Badge variant={PAYMENT_STATUS_VARIANT[order.paymentStatus] || 'neutral'}>
+                    {formatPaymentStatus(order.paymentStatus)}
+                  </Badge>
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -778,6 +860,12 @@ export default function OrderDetail() {
             >
               <FileText className="size-4" aria-hidden="true" />
               Create Invoice
+            </Button>
+          )}
+          {canRecordPayment && order.paymentStatus && (order.remainingAmount || 0) > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setIsCollectPaymentOpen(true)}>
+              <Wallet className="size-4" aria-hidden="true" />
+              Record Payment
             </Button>
           )}
           {actions.includes('cancel') && (
@@ -904,7 +992,7 @@ export default function OrderDetail() {
 
       {progress.length > 0 && order.status !== 'cancelled' && (
         <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-          <div className="flex items-start overflow-x-auto pb-1">
+          <div className="flex items-start justify-center overflow-x-auto pb-1">
             {progress.map((step, index) => (
               <StepperNode key={step.label} index={index + 1} isLast={index === progress.length - 1} {...step} />
             ))}
@@ -912,81 +1000,164 @@ export default function OrderDetail() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <Card title="Order Items" className="p-0" bodyClassName="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-2xl text-left text-sm">
+            <table className="w-full min-w-3xl text-left text-sm">
               <thead>
                 <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                  <th className="whitespace-nowrap px-5 py-3">#</th>
-                  <th className="whitespace-nowrap px-5 py-3">Product</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Unit Price</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Disc %</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Ordered</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Reserved</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Delivered</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Invoiced</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Remaining</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Line Total</th>
+                  <th className="whitespace-nowrap px-4 py-3">#</th>
+                  <th className="whitespace-nowrap px-4 py-3">Product</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Unit Price</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Disc %</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Ordered</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Reserved</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Delivered</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Invoiced</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Remaining</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-right">Line Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-50">
-                {order.items.map((item, index) => (
+                {order.items.map((item, index) => {
+                  const meta = productMeta[item.productId] || {}
+                  const image = meta.image || getFileUrl(item.productImage || '')
+                  const sku = item.sku || meta.sku || ''
+                  return (
                   <tr key={item.id || item.productId} className="transition-colors hover:bg-primary-50/35">
-                    <td className="whitespace-nowrap px-5 py-3.5 text-neutral-400">{index + 1}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5">
-                      <p className="font-medium text-neutral-800">{item.productName}</p>
+                    <td className="whitespace-nowrap px-4 py-3 text-neutral-400">{index + 1}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="relative size-10 shrink-0">
+                          <span className="flex size-10 items-center justify-center rounded-lg bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
+                            <Package className="size-4" aria-hidden="true" />
+                          </span>
+                          {image && (
+                            <img
+                              src={image}
+                              alt=""
+                              className="absolute inset-0 size-10 rounded-lg border border-neutral-100 object-cover"
+                              onError={(event) => {
+                                event.currentTarget.style.display = 'none'
+                              }}
+                            />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-neutral-800">{item.productName}</p>
+                          {sku && <p className="truncate text-xs text-neutral-400">SKU: {sku}</p>}
+                        </div>
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">
                       {formatCurrency(item.unitPrice)}
                       {item.costPrice != null && (
                         <p className="text-xs font-normal text-neutral-400">Cost: {formatCurrency(item.costPrice)}</p>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">
                       {item.discountPercent > 0 ? `${item.discountPercent}%` : '—'}
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.quantity}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.reservedQuantity}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.deliveredQuantity}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{invoicedByProduct[item.productId || item.id] || 0}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.remainingQuantity}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">{item.quantity}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">{item.reservedQuantity}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">{item.deliveredQuantity}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">{invoicedByProduct[item.productId || item.id] || 0}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-neutral-600">{item.remainingQuantity}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
                   </tr>
-                ))}
+                  )
+                })}
                 <tr className="bg-neutral-50/60 font-semibold text-neutral-900">
                   <td colSpan={4} />
-                  <td className="px-5 py-3 text-right">{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
+                  <td className="px-3 py-3 text-right">{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
                   <td colSpan={4} />
-                  <td className="px-5 py-3 text-right">{formatCurrency(order.total)}</td>
+                  <td className="px-4 py-3 text-right">{formatCurrency(order.total)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </Card>
 
-        <Card title="Payment Summary">
-          <div className="space-y-3.5 text-sm">
+        <Card title="Payment Summary" className="xl:self-start">
+          <div className="space-y-2 text-[0.82rem]">
             <div className="flex items-center justify-between"><span className="text-neutral-500">Subtotal</span><span className="font-medium text-neutral-900">{formatCurrency(order.subtotal)}</span></div>
             <div className="flex items-center justify-between"><span className="text-neutral-500">Discount</span><span className="font-medium text-red-500">-{formatCurrency(order.discount)}</span></div>
             <div className="flex items-center justify-between"><span className="text-neutral-500">Tax</span><span className="font-medium text-neutral-900">{formatCurrency(order.tax)}</span></div>
-            <div className="flex items-center justify-between border-t border-neutral-100 pt-3"><span className="font-semibold text-neutral-900">Total Amount</span><span className="font-semibold text-neutral-900">{formatCurrency(order.total)}</span></div>
+            <div className="flex items-center justify-between border-t border-neutral-100 pt-2"><span className="font-semibold text-neutral-900">Total Amount</span><span className="font-semibold text-neutral-900">{formatCurrency(order.total)}</span></div>
+            {order.paymentStatus && (
+              <>
+                <div className="flex items-center justify-between"><span className="text-neutral-500">Paid Amount</span><span className="font-medium text-green-600">{formatCurrency(order.paidAmount || 0)}</span></div>
+                <div className="flex items-center justify-between"><span className="text-neutral-500">Remaining Amount</span><span className="font-medium text-neutral-900">{formatCurrency(order.remainingAmount || 0)}</span></div>
+                <div className="flex items-center justify-between border-t border-neutral-100 pt-2">
+                  <span className="font-semibold text-neutral-900">Payment Status</span>
+                  <Badge variant={PAYMENT_STATUS_VARIANT[order.paymentStatus] || 'neutral'}>{formatPaymentStatus(order.paymentStatus)}</Badge>
+                </div>
+              </>
+            )}
             {order.demoPayment && (
               <>
                 <div className="flex items-center justify-between"><span className="text-neutral-500">Previous Balance</span><span className="font-medium text-neutral-900">{formatCurrency(order.demoPayment.previousBalance)}</span></div>
                 <div className="flex items-center justify-between"><span className="text-neutral-500">Total Due</span><span className="font-medium text-neutral-900">{formatCurrency(order.demoPayment.totalDue)}</span></div>
                 <div className="flex items-center justify-between"><span className="text-neutral-500">Paid</span><span className="font-medium text-green-600">{formatCurrency(order.demoPayment.paid)}</span></div>
-                <div className="flex items-center justify-between border-t border-neutral-100 pt-3"><span className="font-semibold text-neutral-900">Remaining Balance</span><span className="font-semibold text-neutral-900">{formatCurrency(order.demoPayment.remaining)}</span></div>
+                <div className="flex items-center justify-between border-t border-neutral-100 pt-2"><span className="font-semibold text-neutral-900">Remaining Balance</span><span className="font-semibold text-neutral-900">{formatCurrency(order.demoPayment.remaining)}</span></div>
               </>
             )}
           </div>
-          <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
+          <p className="mt-3 rounded-xl bg-neutral-50 px-3 py-2.5 text-[0.7rem] leading-4 text-neutral-500">
             {order.demoPayment
               ? 'Demo payment figures for manual testing — not persisted. Receivables are created once this order is invoiced, not at placement.'
-              : 'Receivables are created once this order is invoiced, not at placement.'}
+              : order.paymentStatus
+                ? 'Paid and remaining amounts are maintained by the backend from this order’s invoice and recorded payments.'
+                : 'Receivables are created once this order is invoiced, not at placement.'}
           </p>
         </Card>
       </div>
+
+      <Card title="Payment History" className="p-0" bodyClassName="p-0">
+        {isLoadingOrderPayments ? (
+          <div className="p-5">
+            <LoadingSpinner label="Loading payment history..." />
+          </div>
+        ) : orderPaymentsError ? (
+          <div className="p-5 text-center">
+            <p className="text-sm text-red-600">{orderPaymentsError}</p>
+            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => loadOrderPayments(order.customerId)}>
+              Retry
+            </Button>
+          </div>
+        ) : orderPayments.length === 0 ? (
+          <p className="p-5 text-center text-sm text-neutral-400">No payments recorded for this customer yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-2xl text-left text-sm">
+              <thead>
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <th className="whitespace-nowrap px-4 py-2.5">Payment Date</th>
+                  <th className="whitespace-nowrap px-4 py-2.5 text-right">Amount</th>
+                  <th className="whitespace-nowrap px-4 py-2.5">Payment Method</th>
+                  <th className="whitespace-nowrap px-4 py-2.5">Collected By</th>
+                  <th className="whitespace-nowrap px-4 py-2.5">Collector Role</th>
+                  <th className="whitespace-nowrap px-4 py-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-50">
+                {orderPayments.map((payment) => (
+                  <tr key={payment.id} className="transition-colors hover:bg-primary-50/35">
+                    <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatDate(payment.recordedAt)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(payment.amount)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatPaymentMode(payment.paymentMode)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-neutral-800">{payment.recordedByName || '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{formatCollectorRole(payment.recordedByRole) || '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <Badge variant={COLLECTION_STATUS_VARIANT[payment.status] || 'neutral'}>{formatCollectionStatus(payment)}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         {!isPickupOrder ? (
@@ -1377,6 +1548,17 @@ export default function OrderDetail() {
           <p className="text-sm text-neutral-400">No invoice on this order yet.</p>
         )}
       </Modal>
+
+      <CollectPaymentDrawer
+        isOpen={isCollectPaymentOpen}
+        onClose={() => setIsCollectPaymentOpen(false)}
+        onRecorded={() => {
+          loadOrder()
+          loadOrderPayments(order.customerId)
+        }}
+        initialCustomer={{ id: order.customerId, name: order.customerName, outstandingBalance: order.remainingAmount || 0 }}
+        partner={{ id: currentUser?.id, name: currentUser?.name, role: currentUser?.role }}
+      />
     </div>
   )
 }

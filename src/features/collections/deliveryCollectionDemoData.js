@@ -54,6 +54,81 @@ const iso = (daysAgo) => new Date(Date.now() - daysAgo * DAY_MS).toISOString()
 const DEMO_ACTOR = { partner: { id: 'demo-dp-sunil', name: 'Sunil Yadav' }, ravi: { id: 'demo-dp-ravi', name: 'Ravi Kumar' } }
 const DEMO_RECONCILER = { id: 'demo-user-accountant', name: 'Priya Menon' }
 
+// -----------------------------------------------------------------------------
+// General customer-outstanding collection demo layer (Delivery Partner -> ANY
+// customer, no assigned delivery). Feeds the "+ Collect Payment" drawer and, on
+// submit, drops a `recorded` `demo-col-*` row into the existing reconciliation
+// queue with `source: 'delivery_partner'` and no delivery. Local-only.
+// -----------------------------------------------------------------------------
+const DEMO_OUTSTANDING = [
+  { id: 'demo-customer-metro', name: 'Metro Mart', phone: '9820011234', outstandingBalance: 16020 },
+  { id: 'demo-customer-green', name: 'Green Basket Stores', phone: '9741122567', outstandingBalance: 2110.5 },
+  { id: 'demo-customer-royal', name: 'Royal Foods', phone: '9900087651', outstandingBalance: 850 },
+]
+
+export function searchDemoOutstandingCustomers(query) {
+  const term = String(query || '').trim().toLowerCase()
+  const customers = DEMO_OUTSTANDING
+    .filter((customer) => customer.outstandingBalance > 0)
+    .filter((customer) => !term || customer.name.toLowerCase().includes(term) || customer.phone.includes(term))
+  return { success: true, customers: customers.map((customer) => ({ ...customer })) }
+}
+
+export function getDemoOutstandingCustomer(customerId) {
+  const found = DEMO_OUTSTANDING.find((customer) => customer.id === customerId)
+  if (!found) return { success: false, error: 'Customer not found.' }
+  return { success: true, customer: { ...found } }
+}
+
+export function createDemoGeneralCollection(payload) {
+  const custom = readJson(CUSTOM_KEY, [])
+  const seq = custom.length + seedCollections().length + 1
+  const now = new Date().toISOString()
+  const customer = DEMO_OUTSTANDING.find((entry) => entry.id === payload.customerId)
+  const row = {
+    id: `demo-col-${Date.now().toString(36)}`,
+    collectionNumber: `COL-DEMO-${String(seq).padStart(4, '0')}`,
+    deliveryId: null,
+    deliveryNumber: '',
+    orderId: null,
+    orderNumber: '',
+    customerId: payload.customerId || '',
+    customerName: customer?.name || '',
+    deliveryPartnerId: payload.deliveryPartnerId || DEMO_ACTOR.partner.id,
+    deliveryPartnerName: payload.deliveryPartnerName || DEMO_ACTOR.partner.name,
+    amount: Math.max(0, Number(payload.amount) || 0),
+    paymentMode: payload.paymentMethod || 'cash',
+    reference: (payload.reference || '').trim(),
+    note: (payload.notes || '').trim(),
+    source: 'delivery_partner',
+    status: 'recorded',
+    recordedById: payload.deliveryPartnerId || DEMO_ACTOR.partner.id,
+    recordedByName: payload.deliveryPartnerName || DEMO_ACTOR.partner.name,
+    // Never hardcoded - whoever actually recorded it (Delivery Partner dashboard, or an
+    // Admin/Sales Officer recording from Order Detail), falling back to Delivery Partner
+    // only because that's this flow's original entry point.
+    recordedByRole: payload.collectorRole || 'delivery_partner',
+    recordedAt: now,
+    reconciledAt: null,
+    reconciledById: '',
+    reconciledByName: '',
+    customerPaymentId: null,
+    customerPaymentNumber: '',
+    invoiceId: null,
+    invoiceNumber: '',
+    invoiceTotal: null,
+    orderTotal: null,
+    alreadyPaid: null,
+    outstandingAtRecording: customer?.outstandingBalance ?? null,
+    outstandingAmount: customer?.outstandingBalance ?? null,
+    voidReason: '',
+    voidedAt: null,
+    voidedByName: '',
+  }
+  writeJson(CUSTOM_KEY, [row, ...custom])
+  return { success: true, collection: row }
+}
+
 function seedCollections() {
   return [
     {
@@ -217,6 +292,8 @@ function patch(id, partial) {
 export function listDemoCollections(params = {}) {
   let rows = resolved()
   if (params.status && params.status !== 'all') rows = rows.filter((row) => row.status === params.status)
+  if (params.customer_id) rows = rows.filter((row) => row.customerId === params.customer_id)
+  if (params.order_id) rows = rows.filter((row) => row.orderId === params.order_id)
   if (params.search) {
     const term = String(params.search).toLowerCase()
     rows = rows.filter((row) =>

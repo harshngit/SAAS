@@ -288,12 +288,12 @@ function LeadJourneyNode({ index, label, state, isLast }) {
           : 'bg-neutral-100 text-neutral-400'
 
   return (
-    <div className={`flex items-start gap-0 ${isLast ? 'shrink-0' : 'flex-1'}`}>
-      <div className="flex flex-col items-center">
+    <div className="flex items-start gap-0">
+      <div className="flex w-24 flex-col items-center">
         <div className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${circleClass}`}>
           {state === 'lost' ? <X className="size-4" /> : state === 'done' ? <Check className="size-4" /> : index}
         </div>
-        <p className={`mt-2 max-w-24 text-center text-xs font-semibold ${state === 'pending' ? 'text-neutral-500' : 'text-neutral-900'}`}>
+        <p className={`mt-2 text-center text-xs font-semibold ${state === 'pending' ? 'text-neutral-500' : 'text-neutral-900'}`}>
           {label}
         </p>
         {/* Reserve the sub-label line on every node so all nodes stay the same height. */}
@@ -301,7 +301,7 @@ function LeadJourneyNode({ index, label, state, isLast }) {
           {state === 'current' ? 'Current Stage' : ' '}
         </p>
       </div>
-      {!isLast && <div className={`mt-4 h-0.5 flex-1 ${state === 'done' || state === 'lost' ? 'bg-primary-500' : 'bg-neutral-100'}`} />}
+      {!isLast && <div className={`mt-4 h-0.5 w-10 shrink-0 sm:w-16 ${state === 'done' || state === 'lost' ? 'bg-primary-500' : 'bg-neutral-100'}`} />}
     </div>
   )
 }
@@ -960,7 +960,7 @@ export default function LeadDetail() {
       )}
 
       <Section title="Lead Journey" icon={Calendar}>
-        <div className="flex items-start px-1">
+        <div className="flex items-start justify-center overflow-x-auto px-1">
           <LeadJourneyNode index={1} label="New" state={journeyState.isLost ? 'done' : journeyState.index > 0 ? 'done' : 'current'} />
           <LeadJourneyNode index={2} label="Contacted" state={journeyState.index > 1 ? 'done' : journeyState.index === 1 ? 'current' : 'pending'} />
           <LeadJourneyNode index={3} label="Qualified" state={journeyState.index > 2 ? 'done' : journeyState.index === 2 ? 'current' : 'pending'} />

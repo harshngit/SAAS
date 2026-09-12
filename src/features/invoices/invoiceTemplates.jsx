@@ -181,6 +181,9 @@ export function ClassicPreview({ primaryColor, fields, footerText, terms, data =
 
 export function ModernPreview({ primaryColor, fields, footerText, terms, data = sampleInvoice }) {
   const { company, billTo, items, subtotal, taxTotal, total, bank } = data
+  // Explicit rgba instead of a `text-white/80` opacity modifier: Tailwind v4 compiles `/80`
+  // to `color-mix(in oklab, ...)`, which the PDF-export canvas engine renders as black.
+  const mutedWhite = { color: 'rgba(255, 255, 255, 0.8)' }
 
   return (
     <div className="space-y-4 font-sans">
@@ -188,13 +191,13 @@ export function ModernPreview({ primaryColor, fields, footerText, terms, data = 
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm font-bold tracking-wide">{company.name}</p>
-            <p className="mt-1 leading-4 text-white/80">{company.address}<br />{company.cityLine}</p>
-            {fields.show_company_gstin && company.gstin && <p className="mt-1 text-white/80">GSTIN: {company.gstin}</p>}
+            <p className="mt-1 leading-4" style={mutedWhite}>{company.address}<br />{company.cityLine}</p>
+            {fields.show_company_gstin && company.gstin && <p className="mt-1" style={mutedWhite}>GSTIN: {company.gstin}</p>}
           </div>
           <div className="text-right">
             <p className="text-sm font-semibold uppercase tracking-widest">Invoice</p>
-            <p className="mt-1 text-white/80">{data.invoiceNo}</p>
-            <p className="text-white/80">{data.invoiceDate}</p>
+            <p className="mt-1" style={mutedWhite}>{data.invoiceNo}</p>
+            <p style={mutedWhite}>{data.invoiceDate}</p>
           </div>
         </div>
       </div>

@@ -89,13 +89,13 @@ function WorkflowTimeline({ delivery }) {
   const currentIndex = deliveryStageIndex(delivery)
 
   return (
-    <div className="flex items-start overflow-x-auto pb-1">
+    <div className="flex items-start justify-center overflow-x-auto pb-1">
       {DELIVERY_STAGES.map((step, index) => {
         const isDone = index < currentIndex
         const isCurrent = index === currentIndex
         return (
-          <div key={step.key} className="flex min-w-20 flex-1 items-start gap-0">
-            <div className="flex flex-col items-center">
+          <div key={step.key} className="flex items-start gap-0">
+            <div className="flex w-20 flex-col items-center">
               <div
                 className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
                   isDone
@@ -107,12 +107,12 @@ function WorkflowTimeline({ delivery }) {
               >
                 {isDone ? <Check className="size-3.5" /> : index + 1}
               </div>
-              <p className={`mt-1.5 whitespace-nowrap text-center text-[0.7rem] font-medium ${isDone || isCurrent ? 'text-neutral-800' : 'text-neutral-400'}`}>
+              <p className={`mt-1.5 text-center text-[0.7rem] font-medium ${isDone || isCurrent ? 'text-neutral-800' : 'text-neutral-400'}`}>
                 {step.label}
               </p>
             </div>
             {index < DELIVERY_STAGES.length - 1 && (
-              <div className={`mt-3.5 h-0.5 flex-1 ${isDone ? 'bg-primary-500' : 'bg-neutral-100'}`} />
+              <div className={`mt-3.5 h-0.5 w-8 shrink-0 sm:w-12 ${isDone ? 'bg-primary-500' : 'bg-neutral-100'}`} />
             )}
           </div>
         )

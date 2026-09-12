@@ -18,7 +18,9 @@ import {
   ORDER_SOURCE_OPTIONS,
   ORDER_STATUS_VARIANT,
   ORDER_TABS,
+  PAYMENT_STATUS_VARIANT,
   formatOrderStatus,
+  formatPaymentStatus,
   getDeliveryStatus,
   getFulfilmentLabel,
   getOrderActions,
@@ -201,6 +203,7 @@ export default function OrderList() {
                   <th className="whitespace-nowrap px-4 py-3">Items</th>
                   <th className="whitespace-nowrap px-4 py-3">Total</th>
                   <th className="whitespace-nowrap px-4 py-3">Order Status</th>
+                  <th className="whitespace-nowrap px-4 py-3">Payment</th>
                   <th className="whitespace-nowrap px-4 py-3">Fulfilment</th>
                   <th className="whitespace-nowrap px-4 py-3">Delivery Status</th>
                   <th className="whitespace-nowrap px-4 py-3">Delivery Partner</th>
@@ -231,6 +234,15 @@ export default function OrderList() {
                       <td className="px-4 py-3.5 font-medium text-neutral-700">{formatCurrency(order.total)}</td>
                       <td className="px-4 py-3.5">
                         <Badge variant={ORDER_STATUS_VARIANT[order.status] || 'neutral'}>{formatOrderStatus(order.status)}</Badge>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {order.paymentStatus ? (
+                          <Badge variant={PAYMENT_STATUS_VARIANT[order.paymentStatus] || 'neutral'}>
+                            {formatPaymentStatus(order.paymentStatus)}
+                          </Badge>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3.5">
                         <Badge variant={takeaway ? 'neutral' : 'info'}>{getFulfilmentLabel(order)}</Badge>

@@ -10,6 +10,7 @@ import Select from '../../components/ui/Select'
 import StatCard from '../../components/ui/StatCard'
 import { getExpiringBatches, getStockBoard, recordStockAdjustment } from '../../api/inventory'
 import { listProducts } from '../../api/products'
+import { getFileUrl } from '../../api/files'
 import StockEntryForm from './StockEntryForm'
 
 function ExpiringBatchesPanel() {
@@ -155,11 +156,30 @@ export default function StockBoard({ readOnly = false }) {
       return
     }
 
-    const createdAtById = new Map(
-      productsResult.success ? productsResult.products.map((product) => [product.id, product.created_at]) : [],
+    // /inventory rows don't carry created_at or the product image - pull both from /products.
+    const productMetaById = new Map(
+      productsResult.success
+        ? productsResult.products.map((product) => [
+            product.id,
+            {
+              created_at: product.created_at,
+              image: getFileUrl(
+                product.cover_image ||
+                  product.cover_image_url ||
+                  (Array.isArray(product.images) ? product.images[0]?.url || product.images[0] : '') ||
+                  '',
+              ),
+            },
+          ])
+        : [],
     )
 
-    setItems(result.items.map((item) => ({ ...item, created_at: createdAtById.get(item.id) || null })))
+    setItems(
+      result.items.map((item) => {
+        const meta = productMetaById.get(item.id) || {}
+        return { ...item, created_at: meta.created_at || null, image: meta.image || null }
+      }),
+    )
     setIsLoading(false)
   }, [categoryFilter, searchTerm])
 
@@ -336,8 +356,20 @@ export default function StockBoard({ readOnly = false }) {
                     >
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="flex size-9 items-center justify-center rounded-full bg-primary-50 text-primary-700 ring-1 ring-primary-100">
-                            <Package className="size-4" aria-hidden="true" />
+                          <div className="relative size-9 shrink-0">
+                            <span className="flex size-9 items-center justify-center rounded-full bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+                              <Package className="size-4" aria-hidden="true" />
+                            </span>
+                            {item.image && (
+                              <img
+                                src={item.image}
+                                alt=""
+                                className="absolute inset-0 size-9 rounded-full object-cover ring-1 ring-primary-100"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = 'none'
+                                }}
+                              />
+                            )}
                           </div>
                           <div>
                             <span className="font-medium text-neutral-900">{item.name}</span>

@@ -27,46 +27,11 @@ import { templateComponents, money as formatPreviewMoney, buildInvoicePreviewDat
 import RecordPaymentDrawer from './RecordPaymentDrawer'
 import { FINANCIAL_STATUS_VARIANT, financialStatus } from './invoiceHelpers'
 import { formatCurrency } from '../../utils/format'
+import { exportElementToPdf } from '../../utils/pdfExport'
 
 function formatDateLabel(dateString) {
   if (!dateString) return '—'
   return new Date(dateString).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-async function downloadPreviewAsPdf(element, filename) {
-  if (!element) {
-    throw new Error('Invoice preview is not ready yet.')
-  }
-
-  const html2pdfModule = await import('html2pdf.js')
-  const html2pdf = html2pdfModule.default || html2pdfModule
-
-  return html2pdf()
-    .set({
-      margin: 6,
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        scrollX: 0,
-        scrollY: 0,
-        onclone(clonedDoc) {
-          const clonedRoot = clonedDoc.querySelector('[data-invoice-export-root]')
-          if (clonedRoot) {
-            clonedRoot.style.transform = 'none'
-            clonedRoot.style.width = '32rem'
-            clonedRoot.style.maxWidth = '100%'
-            clonedRoot.style.boxShadow = 'none'
-          }
-        },
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-    })
-    .from(element)
-    .save()
 }
 
 const invoiceStatusVariant = { Issued: 'success', Draft: 'neutral', Cancelled: 'danger' }
@@ -109,14 +74,18 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
   const templateLabel = template.charAt(0).toUpperCase() + template.slice(1)
 
   const previewDocument = (
-    <div className="relative">
-      <span
-        className={`absolute right-0 top-0 rounded-full px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-wide ${
-          previewPaymentStatusClass[invoice.paymentStatus] || 'bg-neutral-100 text-neutral-600'
-        }`}
-      >
-        {invoice.paymentStatus}
-      </span>
+    <div>
+      {/* Payment-status pill on its own row above the document — an absolute overlay here
+          collided with the template header ("TAX INVOICE" in Classic, "Invoice" in Modern). */}
+      <div className="mb-3 flex justify-end">
+        <span
+          className={`rounded-full px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-wide ${
+            previewPaymentStatusClass[invoice.paymentStatus] || 'bg-neutral-100 text-neutral-600'
+          }`}
+        >
+          {invoice.paymentStatus}
+        </span>
+      </div>
       <TemplateComponent primaryColor={primaryColor} fields={fields} footerText={footerText} terms={terms} data={previewData} />
       <div className="mt-4 grid grid-cols-2 gap-3 border-t border-neutral-100 pt-3">
         <div className="rounded-lg bg-neutral-50 px-3 py-2">
@@ -302,7 +271,7 @@ export default function InvoiceDetail() {
 
     try {
       if (format === 'detailed') {
-        await downloadPreviewAsPdf(previewExportRef.current, `${invoice.invoiceNumber || invoice.id}.pdf`)
+        await exportElementToPdf(previewExportRef.current, `${invoice.invoiceNumber || invoice.id}.pdf`)
         return
       }
 

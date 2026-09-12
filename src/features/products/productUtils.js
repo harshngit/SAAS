@@ -1,4 +1,5 @@
 import { formatCurrency } from '../../utils/format'
+import { getFileUrl } from '../../api/files'
 
 function normalizeVariantInventory(variant = {}) {
   const inventory = variant.inventory && typeof variant.inventory === 'object' ? variant.inventory : {}
@@ -98,8 +99,9 @@ export function normalizeApiProduct(product, fallback = {}) {
     createdAt: product.created_at || product.createdAt || fallback.createdAt || '',
     updatedAt: product.updated_at || product.updatedAt || fallback.updatedAt || '',
     description: product.description || fallback.description || '',
-    coverImage: product.cover_image || fallback.coverImage || '',
-    images: product.images || fallback.images || [],
+    // Stored as "/files/{id}" (or a bare id) - resolve to a full URL for <img src>.
+    coverImage: getFileUrl(product.cover_image) || fallback.coverImage || '',
+    images: (product.images || fallback.images || []).map((image) => getFileUrl(image)).filter(Boolean),
     videoUrl: product.product_video || fallback.videoUrl || '',
     catalogBrochure: product.product_catalog_brochure || fallback.catalogBrochure || '',
     productManual: product.product_manual || fallback.productManual || '',

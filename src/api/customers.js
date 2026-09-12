@@ -403,6 +403,10 @@ export async function listCustomers(params = {}) {
     if (params.category) queryParams.category = params.category
     if (params.is_active !== undefined && params.is_active !== null) queryParams.is_active = params.is_active
     if (params.assigned_sales_officer_id) queryParams.assigned_sales_officer_id = params.assigned_sales_officer_id
+    // Only customers who currently owe money (used by the "Collect Payment" flow).
+    if (params.has_outstanding !== undefined && params.has_outstanding !== null) {
+      queryParams.has_outstanding = params.has_outstanding
+    }
 
     const { data } = await apiClient.get('/customers', {
       headers: authHeader(),

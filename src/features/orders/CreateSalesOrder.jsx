@@ -31,6 +31,7 @@ import { createOrder, assignDeliveryPartner, getOrder, updateOrder } from '../..
 import { getQuotation } from '../../api/quotations'
 import { getFileUrl } from '../../api/files'
 import { duplicateDemoOrder, getDemoOrder, isDemoOrder, patchDemoOrder } from './orderDemoData'
+import { derivePaymentStatus, formatPaymentStatus } from './orderHelpers'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
@@ -90,7 +91,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
-  const isSalesOfficer = currentUser?.role === ROLES.SALES_OFFICER
   const [searchParams] = useSearchParams()
   const { id: editOrderId } = useParams()
   const isEditMode = Boolean(editOrderId)
@@ -474,13 +474,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       if (!deliveryType) {
         nextErrors.deliveryType = 'Select a delivery method.'
       } else if (deliveryType === 'delivery_boy') {
-        // Home Delivery: address is always required; the partner is required when a
-        // Sales Officer creates the order (they own the assignment step).
+        // Home Delivery: address is always required. The delivery partner is OPTIONAL at
+        // creation for every role (backend contract §2) - it can be assigned later from the
+        // order via Plan Delivery. Order creation must never block on a missing partner.
         if (!deliveryAddress.trim()) {
           nextErrors.deliveryAddress = 'Delivery address is required for home delivery.'
-        }
-        if (isSalesOfficer && !isEditMode && !deliveryPartnerId) {
-          nextErrors.deliveryPartnerId = 'Choose a delivery partner.'
         }
       }
     }
@@ -601,14 +599,42 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
     const isHomeDelivery = restrictToVehicleStock || deliveryType === 'delivery_boy'
 
+    // A delivery partner chosen at creation:
+    //  - the delivery-vehicle app self-assigns the current partner
+    //  - Home Delivery: whoever the user picked (optional for every role).
+    // It is sent in POST /orders; the backend creates the assignment itself (contract §2/§8).
+    const partnerToAssign = restrictToVehicleStock
+      ? currentUser?.id
+      : deliveryType === 'delivery_boy' && deliveryPartnerId
+        ? deliveryPartnerId
+        : null
+
+    // Upfront payment (backend contract §11). Takeaway captures a paid amount in the preview
+    // step; Home Delivery has no amount field, so only "Credit / Pay Later" reports a status.
+    const orderTotalRounded = Math.round(totals.total)
+    let paymentStatusForApi
+    let paidAmountForApi
+    if (isTakeawayCheckout) {
+      paidAmountForApi = Math.min(Math.max(0, Math.round(paidAmountValue)), orderTotalRounded)
+      paymentStatusForApi = derivePaymentStatus(orderTotalRounded, paidAmountForApi)
+    } else if (paymentMethod === 'credit') {
+      paymentStatusForApi = 'pending'
+      paidAmountForApi = 0
+    }
+
     const result = await createOrder({
       customerId: selectedCustomer.id,
       warehouseId,
       deliveryDate,
       quotationId: sourceQuotationId || undefined,
       fulfilmentMethod: isHomeDelivery ? 'delivery' : 'pickup',
+      deliveryMethod: isHomeDelivery ? 'home_delivery' : 'takeaway',
       deliveryAddress: isHomeDelivery ? deliveryAddress.trim() : undefined,
+      deliveryPartnerId: partnerToAssign || undefined,
       paymentType: paymentMethod,
+      paymentMethod,
+      paymentStatus: paymentStatusForApi,
+      paidAmount: paidAmountForApi,
       paymentTermsDays: paymentMethod === 'credit' ? Number(paymentTerms) : 0,
       discount: totals.discountAmount,
       source: restrictToVehicleStock ? 'delivery_vehicle' : sourceQuotationId ? 'quotation' : 'office',
@@ -623,22 +649,15 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       return
     }
 
-    // Assign the delivery partner now when one was chosen at creation:
-    //  - the delivery-vehicle app self-assigns the current partner
-    //  - Home Delivery: whoever picked a partner (required for Sales Officer, optional for Admin).
-    //    If it's left blank, it's assigned later from the order via Plan Delivery.
-    const partnerToAssign = restrictToVehicleStock
-      ? currentUser?.id
-      : deliveryType === 'delivery_boy' && deliveryPartnerId
-        ? deliveryPartnerId
-        : null
-    if (partnerToAssign) {
+    // Fallback for an older backend that ignores delivery_partner_id in POST: assign
+    // explicitly only when the created order came back without a partner.
+    if (partnerToAssign && !result.order?.assignedDeliveryPartnerId) {
       await assignDeliveryPartner(result.order.id, partnerToAssign)
     }
 
     showToast({
       title: 'Order created',
-      message: `${result.order.orderNumber} created as a Draft. Confirm it to reserve stock.`,
+      message: `${result.order.orderNumber} has been placed.`,
     })
     setIsSubmitting(false)
     // The delivery-vehicle app returns to its own home; everyone else lands on the new Draft
@@ -665,6 +684,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const grandPayable = totals.total + previousBalance
   const paidAmountValue = Math.max(0, Number(paidAmount) || 0)
   const remainingBalance = grandPayable - paidAmountValue
+  // The payment_status that will be sent to the backend: derived from the order total vs the
+  // amount applied to THIS order (payment beyond the order total goes to previous balance and
+  // is not part of paid_amount, which the backend caps at the order total - contract §11).
+  const previewOrderPaid = Math.min(paidAmountValue, Math.round(totals.total))
+  const previewPaymentStatus = derivePaymentStatus(totals.total, previewOrderPaid)
   const warehouseName = warehouses.find((warehouse) => warehouse.id === warehouseId)?.name || '—'
   const paymentTypeLabel = paymentOptions.find((option) => option.value === paymentMethod)?.label || 'Not selected'
 
@@ -1010,14 +1034,13 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       <div className="flex flex-col gap-1.5">
                         <Select
                           label="Delivery Partner"
-                          required={isSalesOfficer}
                           options={deliveryPartners.map((partner) => ({ value: partner.id, label: partner.name }))}
                           value={deliveryPartnerId}
                           onChange={(event) => {
                             setDeliveryPartnerId(event.target.value)
                             setErrors((current) => ({ ...current, deliveryPartnerId: '' }))
                           }}
-                          placeholder={deliveryPartners.length ? 'Select a delivery partner' : 'No delivery partners available'}
+                          placeholder={deliveryPartners.length ? 'Select a delivery partner (optional)' : 'No delivery partners available'}
                           error={errors.deliveryPartnerId}
                           disabled={!deliveryPartners.length}
                         />
@@ -1025,9 +1048,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                           <p className="text-xs text-neutral-400">Add an active delivery partner in Staff before assigning one here.</p>
                         ) : (
                           <p className="text-xs text-neutral-400">
-                            {isSalesOfficer
-                              ? 'Choose who will deliver this order.'
-                              : 'Optional — you can also assign a partner later from the order via Plan Delivery.'}
+                            Optional — you can also assign a partner later from the order via Plan Delivery.
                           </p>
                         )}
                       </div>
@@ -1185,7 +1206,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 ? 'Changes apply to this draft order immediately.'
                 : isTakeawayCheckout
                   ? 'Review the order and record any payment before placing it.'
-                  : 'The order is created as a draft — confirm it from the order page.'}
+                  : 'The order is placed and sent for processing — track it on the order page.'}
             </p>
           </div>
         </div>
@@ -1415,6 +1436,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
             <div className="rounded-2xl border border-neutral-100 p-3.5">
               <h3 className="text-[0.7rem] font-semibold uppercase tracking-wide text-neutral-400">Payment Summary</h3>
               <div className="mt-2.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500">Order Amount</span>
+                  <span className="font-medium text-neutral-900">{formatCurrency(totals.total)}</span>
+                </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-neutral-500">Paid Amount</span>
                   <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-white pl-2 pr-1">
@@ -1439,6 +1464,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <span className={`text-sm font-bold ${remainingBalance > 0 ? 'text-red-600' : 'text-primary-700'}`}>
                     {formatCurrency(Math.max(remainingBalance, 0))}
                   </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500">Payment Status</span>
+                  <span className="font-semibold text-neutral-900">{formatPaymentStatus(previewPaymentStatus)}</span>
                 </div>
                 <p className="text-[0.68rem] text-neutral-400">
                   Payment is recorded against the order after it is placed.

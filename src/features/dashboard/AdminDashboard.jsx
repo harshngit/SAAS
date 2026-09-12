@@ -4,6 +4,10 @@ import { formatCompactCurrency, formatCurrency } from '../../utils/format'
 import { getAdminDashboard } from '../../api/dashboard'
 import { getExpenseCategories } from '../../api/expenses'
 import { listOrders } from '../../api/orders'
+import { listWarehouses } from '../../api/warehouses'
+import { listCustomers } from '../../api/customers'
+import { listSuppliers } from '../../api/suppliers'
+import { listCompanies } from '../../api/companies'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { demoOrdersResolved } from '../orders/orderDemoData'
 import { DEMO_EXPENSE_CATEGORIES } from '../expenses/expenseDemo'
@@ -11,7 +15,6 @@ import { ORDER_STATUS_VARIANT, formatOrderStatus } from '../orders/orderHelpers'
 import {
   Ban,
   BarChart3,
-  ChevronDown,
   ChevronRight,
   Clock,
   CreditCard,
@@ -57,6 +60,7 @@ const paymentVariant = {
 
 
 const dateRangePresets = [
+  { value: 'today', label: 'Today' },
   { value: 'this_month', label: 'This Month' },
   { value: 'last_month', label: 'Last Month' },
   { value: 'this_quarter', label: 'This Quarter' },
@@ -112,6 +116,9 @@ function resolveDateRange(preset, customRange) {
   const month = now.getMonth()
 
   switch (preset) {
+    case 'today': {
+      return { date_from: toIsoDate(now), date_to: toIsoDate(now) }
+    }
     case 'last_month': {
       const from = new Date(year, month - 1, 1)
       const to = new Date(year, month, 0)
@@ -170,20 +177,15 @@ function formatStatusLabel(value = '') {
   return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-function FilterBox({ label, value }) {
+// A labelled dropdown for the dashboard filter bar. The bar feeds company_id / warehouse_id /
+// customer_id / supplier_id (+ the date range) into GET /dashboard/admin. Only non-empty
+// filters are sent. There is no branch filter - the backend does not support one.
+function FilterField({ label, children }) {
   return (
-    <button
-      type="button"
-      className="flex h-12 min-w-0 items-center justify-between gap-1.5 rounded-xl border border-neutral-200 bg-white px-2.5 py-1.5 text-left shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-colors hover:border-primary-200 hover:bg-primary-50/30"
-    >
-      <span className="min-w-0 flex-1">
-        <span className="block whitespace-nowrap text-[0.54rem] font-semibold uppercase tracking-[0.09em] text-neutral-400">
-          {label}
-        </span>
-        <span className="mt-0.5 block truncate text-[0.73rem] font-medium leading-4 text-neutral-900">{value}</span>
-      </span>
-      <ChevronDown className="size-3 shrink-0 text-neutral-400" aria-hidden="true" />
-    </button>
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className="px-0.5 text-[0.54rem] font-semibold uppercase tracking-[0.09em] text-neutral-400">{label}</span>
+      {children}
+    </label>
   )
 }
 
@@ -478,6 +480,12 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const [datePreset, setDatePreset] = useState('this_month')
   const [customRange, setCustomRange] = useState({ from: '', to: '' })
+  // Dashboard scope filters - '' means "all". Applied on the Apply button, sent to GET /dashboard/admin.
+  const [companyId, setCompanyId] = useState('')
+  const [warehouseId, setWarehouseId] = useState('')
+  const [customerId, setCustomerId] = useState('')
+  const [supplierId, setSupplierId] = useState('')
+  const [filterOptions, setFilterOptions] = useState({ companies: [], warehouses: [], customers: [], suppliers: [] })
   const [recentOrdersSearch, setRecentOrdersSearch] = useState('')
   const [topProductsMetric, setTopProductsMetric] = useState('amount')
   const [dashboard, setDashboard] = useState(null)
@@ -490,14 +498,20 @@ export default function AdminDashboard() {
     return window.localStorage.getItem('saas-sidebar-expanded') !== 'false'
   })
 
-  const loadDashboard = useCallback(async (preset, range) => {
+  const loadDashboard = useCallback(async (preset, range, scope = {}) => {
     setIsLoading(true)
     setError('')
 
     // Demo mode: the dashboard shape comes from getAdminDashboard's demo branch; the extra
     // orders list (Today's Sales card) comes from the demo order store - no real /orders call.
     const [dashboardResult, ordersResult] = await Promise.all([
-      getAdminDashboard(resolveDateRange(preset, range)),
+      getAdminDashboard({
+        ...resolveDateRange(preset, range),
+        ...(scope.companyId ? { company_id: scope.companyId } : {}),
+        ...(scope.warehouseId ? { warehouse_id: scope.warehouseId } : {}),
+        ...(scope.customerId ? { customer_id: scope.customerId } : {}),
+        ...(scope.supplierId ? { supplier_id: scope.supplierId } : {}),
+      }),
       DEMO_MODE
         ? Promise.resolve({ success: true, orders: DEMO_EMPTY ? [] : demoOrdersResolved() })
         : listOrders(),
@@ -514,10 +528,35 @@ export default function AdminDashboard() {
     setOrders(ordersResult.success ? ordersResult.orders : [])
   }, [])
 
+  const applyFilters = useCallback(() => {
+    loadDashboard(datePreset, customRange, { companyId, warehouseId, customerId, supplierId })
+  }, [loadDashboard, datePreset, customRange, companyId, warehouseId, customerId, supplierId])
+
   useEffect(() => {
     loadDashboard(datePreset, customRange)
     // Only refetch when the user explicitly applies a new preset (Apply button) - not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Filter dropdown option lists (real mode only; demo dashboards aren't scope-filtered).
+  // listCompanies fails soft to [] -> the Company dropdown just shows "All Companies".
+  useEffect(() => {
+    if (DEMO_MODE) return
+    let active = true
+    Promise.all([listCompanies({ active: true }), listWarehouses(), listCustomers(), listSuppliers()]).then(
+      ([co, w, c, s]) => {
+        if (!active) return
+        setFilterOptions({
+          companies: co.success ? co.companies : [],
+          warehouses: w.success ? w.warehouses : [],
+          customers: c.success ? c.customers : [],
+          suppliers: s.success ? s.suppliers : [],
+        })
+      },
+    )
+    return () => {
+      active = false
+    }
   }, [])
 
   // Category names for the Expense Breakdown legend — so it lists rows even at ₹0 spend.
@@ -568,7 +607,7 @@ export default function AdminDashboard() {
         <p className="text-sm text-red-600">{error}</p>
         <button
           type="button"
-          onClick={() => loadDashboard(datePreset, customRange)}
+          onClick={applyFilters}
           className="mt-4 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
         >
           Retry
@@ -749,24 +788,74 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-3 rounded-2xl bg-transparent">
       <div className="overflow-hidden rounded-2xl border border-white/70 bg-white p-2.5 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
-        <div className="grid w-full grid-cols-[1fr_repeat(5,minmax(0,1fr))_88px] gap-1.5">
-          <Select
-            options={dateRangePresets}
-            value={datePreset}
-            onChange={(event) => setDatePreset(event.target.value)}
-            triggerClassName="h-12"
-          />
-          <FilterBox label="Company" value="All Companies" />
-          <FilterBox label="Branch" value="All Branches" />
-          <FilterBox label="Warehouse" value="All Warehouses" />
-          <FilterBox label="Customer" value="All Customers" />
-          <FilterBox label="Supplier" value="All Suppliers" />
+        <div className="grid w-full grid-cols-[1fr_repeat(4,minmax(0,1fr))_84px] items-end gap-1.5">
+          <FilterField label="Period">
+            <Select
+              options={dateRangePresets}
+              value={datePreset}
+              onChange={(event) => setDatePreset(event.target.value)}
+              triggerClassName="h-10 !bg-white"
+            />
+          </FilterField>
+          <FilterField label="Company">
+            <Select
+              searchable
+              options={[
+                { value: '', label: 'All Companies' },
+                ...filterOptions.companies.map((company) => ({ value: company.id, label: company.name })),
+              ]}
+              value={companyId}
+              onChange={(event) => setCompanyId(event.target.value)}
+              placeholder="Search companies…"
+              triggerClassName="h-10 !bg-white"
+            />
+          </FilterField>
+          <FilterField label="Warehouse">
+            <Select
+              searchable
+              options={[
+                { value: '', label: 'All Warehouses' },
+                ...filterOptions.warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name })),
+              ]}
+              value={warehouseId}
+              onChange={(event) => setWarehouseId(event.target.value)}
+              placeholder="Search warehouses…"
+              triggerClassName="h-10 !bg-white"
+            />
+          </FilterField>
+          <FilterField label="Customer">
+            <Select
+              searchable
+              options={[
+                { value: '', label: 'All Customers' },
+                ...filterOptions.customers.map((customer) => ({ value: customer.id, label: customer.name })),
+              ]}
+              value={customerId}
+              onChange={(event) => setCustomerId(event.target.value)}
+              placeholder="Search customers…"
+              triggerClassName="h-10 !bg-white"
+            />
+          </FilterField>
+          <FilterField label="Supplier">
+            <Select
+              searchable
+              options={[
+                { value: '', label: 'All Suppliers' },
+                ...filterOptions.suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name })),
+              ]}
+              value={supplierId}
+              onChange={(event) => setSupplierId(event.target.value)}
+              placeholder="Search suppliers…"
+              triggerClassName="h-10 !bg-white"
+            />
+          </FilterField>
           <button
             type="button"
-            onClick={() => loadDashboard(datePreset, customRange)}
-            className="inline-flex h-12 min-w-0 items-center justify-center rounded-xl bg-primary-600 px-3 py-1.5 text-[0.73rem] font-semibold text-white shadow-[0_12px_24px_-14px_rgb(6_59_0/0.45)] transition-colors hover:bg-primary-700"
+            onClick={applyFilters}
+            disabled={isLoading}
+            className="inline-flex h-10 min-w-0 items-center justify-center rounded-xl bg-primary-600 px-3 py-1.5 text-[0.73rem] font-semibold text-white shadow-[0_12px_24px_-14px_rgb(6_59_0/0.45)] transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Apply
+            {isLoading ? 'Applying…' : 'Apply'}
           </button>
         </div>
 

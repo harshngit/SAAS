@@ -23,8 +23,8 @@ import { listCategories } from '../../api/categories'
 import { listBrands } from '../../api/brands'
 import { listSuppliers } from '../../api/suppliers'
 import { mapProductBackendField } from '../../api/products'
-import { readImageAsDataUrl } from '../../utils/imageFile'
-import { uploadFile } from '../../api/files'
+import { getImageFileError } from '../../utils/imageFile'
+import { getFileUrl, uploadFile } from '../../api/files'
 
 const MAX_TOTAL_IMAGES = 5
 
@@ -639,19 +639,29 @@ export default function ProductForm({
     return nextErrors
   }
 
+  // Proper file-upload flow: pick -> POST /files/upload -> store the returned "/files/{id}" path.
+  // The backend no longer accepts inline base64 data: URLs.
   const handleCoverImageChange = async (event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
 
     setImageError('')
-
-    try {
-      const dataUrl = await readImageAsDataUrl(file)
-      updateField('coverImage', dataUrl)
-    } catch (error) {
-      setImageError(error.message)
+    const validationError = getImageFileError(file)
+    if (validationError) {
+      setImageError(validationError)
+      return
     }
+
+    setUploadingFields((current) => ({ ...current, coverImage: true }))
+    const result = await uploadFile(file)
+    setUploadingFields((current) => ({ ...current, coverImage: false }))
+
+    if (!result.success) {
+      setImageError(result.error)
+      return
+    }
+    updateField('coverImage', result.file.path)
   }
 
   const handleAdditionalImagesChange = async (event) => {
@@ -667,21 +677,29 @@ export default function ProductForm({
       return
     }
 
-    const filesToRead = files.slice(0, remainingSlots)
+    const filesToUpload = files.slice(0, remainingSlots)
     if (files.length > remainingSlots) {
       setImageError(`Only ${remainingSlots} more image${remainingSlots === 1 ? '' : 's'} can be added.`)
     }
 
-    const results = await Promise.allSettled(filesToRead.map((file) => readImageAsDataUrl(file)))
-    const nextImages = results.filter((result) => result.status === 'fulfilled').map((result) => result.value)
-    const failure = results.find((result) => result.status === 'rejected')
-
-    if (nextImages.length > 0) {
-      updateField('images', [...formData.images, ...nextImages])
+    const invalid = filesToUpload.map((file) => getImageFileError(file)).find(Boolean)
+    if (invalid) {
+      setImageError(invalid)
+      return
     }
 
+    setUploadingFields((current) => ({ ...current, images: true }))
+    const results = await Promise.all(filesToUpload.map((file) => uploadFile(file)))
+    setUploadingFields((current) => ({ ...current, images: false }))
+
+    const nextPaths = results.filter((result) => result.success).map((result) => result.file.path)
+    const failure = results.find((result) => !result.success)
+
+    if (nextPaths.length > 0) {
+      updateField('images', [...formData.images, ...nextPaths])
+    }
     if (failure) {
-      setImageError(failure.reason.message)
+      setImageError(failure.error)
     }
   }
 
@@ -1386,8 +1404,17 @@ export default function ProductForm({
               className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-dashed border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-400"
               style={{ height: '4.75rem', cursor: 'pointer' }}
             >
-              {formData.coverImage ? (
-                <img src={formData.coverImage} alt="Primary product" className="h-full w-full object-cover" />
+              {uploadingFields.coverImage ? (
+                'Uploading…'
+              ) : formData.coverImage ? (
+                <img
+                  src={getFileUrl(formData.coverImage)}
+                  alt="Primary product"
+                  className="h-full w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.style.display = 'none'
+                  }}
+                />
               ) : (
                 'Preview'
               )}
@@ -1424,7 +1451,14 @@ export default function ProductForm({
                 <div className="flex flex-wrap gap-2">
                   {formData.images.map((image, index) => (
                     <div key={image} className="relative">
-                      <img src={image} alt={`Additional product ${index + 1}`} className="size-12 rounded-lg border border-neutral-200 object-cover" />
+                      <img
+                        src={getFileUrl(image)}
+                        alt={`Additional product ${index + 1}`}
+                        className="size-12 rounded-lg border border-neutral-200 object-cover"
+                        onError={(event) => {
+                          event.currentTarget.style.visibility = 'hidden'
+                        }}
+                      />
                       <button
                         type="button"
                         onClick={() => removeImage(index)}

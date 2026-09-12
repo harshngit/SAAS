@@ -41,8 +41,8 @@ function authHeader() {
 
 // GET /dashboard/admin - 11 blocks: filters, summary, orders, cashflow, receivables_payables,
 // top_customers, top_products, expense_breakdown, sales_trend, stock_watch, recent_orders.
-// branch_id is accepted by the backend but doesn't currently narrow anything (no record carries
-// a branch yet) - passed through anyway in case that changes.
+// Scope filters (query params): date_from / date_to / company_id / warehouse_id / customer_id /
+// supplier_id. Only non-empty filters are sent.
 export async function getAdminDashboard(params = {}) {
   // ANY demo mode - never calls GET /dashboard/admin.
   if (DEMO_MODE) {
@@ -53,10 +53,10 @@ export async function getAdminDashboard(params = {}) {
     const queryParams = {}
     if (params.date_from) queryParams.date_from = params.date_from
     if (params.date_to) queryParams.date_to = params.date_to
+    if (params.company_id) queryParams.company_id = params.company_id
+    if (params.warehouse_id) queryParams.warehouse_id = params.warehouse_id
     if (params.customer_id) queryParams.customer_id = params.customer_id
     if (params.supplier_id) queryParams.supplier_id = params.supplier_id
-    if (params.warehouse_id) queryParams.warehouse_id = params.warehouse_id
-    if (params.branch_id) queryParams.branch_id = params.branch_id
 
     const { data } = await apiClient.get('/dashboard/admin', {
       headers: authHeader(),

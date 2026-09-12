@@ -24,8 +24,10 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
+import { usePermission } from '../../auth/usePermission'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { listDeliveries } from '../../api/deliveries'
+import CollectPaymentDrawer from '../collections/CollectPaymentDrawer'
 import { demoDeliveriesResolved, demoVehicleStockResolved, isDemoDelivery } from '../orders/orderDemoData'
 import { getDeliveryStage } from '../deliveries/deliveryStage'
 import { getCurrentVehicleStock } from '../../api/vehicleStock'
@@ -175,9 +177,14 @@ function DeliveryStatusDonut({ segments }) {
 export default function DeliveryPartnerDashboard() {
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const { can } = usePermission()
   const currentUser = useAuthStore((state) => state.currentUser)
   const displayName = currentUser?.name || 'there'
   const firstName = displayName.split(' ')[0]
+  // General (any-customer) collection is gated on the same permission as recording a
+  // delivery collection - `deliveries:create` (spec §22). No role-name checks.
+  const canCollectPayment = can('deliveries', 'create')
+  const [showCollectPayment, setShowCollectPayment] = useState(false)
 
   const [deliveries, setDeliveries] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -510,6 +517,17 @@ export default function DeliveryPartnerDashboard() {
               <Truck className="size-4" aria-hidden="true" />
               View Pending Deliveries
             </Button>
+            {canCollectPayment && (
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-2xl border-white/40 bg-white/10 px-5 py-3 text-sm font-medium text-white hover:border-white hover:bg-white/20 hover:text-white"
+                onClick={() => setShowCollectPayment(true)}
+              >
+                <Wallet className="size-4" aria-hidden="true" />
+                Collect Payment
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -639,6 +657,13 @@ export default function DeliveryPartnerDashboard() {
           />
         </ShellCard>
       </div>
+
+      <CollectPaymentDrawer
+        isOpen={showCollectPayment}
+        onClose={() => setShowCollectPayment(false)}
+        onRecorded={loadDeliveries}
+        partner={{ id: currentUser?.id, name: currentUser?.name, role: currentUser?.role }}
+      />
     </div>
   )
 }

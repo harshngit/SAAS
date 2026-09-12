@@ -74,6 +74,10 @@ function normalizeCollection(raw) {
     collectionNumber: raw.collection_number || raw.number || raw.id,
     deliveryId: raw.delivery_id || raw.delivery?.id || null,
     deliveryNumber: raw.delivery_number || raw.delivery?.delivery_number || '',
+    // Where the collection was recorded from: 'delivery' (COD at the doorstep) or
+    // 'delivery_partner' (general outstanding collection, no assigned delivery). Empty
+    // on older records - treated as a delivery collection.
+    source: raw.source || raw.collection_source || raw.origin || '',
     orderId: raw.order_id || raw.order?.id || null,
     orderNumber: raw.order_number || raw.order?.order_number || '',
     customerId: raw.customer_id || raw.customer?.id || '',
@@ -86,7 +90,10 @@ function normalizeCollection(raw) {
     note: raw.note || raw.notes || '',
     status: status === 'reconciled' || status === 'voided' ? status : 'recorded',
     recordedById: raw.recorded_by_id || raw.created_by_id || raw.recorded_by?.id || '',
-    recordedByName: raw.recorded_by_name || raw.recorded_by?.name || raw.created_by?.name || '',
+    recordedByName:
+      raw.recorded_by_name || raw.collected_by_name || raw.recorded_by?.name || raw.created_by?.name || '',
+    recordedByRole:
+      raw.recorded_by_role || raw.collected_by_role || raw.recorded_by?.role || raw.recorded_by?.system_role || raw.created_by?.role || '',
     recordedAt: raw.collected_at || raw.recorded_at || raw.created_at || null,
     reconciledAt: raw.reconciled_at || null,
     reconciledById: raw.reconciled_by_id || raw.reconciled_by?.id || '',
@@ -156,6 +163,8 @@ export async function listCollections(params = {}) {
     const queryParams = {}
     if (params.status && params.status !== 'all') queryParams.status = params.status
     if (params.search) queryParams.search = params.search
+    if (params.customer_id) queryParams.customer_id = params.customer_id
+    if (params.order_id) queryParams.order_id = params.order_id
     const { data } = await apiClient.get('/deliveries/collections', { headers: authHeader(), params: queryParams })
     const rows = Array.isArray(data) ? data : data?.collections || []
     return { success: true, collections: rows.map(normalizeCollection) }

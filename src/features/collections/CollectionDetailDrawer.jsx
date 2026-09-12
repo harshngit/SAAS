@@ -4,7 +4,15 @@ import { X } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { formatCurrency } from '../../utils/format'
-import { COLLECTION_STATUS_VARIANT, formatPaymentMode, formatStatus, isReconcilable, isVoidable } from './collectionHelpers'
+import {
+  COLLECTION_STATUS_VARIANT,
+  formatCollectionSource,
+  formatCollectorRole,
+  formatPaymentMode,
+  formatStatus,
+  isReconcilable,
+  isVoidable,
+} from './collectionHelpers'
 
 function formatDateTime(value) {
   if (!value) return '—'
@@ -81,11 +89,13 @@ export default function CollectionDetailDrawer({ collection, isOpen, onClose, on
             <Row label="Payment Mode">{formatPaymentMode(collection.paymentMode)}</Row>
             <Row label="Reference">{collection.reference || '—'}</Row>
             <Row label="Notes">{collection.note || '—'}</Row>
-            <Row label="Recorded By">{collection.recordedByName || '—'}</Row>
+            <Row label="Collected By">{collection.recordedByName || '—'}</Row>
+            {collection.recordedByRole && <Row label="Role">{formatCollectorRole(collection.recordedByRole)}</Row>}
             <Row label="Recorded At">{formatDateTime(collection.recordedAt)}</Row>
           </Section>
 
           <Section title="Source Delivery / Order">
+            {collection.source && <Row label="Source">{formatCollectionSource(collection.source)}</Row>}
             <Row label="Delivery #">{collection.deliveryNumber || '—'}</Row>
             <Row label="Order #">{collection.orderNumber || '—'}</Row>
             <Row label="Customer">{collection.customerName || '—'}</Row>

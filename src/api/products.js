@@ -1,5 +1,16 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { toStoredFilePath } from './files'
+
+// cover_image / images must be stored as "/files/{id}" paths - never a base64 data: URL and
+// never a full frontend-origin URL. Returns null when there is no image.
+function toStoredImage(value) {
+  return toStoredFilePath(value)
+}
+
+function toStoredImageList(value) {
+  return (Array.isArray(value) ? value : []).map(toStoredFilePath).filter(Boolean)
+}
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -235,8 +246,8 @@ export async function createProduct(payload) {
       name: payload.name.trim(),
       description: payload.description?.trim() || '',
       price: Number(payload.price ?? variations[0]?.price) || 0,
-      cover_image: payload.coverImage || payload.cover_image || '',
-      images: payload.images || [],
+      cover_image: toStoredImage(payload.coverImage ?? payload.cover_image),
+      images: toStoredImageList(payload.images),
       product_video: payload.productVideo || payload.videoUrl || payload.product_video || '',
       product_catalog_brochure: payload.catalogBrochure || payload.product_catalog_brochure || '',
       product_manual: payload.productManual || payload.product_manual || '',
@@ -298,9 +309,9 @@ export async function updateProduct(productId, payload) {
     if (payload.description !== undefined) requestBody.description = payload.description?.trim() || ''
     if (payload.price !== undefined) requestBody.price = Number(payload.price) || 0
     if (payload.coverImage !== undefined || payload.cover_image !== undefined) {
-      requestBody.cover_image = payload.coverImage ?? payload.cover_image ?? ''
+      requestBody.cover_image = toStoredImage(payload.coverImage ?? payload.cover_image)
     }
-    if (payload.images !== undefined) requestBody.images = payload.images
+    if (payload.images !== undefined) requestBody.images = toStoredImageList(payload.images)
     if (payload.productVideo !== undefined || payload.videoUrl !== undefined || payload.product_video !== undefined) {
       requestBody.product_video = payload.productVideo || payload.videoUrl || payload.product_video || ''
     }

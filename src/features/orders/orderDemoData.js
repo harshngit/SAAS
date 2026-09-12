@@ -128,6 +128,16 @@ function order({
   const paid = Math.max(0, Number(paidAmount) || 0)
   const totalDue = Math.round(total) + previousBalance
   const showPay = status !== 'cancelled' && (method === 'pickup' || previousBalance > 0 || paid > 0)
+  // Order-level payment status mirrors the real backend `payment_status` (paid|partial|pending)
+  // so demo rows exercise the same badges. Based on the amount applied to THIS order only.
+  const orderPaid = Math.min(paid, Math.round(total))
+  const paymentStatus = !showPay
+    ? ''
+    : orderPaid <= 0
+      ? 'pending'
+      : orderPaid >= Math.round(total)
+        ? 'paid'
+        : 'partial'
   return {
     id: `demo-so-${key}`,
     orderNumber: number,
@@ -160,6 +170,10 @@ function order({
     orderDate: iso(-3),
     deliveryDate: iso(2),
     fulfilmentMethod: method,
+    deliveryMethod: method === 'pickup' ? 'takeaway' : 'home_delivery',
+    paymentStatus,
+    paidAmount: paymentStatus ? orderPaid : null,
+    remainingAmount: paymentStatus ? Math.max(Math.round(total) - orderPaid, 0) : null,
     pickupStatus,
     collectedBy: pickupStatus === 'collected' ? c.name : '',
     collectedAt: pickupStatus === 'collected' ? iso(-1) : null,

@@ -124,7 +124,7 @@ export async function uploadOrganizationLogo(file) {
     const formData = new FormData()
     formData.append('file', file)
 
-    const { data } = await axios.post(`${API_BASE_URL}organizations/settings/logo`, formData, {
+    const { data } = await axios.post(`${API_BASE_URL}/organizations/settings/logo`, formData, {
       headers: authHeader(),
     })
 
@@ -145,7 +145,7 @@ export async function uploadOrganizationSignature(file) {
     const formData = new FormData()
     formData.append('file', file)
 
-    const { data } = await axios.post(`${API_BASE_URL}organizations/settings/signature`, formData, {
+    const { data } = await axios.post(`${API_BASE_URL}/organizations/settings/signature`, formData, {
       headers: authHeader(),
     })
 
@@ -166,7 +166,7 @@ export async function uploadOrganizationSettingsFile(file) {
     const formData = new FormData()
     formData.append('file', file)
 
-    const { data } = await axios.post(`${API_BASE_URL}organizations/settings/upload-file`, formData, {
+    const { data } = await axios.post(`${API_BASE_URL}/organizations/settings/upload-file`, formData, {
       headers: authHeader(),
     })
 
@@ -190,7 +190,7 @@ export async function uploadOrganizationOtherDocuments(files) {
       formData.append('files', file)
     })
 
-    const { data } = await axios.post(`${API_BASE_URL}organizations/settings/documents/other`, formData, {
+    const { data } = await axios.post(`${API_BASE_URL}/organizations/settings/documents/other`, formData, {
       headers: authHeader(),
     })
 

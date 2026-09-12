@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Droplet, Save, Upload } from 'lucide-react'
+import { ArrowLeft, Check, Download, Droplet, Save, Upload } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useToast } from '../../components/ui/toastContext'
 import { getInvoiceSettings, updateInvoiceSettings } from '../../api/invoices'
 import { uploadFile } from '../../api/files'
+import { exportElementToPdf } from '../../utils/pdfExport'
 import { templateComponents } from './invoiceTemplates'
 
 const templates = [
@@ -59,16 +60,48 @@ function Toggle({ checked, onChange }) {
 // Template rendering components (ClassicPreview/ModernPreview/CompactPreview/ThermalPreview)
 // live in ./invoiceTemplates.jsx so InvoiceDetail.jsx can reuse them with real invoice data
 // instead of duplicating a whole invoice-rendering system.
-function InvoicePreviewPanel({ template, primaryColor, paperSize, fields, footerText, terms }) {
+function InvoicePreviewPanel({ template, primaryColor, paperSize, fields, footerText, terms, exportRef }) {
+  const { showToast } = useToast()
+  const [isExporting, setIsExporting] = useState(false)
   const paperClass = paperSize === 'A5' ? 'max-w-sm' : paperSize === 'thermal' ? 'max-w-52' : 'max-w-lg'
   const TemplateComponent = templateComponents[template] || templateComponents.classic
 
+  // Screenshot whatever is currently rendered in the preview (in-memory template / colour /
+  // paper / field toggles) — no save, no network. Thermal exports at its real narrow width.
+  const handleDownloadSample = async () => {
+    setIsExporting(true)
+    try {
+      await exportElementToPdf(exportRef.current, `sample-invoice-${template}.pdf`, {
+        widthRem: paperSize === 'thermal' ? 13 : 32,
+      })
+    } catch (error) {
+      showToast({
+        title: 'Download failed',
+        message: error?.message || 'Unable to export the sample PDF.',
+        variant: 'error',
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
-      <p className="text-sm font-semibold text-neutral-900">Invoice Preview</p>
-      <p className="text-xs text-neutral-400">This is how your invoice will look ({templates.find((t) => t.value === template)?.label} template)</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-neutral-900">Invoice Preview</p>
+          <p className="text-xs text-neutral-400">This is how your invoice will look ({templates.find((t) => t.value === template)?.label} template)</p>
+        </div>
+        <Button type="button" variant="outline" size="sm" loading={isExporting} onClick={handleDownloadSample}>
+          <Download className="size-4" />
+          Download Sample PDF
+        </Button>
+      </div>
 
-      <div className={`mx-auto mt-4 overflow-hidden rounded-xl border border-neutral-100 bg-white p-4 text-xs text-neutral-600 shadow-(--shadow-xs) ${paperClass}`}>
+      <div
+        ref={exportRef}
+        className={`mx-auto mt-4 overflow-hidden rounded-xl border border-neutral-100 bg-white p-4 text-xs text-neutral-600 shadow-(--shadow-xs) ${paperClass}`}
+      >
         <TemplateComponent primaryColor={primaryColor} fields={fields} footerText={footerText} terms={terms} />
       </div>
     </div>
@@ -78,6 +111,7 @@ function InvoicePreviewPanel({ template, primaryColor, paperSize, fields, footer
 export default function InvoiceSettings() {
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const previewExportRef = useRef(null)
 
   const [settings, setSettings] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -280,6 +314,7 @@ export default function InvoiceSettings() {
           fields={settings.fields}
           footerText={settings.footerText}
           terms={settings.terms}
+          exportRef={previewExportRef}
         />
       </div>
       <p className="text-xs text-neutral-400 flex items-center gap-1.5"><Droplet className="size-3" aria-hidden="true" /> Preview uses sample data — actual invoices pull your real company details.</p>

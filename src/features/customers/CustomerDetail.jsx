@@ -50,6 +50,14 @@ import {
 } from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { listOrders } from '../../api/orders'
+import { listCollections } from '../../api/deliveryCollections'
+import {
+  COLLECTION_STATUS_VARIANT,
+  formatCollectionSource,
+  formatCollectorRole,
+  formatPaymentMode as formatCollectionPaymentMode,
+  formatStatus as formatCollectionStatus,
+} from '../collections/collectionHelpers'
 import { ORDER_STATUS_VARIANT, formatOrderStatus, getDeliveryStatus } from '../orders/orderHelpers'
 import { getCustomerFollowUps, getCustomerVisits } from '../../api/visits'
 import { useAuthStore } from '../../store/authStore'
@@ -347,6 +355,12 @@ export default function CustomerDetail() {
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false)
   const [isLoadingPayments, setIsLoadingPayments] = useState(true)
   const [paymentsError, setPaymentsError] = useState('')
+  // Customer-based payment collections (Delivery Partner "Collect Payment" flow, recorded ->
+  // reconciled -> voided) - a different entity from the receipt-based `payments` list above,
+  // which is why it renders as its own section rather than being merged into that table.
+  const [collections, setCollections] = useState([])
+  const [isLoadingCollections, setIsLoadingCollections] = useState(true)
+  const [collectionsError, setCollectionsError] = useState('')
   const [downloadingReceiptId, setDownloadingReceiptId] = useState('')
   const [voidTarget, setVoidTarget] = useState(null)
   const [isVoiding, setIsVoiding] = useState(false)
@@ -408,6 +422,8 @@ export default function CustomerDetail() {
       setLoadError('')
       setIsLoadingPayments(true)
       setPaymentsError('')
+      setIsLoadingCollections(true)
+      setCollectionsError('')
       setIsLoadingOrders(true)
       setIsLoadingLedger(true)
       setLedgerError('')
@@ -415,9 +431,10 @@ export default function CustomerDetail() {
       setDocumentsError('')
 
       const usersPromise = currentUser?.role === ROLES.SALES_OFFICER ? Promise.resolve({ success: true, users: [] }) : listUsers()
-      const [result, paymentsResult, usersResult, ordersResult, ledgerResult, documentsResult] = await Promise.all([
+      const [result, paymentsResult, collectionsResult, usersResult, ordersResult, ledgerResult, documentsResult] = await Promise.all([
         getCustomer(id),
         getCustomerPayments(id),
+        listCollections({ customer_id: id }),
         usersPromise,
         listOrders({ customer_id: id }),
         getCustomerAccountStatement(id),
@@ -428,9 +445,17 @@ export default function CustomerDetail() {
 
       setIsLoading(false)
       setIsLoadingPayments(false)
+      setIsLoadingCollections(false)
       setIsLoadingOrders(false)
       setIsLoadingLedger(false)
       setIsLoadingDocuments(false)
+
+      if (collectionsResult.success) {
+        setCollections(collectionsResult.collections)
+      } else {
+        setCollections([])
+        setCollectionsError(collectionsResult.error)
+      }
 
       if (documentsResult.success) {
         setDocuments(documentsResult.documents)
@@ -511,6 +536,23 @@ export default function CustomerDetail() {
     }
 
     setPayments(result.payments.map(normalizeCustomerPayment))
+  }
+
+  const loadCollections = async () => {
+    setIsLoadingCollections(true)
+    setCollectionsError('')
+
+    const result = await listCollections({ customer_id: id })
+
+    setIsLoadingCollections(false)
+
+    if (!result.success) {
+      setCollections([])
+      setCollectionsError(result.error)
+      return
+    }
+
+    setCollections(result.collections)
   }
 
   // Visits + follow-ups are loaded lazily the first time the tab is opened - keeps the
@@ -1224,6 +1266,58 @@ export default function CustomerDetail() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </Section>
+      </div>
+      )}
+
+      {activeTab === 'payments' && (
+      <div className="space-y-4">
+        <Section title="Collection History" icon={Wallet}>
+          <div>
+            {collectionsError ? (
+              <div className="py-6 text-center">
+                <p className="text-sm text-red-600">{collectionsError}</p>
+                <Button type="button" variant="outline" size="sm" className="mt-3" onClick={loadCollections}>Retry</Button>
+              </div>
+            ) : isLoadingCollections ? (
+              <LoadingSpinner label="Loading collection history..." />
+            ) : collections.length === 0 ? (
+              <p className="py-6 text-center text-sm text-neutral-400">No payment collections recorded for this customer yet.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-neutral-100">
+                <table className="w-full min-w-2xl text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                      <th className="whitespace-nowrap px-4 py-2.5">Date</th>
+                      <th className="whitespace-nowrap px-4 py-2.5 text-right">Amount</th>
+                      <th className="whitespace-nowrap px-4 py-2.5">Payment Method</th>
+                      <th className="whitespace-nowrap px-4 py-2.5">Source</th>
+                      <th className="whitespace-nowrap px-4 py-2.5">Collected By</th>
+                      <th className="whitespace-nowrap px-4 py-2.5">Role</th>
+                      <th className="whitespace-nowrap px-4 py-2.5">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-50">
+                    {collections.map((collection) => (
+                      <tr key={collection.id}>
+                        <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatDate(collection.recordedAt)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(collection.amount)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatCollectionPaymentMode(collection.paymentMode)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{formatCollectionSource(collection.source) || '—'}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-neutral-800">{collection.recordedByName || '—'}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{formatCollectorRole(collection.recordedByRole) || '—'}</td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <Badge variant={COLLECTION_STATUS_VARIANT[collection.status] || 'neutral'}>
+                            {formatCollectionStatus(collection)}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

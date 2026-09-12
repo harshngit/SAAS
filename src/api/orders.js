@@ -147,7 +147,37 @@ function buildOrderBody(payload) {
   if (payload.deliveryDate || payload.delivery_date) body.delivery_date = payload.deliveryDate || payload.delivery_date
   const deliveryAddress = payload.deliveryAddress ?? payload.delivery_address
   if (deliveryAddress) body.delivery_address = deliveryAddress
-  if (payload.paymentType || payload.payment_type) body.payment_type = payload.paymentType || payload.payment_type
+
+  // Order Flow Enhancement (backend contract §4): the canonical `delivery_method`
+  // (takeaway | home_delivery) is sent alongside the legacy `fulfilment_method`
+  // (pickup | delivery) - the backend keeps the two in sync and accepts either.
+  const deliveryMethod = payload.deliveryMethod || payload.delivery_method
+  if (deliveryMethod) body.delivery_method = deliveryMethod
+
+  // Upfront payment (backend contract §11). `payment_method` is the canonical field;
+  // `payment_type` stays for backward compatibility. `cod` is not a backend
+  // payment_method enum value, so for COD only the legacy `payment_type` is sent.
+  const paymentType = payload.paymentType || payload.payment_type
+  if (paymentType) {
+    body.payment_type = paymentType
+    const canonicalMethod = payload.paymentMethod || payload.payment_method || paymentType
+    if (['cash', 'credit', 'upi', 'card', 'bank_transfer'].includes(canonicalMethod)) {
+      body.payment_method = canonicalMethod
+    }
+  }
+  const paymentStatus = payload.paymentStatus || payload.payment_status
+  if (paymentStatus) body.payment_status = paymentStatus
+  const paidAmount = payload.paidAmount ?? payload.paid_amount
+  if (paidAmount !== undefined && paidAmount !== null && paidAmount !== '') {
+    body.paid_amount = Number(paidAmount) || 0
+  }
+
+  // Optional assignment at creation - the backend creates the delivery assignment itself
+  // when these are present (contract §2 / §8). No separate assign call is needed.
+  const deliveryPartnerId = payload.deliveryPartnerId || payload.delivery_partner_id
+  if (deliveryPartnerId) body.delivery_partner_id = deliveryPartnerId
+  const vehicleId = payload.vehicleId || payload.vehicle_id
+  if (vehicleId) body.vehicle_id = vehicleId
   if (payload.paymentTermsDays !== undefined || payload.payment_terms_days !== undefined) {
     body.payment_terms_days = Number(payload.paymentTermsDays ?? payload.payment_terms_days) || 0
   }
@@ -178,6 +208,11 @@ function normalizeOrderItem(item) {
     productId: item.product_id,
     variantId: item.variant_id,
     productName: item.product_name || item.name || '',
+    // Order items usually carry no image / SKU - OrderDetail backfills from the product catalogue,
+    // but read them here too in case the backend nests the product.
+    sku: item.product_sku || item.sku || item.product?.sku || '',
+    productImage:
+      item.product_image || item.product?.cover_image || item.product?.image_url || item.cover_image || '',
     quantity,
     orderedQuantity,
     unitPrice,
@@ -212,12 +247,25 @@ function normalizeOrder(order) {
     orderDate: order.order_date || order.created_at,
     deliveryDate: order.delivery_date,
     fulfilmentMethod: order.fulfilment_method || 'delivery',
+    // Canonical Order Flow Enhancement field (backend contract §6). May be absent on
+    // legacy records - isTakeawayOrder() also falls back to fulfilmentMethod.
+    deliveryMethod: order.delivery_method || '',
     pickupStatus: order.pickup_status || 'not_started',
     collectedBy: order.collected_by || '',
     collectedAt: order.collected_at || null,
     pickupNotes: order.pickup_notes || '',
     paymentType: order.payment_type || '',
+    paymentMethod: order.payment_method || order.payment_type || '',
     paymentTermsDays: order.payment_terms_days ?? 0,
+    // Payment figures - backend is authoritative (contract §6/§11). Null when the
+    // backend hasn't returned them (older records / legacy create) so the UI can hide
+    // the payment rows rather than show a misleading ₹0.
+    paymentStatus: order.payment_status || '',
+    paidAmount: order.paid_amount ?? null,
+    remainingAmount: order.remaining_amount ?? null,
+    previousBalance: order.previous_balance ?? null,
+    currentOrderAmount: order.current_order_amount ?? null,
+    totalDue: order.total_due ?? null,
     source: order.source || 'office',
     salespersonId: order.salesperson_id || order.salesperson?.id || '',
     salespersonName: order.salesperson?.name || '',

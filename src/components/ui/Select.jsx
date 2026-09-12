@@ -48,10 +48,13 @@ const Select = forwardRef(function Select(
     }
   }, [value])
 
+  // Searchable field text: while CLOSED it mirrors the selected option's label (so the trigger
+  // reads like a normal select); while OPEN it is cleared so the user can type a fresh query and
+  // the `placeholder` (e.g. "Search customers...") shows instead of the current selection.
   useEffect(() => {
     if (!searchable) return
-    setSearchQuery(selectedOption?.label || '')
-  }, [searchable, selectedOption?.label])
+    setSearchQuery(isOpen ? '' : selectedOption?.label || '')
+  }, [searchable, isOpen, selectedOption?.label])
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -204,7 +207,7 @@ const Select = forwardRef(function Select(
                   }
                 }, 80)
               }}
-              placeholder={selectedOption?.label || placeholder}
+              placeholder={isOpen ? placeholder : selectedOption?.label || placeholder}
               disabled={disabled}
               className="w-full bg-transparent text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
             />

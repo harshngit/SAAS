@@ -1,9 +1,20 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle, Minus, Package, Pencil, Plus, Search } from 'lucide-react'
 import { formatCurrency } from '../../utils/format'
+import { getFileUrl } from '../../api/files'
 
 const productCategoryOf = (product) =>
   product.category?.name || product.category_name || product.product_type || ''
+
+// Raw product rows store "/files/{id}" (or a bare id) - resolve for <img src>.
+const productImageUrl = (product) =>
+  getFileUrl(
+    product.cover_image ||
+      product.cover_image_url ||
+      product.image_url ||
+      (Array.isArray(product.images) ? product.images[0]?.url || product.images[0] : '') ||
+      '',
+  )
 
 // The Amazon-style inline product picker: search + category chips + a scrollable list where
 // every row is the editing surface (stepper always visible, inline unit price when selected).
@@ -88,11 +99,11 @@ export default function ProductPickerList({
         </div>
       )}
 
-      <div className={`mt-2 ${listMaxHeightClass} divide-y divide-neutral-200 overflow-y-auto rounded-xl border border-neutral-100`}>
+      <div className={`mt-2 ${listMaxHeightClass} space-y-2 overflow-y-auto px-1.5 py-1`}>
         {isLoading ? (
-          <p className="px-3 py-6 text-center text-sm text-neutral-400">Loading products…</p>
+          <p className="rounded-2xl border border-neutral-100 px-3 py-6 text-center text-sm text-neutral-400">Loading products…</p>
         ) : filtered.length === 0 ? (
-          <p className="px-3 py-6 text-center text-sm text-neutral-400">No products found.</p>
+          <p className="rounded-2xl border border-neutral-100 px-3 py-6 text-center text-sm text-neutral-400">No products found.</p>
         ) : (
           filtered.map((product) => {
             const item = orderItems.find((entry) => entry.productId === product.id)
@@ -104,19 +115,30 @@ export default function ProductPickerList({
             const isOutOfStock = stock !== null && stock <= 0
             const isLowStock = stock !== null && stock > 0 && stock <= threshold
             const shortStock = isSelected && stock !== null && quantity > stock
+            const imageUrl = productImageUrl(product)
 
             return (
               <div
                 key={product.id}
-                className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${isSelected ? 'bg-primary-50/60' : ''}`}
+                className={`flex items-center gap-3 rounded-2xl border p-3 transition-colors ${
+                  isSelected
+                    ? 'border-primary-600 bg-primary-50/50 ring-1 ring-primary-600'
+                    : 'border-neutral-100 bg-white hover:border-neutral-200'
+                }`}
               >
-                <div className="size-11 shrink-0">
-                  {product.cover_image ? (
-                    <img src={product.cover_image} alt="" className="size-11 rounded-lg border border-neutral-100 object-cover" />
-                  ) : (
-                    <span className="flex size-11 items-center justify-center rounded-lg bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
-                      <Package className="size-5" aria-hidden="true" />
-                    </span>
+                <div className="relative size-14 shrink-0">
+                  <span className="flex size-14 items-center justify-center rounded-xl bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
+                    <Package className="size-5" aria-hidden="true" />
+                  </span>
+                  {imageUrl && (
+                    <img
+                      src={imageUrl}
+                      alt=""
+                      className="absolute inset-0 size-14 rounded-xl border border-neutral-100 object-cover"
+                      onError={(event) => {
+                        event.currentTarget.style.display = 'none'
+                      }}
+                    />
                   )}
                 </div>
 

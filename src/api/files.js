@@ -14,10 +14,26 @@ export function getFileUrl(fileOrId) {
 
   const value = String(fileOrId).trim()
   if (!value) return ''
+  if (value.startsWith('data:')) return value
   if (isAbsoluteUrl(value)) return value
   if (value.startsWith('/files/')) return `${API_BASE_URL.replace(/\/$/, '')}${value}`
 
   return `${API_BASE_URL.replace(/\/$/, '')}/files/${encodeURIComponent(value)}`
+}
+
+// Portable value to STORE on a record (e.g. product.cover_image). The backend expects a
+// "/files/{file_id}" path - never a base64 data: URL. Returns null when there is nothing to store.
+export function toStoredFilePath(value) {
+  if (typeof value === 'object' && value) {
+    return toStoredFilePath(value.url || value.file_url || value.file_id || value.fileId)
+  }
+  const raw = String(value || '').trim()
+  if (!raw || raw.startsWith('data:')) return null
+  const base = API_BASE_URL.replace(/\/$/, '')
+  if (raw.startsWith(`${base}/files/`)) return raw.slice(base.length) // -> "/files/{id}"
+  if (raw.startsWith('/files/')) return raw
+  if (isAbsoluteUrl(raw)) return raw // some other CDN URL already persisted - leave it
+  return `/files/${raw}` // bare file_id
 }
 
 export async function getFile(fileId) {
@@ -74,7 +90,15 @@ export async function uploadFile(file) {
       },
     })
 
-    return { success: true, file: { ...data, url: getFileUrl(data?.url || data?.file_id) } }
+    return {
+      success: true,
+      file: {
+        ...data,
+        // `url` - fully qualified, for previews / <img src>. `path` - portable "/files/{id}" to STORE.
+        url: getFileUrl(data?.url || data?.file_id),
+        path: toStoredFilePath(data?.url || data?.file_id),
+      },
+    }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

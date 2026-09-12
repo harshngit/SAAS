@@ -28,6 +28,39 @@ export function formatOrderStatus(status) {
   return ORDER_STATUS_LABEL[status] || String(status || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+// -----------------------------------------------------------------------------
+// Payment status - paid / partial / pending. A THIRD axis, kept separate from
+// Order status and Delivery status (backend contract §11). `order.paymentStatus`
+// is set from the API `payment_status` field (api/orders.js normalizeOrder);
+// backend `paid_amount` / `remaining_amount` are the source of truth for figures.
+// -----------------------------------------------------------------------------
+export const PAYMENT_STATUS_LABEL = {
+  paid: 'Paid',
+  partial: 'Partial',
+  pending: 'Pending',
+}
+
+export const PAYMENT_STATUS_VARIANT = {
+  paid: 'success',
+  partial: 'warning',
+  pending: 'danger',
+}
+
+export function formatPaymentStatus(status) {
+  return PAYMENT_STATUS_LABEL[status] || ''
+}
+
+// Pre-submit only: the Create-Order preview has no backend response yet, so it derives the
+// status it is about to send from the amount typed vs the order total. Once the order exists,
+// the UI always reads `order.paymentStatus` from the backend instead of recomputing.
+export function derivePaymentStatus(orderTotal, paidAmount) {
+  const total = Math.round(Number(orderTotal) || 0)
+  const paid = Math.max(0, Math.round(Number(paidAmount) || 0))
+  if (paid <= 0) return 'pending'
+  if (paid >= total) return 'paid'
+  return 'partial'
+}
+
 // List/filter tabs - canonical statuses only (GET /orders accepts `draft`).
 export const ORDER_TABS = [
   { value: 'all', label: 'All', apiStatus: null },
@@ -65,6 +98,7 @@ export function getFulfilmentLabel(order) {
 // -----------------------------------------------------------------------------
 const DELIVERY_VARIANT = {
   not_planned: 'neutral',
+  pending_assignment: 'warning',
   picking: 'warning',
   assigned: 'info',
   ready_for_pickup: 'warning',
@@ -97,7 +131,10 @@ export function getDeliveryStatus(order) {
   if (fs === 'partially_delivered') return { key: 'partially_delivered', label: 'Partially Delivered', variant: DELIVERY_VARIANT.partially_delivered }
   if (fs === 'in_transit') return { key: 'in_transit', label: 'In Transit', variant: DELIVERY_VARIANT.in_transit }
   if (fs === 'loaded') return { key: 'loaded', label: 'Loaded', variant: DELIVERY_VARIANT.loaded }
-  if (order.assignedDeliveryPartnerId || fs === 'planned') return { key: 'assigned', label: 'Assigned', variant: DELIVERY_VARIANT.assigned }
+  if (order.assignedDeliveryPartnerId) return { key: 'assigned', label: 'Assigned', variant: DELIVERY_VARIANT.assigned }
+  // Delivery planned by the backend but no partner yet (e.g. home-delivery order created
+  // without a delivery_partner_id) - assign it from the order via Plan Delivery.
+  if (fs === 'planned') return { key: 'pending_assignment', label: 'Pending Assignment', variant: DELIVERY_VARIANT.pending_assignment }
   return { key: 'not_planned', label: 'Not Planned', variant: DELIVERY_VARIANT.not_planned }
 }
 

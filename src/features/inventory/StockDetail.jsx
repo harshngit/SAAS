@@ -8,6 +8,8 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import StatCard from '../../components/ui/StatCard'
 import { getProductStock, recordStockAdjustment } from '../../api/inventory'
+import { getProduct } from '../../api/products'
+import { getFileUrl } from '../../api/files'
 import { getWarehouseStock } from '../../api/warehouses'
 import { getMovementMeta } from './inventoryConstants'
 import StockEntryForm from './StockEntryForm'
@@ -17,6 +19,7 @@ export default function StockDetail() {
   const navigate = useNavigate()
 
   const [stock, setStock] = useState(null)
+  const [productImage, setProductImage] = useState('')
   const [warehouseStock, setWarehouseStock] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -28,9 +31,11 @@ export default function StockDetail() {
     setIsLoading(true)
     setLoadError('')
 
-    const [result, warehouseResult] = await Promise.all([
+    const [result, warehouseResult, productResult] = await Promise.all([
       getProductStock(productId),
       getWarehouseStock({ product_id: productId }),
+      // The /inventory record doesn't carry the product image - pull it from /products.
+      getProduct(productId),
     ])
 
     setIsLoading(false)
@@ -42,6 +47,16 @@ export default function StockDetail() {
 
     setStock(result.stock)
     setWarehouseStock(warehouseResult.success ? warehouseResult.stock : [])
+
+    const rawImage = productResult.success
+      ? productResult.product.cover_image ||
+        productResult.product.cover_image_url ||
+        (Array.isArray(productResult.product.images)
+          ? productResult.product.images[0]?.url || productResult.product.images[0]
+          : '') ||
+        ''
+      : result.stock.cover_image || ''
+    setProductImage(getFileUrl(rawImage))
   }
 
   useEffect(() => {
@@ -116,6 +131,21 @@ export default function StockDetail() {
             <ArrowLeft className="size-4" aria-hidden="true" />
             Back
           </Button>
+          <div className="relative size-14 shrink-0">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+              <Package className="size-6" aria-hidden="true" />
+            </span>
+            {productImage && (
+              <img
+                src={productImage}
+                alt=""
+                className="absolute inset-0 size-14 rounded-2xl object-cover ring-1 ring-primary-100"
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none'
+                }}
+              />
+            )}
+          </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold text-neutral-900">{stock.name}</h1>
