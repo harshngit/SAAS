@@ -542,3 +542,19 @@ export async function cancelOrder(orderId, reason) {
     return { success: false, error: message }
   }
 }
+
+export async function deleteOrder(orderId) {
+  try {
+    await apiClient.delete(`/orders/${orderId}`, { headers: authHeader() })
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    return {
+      success: false,
+      error: formatApiError(
+        errorData?.detail || errorData?.message || errorData?.error || errorData,
+        'Unable to delete this order. Please try again.',
+      ),
+    }
+  }
+}

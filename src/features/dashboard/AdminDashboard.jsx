@@ -207,25 +207,25 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
 
   return (
     <div
-      className={`group relative flex min-h-42 flex-col overflow-hidden rounded-2xl p-3.5 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-3.5 ${toneClasses[tone]}`}
+      className={`group relative flex h-[172px] min-w-0 flex-col overflow-hidden rounded-2xl p-4 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] ${toneClasses[tone]}`}
     >
       <div className="min-w-0">
-        <p className="mx-auto min-h-[2.35rem] max-w-[8rem] whitespace-normal break-normal text-center text-[0.68rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-current/72 sm:text-[0.72rem]">
+        <p className="flex h-10 items-start justify-center text-center text-[0.68rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-current/72 sm:text-[0.72rem]">
           {title}
         </p>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <p className="min-w-0 truncate font-(--font-display) text-[1.05rem] font-semibold leading-none tracking-tight">
+        <div className="mt-3 flex min-h-8 items-center justify-between gap-2">
+          <p className="min-w-0 whitespace-nowrap font-(--font-display) text-[1rem] font-semibold leading-none tracking-tight sm:text-[1.05rem]">
             {value}
           </p>
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 transition-transform duration-300 group-hover:scale-105">
-            <Icon className="size-3.5" aria-hidden="true" />
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20 transition-transform duration-300 group-hover:scale-105">
+            <Icon className="size-4" aria-hidden="true" />
           </div>
         </div>
-        {delta && <p className="mt-1 break-words text-[0.65rem] leading-4 text-current/78">{delta}</p>}
+        <p className="mt-2 min-h-8 text-[0.65rem] leading-4 text-current/78">{delta || '\u00a0'}</p>
       </div>
       {footer && (
         <div
-          className="mt-auto flex w-full items-end justify-between gap-4 border-t border-white/40 pt-2.5 text-[0.72rem] font-semibold leading-4 text-current/86 transition-transform duration-300 group-hover:translate-x-0.5"
+          className="mt-auto flex w-full items-end justify-between gap-2 border-t border-white/40 pt-3 text-[0.72rem] font-semibold leading-4 text-current/86 transition-transform duration-300 group-hover:translate-x-0.5"
         >
           <span className="min-w-0 flex-1 leading-[1.05]">
             <span className="block whitespace-nowrap">{footerFirstLine}</span>
@@ -245,28 +245,28 @@ function ProfitSummaryCard({ grossProfit, netProfit }) {
   const footerSecondLine = footerParts.length === 3 ? footerParts.slice(2).join(' ') : footerParts.slice(1).join(' ')
  
   return (
-    <div className="group relative flex min-h-42 flex-col overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#1687a8_0%,#2670db_100%)] p-4 text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-4">
+    <div className="group relative flex h-[172px] min-w-0 flex-col overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#1687a8_0%,#2670db_100%)] p-4 text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_36%)] opacity-90" />
       <div className="relative min-w-0">
-        <p className="-ml-1 w-full whitespace-nowrap text-center text-[0.70rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-white/82 sm:text-[0.72rem]">
+        <p className="flex h-10 items-start justify-center text-center text-[0.70rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-white/82 sm:text-[0.72rem]">
           Profit Summary
         </p>
-        <div className="mt-3 space-y-2.5">
+        <div className="mt-3 space-y-2">
           <div>
             <p className="text-[0.62rem] font-medium leading-none text-white/72">Gross Profit</p>
-            <p className="mt-1 pr-2 text-right font-(--font-display) text-[1.05rem] font-semibold leading-none tracking-tight text-white">
+            <p className="mt-1 whitespace-nowrap pr-1 text-right font-(--font-display) text-[1rem] font-semibold leading-none tracking-tight text-white sm:text-[1.05rem]">
               {formatCompactCurrency(grossProfit)}
             </p>
           </div>
           <div>
             <p className="text-[0.62rem] font-medium leading-none text-white/72">Net Profit</p>
-            <p className="mt-1 pr-2 text-right font-(--font-display) text-[1.05rem] font-semibold leading-none tracking-tight text-white">
+            <p className="mt-1 whitespace-nowrap pr-1 text-right font-(--font-display) text-[1rem] font-semibold leading-none tracking-tight text-white sm:text-[1.05rem]">
               {formatCompactCurrency(netProfit)}
             </p>
           </div>
         </div>
       </div>
-      <div className="relative z-10 mt-auto flex items-end justify-between gap-4 border-t border-white/40 pt-2.5 text-[0.72rem] font-semibold leading-4 text-white/92 transition-transform duration-300 group-hover:translate-x-0.5">
+      <div className="relative z-10 mt-auto flex items-end justify-between gap-2 border-t border-white/40 pt-3 text-[0.72rem] font-semibold leading-4 text-white/92 transition-transform duration-300 group-hover:translate-x-0.5">
         <span className="min-w-0 leading-[1.02]">
           <span className="block whitespace-nowrap">{footerFirstLine}</span>
           {footerSecondLine && <span className="block whitespace-nowrap">{footerSecondLine}</span>}
@@ -331,14 +331,14 @@ function FeaturedSalesCard({
       type="button"
       onClick={() => navigate('/admin/orders')}
       aria-label="View sales orders"
-      className="group relative flex h-[320px] w-full min-w-0 flex-col overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#175e17_0%,#0c4608_100%)] p-4 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] sm:p-4"
+      className="group relative flex h-[320px] w-full min-w-0 flex-col overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#175e17_0%,#0c4608_100%)] p-5 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)]"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_33%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.06),transparent_28%)] opacity-85 transition-opacity duration-300 group-hover:opacity-100" />
-      <div className="pointer-events-none absolute right-4 top-4 flex size-14 items-center justify-center rounded-full bg-white/12 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-105">
+      <div className="pointer-events-none absolute right-5 top-5 flex size-14 items-center justify-center rounded-full bg-white/12 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-105">
         <IndianRupee className="size-5.5" aria-hidden="true" />
       </div>
 
-      <div className="min-w-0 pr-16">
+      <div className="min-w-0 pr-20">
         <p className="max-w-full whitespace-nowrap text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/78">
           TODAY&apos;S SALES
         </p>
@@ -347,7 +347,7 @@ function FeaturedSalesCard({
         </p>
       </div>
 
-      <div className="relative mt-8 grid grid-cols-2 gap-x-8 gap-y-2">
+      <div className="relative mt-10 grid grid-cols-2 gap-x-8 gap-y-2">
         <div className="min-w-0">
           <p className="text-[0.92rem] font-semibold leading-none text-white/90">Received</p>
           <p className="mt-1 truncate text-[1.50rem] font-semibold leading-none tracking-tight text-white">
@@ -364,7 +364,7 @@ function FeaturedSalesCard({
 
       <div className="flex-1" />
 
-      <div className="mb-5 grid grid-cols-3 divide-x divide-white/25 text-left">
+      <div className="mb-4 grid grid-cols-3 divide-x divide-white/25 text-left">
         <div className="pr-3">
           <p className="text-[0.78rem] font-semibold leading-none text-white/88">Orders</p>
           <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
@@ -458,7 +458,7 @@ function DashboardCard({ className = '', ...props }) {
   return (
     <Card
       {...props}
-      className={`p-4 [&>div:first-child]:mb-3 [&>div:first-child_h3]:text-[0.95rem] [&>div:first-child_h3]:leading-5 [&>div:first-child_p]:text-[0.76rem] [&>div:first-child_p]:leading-4 ${className}`}
+      className={`p-5 [&>div:first-child]:mb-4 [&>div:first-child_h3]:text-[0.95rem] [&>div:first-child_h3]:leading-5 [&>div:first-child_p]:text-[0.76rem] [&>div:first-child_p]:leading-4 ${className}`}
     />
   )
 }
@@ -493,10 +493,6 @@ export default function AdminDashboard() {
   const [expenseCategoryNames, setExpenseCategoryNames] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(() => {
-    if (typeof window === 'undefined') return true
-    return window.localStorage.getItem('saas-sidebar-expanded') !== 'false'
-  })
 
   const loadDashboard = useCallback(async (preset, range, scope = {}) => {
     setIsLoading(true)
@@ -786,8 +782,8 @@ export default function AdminDashboard() {
       )
 
   return (
-    <div className="space-y-3 rounded-2xl bg-transparent">
-      <div className="overflow-hidden rounded-2xl border border-white/70 bg-white p-2.5 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+    <div className="space-y-4 rounded-2xl bg-transparent">
+      <div className="overflow-hidden rounded-2xl border border-white/70 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
         <div className="grid w-full grid-cols-[1fr_repeat(4,minmax(0,1fr))_84px] items-end gap-1.5">
           <FilterField label="Period">
             <Select
@@ -894,7 +890,7 @@ export default function AdminDashboard() {
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-2 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
         <div className="min-w-0 self-start">
           <FeaturedSalesCard
             salesAmount={todaysSalesAmount}
@@ -906,9 +902,7 @@ export default function AdminDashboard() {
           />
         </div>
         <div
-          className={`grid min-w-0 w-full self-start content-start grid-cols-1 gap-2.5 transition-[padding] duration-300 md:grid-cols-2 xl:grid-cols-6 ${
-            isSidebarExpanded ? 'pl-0' : 'pl-2'
-          }`}
+          className="grid min-w-0 w-full self-start content-start grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6"
         >
           <KpiCard
             title="This Month Sales"
@@ -951,10 +945,10 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="space-y-3 ">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="space-y-4">
           <div className="border-0 bg-transparent p-0 shadow-none hover:shadow-none">
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-5 gap-2">
               <button className="flex min-h-[76px] min-w-0 bg-white flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 px-1 py-3 text-center text-primary-700 shadow-none">
                 <ShoppingCart className="size-3.5 shrink-0  " />
                 <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
@@ -1102,8 +1096,8 @@ export default function AdminDashboard() {
 
         </div>
 
-        <div className="space-y-3.5 xl:-mt-37">
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+        <div className="space-y-4 xl:-mt-37">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
             <DashboardCard
               title="Cashflow"
               subtitle={`Net for period ${formatCurrency(summary.period_sales ?? summary.month_sales)}`}
@@ -1208,7 +1202,7 @@ export default function AdminDashboard() {
             </DashboardCard>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
             <DashboardCard
               title="Sales Trend"
               subtitle={rangeLabel}
@@ -1324,7 +1318,7 @@ export default function AdminDashboard() {
             </DashboardCard>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <DashboardCard
               title="Top Selling Products"
               subtitle={topProductsMetric === 'amount' ? 'Amount' : 'Quantity'}

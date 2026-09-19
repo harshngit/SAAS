@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Edit, Eye, Plus, Power, RotateCw, Search, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Edit, Eye, Plus, Power, RotateCw, Search, SlidersHorizontal, Trash2, Users, Wallet, X } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -48,6 +48,10 @@ export default function SupplierList() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [sortFilter, setSortFilter] = useState('recent')
   const [searchTerm, setSearchTerm] = useState('')
+  const [pageSize, setPageSize] = useState('10')
+  const [page, setPage] = useState(1)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [selectedIds, setSelectedIds] = useState([])
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState(null)
   const [isPreparingEdit, setIsPreparingEdit] = useState(false)
@@ -173,6 +177,51 @@ export default function SupplierList() {
       return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
     })
   }, [categoryFilter, searchTerm, sortFilter, statusFilter, suppliers])
+
+  const supplierSummary = useMemo(() => ({
+    total: filteredSuppliers.length,
+    active: filteredSuppliers.filter((supplier) => supplier.status === 'active').length,
+    inactive: filteredSuppliers.filter((supplier) => supplier.status !== 'active').length,
+    payable: filteredSuppliers.reduce((sum, supplier) => sum + Number(supplier.outstandingPayable || 0), 0),
+  }), [filteredSuppliers])
+
+  const totalPages = Math.max(1, Math.ceil(filteredSuppliers.length / Number(pageSize)))
+  const currentPage = Math.min(page, totalPages)
+  const visibleSuppliers = filteredSuppliers.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize))
+  const rangeStart = filteredSuppliers.length === 0 ? 0 : (currentPage - 1) * Number(pageSize) + 1
+  const rangeEnd = Math.min(filteredSuppliers.length, currentPage * Number(pageSize))
+  const allVisibleSelected = visibleSuppliers.length > 0 && visibleSuppliers.every((supplier) => selectedIds.includes(supplier.id))
+
+  const toggleAllVisible = () => setSelectedIds((current) => allVisibleSelected
+    ? current.filter((id) => !visibleSuppliers.some((supplier) => supplier.id === id))
+    : [...new Set([...current, ...visibleSuppliers.map((supplier) => supplier.id)])])
+
+  const exportSuppliersCsv = (onlySelected = false) => {
+    const rows = [
+      ['Supplier', 'Category', 'Contact', 'City', 'Product Count', 'Total Purchases', 'Outstanding Payable', 'Status'],
+      ...filteredSuppliers.filter((supplier) => !onlySelected || selectedIds.includes(supplier.id)).map((supplier) => [supplier.name, supplier.category, supplier.contactPerson, supplier.city, getProductCount(supplier), formatCurrency(supplier.totalPurchases), formatCurrency(supplier.outstandingPayable), formatSupplierStatus(supplier.status)]),
+    ]
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'suppliers.csv'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleBulkDelete = async () => {
+    if (!selectedIds.length || !window.confirm(`Delete ${selectedIds.length} selected supplier${selectedIds.length === 1 ? '' : 's'}?`)) return
+    setIsDeleting(true)
+    const results = await Promise.all(selectedIds.map((id) => DEMO_MODE ? Promise.resolve({ success: true }) : deleteSupplier(id)))
+    const failed = results.find((result) => !result.success)
+    if (failed) { setDeleteError(failed.error || 'Some suppliers could not be deleted.'); setIsDeleting(false); return }
+    setSuppliers((current) => current.filter((supplier) => !selectedIds.includes(supplier.id)))
+    setSelectedIds([])
+    setIsDeleting(false)
+  }
 
   const handleOpenForm = async (supplier = null) => {
     setFormError('')
@@ -369,71 +418,37 @@ export default function SupplierList() {
   }
 
   return (
-    <div className="space-y-5">
-      <Card className="p-0">
-        <div className="border-b border-neutral-100 px-4 py-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-5">
-              {supplierStatusTabs.map((tab) => {
-                const isActive = statusFilter === tab.value
-
-                return (
-                  <button
-                    key={tab.value}
-                    type="button"
-                    onClick={() => setStatusFilter(tab.value)}
-                    className={`relative py-2 text-sm font-medium transition-colors ${
-                      isActive ? 'text-primary-700' : 'text-neutral-500 hover:text-neutral-900'
-                    }`}
-                  >
-                    {tab.label}
-                    {isActive && (
-                      <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-600" aria-hidden="true" />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-            <Button onClick={() => handleOpenForm()} size="sm" className="w-full sm:w-auto">
-              <Plus className="size-4" aria-hidden="true" />
-              Add Supplier
-            </Button>
-          </div>
-        </div>
-
-        <div className="border-b border-neutral-100 px-4 py-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative w-full sm:w-80">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search suppliers, contact, phone, email"
-                  className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                />
+    <div className="listing-page space-y-4">
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Suppliers</h1><p className="mt-1 text-xs text-neutral-400">{filteredSuppliers.length} suppliers in view</p></div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search suppliers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportSuppliersCsv()}><Download className="size-4" />Export</Button>
+                <Button onClick={() => handleOpenForm()} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Supplier</Button>
               </div>
-              <Select
-                options={[{ value: 'all', label: 'All supplier types' }, ...supplierCategoryOptions.map((category) => ({ value: category, label: category }))]}
-                value={categoryFilter}
-                onChange={(event) => setCategoryFilter(event.target.value)}
-                className="sm:w-48"
-              />
-              <Select
-                options={[
-                  { value: 'recent', label: 'Recent' },
-                  { value: 'oldest', label: 'Oldest' },
-                ]}
-                value={sortFilter}
-                onChange={(event) => setSortFilter(event.target.value)}
-                className="sm:w-40"
-              />
             </div>
           </div>
+          <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
+            {[
+              { label: 'Total Suppliers', value: supplierSummary.total, detail: `${supplierSummary.active} active`, icon: Users },
+              { label: 'Active Suppliers', value: supplierSummary.active, detail: 'currently active', icon: Power },
+              { label: 'Inactive Suppliers', value: supplierSummary.inactive, detail: 'needs review', icon: Users },
+              { label: 'Outstanding Payable', value: formatCurrency(supplierSummary.payable), detail: 'total balance', icon: Wallet },
+            ].map(({ label, value, detail, icon: Icon }, index) => (
+              <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-[#6b86ad]">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>
+            ))}
+          </div>
         </div>
+      </Card>
 
-        <div className="overflow-x-auto bg-neutral-50/35 py-4">
+      {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} supplier{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-white px-3" onClick={() => exportSuppliersCsv(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
+
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto bg-white px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -484,27 +499,29 @@ export default function SupplierList() {
                 </div>
               ))}
             </div>
-            <table className="hidden w-full min-w-[900px] text-left text-sm md:table">
+            <table className="listing-table hidden w-full min-w-[72rem] text-left text-sm md:table">
               <thead>
-                <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  <th className="whitespace-nowrap px-4 py-3">Supplier</th>
-                  <th className="whitespace-nowrap px-4 py-3">Contact</th>
-                  <th className="whitespace-nowrap px-4 py-3">City</th>
-                  <th className="whitespace-nowrap px-4 py-3">Product Count</th>
-                  <th className="whitespace-nowrap px-4 py-3">Total Purchases</th>
-                  <th className="whitespace-nowrap px-4 py-3">Outstanding Payable</th>
-                  <th className="whitespace-nowrap px-4 py-3">Status</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
+                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                  <th className="w-14 px-6 py-6"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all suppliers" /></th>
+                  <th className="whitespace-nowrap px-6 py-6">Supplier</th>
+                  <th className="whitespace-nowrap px-6 py-6">Contact</th>
+                  <th className="whitespace-nowrap px-6 py-6">City</th>
+                  <th className="whitespace-nowrap px-6 py-6">Product Count</th>
+                  <th className="whitespace-nowrap px-6 py-6">Total Purchases</th>
+                  <th className="whitespace-nowrap px-6 py-6">Outstanding Payable</th>
+                  <th className="whitespace-nowrap px-6 py-6">Status</th>
+                  <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredSuppliers.map((supplier) => (
+                {visibleSuppliers.map((supplier) => (
                   <tr
                     key={supplier.id}
                     onClick={() => navigate(`/admin/suppliers/${supplier.id}`)}
-                    className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                    className="cursor-pointer bg-white transition-colors hover:bg-primary-50/30"
                   >
-                    <td className="px-4 py-3.5">
+                    <td className="px-6 py-5 align-middle" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(supplier.id)} onChange={() => setSelectedIds((current) => current.includes(supplier.id) ? current.filter((id) => id !== supplier.id) : [...current, supplier.id])} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label={`Select ${supplier.name}`} /></td>
+                    <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <div className="flex size-9 items-center justify-center rounded-full bg-primary-50 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">
                           {getInitials(supplier.name)}
@@ -515,28 +532,28 @@ export default function SupplierList() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-neutral-600">
+                    <td className="px-6 py-5 text-neutral-600">
                       <span>{supplier.contactPerson || '-'}</span>
                       <p className="mt-0.5 text-xs text-neutral-400">{supplier.phone}</p>
                     </td>
-                    <td className="px-4 py-3.5 text-neutral-600">{supplier.city || '-'}</td>
-                    <td className="px-4 py-3.5 text-neutral-600">{getProductCount(supplier)}</td>
-                    <td className="px-4 py-3.5 font-medium text-neutral-700">
+                    <td className="px-6 py-5 text-neutral-600">{supplier.city || '-'}</td>
+                    <td className="px-6 py-5 text-neutral-600">{getProductCount(supplier)}</td>
+                    <td className="px-6 py-5 font-medium text-neutral-700">
                       {formatCurrency(supplier.totalPurchases)}
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-6 py-5">
                       {supplier.outstandingPayable > 0 ? (
                         <Badge variant="warning">{formatCurrency(supplier.outstandingPayable)}</Badge>
                       ) : (
                         <span className="font-medium text-neutral-700">{formatCurrency(0)}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-6 py-5">
                       <Badge variant={supplier.status === 'active' ? 'success' : 'neutral'}>
                         {formatSupplierStatus(supplier.status)}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
+                    <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
                       <ActionMenu
                         items={[
                           { label: 'View Details', icon: Eye, onClick: () => navigate(`/admin/suppliers/${supplier.id}`) },
@@ -563,13 +580,26 @@ export default function SupplierList() {
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-xs text-neutral-400">
-          <span>
-            {filteredSuppliers.length === 0 ? '0' : `1 to ${filteredSuppliers.length}`} of {suppliers.length}
-          </span>
-          <span>Suppliers</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-white px-5 py-4 text-xs text-[#6f89b0]">
+          <div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredSuppliers.length}</span></span><span className="hidden text-neutral-300 sm:inline">|</span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-white py-1 text-xs" /></label></div>
+          <div className="flex items-center gap-1.5"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Previous page"><ChevronLeft className="size-4" /></button><span className="min-w-14 text-center font-medium text-[#082445]">{currentPage} / {totalPages}</span><button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Next page"><ChevronRight className="size-4" /></button></div>
         </div>
       </Card>
+
+      {isFilterOpen && (
+        <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Supplier filters">
+          <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" />
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4"><div><h2 className="text-lg font-semibold text-neutral-900">Filter Suppliers</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the suppliers shown in the table.</p></div><button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button></div>
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={supplierStatusTabs.map((tab) => ({ value: tab.value, label: tab.label }))} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category<Select options={[{ value: 'all', label: 'All supplier types' }, ...supplierCategoryOptions.map((category) => ({ value: category, label: category }))]} value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1) }} /></label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort<Select options={[{ value: 'recent', label: 'Recent' }, { value: 'oldest', label: 'Oldest' }]} value={sortFilter} onChange={(event) => { setSortFilter(event.target.value); setPage(1) }} /></label>
+            </div>
+            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSortFilter('recent'); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
+          </aside>
+        </div>
+      )}
 
       <Modal
         isOpen={Boolean(statusSupplier)}

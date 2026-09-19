@@ -128,6 +128,7 @@ export default function Topbar() {
     .filter((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))
     .sort((a, b) => b.path.length - a.path.length)[0]
   const pageTitle = activeMenuItem?.label || formatPathTitle(location.pathname)
+  const pageSubtitle = pageTitle === 'Leads' ? 'Unified feed from WhatsApp, website form & calls' : ''
 
   const initials = currentUser.name
     .split(' ')
@@ -154,19 +155,21 @@ export default function Topbar() {
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3">
-      {pageTitle == 'Dashboard' && (
-        <div className="relative hidden w-full max-w-[650px] sm:block lg:mx-auto">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+      <div className="ml-4 min-w-0">
+        <h1 className="truncate text-xl font-semibold tracking-tight text-[#082445]">{pageTitle}</h1>
+        {pageSubtitle && <p className="mt-0.5 hidden truncate text-sm text-[#6f89b0] sm:block">{pageSubtitle}</p>}
+      </div>
+
+      <div className="ml-auto flex min-w-0 items-center gap-3 sm:gap-5">
+        {logoutError && <p className="hidden text-sm text-red-600 md:block">{logoutError}</p>}
+        <div className="relative hidden min-w-0 w-[min(34rem,42vw)] md:block">
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-4.5 -translate-y-1/2 text-[#8fa5c6]" />
           <input
-            type="text"
-            placeholder="Search deliveries, customers, orders..."
-            className="w-full rounded-full border border-neutral-200 bg-white py-2.5 pl-11 pr-4 text-sm text-neutral-700 shadow-[0_10px_22px_-18px_rgb(15_23_42/0.18)] transition-all placeholder:text-neutral-400 focus:border-neutral-300 focus:outline-none focus:ring-4 focus:ring-primary-500/10"
+            type="search"
+            placeholder="Search customers, jobs, quotes..."
+            className="w-full rounded-xl border border-[#dfe6f2] bg-[#f8faff] py-2.5 pl-11 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-[#9fb0cf] focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/10"
           />
         </div>
-      )}
-
-      <div className="ml-auto flex items-center gap-5">
-        {logoutError && <p className="hidden text-sm text-red-600 md:block">{logoutError}</p>}
         <button
           type="button"
           aria-label="Help"

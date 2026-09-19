@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarPlus, CalendarClock, Check, Edit, Eye, Filter, ImageIcon, Plus, RotateCw, Search, Tags, Trash2, Upload } from 'lucide-react'
+import { CalendarPlus, CalendarClock, Check, Download, Edit, Eye, Filter, ImageIcon, Plus, RotateCw, Search, Tags, Trash2, Upload } from 'lucide-react'
 import {
   createCategory,
   deleteCategoriesBulk,
@@ -211,6 +211,8 @@ export default function CategoryList() {
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false)
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
+  const [pageSize, setPageSize] = useState('10')
+  const [page, setPage] = useState(1)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
   const [viewCategory, setViewCategory] = useState(null)
@@ -244,8 +246,12 @@ export default function CategoryList() {
     })
   }, [categoryFilter, categorySort, categories, searchTerm])
 
-  const allVisibleSelected =
-    filteredCategories.length > 0 && filteredCategories.every((category) => selectedIds.includes(category.id))
+  const totalPages = Math.max(1, Math.ceil(filteredCategories.length / Number(pageSize)))
+  const currentPage = Math.min(page, totalPages)
+  const visibleCategories = filteredCategories.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize))
+  const allVisibleSelected = visibleCategories.length > 0 && visibleCategories.every((category) => selectedIds.includes(category.id))
+  const rangeStart = filteredCategories.length === 0 ? 0 : (currentPage - 1) * Number(pageSize) + 1
+  const rangeEnd = Math.min(filteredCategories.length, currentPage * Number(pageSize))
 
   const loadCategories = useCallback(async () => {
     setIsLoading(true)
@@ -367,11 +373,24 @@ export default function CategoryList() {
 
   const toggleVisibleSelected = () => {
     if (allVisibleSelected) {
-      setSelectedIds((current) => current.filter((id) => !filteredCategories.some((category) => category.id === id)))
+      setSelectedIds((current) => current.filter((id) => !visibleCategories.some((category) => category.id === id)))
       return
     }
 
-    setSelectedIds((current) => [...new Set([...current, ...filteredCategories.map((category) => category.id)])])
+    setSelectedIds((current) => [...new Set([...current, ...visibleCategories.map((category) => category.id)])])
+  }
+
+  const exportSelectedCategories = () => {
+    const rows = [['Category', 'Parent', 'Description'], ...categories.filter((category) => selectedIds.includes(category.id)).map((category) => [category.name, category.parentId ? categories.find((item) => item.id === category.parentId)?.name || '' : '', category.description])]
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'categories.csv'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
   }
 
   const handleDelete = async () => {
@@ -396,7 +415,7 @@ export default function CategoryList() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="listing-page space-y-4">
       <Card className="p-0">
         <div className="border-b border-neutral-100 px-4 py-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -406,15 +425,7 @@ export default function CategoryList() {
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               {selectedIds.length > 0 && (
-                <Button
-                  type="button"
-                  variant="danger"
-                  size="sm"
-                  onClick={() => setDeleteTarget({ type: 'bulk' })}
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                  Delete Selected
-                </Button>
+                <div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" onClick={exportSelectedCategories}><Download className="size-4" aria-hidden="true" />Download</Button><Button type="button" variant="danger" size="sm" onClick={() => setDeleteTarget({ type: 'bulk' })}><Trash2 className="size-4" aria-hidden="true" />Delete Selected</Button></div>
               )}
               <Button type="button" size="sm" onClick={() => navigate('/admin/categories/new')}>
                 <Plus className="size-4" aria-hidden="true" />
@@ -544,7 +555,18 @@ export default function CategoryList() {
           </div>
         </div>
 
-        <div className="overflow-x-auto bg-neutral-50/35 py-4">
+        <div className="grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
+          {[
+            { label: 'Total Categories', value: categories.length, detail: `${categories.filter((category) => category.image).length} with image`, icon: Tags },
+            { label: 'With Image', value: categories.filter((category) => category.image).length, detail: 'catalog visuals', icon: ImageIcon },
+            { label: 'Top-level', value: categories.filter((category) => !category.parentId).length, detail: 'parent categories', icon: CalendarPlus },
+            { label: 'Subcategories', value: categories.filter((category) => category.parentId).length, detail: 'nested categories', icon: CalendarClock },
+          ].map(({ label, value, detail, icon: Icon }, index) => (
+            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-[#6b86ad]">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>
+          ))}
+        </div>
+
+        <div className="overflow-x-auto bg-white px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -567,10 +589,10 @@ export default function CategoryList() {
           ) : filteredCategories.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No categories match this search or filter.</p>
           ) : (
-            <table className="w-full text-left text-sm">
+            <table className="listing-table w-full min-w-[64rem] text-left text-sm">
               <thead>
-                <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  <th className="w-10 px-4 py-3">
+                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                  <th className="w-14 px-6 py-6">
                     <input
                       type="checkbox"
                       checked={allVisibleSelected}
@@ -579,17 +601,17 @@ export default function CategoryList() {
                       className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                     />
                   </th>
-                  <th className="whitespace-nowrap px-4 py-3">Category</th>
-                  <th className="whitespace-nowrap px-4 py-3">Parent</th>
-                  <th className="whitespace-nowrap px-4 py-3">Image</th>
-                  <th className="whitespace-nowrap px-4 py-3">Description</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
+                  <th className="whitespace-nowrap px-6 py-6">Category</th>
+                  <th className="whitespace-nowrap px-6 py-6">Parent</th>
+                  <th className="whitespace-nowrap px-6 py-6">Image</th>
+                  <th className="whitespace-nowrap px-6 py-6">Description</th>
+                  <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredCategories.map((category) => (
-                  <tr key={category.id} className="bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35">
-                    <td className="px-4 py-3.5">
+                {visibleCategories.map((category) => (
+                  <tr key={category.id} className="bg-white transition-colors hover:bg-primary-50/30">
+                    <td className="px-6 py-5">
                       <input
                         type="checkbox"
                         checked={selectedIds.includes(category.id)}
@@ -598,7 +620,7 @@ export default function CategoryList() {
                         className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                       />
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <div className="flex size-9 items-center justify-center rounded-full bg-primary-50 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">
                           {getInitials(category.name) || <Tags className="size-4" aria-hidden="true" />}
@@ -606,12 +628,12 @@ export default function CategoryList() {
                         <span className="font-medium text-neutral-900">{category.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-neutral-600">
+                    <td className="px-6 py-5 text-neutral-600">
                       {category.parentId ? categories.find((item) => item.id === category.parentId)?.name || '—' : (
                         <span className="text-neutral-300">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-6 py-5">
                       {category.image ? (
                       <img
                           src={category.image}
@@ -624,10 +646,10 @@ export default function CategoryList() {
                         </div>
                       )}
                     </td>
-                    <td className="max-w-xl px-4 py-3.5 text-neutral-600">
+                    <td className="max-w-xl px-6 py-5 text-neutral-600">
                       <span className="line-clamp-2">{category.description || '-'}</span>
                     </td>
-                    <td className="px-4 py-3.5 text-right">
+                    <td className="px-6 py-5 text-right">
                       <ActionMenu
                         items={[
                           { label: 'View Details', icon: Eye, onClick: () => handleViewDetails(category) },
@@ -648,11 +670,9 @@ export default function CategoryList() {
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-xs text-neutral-400">
-          <span>
-            {filteredCategories.length === 0 ? '0' : `1 to ${filteredCategories.length}`} of {categories.length}
-          </span>
-          <span>Categories</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-4 text-xs text-[#6f89b0]">
+          <div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredCategories.length}</span></span><span className="hidden text-neutral-300 sm:inline">|</span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-white py-1 text-xs" /></label></div>
+          <div className="flex items-center gap-1.5"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Previous page">‹</button><span className="min-w-14 text-center font-medium text-[#082445]">{currentPage} / {totalPages}</span><button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Next page">›</button></div>
         </div>
       </Card>
 

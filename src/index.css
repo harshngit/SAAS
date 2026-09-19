@@ -167,6 +167,68 @@ body {
   display: none;
 }
 
+/* Shared visual language for primary list tables. */
+.listing-table thead tr {
+  border-bottom: 1px solid #e3e9f3;
+  background: #f8faff;
+}
+
+.listing-table thead th {
+  padding: 1.25rem 1.5rem;
+  color: #a0b0cf;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.listing-table tbody tr {
+  border-bottom: 1px solid #e7ebf3;
+  background: #fff;
+  transition: background-color 160ms ease;
+}
+
+.listing-table tbody tr:hover {
+  background: #f7faf8;
+}
+
+.listing-table tbody td {
+  padding: 1.25rem 1.5rem;
+}
+
+/* Keep standard tables consistent even on feature pages that use inline table markup. */
+main table:not(.od-products):not(.dd-products):not(.listing-table) thead tr {
+  border-bottom: 1px solid #e3e9f3;
+  background: #f8faff;
+}
+
+main table:not(.od-products):not(.dd-products):not(.listing-table) thead th {
+  padding: 1.25rem 1.5rem;
+  color: #a0b0cf;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+main table:not(.od-products):not(.dd-products):not(.listing-table) tbody tr {
+  border-bottom: 1px solid #e7ebf3;
+  background: #fff;
+  transition: background-color 160ms ease;
+}
+
+main table:not(.od-products):not(.dd-products):not(.listing-table) tbody tr:hover {
+  background: #f7faf8;
+}
+
+main table:not(.od-products):not(.dd-products):not(.listing-table) tbody td {
+  padding: 1.25rem 1.5rem;
+}
+
 .dashboard-page-content > :first-child > :first-child:has(> h1:first-child) > h1:first-child,
 .dashboard-page-content > :first-child > :first-child:has(> h1:first-child) > h1:first-child + p,
 .dashboard-page-content > :first-child > :first-child:has(> div > h1:first-child) > div:first-child > h1:first-child,

@@ -91,10 +91,10 @@ export default function DataTable({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-xs)">
-        <table className="w-full text-left text-sm">
+      <div className="overflow-x-auto rounded-2xl border border-neutral-100 bg-white">
+        <table className="listing-table w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-neutral-100 bg-neutral-50/80">
+            <tr className="border-y border-neutral-100 bg-white">
               {columns.map((column) => (
                 <th
                   key={column.key}
@@ -125,7 +125,7 @@ export default function DataTable({
               {actions && <th className="w-12 px-4 py-2.5" />}
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-50">
+          <tbody className="divide-y divide-neutral-100">
             {loading ? (
               <tr>
                 <td colSpan={colSpan}>
@@ -148,12 +148,12 @@ export default function DataTable({
                     className={`transition-colors hover:bg-primary-50/35 ${clickable ? 'cursor-pointer' : ''}`}
                   >
                     {columns.map((column) => (
-                      <td key={column.key} className={`px-4 py-2.5 text-neutral-700 ${alignClass(column.align)}`}>
+                      <td key={column.key} className={`px-4 py-3.5 text-neutral-700 ${alignClass(column.align)}`}>
                         {column.render ? column.render(row) : row[column.key]}
                       </td>
                     ))}
                     {actions && (
-                      <td className="px-4 py-2.5 text-right" onClick={(event) => event.stopPropagation()}>
+                        <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
                         <ActionMenu items={actions(row)} />
                       </td>
                     )}

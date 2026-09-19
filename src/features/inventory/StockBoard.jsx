@@ -255,7 +255,7 @@ export default function StockBoard({ readOnly = false }) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="listing-page space-y-5">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={Boxes} iconVariant="primary" label="Tracked Products" value={stats.totalProducts} />
         <StatCard icon={Package} iconVariant="info" label="Total Stock Units" value={stats.totalStock.toLocaleString()} />
@@ -333,7 +333,7 @@ export default function StockBoard({ readOnly = false }) {
           ) : filteredItems.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No stock items match these filters.</p>
           ) : (
-            <table className="w-full text-left text-sm">
+            <table className="listing-table w-full text-left text-sm">
               <thead>
                 <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
                   <th className="whitespace-nowrap px-4 py-3">Product</th>

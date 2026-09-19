@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Award, Check, Edit, Filter, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
+import { Award, Check, Download, Edit, Eye, Filter, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import {
   createBrand,
   deleteBrand,
@@ -14,6 +14,7 @@ import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
+import Select from '../../components/ui/Select'
 
 const emptyForm = {
   name: '',
@@ -121,6 +122,8 @@ export default function BrandList() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
+  const [pageSize, setPageSize] = useState('10')
+  const [page, setPage] = useState(1)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingBrand, setEditingBrand] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -164,8 +167,12 @@ export default function BrandList() {
     })
   }, [brands, searchTerm, statusFilter])
 
-  const allVisibleSelected =
-    filteredBrands.length > 0 && filteredBrands.every((brand) => selectedIds.includes(brand.id))
+  const totalPages = Math.max(1, Math.ceil(filteredBrands.length / Number(pageSize)))
+  const currentPage = Math.min(page, totalPages)
+  const visibleBrands = filteredBrands.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize))
+  const allVisibleSelected = visibleBrands.length > 0 && visibleBrands.every((brand) => selectedIds.includes(brand.id))
+  const rangeStart = filteredBrands.length === 0 ? 0 : (currentPage - 1) * Number(pageSize) + 1
+  const rangeEnd = Math.min(filteredBrands.length, currentPage * Number(pageSize))
 
   const openForm = (brand = null) => {
     setEditingBrand(brand)
@@ -213,11 +220,24 @@ export default function BrandList() {
 
   const toggleVisibleSelected = () => {
     if (allVisibleSelected) {
-      setSelectedIds((current) => current.filter((id) => !filteredBrands.some((brand) => brand.id === id)))
+      setSelectedIds((current) => current.filter((id) => !visibleBrands.some((brand) => brand.id === id)))
       return
     }
 
-    setSelectedIds((current) => [...new Set([...current, ...filteredBrands.map((brand) => brand.id)])])
+    setSelectedIds((current) => [...new Set([...current, ...visibleBrands.map((brand) => brand.id)])])
+  }
+
+  const exportSelectedBrands = () => {
+    const rows = [['Brand', 'Description', 'Status'], ...brands.filter((brand) => selectedIds.includes(brand.id)).map((brand) => [brand.name, brand.description, brand.isActive ? 'Active' : 'Inactive'])]
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'brands.csv'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
   }
 
   const handleDelete = async () => {
@@ -242,7 +262,7 @@ export default function BrandList() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="listing-page space-y-4">
       <Card className="p-0">
         <div className="border-b border-neutral-100 px-4 py-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -252,10 +272,10 @@ export default function BrandList() {
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               {selectedIds.length > 0 && (
-                <Button type="button" variant="danger" size="sm" onClick={() => setDeleteTarget({ type: 'bulk' })}>
-                  <Trash2 className="size-4" aria-hidden="true" />
-                  Delete Selected
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={exportSelectedBrands}><Download className="size-4" aria-hidden="true" />Download</Button>
+                  <Button type="button" variant="danger" size="sm" onClick={() => setDeleteTarget({ type: 'bulk' })}><Trash2 className="size-4" aria-hidden="true" />Delete Selected</Button>
+                </div>
               )}
               <Button type="button" size="sm" onClick={() => openForm()}>
                 <Plus className="size-4" aria-hidden="true" />
@@ -331,7 +351,7 @@ export default function BrandList() {
           </div>
         </div>
 
-        <div className="overflow-x-auto bg-neutral-50/35 py-4">
+        <div className="overflow-x-auto bg-white px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -354,10 +374,10 @@ export default function BrandList() {
           ) : filteredBrands.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No brands match this search or filter.</p>
           ) : (
-            <table className="w-full text-left text-sm">
+            <table className="listing-table w-full min-w-[54rem] text-left text-sm">
               <thead>
-                <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  <th className="w-10 px-4 py-3">
+                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                  <th className="w-14 px-6 py-6">
                     <input
                       type="checkbox"
                       checked={allVisibleSelected}
@@ -366,16 +386,16 @@ export default function BrandList() {
                       className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                     />
                   </th>
-                  <th className="whitespace-nowrap px-4 py-3">Brand</th>
-                  <th className="whitespace-nowrap px-4 py-3">Description</th>
-                  <th className="whitespace-nowrap px-4 py-3">Status</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
+                  <th className="whitespace-nowrap px-6 py-6">Brand</th>
+                  <th className="whitespace-nowrap px-6 py-6">Description</th>
+                  <th className="whitespace-nowrap px-6 py-6">Status</th>
+                  <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredBrands.map((brand) => (
-                  <tr key={brand.id} className="bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35">
-                    <td className="px-4 py-3.5">
+                {visibleBrands.map((brand) => (
+                  <tr key={brand.id} className="bg-white transition-colors hover:bg-primary-50/30">
+                    <td className="px-6 py-5">
                       <input
                         type="checkbox"
                         checked={selectedIds.includes(brand.id)}
@@ -384,7 +404,7 @@ export default function BrandList() {
                         className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                       />
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <div className="flex size-9 items-center justify-center rounded-full bg-primary-50 text-primary-700 ring-1 ring-primary-100">
                           <Award className="size-4" aria-hidden="true" />
@@ -392,15 +412,16 @@ export default function BrandList() {
                         <span className="font-medium text-neutral-900">{brand.name}</span>
                       </div>
                     </td>
-                    <td className="max-w-xl px-4 py-3.5 text-neutral-600">
+                    <td className="max-w-xl px-6 py-5 text-neutral-600">
                       <span className="line-clamp-2">{brand.description || '-'}</span>
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-6 py-5">
                       <Badge variant={brand.isActive ? 'success' : 'neutral'} dot>{brand.isActive ? 'Active' : 'Inactive'}</Badge>
                     </td>
-                    <td className="px-4 py-3.5 text-right">
+                    <td className="px-6 py-5 text-right">
                       <ActionMenu
                         items={[
+                          { label: 'View Details', icon: Eye, onClick: () => setEditingBrand(brand) },
                           { label: 'Edit', icon: Edit, onClick: () => openForm(brand) },
                           {
                             label: 'Delete',
@@ -418,11 +439,9 @@ export default function BrandList() {
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-xs text-neutral-400">
-          <span>
-            {filteredBrands.length === 0 ? '0' : `1 to ${filteredBrands.length}`} of {brands.length}
-          </span>
-          <span>Brands</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-4 text-xs text-[#6f89b0]">
+          <div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredBrands.length}</span></span><span className="hidden text-neutral-300 sm:inline">|</span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-white py-1 text-xs" /></label></div>
+          <div className="flex items-center gap-1.5"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Previous page">‹</button><span className="min-w-14 text-center font-medium text-[#082445]">{currentPage} / {totalPages}</span><button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Next page">›</button></div>
         </div>
       </Card>
 

@@ -160,7 +160,7 @@ export default function Sidebar({
     ? 'md:visible md:max-w-48 md:opacity-100 md:delay-150'
     : 'md:invisible md:max-w-0 md:opacity-0 md:delay-0'
   const sectionLabelVisibilityClass = isExpanded
-    ? 'visible max-w-48 whitespace-nowrap opacity-100 delay-150'
+    ? 'visible w-full whitespace-nowrap opacity-100 delay-150'
     : 'invisible max-w-0 opacity-0 delay-0'
   const useCollapsedSectionNav = !isExpanded && menuGroups.length > 1
   const currentPlanName =
@@ -196,8 +196,8 @@ export default function Sidebar({
 
       <aside
         id={id}
-        className={`fixed inset-y-3 left-3 z-50 flex w-[16rem] flex-col overflow-visible rounded-2xl bg-[#eef6eb] shadow-(--shadow-card) transition-transform duration-300 md:static md:inset-auto md:h-full md:translate-x-0 md:rounded-none md:shadow-none md:transition-[width] md:duration-300 md:ease-in-out ${
-          isExpanded ? 'md:w-[16rem]' : 'md:w-[4.75rem]'
+        className={`fixed inset-y-3 left-3 z-50 flex w-[14rem] flex-col overflow-visible rounded-2xl bg-[#eef6eb] shadow-(--shadow-card) transition-transform duration-300 md:static md:inset-auto md:h-full md:translate-x-0 md:rounded-none md:shadow-none md:transition-[width] md:duration-300 md:ease-in-out ${
+          isExpanded ? 'md:w-[14rem]' : 'md:w-[4.75rem]'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'}`}
       >
         

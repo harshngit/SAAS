@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
   Edit,
   MapPin,
   Phone,
   Plus,
   RotateCw,
   Search,
+  SlidersHorizontal,
   Trash2,
   UserCheck,
+  Users,
+  UserX,
+  Wallet,
+  X,
 } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
@@ -27,12 +35,6 @@ import { formatCurrency } from '../../utils/format'
 import CustomerForm from './CustomerForm'
 import { customerCategoryOptions } from './customerConstants'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
-
-const customerStatusTabs = [
-  { value: 'all', label: 'All' },
-  { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
-]
 
 const normalizeCustomer = (customer) => ({
   ...customer,
@@ -104,6 +106,10 @@ export default function CustomerList() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [salesOfficerFilter, setSalesOfficerFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [pageSize, setPageSize] = useState('10')
+  const [page, setPage] = useState(1)
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState([])
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState(null)
   const [isLoadingEditCustomer, setIsLoadingEditCustomer] = useState(false)
@@ -213,6 +219,83 @@ export default function CustomerList() {
       return matchesSearch && matchesType && matchesSalesOfficer && matchesStatus && matchesSalesScope
     })
   }, [currentUser?.id, customers, isAdmin, isSalesOfficer, salesOfficerFilter, searchTerm, statusFilter, typeFilter])
+
+  const customerSummary = useMemo(() => ({
+    total: filteredCustomers.length,
+    active: filteredCustomers.filter((customer) => customer.status === 'active').length,
+    inactive: filteredCustomers.filter((customer) => customer.status === 'inactive').length,
+    outstanding: filteredCustomers.reduce((sum, customer) => sum + Number(customer.outstandingBalance || 0), 0),
+  }), [filteredCustomers])
+
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / Number(pageSize)))
+  const currentPage = Math.min(page, totalPages)
+  const visibleCustomers = filteredCustomers.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize))
+  const rangeStart = filteredCustomers.length === 0 ? 0 : (currentPage - 1) * Number(pageSize) + 1
+  const rangeEnd = Math.min(filteredCustomers.length, currentPage * Number(pageSize))
+  const allVisibleSelected = visibleCustomers.length > 0 && visibleCustomers.every((customer) => selectedCustomerIds.includes(customer.id))
+
+  const toggleCustomerSelection = (customerId) => {
+    setSelectedCustomerIds((current) => (
+      current.includes(customerId)
+        ? current.filter((id) => id !== customerId)
+        : [...current, customerId]
+    ))
+  }
+
+  const toggleAllVisibleCustomers = () => {
+    setSelectedCustomerIds((current) => {
+      if (allVisibleSelected) {
+        return current.filter((id) => !visibleCustomers.some((customer) => customer.id === id))
+      }
+
+      return [...new Set([...current, ...visibleCustomers.map((customer) => customer.id)])]
+    })
+  }
+
+  const exportCustomersCsv = () => {
+    const customersToExport = filteredCustomers.filter((customer) => selectedCustomerIds.includes(customer.id))
+    const rows = [
+      ['Customer', 'Category', 'Contact Person', 'Location', 'Sales Officer', 'Last Order', 'Last Visit', 'Outstanding', 'Status'],
+      ...customersToExport.map((customer) => [
+        customer.name,
+        customer.type,
+        customer.contactPerson,
+        customer.city,
+        salesOfficerById.get(customer.assignedSalesOfficerId) || 'Unassigned',
+        formatListDate(customer.lastOrderDate, 'No order yet'),
+        formatListDate(customer.lastVisitDate, 'No visit yet'),
+        formatCurrency(customer.outstandingBalance),
+        customer.status,
+      ]),
+    ]
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'customers.csv'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleBulkDelete = async () => {
+    if (!selectedCustomerIds.length || !window.confirm(`Delete ${selectedCustomerIds.length} selected customer${selectedCustomerIds.length === 1 ? '' : 's'}?`)) return
+
+    setIsDeleting(true)
+    const results = await Promise.all(selectedCustomerIds.map((id) => deleteCustomerApi(id)))
+    const failed = results.find((result) => !result.success)
+
+    if (failed) {
+      setDeleteError(failed.error || 'Some customers could not be deleted.')
+      setIsDeleting(false)
+      return
+    }
+
+    setCustomers((current) => current.filter((customer) => !selectedCustomerIds.includes(customer.id)))
+    setSelectedCustomerIds([])
+    setIsDeleting(false)
+  }
 
   const handleOpenForm = async (customer = null) => {
     setFormError('')
@@ -348,72 +431,63 @@ export default function CustomerList() {
   }
 
   return (
-    <div className="space-y-5">
-      <Card className="p-0">
-        <div className="border-b border-neutral-100 px-4 py-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-5">
-              {customerStatusTabs.map((tab) => {
-                const isActive = statusFilter === tab.value
-
-                return (
-                  <button
-                    key={tab.value}
-                    type="button"
-                    onClick={() => setStatusFilter(tab.value)}
-                    className={`relative py-2 text-sm font-medium transition-colors ${
-                      isActive ? 'text-primary-700' : 'text-neutral-500 hover:text-neutral-900'
-                    }`}
-                  >
-                    {tab.label}
-                    {isActive && (
-                      <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-600" aria-hidden="true" />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-            <RequirePermission module="customers" action="create">
-              <Button onClick={() => handleOpenForm()} size="sm" className="w-full sm:w-auto">
-                <Plus className="size-4" aria-hidden="true" />
-                Add Customer
-              </Button>
-            </RequirePermission>
-          </div>
-        </div>
-
-        <div className="border-b border-neutral-100 px-4 py-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative w-full sm:w-80">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search customers"
-                  className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                />
+    <div className="listing-page space-y-4">
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Customers</h1>
+                <p className="mt-1 text-xs text-neutral-400">{filteredCustomers.length} customers in view</p>
               </div>
-              <Select
-                options={[{ value: 'all', label: 'All categories' }, ...customerCategoryOptions]}
-                value={typeFilter}
-                onChange={(event) => setTypeFilter(event.target.value)}
-                className="sm:w-44"
-              />
-              {isAdmin && (
-                <Select
-                  options={salesOfficerFilterOptions}
-                  value={salesOfficerFilter}
-                  onChange={(event) => setSalesOfficerFilter(event.target.value)}
-                  className="sm:w-56"
-                />
-              )}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="relative w-full sm:w-60">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                  <input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search customers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
+                </div>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button>
+                <RequirePermission module="customers" action="create">
+                  <Button onClick={() => handleOpenForm()} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Customer</Button>
+                </RequirePermission>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="overflow-x-auto bg-neutral-50/35 py-4">
+          <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
+            {[
+              { label: 'Total Customers', value: customerSummary.total, detail: `${customerSummary.active} active`, icon: Users },
+              { label: 'Active Customers', value: customerSummary.active, detail: 'currently active', icon: UserCheck },
+              { label: 'Inactive Customers', value: customerSummary.inactive, detail: 'needs follow-up', icon: UserX },
+              { label: 'Outstanding', value: formatCurrency(customerSummary.outstanding), detail: 'total balance', icon: Wallet },
+            ].map(({ label, value, detail, icon: Icon }, index) => (
+              <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
+                <div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-[#6b86ad]">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]"><Icon className="size-4" /></span></div>
+                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p>
+                <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      {selectedCustomerIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
+          <p className="text-sm font-medium text-primary-900">{selectedCustomerIds.length} customer{selectedCustomerIds.length === 1 ? '' : 's'} selected</p>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-white px-3" onClick={exportCustomersCsv}>
+              <Download className="size-4" aria-hidden="true" />
+              Download
+            </Button>
+            <Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}>
+              <Trash2 className="size-4" aria-hidden="true" />
+              Delete
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto bg-white px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -440,28 +514,46 @@ export default function CustomerList() {
           ) : filteredCustomers.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No customers match these filters.</p>
           ) : (
-            <table className="w-full text-left text-sm">
+            <table className="listing-table w-full min-w-[72rem] text-left text-sm">
               <thead>
-                <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  <th className="whitespace-nowrap px-4 py-3">Customer</th>
-                  <th className="whitespace-nowrap px-4 py-3">Contact Person</th>
-                  <th className="whitespace-nowrap px-4 py-3">Location</th>
-                  <th className="whitespace-nowrap px-4 py-3">Sales Officer</th>
-                  <th className="whitespace-nowrap px-4 py-3">Last Order</th>
-                  <th className="whitespace-nowrap px-4 py-3">Last Visit</th>
-                  <th className="whitespace-nowrap px-4 py-3">Outstanding</th>
-                  <th className="whitespace-nowrap px-4 py-3">Status</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
+                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                  <th className="w-14 px-6 py-6">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleAllVisibleCustomers}
+                      className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                      aria-label="Select all customers"
+                    />
+                  </th>
+                  <th className="min-w-[20rem] whitespace-nowrap px-6 py-6">Customer</th>
+                  <th className="whitespace-nowrap px-6 py-6">Contact Person</th>
+                  <th className="whitespace-nowrap px-6 py-6">Location</th>
+                  <th className="whitespace-nowrap px-6 py-6">Sales Officer</th>
+                  <th className="whitespace-nowrap px-6 py-6">Last Order</th>
+                  <th className="whitespace-nowrap px-6 py-6">Last Visit</th>
+                  <th className="whitespace-nowrap px-6 py-6">Outstanding</th>
+                  <th className="whitespace-nowrap px-6 py-6">Status</th>
+                  <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredCustomers.map((customer) => (
+                {visibleCustomers.map((customer) => (
                   <tr
                     key={customer.id}
                     onClick={() => navigate(`${basePath}/${customer.id}`)}
-                    className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                    className="cursor-pointer bg-white transition-colors hover:bg-primary-50/30"
                   >
-                    <td className="px-4 py-3.5">
+                    <td className="px-6 py-5 align-middle" onClick={(event) => event.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedCustomerIds.includes(customer.id)}
+                        onChange={() => toggleCustomerSelection(customer.id)}
+                        className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                        aria-label={`Select ${customer.name}`}
+                      />
+                    </td>
+                    <td className="min-w-[20rem] px-6 py-5">
                       <div className="flex items-center gap-3">
                         <div className="flex size-9 items-center justify-center overflow-hidden rounded-full bg-primary-50 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">
                           {customer.profileImage ? (
@@ -476,30 +568,30 @@ export default function CustomerList() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-neutral-600">{customer.contactPerson || '—'}</td>
-                    <td className="px-4 py-3.5 text-neutral-600">{customer.city || '—'}</td>
-                    <td className="px-4 py-3.5 text-neutral-600">
+                    <td className="px-6 py-5 text-[#315987]">{customer.contactPerson || '—'}</td>
+                    <td className="px-6 py-5 text-[#315987]">{customer.city || '—'}</td>
+                    <td className="px-6 py-5 text-[#315987]">
                       {salesOfficerById.get(customer.assignedSalesOfficerId) || 'Unassigned'}
                     </td>
-                    <td className="px-4 py-3.5 text-neutral-600">
+                    <td className="px-6 py-5 text-[#315987]">
                       {formatListDate(customer.lastOrderDate, 'No order yet')}
                     </td>
-                    <td className="px-4 py-3.5 text-neutral-600">
+                    <td className="px-6 py-5 text-[#315987]">
                       {formatListDate(customer.lastVisitDate, 'No visit yet')}
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-6 py-5">
                       {customer.outstandingBalance > 0 ? (
                         <Badge variant="warning">{formatCurrency(customer.outstandingBalance)}</Badge>
                       ) : (
                         <span className="font-medium text-neutral-700">{formatCurrency(0)}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-6 py-5">
                       <Badge variant={customer.status === 'active' ? 'success' : 'neutral'}>
                         {customer.status}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
+                    <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
@@ -547,13 +639,36 @@ export default function CustomerList() {
             </table>
           )}
         </div>
-        <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-xs text-neutral-400">
-          <span>
-            {filteredCustomers.length === 0 ? '0' : `1 to ${filteredCustomers.length}`} of {customers.length}
-          </span>
-          <span>Customers</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-white px-5 py-4 text-xs text-[#6f89b0]">
+          <div className="flex items-center gap-3">
+            <span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredCustomers.length}</span></span>
+            <span className="hidden text-neutral-300 sm:inline">|</span>
+            <label className="flex items-center gap-2">Rows per page
+              <Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-white py-1 text-xs" />
+            </label>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Previous page"><ChevronLeft className="size-4" /></button>
+            <span className="min-w-14 text-center font-medium text-[#082445]">{currentPage} / {totalPages}</span>
+            <button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Next page"><ChevronRight className="size-4" /></button>
+          </div>
         </div>
       </Card>
+
+      {isFilterOpen && (
+        <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Customer filters">
+          <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" />
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4"><div><h2 className="text-lg font-semibold text-neutral-900">Filter Customers</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the customers shown in the table.</p></div><button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button></div>
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={[{ value: 'all', label: 'All Statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category<Select options={[{ value: 'all', label: 'All categories' }, ...customerCategoryOptions]} value={typeFilter} onChange={(event) => { setTypeFilter(event.target.value); setPage(1) }} /></label>
+              {isAdmin && <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sales officer<Select options={salesOfficerFilterOptions} value={salesOfficerFilter} onChange={(event) => { setSalesOfficerFilter(event.target.value); setPage(1) }} /></label>}
+            </div>
+            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setTypeFilter('all'); setSalesOfficerFilter('all'); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
+          </aside>
+        </div>
+      )}
 
       <Modal
         isOpen={Boolean(deleteCustomer)}

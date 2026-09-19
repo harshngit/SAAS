@@ -14,7 +14,6 @@ export default function Layout() {
   })
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const location = useLocation()
-  const isDashboardRoute = location.pathname.endsWith('/dashboard')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -52,7 +51,7 @@ export default function Layout() {
   }, [location.pathname])
 
   return (
-    <div className={`h-svh overflow-hidden ${isDashboardRoute ? 'bg-transparent' : 'bg-[#eef6eb]'}`}>
+    <div className="h-svh overflow-hidden bg-white">
       <div className="flex h-full overflow-hidden">
         <Sidebar
           id="dashboard-sidebar"
@@ -62,11 +61,9 @@ export default function Layout() {
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
         <div
-          className={`flex min-w-0 flex-1 flex-col ${
-            isDashboardRoute ? 'bg-transparent md:rounded-l-none md:shadow-none' : 'bg-white md:rounded-l-2xl md:shadow-(--shadow-card)'
-          }`}
+          className="flex min-w-0 flex-1 flex-col bg-white md:rounded-l-2xl md:shadow-(--shadow-card)"
         >
-          <header className="flex h-16 shrink-0 items-center gap-3 bg-transparent pr-7 lg:h-[4.75rem] ">
+          <header className="flex h-20 shrink-0 items-center gap-3 border-b border-neutral-200 bg-white pr-7 lg:h-[5.75rem]">
           <button
             type="button"
             onClick={() => setIsMobileSidebarOpen(true)}
@@ -79,7 +76,7 @@ export default function Layout() {
           </button>
           <Topbar />
           </header>
-          <main className={`flex-1 overflow-y-auto ${isDashboardRoute ? 'rounded-b-none bg-transparent' : 'rounded-b-2xl bg-white'}`}>
+          <main className="flex-1 overflow-y-auto rounded-b-2xl bg-white">
             <PageWrapper>
               <Outlet />
             </PageWrapper>
