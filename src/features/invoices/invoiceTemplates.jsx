@@ -1,4 +1,5 @@
 import { QrCode } from 'lucide-react'
+import { normalizeOrganizationBranding } from '../../api/organizations'
 
 // Shared sample data for the Invoice Settings page's "how will this look" preview - real
 // invoice data (see InvoiceDetail.jsx) is shaped identically and passed as the `data` prop.
@@ -34,6 +35,8 @@ function formatDateLabel(dateString) {
 // both call this - one place that defines what "the invoice" looks like as template props).
 export function buildInvoicePreviewData(invoice, org) {
   const company = org || {}
+  // Branding & Identity assets (Company Settings) - existing upload flow, read-only here.
+  const branding = normalizeOrganizationBranding(org)
 
   return {
     company: {
@@ -41,6 +44,7 @@ export function buildInvoicePreviewData(invoice, org) {
       address: company.registered_address || company.address || '',
       cityLine: [company.city, company.state, company.pin_code].filter(Boolean).join(', '),
       gstin: company.gst_number || '',
+      ...branding,
     },
     invoiceNo: invoice.invoiceNumber,
     invoiceDate: formatDateLabel(invoice.invoiceDate),
@@ -75,11 +79,30 @@ export function ClassicPreview({ primaryColor, fields, footerText, terms, data =
 
   return (
     <div className="space-y-4 font-sans">
+      {/* Company letterhead - A4-style template only, capped height so it never dominates the page. */}
+      {company.letterheadUrl && (
+        <img
+          src={company.letterheadUrl}
+          alt=""
+          className="max-h-16 w-full rounded object-contain"
+          onError={(event) => { event.currentTarget.style.display = 'none' }}
+        />
+      )}
       <div className="flex items-start justify-between border-b-2 pb-3" style={{ borderColor: primaryColor }}>
-        <div>
-          <p className="text-sm font-bold" style={{ color: primaryColor }}>{company.name}</p>
-          <p className="mt-1 leading-4 text-neutral-500">{company.address}<br />{company.cityLine}</p>
-          {fields.show_company_gstin && company.gstin && <p className="mt-1 text-neutral-500">GSTIN: {company.gstin}</p>}
+        <div className="flex items-start gap-2.5">
+          {company.logoUrl && (
+            <img
+              src={company.logoUrl}
+              alt={`${company.name} logo`}
+              className="size-10 shrink-0 rounded object-contain"
+              onError={(event) => { event.currentTarget.style.display = 'none' }}
+            />
+          )}
+          <div>
+            <p className="text-sm font-bold" style={{ color: primaryColor }}>{company.name}</p>
+            <p className="mt-1 leading-4 text-neutral-500">{company.address}<br />{company.cityLine}</p>
+            {fields.show_company_gstin && company.gstin && <p className="mt-1 text-neutral-500">GSTIN: {company.gstin}</p>}
+          </div>
         </div>
         <div className="text-right">
           <p className="text-sm font-semibold tracking-wide text-neutral-900">TAX INVOICE</p>
@@ -143,8 +166,17 @@ export function ClassicPreview({ primaryColor, fields, footerText, terms, data =
           )}
           {fields.show_upi_qr && (
             <div className="flex items-center gap-2">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50">
-                <QrCode className="size-5 text-neutral-400" />
+              <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
+                {company.qrCodeUrl ? (
+                  <img
+                    src={company.qrCodeUrl}
+                    alt="Payment QR code"
+                    className="size-full object-contain"
+                    onError={(event) => { event.currentTarget.style.display = 'none' }}
+                  />
+                ) : (
+                  <QrCode className="size-5 text-neutral-400" />
+                )}
               </div>
               <p className="text-neutral-500">Scan to pay via UPI</p>
             </div>
@@ -170,7 +202,26 @@ export function ClassicPreview({ primaryColor, fields, footerText, terms, data =
         <p className="text-neutral-500">{footerText}</p>
         {fields.show_signature && (
           <div className="text-right">
-            <p className="italic text-neutral-400">Signature</p>
+            <div className="flex items-center justify-end gap-2">
+              {company.stampSealUrl && (
+                <img
+                  src={company.stampSealUrl}
+                  alt="Company stamp"
+                  className="size-11 object-contain"
+                  onError={(event) => { event.currentTarget.style.display = 'none' }}
+                />
+              )}
+              {company.signatureUrl ? (
+                <img
+                  src={company.signatureUrl}
+                  alt="Authorised signatory"
+                  className="h-9 max-w-28 object-contain"
+                  onError={(event) => { event.currentTarget.style.display = 'none' }}
+                />
+              ) : (
+                <p className="italic text-neutral-400">Signature</p>
+              )}
+            </div>
             <p className="mt-1 text-neutral-500">Authorised Signatory</p>
           </div>
         )}
@@ -187,12 +238,31 @@ export function ModernPreview({ primaryColor, fields, footerText, terms, data = 
 
   return (
     <div className="space-y-4 font-sans">
+      {/* Company letterhead - A4-style template only, capped height so it never dominates the page. */}
+      {company.letterheadUrl && (
+        <img
+          src={company.letterheadUrl}
+          alt=""
+          className="max-h-16 w-full rounded-lg object-contain"
+          onError={(event) => { event.currentTarget.style.display = 'none' }}
+        />
+      )}
       <div className="rounded-xl p-4 text-white" style={{ backgroundColor: primaryColor }}>
         <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm font-bold tracking-wide">{company.name}</p>
-            <p className="mt-1 leading-4" style={mutedWhite}>{company.address}<br />{company.cityLine}</p>
-            {fields.show_company_gstin && company.gstin && <p className="mt-1" style={mutedWhite}>GSTIN: {company.gstin}</p>}
+          <div className="flex items-start gap-2.5">
+            {company.logoUrl && (
+              <img
+                src={company.logoUrl}
+                alt={`${company.name} logo`}
+                className="size-9 shrink-0 rounded bg-white/90 object-contain p-0.5"
+                onError={(event) => { event.currentTarget.style.display = 'none' }}
+              />
+            )}
+            <div>
+              <p className="text-sm font-bold tracking-wide">{company.name}</p>
+              <p className="mt-1 leading-4" style={mutedWhite}>{company.address}<br />{company.cityLine}</p>
+              {fields.show_company_gstin && company.gstin && <p className="mt-1" style={mutedWhite}>GSTIN: {company.gstin}</p>}
+            </div>
           </div>
           <div className="text-right">
             <p className="text-sm font-semibold uppercase tracking-widest">Invoice</p>
@@ -239,7 +309,17 @@ export function ModernPreview({ primaryColor, fields, footerText, terms, data = 
           {fields.show_bank_details && bank?.name && <p>{bank.name} · {bank.account}</p>}
           {fields.show_upi_qr && (
             <div className="flex items-center gap-1.5">
-              <QrCode className="size-4" /> Scan to pay
+              {company.qrCodeUrl ? (
+                <img
+                  src={company.qrCodeUrl}
+                  alt="Payment QR code"
+                  className="size-4 object-contain"
+                  onError={(event) => { event.currentTarget.style.display = 'none' }}
+                />
+              ) : (
+                <QrCode className="size-4" />
+              )}
+              Scan to pay
             </div>
           )}
         </div>
@@ -251,7 +331,31 @@ export function ModernPreview({ primaryColor, fields, footerText, terms, data = 
 
       <div className="flex items-end justify-between border-t border-neutral-100 pt-3">
         <p className="text-neutral-500">{footerText}</p>
-        {fields.show_signature && <p className="text-right italic text-neutral-400">Authorised Signatory</p>}
+        {fields.show_signature && (
+          <div className="text-right">
+            {(company.stampSealUrl || company.signatureUrl) && (
+              <div className="mb-1 flex items-center justify-end gap-2">
+                {company.stampSealUrl && (
+                  <img
+                    src={company.stampSealUrl}
+                    alt="Company stamp"
+                    className="size-9 object-contain"
+                    onError={(event) => { event.currentTarget.style.display = 'none' }}
+                  />
+                )}
+                {company.signatureUrl && (
+                  <img
+                    src={company.signatureUrl}
+                    alt="Authorised signatory"
+                    className="h-8 max-w-24 object-contain"
+                    onError={(event) => { event.currentTarget.style.display = 'none' }}
+                  />
+                )}
+              </div>
+            )}
+            <p className="text-right italic text-neutral-400">Authorised Signatory</p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -263,7 +367,17 @@ export function CompactPreview({ fields, footerText, terms, primaryColor, data =
   return (
     <div className="space-y-2 font-sans text-[0.65rem] leading-tight">
       <div className="flex items-center justify-between">
-        <p className="font-bold" style={{ color: primaryColor }}>{company.name}</p>
+        <div className="flex items-center gap-1.5">
+          {company.logoUrl && (
+            <img
+              src={company.logoUrl}
+              alt={`${company.name} logo`}
+              className="size-5 shrink-0 rounded object-contain"
+              onError={(event) => { event.currentTarget.style.display = 'none' }}
+            />
+          )}
+          <p className="font-bold" style={{ color: primaryColor }}>{company.name}</p>
+        </div>
         <p className="text-neutral-500">{data.invoiceNo} · {data.invoiceDate}</p>
       </div>
       {fields.show_company_gstin && company.gstin && <p className="text-neutral-400">GSTIN: {company.gstin}</p>}
@@ -302,6 +416,29 @@ export function CompactPreview({ fields, footerText, terms, primaryColor, data =
       </div>
 
       {fields.show_terms && terms && <p className="border-t border-neutral-100 pt-1 text-neutral-400">{terms}</p>}
+      {fields.show_signature && (
+        <div className="flex items-center justify-end gap-1.5 border-t border-neutral-100 pt-1">
+          {company.stampSealUrl && (
+            <img
+              src={company.stampSealUrl}
+              alt="Company stamp"
+              className="size-5 object-contain"
+              onError={(event) => { event.currentTarget.style.display = 'none' }}
+            />
+          )}
+          {company.signatureUrl ? (
+            <img
+              src={company.signatureUrl}
+              alt="Authorised signatory"
+              className="h-4 max-w-16 object-contain"
+              onError={(event) => { event.currentTarget.style.display = 'none' }}
+            />
+          ) : (
+            <span className="italic text-neutral-400">Signed</span>
+          )}
+          <span className="text-neutral-400">Auth. Signatory</span>
+        </div>
+      )}
       <p className="text-neutral-400">{footerText}</p>
     </div>
   )
@@ -313,6 +450,14 @@ export function ThermalPreview({ fields, footerText, primaryColor, data = sample
   return (
     <div className="space-y-2 font-mono text-[0.65rem] leading-tight text-neutral-700">
       <div className="text-center">
+        {company.logoUrl && (
+          <img
+            src={company.logoUrl}
+            alt={`${company.name} logo`}
+            className="mx-auto mb-1 size-8 object-contain"
+            onError={(event) => { event.currentTarget.style.display = 'none' }}
+          />
+        )}
         <p className="font-bold" style={{ color: primaryColor }}>{company.name}</p>
         <p className="text-neutral-500">{company.address}</p>
         <p className="text-neutral-500">{company.cityLine}</p>
@@ -338,6 +483,29 @@ export function ThermalPreview({ fields, footerText, primaryColor, data = sample
         {fields.show_tax_amount && <div className="flex justify-between"><span>Tax</span><span>{money(taxTotal)}</span></div>}
         <div className="flex justify-between font-bold"><span>TOTAL</span><span>{money(total)}</span></div>
       </div>
+      {fields.show_signature && (
+        <div className="flex flex-col items-center gap-0.5 border-t border-dashed border-neutral-300 pt-1.5">
+          {company.stampSealUrl && (
+            <img
+              src={company.stampSealUrl}
+              alt="Company stamp"
+              className="size-7 object-contain"
+              onError={(event) => { event.currentTarget.style.display = 'none' }}
+            />
+          )}
+          {company.signatureUrl ? (
+            <img
+              src={company.signatureUrl}
+              alt="Authorised signatory"
+              className="h-6 max-w-20 object-contain"
+              onError={(event) => { event.currentTarget.style.display = 'none' }}
+            />
+          ) : (
+            <span className="italic text-neutral-400">Signature</span>
+          )}
+          <span className="text-neutral-500">Authorised Signatory</span>
+        </div>
+      )}
       <p className="border-t border-dashed border-neutral-300 pt-1.5 text-center text-neutral-500">{footerText || 'Thank you!'}</p>
     </div>
   )

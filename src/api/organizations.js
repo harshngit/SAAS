@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { apiClient, API_BASE_URL } from './client'
 import { useAuthStore } from '../store/authStore'
+import { getFileUrl } from './files'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -53,6 +54,23 @@ export async function getOrganizationSettings() {
     )
 
     return { success: false, error: message }
+  }
+}
+
+// Resolves the Branding & Identity assets (Company Settings) from the raw /organizations/settings
+// response - the same field-name fallbacks CompanySettings.jsx uses when it loads them into
+// companyData, so every consumer reads the identical value. Read-only; does not touch that
+// page's own upload/edit logic. Used by the invoice templates so a real invoice/PDF shows the
+// company's actual logo, signature, stamp/seal, letterhead, and payment QR - never hardcoded.
+export function normalizeOrganizationBranding(organization) {
+  const org = organization || {}
+  return {
+    logoUrl: getFileUrl(org.logo_url || org.logoUrl || ''),
+    signatureUrl: getFileUrl(org.signature_url || org.signatureUrl || ''),
+    stampSealUrl: getFileUrl(org.stamp_url || org.stampUrl || org.stamp_seal_url || org.stampSealUrl || ''),
+    letterheadUrl: getFileUrl(org.letterhead_url || org.letterheadUrl || org.letterhead_file || org.letterheadFile || ''),
+    bannerUrl: getFileUrl(org.banner_url || org.bannerUrl || ''),
+    qrCodeUrl: getFileUrl(org.payment_qr_url || org.paymentQrUrl || org.qr_code_url || org.qrCodeUrl || ''),
   }
 }
 

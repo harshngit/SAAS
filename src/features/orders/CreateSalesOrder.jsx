@@ -1129,9 +1129,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-600">Discount</span>
                   <span className={`text-sm font-medium ${totals.discountAmount > 0 ? 'text-red-600' : 'text-neutral-900'}`}>
-                    {totals.discountAmount > 0
-                      ? `-${formatCurrency(totals.discountAmount)}${discountType === 'percentage' && Number(discountValue) > 0 ? ` (${Math.round(Number(discountValue))}%)` : ''}`
-                      : formatCurrency(0)}
+                    {totals.discountAmount > 0 ? `-${formatCurrency(totals.discountAmount)}` : formatCurrency(0)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1344,9 +1342,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               </div>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-right text-neutral-600">
+                          <td className="px-3 py-2.5 text-right font-bold text-neutral-900">
                             {formatCurrency(unitPrice)}
-                            <span className="ml-1 text-[0.62rem] text-neutral-400">/ {unit}</span>
+                            <span className="ml-1 text-[0.62rem] font-normal text-neutral-400">/ {unit}</span>
                           </td>
                           <td className="px-3 py-2.5">
                             <div className="mx-auto flex w-fit items-center rounded-lg border border-neutral-200 p-0.5 text-neutral-500">

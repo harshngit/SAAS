@@ -3885,11 +3885,9 @@ export default function CompanySettings() {
                       value={pendingLogoPreview || companyData.logoUrl}
                       onChange={handleLogoFileSelect}
                       onRemove={handleRemoveLogo}
-                      disabled={
-                        !isActiveSectionEditing || Boolean(companyData.logoUrl)
-                      }
+                      disabled={!isActiveSectionEditing}
                       uploadLabel={
-                        companyData.logoUrl ? "Logo Uploaded" : "Upload Logo"
+                        companyData.logoUrl ? "Change Logo" : "Upload Logo"
                       }
                       required
                     />

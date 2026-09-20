@@ -286,6 +286,11 @@
   font-size: 8px;
   line-height: 12px;
 }
+/* Unit Price - bold and true dark black, distinct from the muted/tabular default. */
+.order-detail-view .od-products .od-price {
+  font-weight: 700;
+  color: #0a0a0a;
+}
 /* Overview metadata: three cells above, two equal cells below. */
 .order-detail-view .od-overview-fields {
   grid-template-columns: repeat(6, minmax(0, 1fr));

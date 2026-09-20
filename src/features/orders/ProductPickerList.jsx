@@ -143,28 +143,31 @@ export default function ProductPickerList({
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-neutral-900">{product.name}</p>
+                  {/* Available quantity sits beside the product name, not on its own line. */}
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <p className="truncate text-sm font-medium text-neutral-900">{product.name}</p>
+                    <span
+                      className={`shrink-0 whitespace-nowrap text-[0.68rem] font-medium ${
+                        isOutOfStock
+                          ? 'text-red-600'
+                          : isLowStock
+                            ? 'text-amber-600'
+                            : stock === null
+                              ? 'text-neutral-400'
+                              : 'text-emerald-600'
+                      }`}
+                    >
+                      {isOutOfStock
+                        ? 'Out of stock'
+                        : stock === null
+                          ? 'Stock not tracked'
+                          : `${isLowStock ? 'Low stock · ' : ''}${stock} ${unit}${isLowStock ? '' : ' available'}`}
+                    </span>
+                  </div>
                   <p className="truncate text-[0.7rem] text-neutral-400">SKU: {product.sku || '—'}</p>
-                  <p
-                    className={`text-[0.7rem] font-medium ${
-                      isOutOfStock
-                        ? 'text-red-600'
-                        : isLowStock
-                          ? 'text-amber-600'
-                          : stock === null
-                            ? 'text-neutral-400'
-                            : 'text-emerald-600'
-                    }`}
-                  >
-                    {isOutOfStock
-                      ? 'Out of stock'
-                      : stock === null
-                        ? 'Stock not tracked'
-                        : `${isLowStock ? 'Low stock · ' : ''}${stock} ${unit}${isLowStock ? '' : ' available'}`}
-                  </p>
                   {/* Base (catalogue) price - always shown under the name. The right column
                       holds the editable line price + stepper only once the row is selected. */}
-                  <p className="text-[0.7rem] font-medium text-neutral-500">
+                  <p className="text-[0.7rem] font-bold text-neutral-900">
                     {formatCurrency(product.price || 0)}
                     <span className="ml-1 font-normal text-neutral-400">/ {unit}</span>
                   </p>
