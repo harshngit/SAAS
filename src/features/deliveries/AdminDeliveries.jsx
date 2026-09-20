@@ -1,10 +1,9 @@
+import { ListOverview, ListHeader, ListSummary, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Ban, Truck, CheckCircle2, Clock, XCircle, RotateCw } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
-import DataTable from '../../components/ui/DataTable'
-import StatCard from '../../components/ui/StatCard'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
 import { listDeliveries } from '../../api/deliveries'
@@ -54,13 +53,16 @@ export default function AdminDeliveries() {
   }, [deliveries, statusFilter])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Deliveries</h1>
-        <p className="mt-1 text-sm text-neutral-500">Track every delivery across your organization</p>
-      </div>
+    <div className="listing-page space-y-4">
+      <ListOverview>
+      <ListHeader>
+        <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Deliveries</h1>
+        <p className="mt-1 text-xs text-neutral-400">Track every delivery across your organization</p>
+        </div>
+      </ListHeader>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <ListSummary className="grid-cols-2 lg:grid-cols-5">
         <StatCard icon={Truck} label="Total Deliveries" value={stats.total} iconVariant="primary" />
         <StatCard icon={CheckCircle2} label="Delivered" value={stats.delivered} iconVariant="success" />
         <StatCard icon={Clock} label="In Progress" value={stats.inProgress} iconVariant="warning" />
@@ -68,9 +70,10 @@ export default function AdminDeliveries() {
         <button type="button" className="block w-full text-left" onClick={() => setStatusFilter('assigned')}>
           <StatCard icon={Ban} label="Awaiting Response" value={stats.awaiting} iconVariant="danger" />
         </button>
-      </div>
+      </ListSummary>
+      </ListOverview>
 
-      <Card title="All Deliveries" subtitle="Every delivery across the organization">
+      <Card title={error ? 'All Deliveries' : undefined} subtitle={error ? 'Every delivery across the organization' : undefined} className="overflow-hidden p-0">
         {error ? (
           <div className="py-8 text-center">
             <p className="text-sm text-red-600">{error}</p>
@@ -81,15 +84,18 @@ export default function AdminDeliveries() {
           </div>
         ) : (
           <>
-            <div className="mb-4 flex justify-end">
+            <DataTable
+              title="All Deliveries"
+              subtitle="Every delivery across the organization"
+              toolbarActions={
               <Select
                 options={[{ value: 'all', label: 'All status' }, ...DELIVERY_STAGE_FILTER_OPTIONS]}
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="sm:w-52"
+                className="w-full"
+                triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs"
               />
-            </div>
-            <DataTable
+              }
               loading={isLoading}
               columns={[
                 { key: 'deliveryNumber', header: 'Delivery #', sortable: true },

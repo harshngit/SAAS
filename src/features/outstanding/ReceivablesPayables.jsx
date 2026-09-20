@@ -1,10 +1,9 @@
+import { ListOverview, ListHeader, ListSummary, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AlertTriangle, CalendarClock, Eye, IndianRupee, Users, Wallet } from 'lucide-react'
 import Card from '../../components/ui/Card'
-import DataTable from '../../components/ui/DataTable'
 import Badge from '../../components/ui/Badge'
-import StatCard from '../../components/ui/StatCard'
 import { usePermission } from '../../auth/usePermission'
 import { listInvoices } from '../../api/invoices'
 import RecordPaymentDrawer from '../invoices/RecordPaymentDrawer'
@@ -77,24 +76,30 @@ export default function ReceivablesPayables() {
   )
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Receivables</h1>
-        <p className="mt-1 text-sm text-neutral-500">Track outstanding customer invoices and overdue balances.</p>
-      </div>
+    <div className="listing-page space-y-4">
+      <ListOverview>
+      <ListHeader>
+        <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Receivables</h1>
+        <p className="mt-1 text-xs text-neutral-400">Track outstanding customer invoices and overdue balances.</p>
+        </div>
+      </ListHeader>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <ListSummary className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={IndianRupee} iconVariant="primary" label="Total Outstanding" value={formatCurrency(stats.totalOutstanding)} />
         <StatCard icon={AlertTriangle} iconVariant="danger" label="Overdue" value={formatCurrency(stats.overdueAmount)} />
         <StatCard icon={CalendarClock} iconVariant="warning" label="Due Soon" value={formatCurrency(stats.dueSoonAmount)} />
         <StatCard icon={Users} iconVariant="info" label="Customers with Balance" value={String(stats.customersWithBalance)} />
-      </div>
+      </ListSummary>
+      </ListOverview>
 
-      <Card title="Open Receivables" subtitle="One row per unpaid invoice, soonest due first">
+      <Card className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:m-5 [&>p]:mx-5 [&>p]:mb-5">
         {error && (
           <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
         <DataTable
+          title="Open Receivables"
+          subtitle="One row per unpaid invoice, soonest due first"
           loading={isLoading}
           columns={[
             { key: 'customerName', header: 'Customer', sortable: true, render: (row) => row.customerName || row.walkInName || '—' },

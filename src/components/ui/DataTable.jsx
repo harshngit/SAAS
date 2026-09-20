@@ -25,6 +25,7 @@ export default function DataTable({
   loading = false,
   emptyTitle = 'No records found',
   emptyDescription,
+  renderToolbar,
 }) {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState({ key: null, direction: 'asc' })
@@ -73,7 +74,7 @@ export default function DataTable({
 
   return (
     <div>
-      {searchable && (
+      {renderToolbar ? renderToolbar({ search, onSearchChange: handleSearchChange, resultCount: sorted.length, searchable }) : searchable && (
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full max-w-xs">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />

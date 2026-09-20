@@ -1,3 +1,4 @@
+import { ListHeader, ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Boxes, Eye, Package, PackagePlus, PowerOff, RotateCw, Search, XCircle } from 'lucide-react'
@@ -7,7 +8,6 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
-import StatCard from '../../components/ui/StatCard'
 import { getExpiringBatches, getStockBoard, recordStockAdjustment } from '../../api/inventory'
 import { listProducts } from '../../api/products'
 import { getFileUrl } from '../../api/files'
@@ -40,17 +40,17 @@ function ExpiringBatchesPanel() {
         <p className="text-sm font-semibold text-amber-800">{batches.length} batch(es) expired or expiring within 30 days</p>
       </div>
       <div className="max-h-56 overflow-y-auto px-5 py-3">
-        <table className="w-full text-left text-sm">
+        <table className="listing-table w-full text-left text-sm">
           <thead>
-            <tr className="text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-              <th className="py-2 pr-4">Product</th>
-              <th className="py-2 pr-4">Batch</th>
-              <th className="py-2 pr-4">Warehouse</th>
-              <th className="py-2 pr-4">Qty</th>
-              <th className="py-2 text-right">Expiry</th>
+            <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+              <th className="py-6 pr-4">Product</th>
+              <th className="py-6 pr-4">Batch</th>
+              <th className="py-6 pr-4">Warehouse</th>
+              <th className="py-6 pr-4">Qty</th>
+              <th className="py-6 text-right">Expiry</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-50">
+          <tbody className="divide-y divide-neutral-100">
             {batches.map((batch, index) => (
               <tr key={batch.id || index}>
                 <td className="py-2 pr-4 font-medium text-neutral-800">{batch.product_name || batch.product?.name || '—'}</td>
@@ -255,18 +255,11 @@ export default function StockBoard({ readOnly = false }) {
   }
 
   return (
-    <div className="listing-page space-y-5">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={Boxes} iconVariant="primary" label="Tracked Products" value={stats.totalProducts} />
-        <StatCard icon={Package} iconVariant="info" label="Total Stock Units" value={stats.totalStock.toLocaleString()} />
-        <StatCard icon={XCircle} iconVariant="danger" label="Out of Stock" value={stats.outOfStock} />
-        <StatCard icon={PowerOff} iconVariant="warning" label="Inactive" value={stats.inactive} />
-      </div>
+    <div className="listing-page space-y-4">
 
-      {!readOnly && <ExpiringBatchesPanel />}
-
-      <Card className="p-0">
-        <div className="border-b border-neutral-100 px-4 py-4">
+      <ListOverview>
+        <ListHeader><div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Inventory</h1></div></ListHeader>
+<div className="border-b border-neutral-100 px-5 py-4">
           <div className="flex flex-wrap gap-5">
             {stockStatusTabs.map((tab) => {
               const isActive = statusFilter === tab.value
@@ -290,7 +283,7 @@ export default function StockBoard({ readOnly = false }) {
           </div>
         </div>
 
-        <div className="border-b border-neutral-100 px-4 py-3">
+        <div className="border-b border-neutral-100 px-5 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative w-full sm:w-80">
@@ -300,7 +293,7 @@ export default function StockBoard({ readOnly = false }) {
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Search products, brands, SKU"
-                  className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
               </div>
               <Select
@@ -318,8 +311,18 @@ export default function StockBoard({ readOnly = false }) {
             </div>
           </div>
         </div>
+<ListSummary className="grid-cols-2  lg:grid-cols-4">
+        <StatCard icon={Boxes} iconVariant="primary" label="Tracked Products" value={stats.totalProducts} />
+        <StatCard icon={Package} iconVariant="info" label="Total Stock Units" value={stats.totalStock.toLocaleString()} />
+        <StatCard icon={XCircle} iconVariant="danger" label="Out of Stock" value={stats.outOfStock} />
+        <StatCard icon={PowerOff} iconVariant="warning" label="Inactive" value={stats.inactive} />
+      </ListSummary>
+      </ListOverview>
 
-        <div className="overflow-x-auto bg-neutral-50/35 py-4">
+      {!readOnly && <ExpiringBatchesPanel />}
+
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto bg-white px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -335,16 +338,16 @@ export default function StockBoard({ readOnly = false }) {
           ) : (
             <table className="listing-table w-full text-left text-sm">
               <thead>
-                <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  <th className="whitespace-nowrap px-4 py-3">Product</th>
-                  <th className="whitespace-nowrap px-4 py-3">SKU</th>
-                  <th className="whitespace-nowrap px-4 py-3">Variants</th>
-                  <th className="whitespace-nowrap px-4 py-3">Current Stock</th>
-                  <th className="whitespace-nowrap px-4 py-3">Status</th>
-                  {!readOnly && <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>}
+                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                  <th className="whitespace-nowrap px-6 py-6">Product</th>
+                  <th className="whitespace-nowrap px-6 py-6">SKU</th>
+                  <th className="whitespace-nowrap px-6 py-6">Variants</th>
+                  <th className="whitespace-nowrap px-6 py-6">Current Stock</th>
+                  <th className="whitespace-nowrap px-6 py-6">Status</th>
+                  {!readOnly && <th className="whitespace-nowrap px-6 py-6 text-right">Action</th>}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-neutral-100">
                 {filteredItems.map((item) => {
                   const isOutOfStock = (item.total_stock || 0) <= 0
 
@@ -352,9 +355,9 @@ export default function StockBoard({ readOnly = false }) {
                     <tr
                       key={item.id}
                       onClick={readOnly ? undefined : () => navigate(`/admin/inventory/${item.id}`)}
-                      className={`bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35 ${readOnly ? '' : 'cursor-pointer'}`}
+                      className={`bg-white transition-colors hover:bg-primary-50/30 ${readOnly ? '' : 'cursor-pointer'}`}
                     >
-                      <td className="px-4 py-3.5">
+                      <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
                           <div className="relative size-9 shrink-0">
                             <span className="flex size-9 items-center justify-center rounded-full bg-primary-50 text-primary-700 ring-1 ring-primary-100">
@@ -377,14 +380,14 @@ export default function StockBoard({ readOnly = false }) {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3.5 font-mono text-neutral-600">{item.sku || '—'}</td>
-                      <td className="px-4 py-3.5 text-neutral-600">{item.variations?.length || 0}</td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-6 py-5 font-mono text-neutral-600">{item.sku || '—'}</td>
+                      <td className="px-6 py-5 text-neutral-600">{item.variations?.length || 0}</td>
+                      <td className="px-6 py-5">
                         <span className={isOutOfStock ? 'font-semibold text-red-600' : 'font-medium text-neutral-900'}>
                           {item.total_stock}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-6 py-5">
                         <div className="flex flex-wrap items-center gap-1.5">
                           {!item.is_active && <Badge variant="neutral">Inactive</Badge>}
                           {isOutOfStock ? (
@@ -395,7 +398,7 @@ export default function StockBoard({ readOnly = false }) {
                         </div>
                       </td>
                       {!readOnly && (
-                        <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
+                        <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
                           <ActionMenu
                             items={[
                               { label: 'View Details', icon: Eye, onClick: () => navigate(`/admin/inventory/${item.id}`) },

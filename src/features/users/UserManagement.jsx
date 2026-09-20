@@ -1,3 +1,4 @@
+import ActionMenu from '../../components/ui/ActionMenu'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Banknote,
@@ -1249,7 +1250,7 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="listing-page space-y-4">
       <Modal
         isOpen={Boolean(statusUser)}
         onClose={handleCloseStatusModal}
@@ -1336,7 +1337,8 @@ export default function UserManagement() {
         </div>
       </Modal>
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-4 py-4">
+        <div className="px-5 pt-5"><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Staff</h1></div>
+        <div className="px-5 py-5">
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[12rem_1fr_auto] lg:items-center">
             <div className="w-full">
               <Select
@@ -1347,14 +1349,14 @@ export default function UserManagement() {
               />
             </div>
 
-            <div className="relative w-full lg:mx-auto lg:max-w-md">
+            <div className="relative w-full lg:ml-auto lg:max-w-60">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
               <input
                 type="search"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search staff"
-                className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
 
@@ -1373,7 +1375,10 @@ export default function UserManagement() {
           </div>
         </div>
 
-        <div className="overflow-x-auto bg-neutral-50/35 py-4">
+        </Card>
+
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto bg-white px-0 py-0">
           {isLoadingUsers ? (
             <LoadingSpinner label="Loading staff..." />
           ) : listError ? (
@@ -1400,25 +1405,25 @@ export default function UserManagement() {
             <p className="py-8 text-center text-sm text-neutral-500">No staff found.</p>
           ) : (
             <>
-              <table className="w-full text-left text-sm">
+              <table className="listing-table w-full text-left text-sm">
                 <thead>
-                  <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                    <th className="whitespace-nowrap px-4 py-3">User</th>
-                    <th className="whitespace-nowrap px-4 py-3">Email</th>
-                    <th className="whitespace-nowrap px-4 py-3">Role</th>
-                    <th className="whitespace-nowrap px-4 py-3">Status</th>
-                    <th className="whitespace-nowrap px-4 py-3">Joined</th>
-                    <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
+                  <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                    <th className="whitespace-nowrap px-6 py-6">User</th>
+                    <th className="whitespace-nowrap px-6 py-6">Email</th>
+                    <th className="whitespace-nowrap px-6 py-6">Role</th>
+                    <th className="whitespace-nowrap px-6 py-6">Status</th>
+                    <th className="whitespace-nowrap px-6 py-6">Joined</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="space-y-2">
+                <tbody className="divide-y divide-neutral-100">
                   {paginatedUsers.map((user) => (
                     <tr
                       key={user.id}
                       onClick={() => navigate(`/admin/users/${user.id}`)}
-                      className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                      className="cursor-pointer bg-white transition-colors hover:bg-primary-50/30"
                     >
-                      <td className="px-4 py-3.5">
+                      <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
                           <StaffAvatar name={user.name} photoUrl={user.profilePhoto} />
                           <div>
@@ -1432,62 +1437,26 @@ export default function UserManagement() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3.5 text-neutral-600">{user.email}</td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-6 py-5 text-neutral-600">{user.email}</td>
+                      <td className="px-6 py-5">
                         <Badge variant="primary">{roleLabels[user.role] || user.roleDetail?.name || user.role}</Badge>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-6 py-5">
                         <Badge variant={user.isActive ? 'success' : 'danger'}>
                           {user.isActive ? 'active' : 'inactive'}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3.5 text-neutral-500">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/admin/users/edit/${user.id}`)}
-                            className="flex size-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-                            aria-label={`Edit ${user.name}`}
-                            title="Edit"
-                          >
-                            <Edit className="size-4" aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenStatusModal(user)}
-                            className="flex size-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-                            aria-label={`Change status for ${user.name}`}
-                            title="Change Status"
-                          >
-                            <RefreshCw className="size-4" aria-hidden="true" />
-                          </button>
-                          {isAdmin && (
-                            <button
-                              type="button"
-                              onClick={() => setResetPasswordUser(user)}
-                              className="flex size-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-                              aria-label={`Reset password for ${user.name}`}
-                              title="Reset Password"
-                            >
-                              <KeyRound className="size-4" aria-hidden="true" />
-                            </button>
-                          )}
-                          {isSuperAdmin && user.id !== currentUser?.id && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPermanentDeleteError('')
-                                setPermanentDeleteTarget(user)
-                              }}
-                              className="flex size-8 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
-                              aria-label={`Permanently delete ${user.name}`}
-                              title="Delete Permanently"
-                            >
-                              <Trash2 className="size-4" aria-hidden="true" />
-                            </button>
-                          )}
-                        </div>
+                      <td className="px-6 py-5 text-neutral-500">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</td>
+                      <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
+                        <ActionMenu items={[
+                          { label: 'Edit', icon: Edit, onClick: () => navigate(`/admin/users/edit/${user.id}`) },
+                          { label: 'Change Status', icon: RefreshCw, onClick: () => handleOpenStatusModal(user) },
+                          ...(isAdmin ? [{ label: 'Reset Password', icon: KeyRound, onClick: () => setResetPasswordUser(user) }] : []),
+                          ...(isSuperAdmin && user.id !== currentUser?.id ? [{
+                            label: 'Delete Permanently', icon: Trash2, danger: true,
+                            onClick: () => { setPermanentDeleteError(''); setPermanentDeleteTarget(user) },
+                          }] : []),
+                        ]} />
                       </td>
                     </tr>
                   ))}

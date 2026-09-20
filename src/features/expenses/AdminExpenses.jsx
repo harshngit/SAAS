@@ -1,10 +1,9 @@
+import { ListOverview, ListHeader, ListSummary, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Receipt, Clock, CheckCircle2, XCircle, Check, Wallet, Eye, HelpCircle } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
-import DataTable from '../../components/ui/DataTable'
-import StatCard from '../../components/ui/StatCard'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { usePermission } from '../../auth/usePermission'
@@ -171,27 +170,31 @@ export default function AdminExpenses() {
   }, [expenseList, statusFilter])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Expenses</h1>
-        <p className="mt-1 text-sm text-neutral-500">Review and manage organization expenses.</p>
-      </div>
+    <div className="listing-page space-y-4">
+      <ListOverview>
+      <ListHeader>
+        <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Expenses</h1>
+        <p className="mt-1 text-xs text-neutral-400">Review and manage organization expenses.</p>
+        </div>
+      </ListHeader>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <ListSummary className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Receipt} label="Total Expenses" value={formatCurrency(stats.totalAmount)} iconVariant="primary" />
         <StatCard icon={Clock} label="Pending Review" value={stats.pending.length} iconVariant="warning" />
         <StatCard icon={CheckCircle2} label="Approved" value={stats.approved.length} iconVariant="success" />
         <StatCard icon={Wallet} label="Reimbursed" value={formatCurrency(stats.reimbursedAmount)} iconVariant="info" />
-      </div>
+      </ListSummary>
+      </ListOverview>
 
-      <Card title="All Expenses" subtitle="Submitted by sales officers, delivery partners, and staff">
+      <Card className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:m-5 [&>p]:mx-5 [&>p]:mb-5">
         {error && (
           <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
-        <div className="mb-4 flex justify-end">
-          <Select options={FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="sm:w-52" />
-        </div>
         <DataTable
+          title="All Expenses"
+          subtitle="Submitted by sales officers, delivery partners, and staff"
+          toolbarActions={<Select options={FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />}
           loading={isLoading}
           columns={[
             { key: 'expenseNumber', header: 'Expense #', sortable: true, render: (row) => row.expenseNumber || row.expenseId || '—' },

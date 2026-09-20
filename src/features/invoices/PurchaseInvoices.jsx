@@ -1,9 +1,9 @@
+import { ListHeader, ListDataTable as DataTable } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { IndianRupee } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
-import DataTable from '../../components/ui/DataTable'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
@@ -108,11 +108,13 @@ export default function PurchaseInvoices() {
   )
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Purchase Invoices</h1>
-        <p className="mt-1 text-sm text-neutral-500">Manage all supplier purchase invoices</p>
-      </div>
+    <div className="listing-page space-y-4">
+      <ListHeader>
+        <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Purchase Invoices</h1>
+        <p className="mt-1 text-xs text-neutral-400">Manage all supplier purchase invoices</p>
+        </div>
+      </ListHeader>
 
       {listError ? (
         <Card>
@@ -126,7 +128,7 @@ export default function PurchaseInvoices() {
           <LoadingSpinner label="Loading purchase invoices..." />
         </Card>
       ) : (
-        <Card title="Purchase Invoices">
+        <Card title="Purchase Invoices" className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:mx-5 [&>p]:mx-5 [&>p]:mb-5">
           <DataTable
             columns={columns}
             data={invoices}

@@ -1,8 +1,8 @@
+import { ListHeader, ListDataTable as DataTable } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, Wallet } from 'lucide-react'
 import Card from '../../components/ui/Card'
-import DataTable from '../../components/ui/DataTable'
 import Badge from '../../components/ui/Badge'
 import { usePermission } from '../../auth/usePermission'
 import { listInvoices } from '../../api/invoices'
@@ -44,13 +44,15 @@ export default function SalesInvoices() {
   }, [load])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Sales Invoices</h1>
-        <p className="mt-1 text-sm text-neutral-500">Manage all customer sales invoices</p>
-      </div>
+    <div className="listing-page space-y-4">
+      <ListHeader>
+        <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Sales Invoices</h1>
+        <p className="mt-1 text-xs text-neutral-400">Manage all customer sales invoices</p>
+        </div>
+      </ListHeader>
 
-      <Card title="Sales Invoices">
+      <Card title="Sales Invoices" className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:mx-5 [&>p]:mx-5 [&>p]:mb-5">
         {error && (
           <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         )}

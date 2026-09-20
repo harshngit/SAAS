@@ -207,7 +207,7 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
 
   return (
     <div
-      className={`group relative flex h-[172px] min-w-0 flex-col overflow-hidden rounded-2xl p-4 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] ${toneClasses[tone]}`}
+      className={`group relative flex h-full min-h-[220px] min-w-0 flex-col overflow-hidden rounded-2xl p-4 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] ${toneClasses[tone]}`}
     >
       <div className="min-w-0">
         <p className="flex h-10 items-start justify-center text-center text-[0.68rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-current/72 sm:text-[0.72rem]">
@@ -245,7 +245,7 @@ function ProfitSummaryCard({ grossProfit, netProfit }) {
   const footerSecondLine = footerParts.length === 3 ? footerParts.slice(2).join(' ') : footerParts.slice(1).join(' ')
  
   return (
-    <div className="group relative flex h-[172px] min-w-0 flex-col overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#1687a8_0%,#2670db_100%)] p-4 text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)]">
+    <div className="group relative flex h-full min-h-[220px] min-w-0 flex-col overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#1687a8_0%,#2670db_100%)] p-4 text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_36%)] opacity-90" />
       <div className="relative min-w-0">
         <p className="flex h-10 items-start justify-center text-center text-[0.70rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-white/82 sm:text-[0.72rem]">
@@ -1096,7 +1096,7 @@ export default function AdminDashboard() {
 
         </div>
 
-        <div className="space-y-4 xl:-mt-37">
+        <div className="space-y-4 xl:-mt-25">
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
             <DashboardCard
               title="Cashflow"

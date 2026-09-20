@@ -1,3 +1,4 @@
+import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CarFront, CheckCircle2, Edit, Eye, Plus, RotateCw, Search, Trash2, Truck } from 'lucide-react'
@@ -11,7 +12,6 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import StatCard from '../../components/ui/StatCard'
 import {
   AVAILABILITY_FILTER_OPTIONS,
   assignedPartnerName,
@@ -189,27 +189,18 @@ export default function VehicleList() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="listing-page space-y-4">
+      <ListOverview>
+      <ListHeader>
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Vehicles</h1>
-          <p className="mt-1 text-sm text-neutral-500">Your delivery fleet — who each vehicle is assigned to and whether it can be used.</p>
+          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Vehicles</h1>
+          <p className="mt-1 text-xs text-neutral-400">Your delivery fleet — who each vehicle is assigned to and whether it can be used.</p>
         </div>
         <Button type="button" onClick={() => openForm()}>
           <Plus className="size-4" aria-hidden="true" />
           Add Vehicle
         </Button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Truck} iconVariant="primary" label="Total Vehicles" value={stats.total} />
-        <StatCard icon={CheckCircle2} iconVariant="success" label="Active Vehicles" value={stats.active} />
-        <StatCard icon={CarFront} iconVariant="info" label="Assigned Vehicles" value={stats.assigned} />
-        <StatCard icon={CarFront} iconVariant="warning" label="Available Vehicles" value={stats.available} />
-      </div>
-
-      <Card className="p-0">
-        <div className="flex flex-wrap items-center gap-3 border-b border-neutral-100 px-4 py-4">
+      <div className="flex w-full flex-wrap items-center gap-2">
           <div className="relative min-w-56 flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
             <input
@@ -217,14 +208,25 @@ export default function VehicleList() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search Vehicle / Number / Delivery Partner"
-              className="w-full rounded-full border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
-          <Select options={VEHICLE_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-40" triggerClassName="bg-white" />
-          <Select options={AVAILABILITY_FILTER_OPTIONS} value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)} className="w-40" triggerClassName="bg-white" />
-          <Select options={VEHICLE_TYPE_FILTER_OPTIONS} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-36" triggerClassName="bg-white" />
-          <Select options={VEHICLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-40" triggerClassName="bg-white" />
+          <Select options={VEHICLE_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-40" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select options={AVAILABILITY_FILTER_OPTIONS} value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)} className="w-40" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select options={VEHICLE_TYPE_FILTER_OPTIONS} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-36" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select options={VEHICLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-40" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
         </div>
+      </ListHeader>
+
+      <ListSummary className="grid-cols-2 lg:grid-cols-4">
+        <StatCard icon={Truck} iconVariant="primary" label="Total Vehicles" value={stats.total} />
+        <StatCard icon={CheckCircle2} iconVariant="success" label="Active Vehicles" value={stats.active} />
+        <StatCard icon={CarFront} iconVariant="info" label="Assigned Vehicles" value={stats.assigned} />
+        <StatCard icon={CarFront} iconVariant="warning" label="Available Vehicles" value={stats.available} />
+      </ListSummary>
+      </ListOverview>
+
+      <Card className="overflow-hidden p-0">
 
         <div className="overflow-x-auto">
           {listError ? (
@@ -240,7 +242,7 @@ export default function VehicleList() {
           ) : vehicles.length === 0 ? (
             <div className="p-10 text-center">
               <p className="text-sm font-medium text-neutral-900">No vehicles yet</p>
-              <p className="mt-1 text-sm text-neutral-500">Add your first delivery vehicle to start assigning deliveries.</p>
+              <p className="mt-1 text-xs text-neutral-400">Add your first delivery vehicle to start assigning deliveries.</p>
             </div>
           ) : rows.length === 0 ? (
             <p className="py-10 text-center text-sm text-neutral-500">No vehicles match the selected filters.</p>
@@ -273,36 +275,36 @@ export default function VehicleList() {
               </div>
 
               {/* Desktop table */}
-              <table className="hidden w-full min-w-4xl text-left text-sm md:table">
+              <table className="listing-table hidden w-full min-w-4xl text-left text-sm md:table">
                 <thead>
-                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                    <th className="whitespace-nowrap px-4 py-3.5">Vehicle</th>
-                    <th className="whitespace-nowrap px-4 py-3.5">Vehicle Number</th>
-                    <th className="whitespace-nowrap px-4 py-3.5">Type</th>
-                    <th className="whitespace-nowrap px-4 py-3.5">Capacity</th>
-                    <th className="whitespace-nowrap px-4 py-3.5">Assigned To</th>
-                    <th className="whitespace-nowrap px-4 py-3.5">Status</th>
-                    <th className="whitespace-nowrap px-4 py-3.5">Availability</th>
-                    <th className="w-12 px-4 py-3" />
+                  <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                    <th className="whitespace-nowrap px-6 py-6">Vehicle</th>
+                    <th className="whitespace-nowrap px-6 py-6">Vehicle Number</th>
+                    <th className="whitespace-nowrap px-6 py-6">Type</th>
+                    <th className="whitespace-nowrap px-6 py-6">Capacity</th>
+                    <th className="whitespace-nowrap px-6 py-6">Assigned To</th>
+                    <th className="whitespace-nowrap px-6 py-6">Status</th>
+                    <th className="whitespace-nowrap px-6 py-6">Availability</th>
+                    <th className="w-12 px-6 py-6" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-50">
+                <tbody className="divide-y divide-neutral-100">
                   {rows.map((vehicle) => {
                     const status = vehicleStatusMeta(vehicle)
                     const availability = deriveAvailability(vehicle)
                     return (
                       <tr key={vehicle.id} className="cursor-pointer transition-colors hover:bg-primary-50/30" onClick={() => navigate(`/admin/vehicles/${vehicle.id}`)}>
-                        <td className="whitespace-nowrap px-4 py-3.5">
+                        <td className="whitespace-nowrap px-6 py-5">
                           <span className="font-medium text-neutral-900">{vehicleDisplayName(vehicle)}</span>
                           {isDemoVehicle(vehicle.id) && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3.5 text-neutral-600">{vehicle.vehicleNumber}</td>
-                        <td className="whitespace-nowrap px-4 py-3.5 text-neutral-600">{vehicle.vehicleType || '—'}</td>
-                        <td className="whitespace-nowrap px-4 py-3.5 text-neutral-600">{capacityLabel(vehicle)}</td>
-                        <td className="whitespace-nowrap px-4 py-3.5 text-neutral-700">{assignedName(vehicle)}</td>
-                        <td className="whitespace-nowrap px-4 py-3.5"><Badge variant={status.variant} dot>{status.label}</Badge></td>
-                        <td className="whitespace-nowrap px-4 py-3.5"><Badge variant={availability.variant}>{availability.label}</Badge></td>
-                        <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
+                        <td className="whitespace-nowrap px-6 py-5 text-neutral-600">{vehicle.vehicleNumber}</td>
+                        <td className="whitespace-nowrap px-6 py-5 text-neutral-600">{vehicle.vehicleType || '—'}</td>
+                        <td className="whitespace-nowrap px-6 py-5 text-neutral-600">{capacityLabel(vehicle)}</td>
+                        <td className="whitespace-nowrap px-6 py-5 text-neutral-700">{assignedName(vehicle)}</td>
+                        <td className="whitespace-nowrap px-6 py-5"><Badge variant={status.variant} dot>{status.label}</Badge></td>
+                        <td className="whitespace-nowrap px-6 py-5"><Badge variant={availability.variant}>{availability.label}</Badge></td>
+                        <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
                           <ActionMenu
                             items={[
                               { label: 'View', icon: Eye, onClick: () => navigate(`/admin/vehicles/${vehicle.id}`) },

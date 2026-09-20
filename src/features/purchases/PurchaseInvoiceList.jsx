@@ -1,3 +1,4 @@
+import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, Edit, Eye, IndianRupee, PackageSearch, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
@@ -8,7 +9,6 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import StatCard from '../../components/ui/StatCard'
 import { formatCurrency } from '../../utils/format'
 import { DEMO_MODE } from '../../config/demoMode'
 import { deletePurchase, listPurchases } from '../../api/purchases'
@@ -158,27 +158,18 @@ export default function PurchaseInvoiceList() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="listing-page space-y-4">
+      <ListOverview>
+      <ListHeader>
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Purchases</h1>
-          <p className="mt-1 text-sm text-neutral-500">Track what you buy from suppliers, end to end.</p>
+          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Purchases</h1>
+          <p className="mt-1 text-xs text-neutral-400">Track what you buy from suppliers, end to end.</p>
         </div>
         <Button type="button" onClick={() => navigate(`${basePath}/create`)}>
           <Plus className="size-4" aria-hidden="true" />
           Create Purchase
         </Button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={ClipboardList} iconVariant="primary" label="Total Purchases" value={stats.total} />
-        <StatCard icon={IndianRupee} iconVariant="info" label="Total Purchase Value" value={formatCurrency(stats.totalValue)} />
-        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={formatCurrency(stats.outstanding)} />
-        <StatCard icon={PackageSearch} iconVariant="success" label="Pending Receipts" value={stats.pendingReceipts} />
-      </div>
-
-      <Card className="p-0">
-        <div className="flex flex-wrap items-center gap-3 border-b border-neutral-100 px-4 py-4">
+      <div className="flex w-full flex-wrap items-center gap-2">
           <div className="relative min-w-[14rem] flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
             <input
@@ -186,15 +177,26 @@ export default function PurchaseInvoiceList() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search Purchase # / Supplier / Reference"
-              className="w-full rounded-full border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
-          <Select options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-44" triggerClassName="bg-white" />
-          <Select options={purchaseStatusFilterOptions} value={purchaseStatusFilter} onChange={(event) => setPurchaseStatusFilter(event.target.value)} className="w-48" triggerClassName="bg-white" />
-          <Select options={receivingStatusFilterOptions} value={receivingStatusFilter} onChange={(event) => setReceivingStatusFilter(event.target.value)} className="w-52" triggerClassName="bg-white" />
-          <Select options={paymentStatusFilterOptions} value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="w-48" triggerClassName="bg-white" />
-          <Select options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-32" triggerClassName="bg-white" />
+          <Select options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-44" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select options={purchaseStatusFilterOptions} value={purchaseStatusFilter} onChange={(event) => setPurchaseStatusFilter(event.target.value)} className="w-48" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select options={receivingStatusFilterOptions} value={receivingStatusFilter} onChange={(event) => setReceivingStatusFilter(event.target.value)} className="w-52" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select options={paymentStatusFilterOptions} value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="w-48" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-32" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
         </div>
+      </ListHeader>
+
+      <ListSummary className="grid-cols-2 lg:grid-cols-4">
+        <StatCard icon={ClipboardList} iconVariant="primary" label="Total Purchases" value={stats.total} />
+        <StatCard icon={IndianRupee} iconVariant="info" label="Total Purchase Value" value={formatCurrency(stats.totalValue)} />
+        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={formatCurrency(stats.outstanding)} />
+        <StatCard icon={PackageSearch} iconVariant="success" label="Pending Receipts" value={stats.pendingReceipts} />
+      </ListSummary>
+      </ListOverview>
+
+      <Card className="overflow-hidden p-0">
 
         <div className="overflow-x-auto">
           {listError ? (
@@ -212,7 +214,7 @@ export default function PurchaseInvoiceList() {
           ) : purchases.length === 0 ? (
             <div className="p-10 text-center">
               <p className="text-sm font-medium text-neutral-900">No purchases yet</p>
-              <p className="mt-1 text-sm text-neutral-500">Create your first purchase to start tracking supplier buying.</p>
+              <p className="mt-1 text-xs text-neutral-400">Create your first purchase to start tracking supplier buying.</p>
               <Button type="button" className="mt-4" onClick={() => navigate(`${basePath}/create`)}>
                 <Plus className="size-4" aria-hidden="true" />
                 Create Purchase
@@ -260,21 +262,21 @@ export default function PurchaseInvoiceList() {
               </div>
 
               {/* Desktop table */}
-              <table className="hidden w-full min-w-6xl text-left text-sm md:table">
+              <table className="listing-table hidden w-full min-w-6xl text-left text-sm md:table">
                 <thead>
-                  <tr className="border-b border-neutral-100 bg-neutral-50/80">
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Purchase #</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Supplier</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Purchase Date</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Warehouse</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Grand Total</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Receiving Status</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Payment Status</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Purchase Status</th>
-                    <th className="w-12 px-4 py-3" />
+                  <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Purchase #</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Supplier</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Purchase Date</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Warehouse</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Grand Total</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Receiving Status</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Payment Status</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Purchase Status</th>
+                    <th className="w-12 px-6 py-6" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-50">
+                <tbody className="divide-y divide-neutral-100">
                   {filteredPurchases.map((purchase) => {
                     const purchaseStatus = derivePurchaseStatus(purchase)
                     const receiving = deriveReceivingStatus(purchase)
@@ -282,20 +284,20 @@ export default function PurchaseInvoiceList() {
                     const actions = getPurchaseActions(purchase)
                     return (
                       <tr key={purchase.id} className="cursor-pointer transition-colors hover:bg-primary-50/30" onClick={() => navigate(`${basePath}/${purchase.id}`)}>
-                        <td className="whitespace-nowrap px-4 py-3.5 font-medium text-primary-700">
+                        <td className="whitespace-nowrap px-6 py-5 font-medium text-primary-700">
                           {purchase.invoiceNumber}
                           {isDemoPurchase(purchase.id) && (
                             <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
                           )}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3.5 text-neutral-800">{purchase.supplierName || '—'}</td>
-                        <td className="whitespace-nowrap px-4 py-3.5 text-neutral-500">{formatDate(purchase.purchaseDate || purchase.invoiceDate)}</td>
-                        <td className="whitespace-nowrap px-4 py-3.5 text-neutral-600">{purchase.warehouseName || '—'}</td>
-                        <td className="whitespace-nowrap px-4 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(purchase.total)}</td>
-                        <td className="whitespace-nowrap px-4 py-3.5"><Badge variant={receiving.variant}>{receiving.label}</Badge></td>
-                        <td className="whitespace-nowrap px-4 py-3.5"><Badge variant={payment.variant} dot>{payment.label}</Badge></td>
-                        <td className="whitespace-nowrap px-4 py-3.5"><Badge variant={purchaseStatus.variant}>{purchaseStatus.label}</Badge></td>
-                        <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
+                        <td className="whitespace-nowrap px-6 py-5 text-neutral-800">{purchase.supplierName || '—'}</td>
+                        <td className="whitespace-nowrap px-6 py-5 text-neutral-500">{formatDate(purchase.purchaseDate || purchase.invoiceDate)}</td>
+                        <td className="whitespace-nowrap px-6 py-5 text-neutral-600">{purchase.warehouseName || '—'}</td>
+                        <td className="whitespace-nowrap px-6 py-5 text-right font-medium text-neutral-900">{formatCurrency(purchase.total)}</td>
+                        <td className="whitespace-nowrap px-6 py-5"><Badge variant={receiving.variant}>{receiving.label}</Badge></td>
+                        <td className="whitespace-nowrap px-6 py-5"><Badge variant={payment.variant} dot>{payment.label}</Badge></td>
+                        <td className="whitespace-nowrap px-6 py-5"><Badge variant={purchaseStatus.variant}>{purchaseStatus.label}</Badge></td>
+                        <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
                           <ActionMenu
                             items={[
                               { label: 'View', icon: Eye, onClick: () => navigate(`${basePath}/${purchase.id}`) },

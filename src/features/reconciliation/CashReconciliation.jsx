@@ -1,3 +1,4 @@
+import { ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BadgeCheck, Info, Scale, Wallet } from 'lucide-react'
 import Button from '../../components/ui/Button'
@@ -5,7 +6,7 @@ import Card from '../../components/ui/Card'
 import DatePicker from '../../components/ui/DatePicker'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import StatCard from '../../components/ui/StatCard'
+import ActionMenu from '../../components/ui/ActionMenu'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
@@ -159,11 +160,13 @@ export default function CashReconciliation() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Cash Reconciliation</h1>
-        <p className="mt-1 text-sm text-neutral-500">Compare recorded payments with actual closing balances.</p>
-      </div>
+    <div className="listing-page space-y-4">
+      <ListHeader>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Cash Reconciliation</h1>
+          <p className="mt-1 text-xs text-neutral-400">Compare recorded payments with actual closing balances.</p>
+        </div>
+      </ListHeader>
 
       <Card
         title="Closing day"
@@ -179,7 +182,7 @@ export default function CashReconciliation() {
           </p>
         ) : (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <ListSummary className="grid-cols-2 xl:grid-cols-4">
               <StatCard icon={Wallet} iconVariant="primary" label="Expected Total" value={formatCurrency(expectedTotal)} />
               <StatCard icon={Wallet} iconVariant="info" label="Actual Total" value={anyEntered ? formatCurrency(actualTotal) : '—'} />
               <StatCard
@@ -189,7 +192,7 @@ export default function CashReconciliation() {
                 value={anyEntered ? `${variance > 0 ? '+' : ''}${formatCurrency(variance)}` : '—'}
               />
               <StatCard icon={BadgeCheck} iconVariant={statusVariant} label="Status" value={status} />
-            </div>
+            </ListSummary>
 
             <div className="overflow-x-auto rounded-xl border border-neutral-100">
               <table className="w-full min-w-2xl text-left text-sm">
@@ -310,7 +313,7 @@ export default function CashReconciliation() {
         )}
       </Card>
 
-      <Card title="Reconciliation History">
+      <Card title="Reconciliation History" className="overflow-hidden p-0" bodyClassName="[&>p]:m-5">
         {!historyAvailable ? (
           <p className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
             No reconciliation history yet. <span className="text-neutral-400">BACKEND LATER — persisted sessions.</span>
@@ -321,7 +324,7 @@ export default function CashReconciliation() {
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-neutral-100">
-            <table className="w-full min-w-3xl text-left text-sm">
+            <table className="listing-table w-full min-w-3xl text-left text-sm">
               <thead>
                 <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
                   <th className="px-4 py-2.5">Date</th>
@@ -347,9 +350,7 @@ export default function CashReconciliation() {
                     </td>
                     <td className="px-4 py-2.5 text-neutral-500">{session.reconciledByName || '—'}</td>
                     <td className="px-4 py-2.5 text-right">
-                      <button type="button" onClick={() => setDetailSession(session)} className="text-xs font-medium text-primary-700 hover:underline">
-                        Details
-                      </button>
+                      <ActionMenu items={[{ label: 'Details', onClick: () => setDetailSession(session) }]} />
                     </td>
                   </tr>
                 ))}

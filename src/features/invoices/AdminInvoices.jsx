@@ -1,3 +1,5 @@
+import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import ActionMenu from '../../components/ui/ActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -17,7 +19,6 @@ import {
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import Select from '../../components/ui/Select'
-import StatCard from '../../components/ui/StatCard'
 import Modal from '../../components/ui/Modal'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { listInvoices } from '../../api/invoices'
@@ -43,7 +44,7 @@ function formatDateLabel(dateString) {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-function SalesInvoicesPanel() {
+function SalesInvoicesPanel({ header }) {
   const navigate = useNavigate()
   const { can } = usePermission()
   // Recording a customer payment is a financial transaction - gate it on payments:create only.
@@ -139,15 +140,11 @@ function SalesInvoicesPanel() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={IndianRupee} iconVariant="success" label="Total Receivables" value={formatCurrency(stats.totalReceivable)} />
-        <StatCard icon={RefreshCw} iconVariant="danger" label="Overdue" value={formatCurrency(stats.overdueAmount)} />
-        <StatCard icon={FileText} iconVariant="warning" label="Due Soon" value={formatCurrency(stats.dueSoonAmount)} />
-        <StatCard icon={Receipt} iconVariant="info" label="Paid This Month" value={formatCurrency(stats.paidThisMonth)} />
-      </div>
+    <div className="listing-page space-y-4">
+      <ListOverview>
+        {header}
 
-      <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+      <div className="bg-white px-5 pb-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-[14rem] flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
@@ -156,10 +153,10 @@ function SalesInvoicesPanel() {
               value={search}
               onChange={updateFilter(setSearch)}
               placeholder="Search invoices..."
-              className="w-full rounded-full border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
-          <Select options={INVOICE_STATUS_FILTERS} value={paymentStatus} onChange={updateFilter(setPaymentStatus)} className="w-44" triggerClassName="bg-white" />
+          <Select options={INVOICE_STATUS_FILTERS} value={paymentStatus} onChange={updateFilter(setPaymentStatus)} className="w-44" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
           <button
             type="button"
             onClick={() => { setSearch(''); setPaymentStatus('all'); setPage(1) }}
@@ -170,6 +167,14 @@ function SalesInvoicesPanel() {
           </button>
         </div>
       </div>
+
+        <ListSummary className="grid-cols-2 lg:grid-cols-4">
+        <StatCard icon={IndianRupee} iconVariant="success" label="Total Receivables" value={formatCurrency(stats.totalReceivable)} />
+        <StatCard icon={RefreshCw} iconVariant="danger" label="Overdue" value={formatCurrency(stats.overdueAmount)} />
+        <StatCard icon={FileText} iconVariant="warning" label="Due Soon" value={formatCurrency(stats.dueSoonAmount)} />
+        <StatCard icon={Receipt} iconVariant="info" label="Paid This Month" value={formatCurrency(stats.paidThisMonth)} />
+      </ListSummary>
+      </ListOverview>
 
       <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
         {listError ? (
@@ -187,33 +192,33 @@ function SalesInvoicesPanel() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-5xl text-left text-sm">
+              <table className="listing-table w-full min-w-5xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-neutral-100 bg-neutral-50/80">
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Invoice No.</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Order #</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Customer</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Invoice Date</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Due Date</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Total</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Paid</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Due</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Payment Status</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Invoice Status</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Actions</th>
+                  <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Invoice No.</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Order #</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Customer</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Invoice Date</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Due Date</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Total</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Paid</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Due</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Payment Status</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Invoice Status</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-50">
+                <tbody className="divide-y divide-neutral-100">
                   {paginated.map((invoice) => (
                     <tr
                       key={invoice.id}
                       onClick={() => navigate(`/admin/invoices/${invoice.id}`)}
                       className="cursor-pointer transition-colors hover:bg-primary-50/30"
                     >
-                      <td className="whitespace-nowrap px-4 py-3.5 font-medium text-primary-700">
+                      <td className="whitespace-nowrap px-6 py-5 font-medium text-primary-700">
                         {invoice.invoiceNumber}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-neutral-500">
+                      <td className="whitespace-nowrap px-6 py-5 text-neutral-500">
                         {invoice.orderId ? (
                           <button
                             type="button"
@@ -229,39 +234,29 @@ function SalesInvoicesPanel() {
                           <span className="text-neutral-400">Direct</span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-neutral-800">{invoice.customerName || invoice.walkInName || '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-neutral-500">{formatDateLabel(invoice.invoiceDate)}</td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-neutral-500">{formatDateLabel(invoice.dueDate)}</td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(invoice.total)}</td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-right text-neutral-600">{formatCurrency(invoice.amountPaid)}</td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-right text-neutral-600">{formatCurrency(invoice.outstandingAmount)}</td>
-                      <td className="whitespace-nowrap px-4 py-3.5">
+                      <td className="whitespace-nowrap px-6 py-5 text-neutral-800">{invoice.customerName || invoice.walkInName || '—'}</td>
+                      <td className="whitespace-nowrap px-6 py-5 text-neutral-500">{formatDateLabel(invoice.invoiceDate)}</td>
+                      <td className="whitespace-nowrap px-6 py-5 text-neutral-500">{formatDateLabel(invoice.dueDate)}</td>
+                      <td className="whitespace-nowrap px-6 py-5 text-right font-medium text-neutral-900">{formatCurrency(invoice.total)}</td>
+                      <td className="whitespace-nowrap px-6 py-5 text-right text-neutral-600">{formatCurrency(invoice.amountPaid)}</td>
+                      <td className="whitespace-nowrap px-6 py-5 text-right text-neutral-600">{formatCurrency(invoice.outstandingAmount)}</td>
+                      <td className="whitespace-nowrap px-6 py-5">
                         <Badge variant={FINANCIAL_STATUS_VARIANT[financialStatus(invoice)] || 'neutral'} dot>{financialStatus(invoice)}</Badge>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3.5">
+                      <td className="whitespace-nowrap px-6 py-5">
                         <Badge variant={invoiceStatusVariant[invoice.invoiceStatus] || 'neutral'}>{invoice.invoiceStatus}</Badge>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3.5" onClick={(event) => event.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1.5">
-                          {canRecordPayment && invoice.outstandingAmount > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setPaymentInvoice(invoice)}
-                              className="rounded-lg border border-primary-200 px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50"
-                            >
-                              Record Payment
-                            </button>
-                          )}
-                          <button type="button" onClick={() => navigate(`/admin/invoices/${invoice.id}`)} aria-label="View invoice" className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">
-                            <Eye className="size-4" />
-                          </button>
-                        </div>
+                      <td className="whitespace-nowrap px-6 py-5" onClick={(event) => event.stopPropagation()}>
+                        <ActionMenu items={[
+                          ...(canRecordPayment && invoice.outstandingAmount > 0 ? [{ label: 'Record Payment', onClick: () => setPaymentInvoice(invoice) }] : []),
+                          { label: 'View invoice', icon: Eye, onClick: () => navigate(`/admin/invoices/${invoice.id}`) },
+                        ]} />
                       </td>
                     </tr>
                   ))}
                   {paginated.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-10 text-center text-sm text-neutral-400">No invoices match your filters.</td>
+                      <td colSpan={10} className="px-6 py-10 text-center text-sm text-neutral-400">No invoices match your filters.</td>
                     </tr>
                   )}
                 </tbody>
@@ -339,11 +334,12 @@ export default function AdminInvoices() {
   const [showNewInvoiceChoice, setShowNewInvoiceChoice] = useState(false)
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="listing-page space-y-4">
+      <SalesInvoicesPanel header={
+        <ListHeader>
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Sales Invoices</h1>
-          <p className="mt-1 text-sm text-neutral-500">Customer invoices and receivables. Supplier bills live under Supplier Invoices.</p>
+          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Sales Invoices</h1>
+          <p className="mt-1 text-xs text-neutral-400">Customer invoices and receivables. Supplier bills live under Supplier Invoices.</p>
         </div>
         <div className="flex items-center gap-2.5">
           <Button type="button" onClick={() => setShowNewInvoiceChoice(true)}>
@@ -359,9 +355,8 @@ export default function AdminInvoices() {
             <Settings className="size-4" />
           </button>
         </div>
-      </div>
-
-      <SalesInvoicesPanel />
+      </ListHeader>
+      } />
 
       <Modal
         isOpen={showNewInvoiceChoice}

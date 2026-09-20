@@ -1,9 +1,9 @@
+import { ListHeader, ListDataTable as DataTable } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Ban, Check, Eye, MapPin, Phone, RotateCw } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
-import DataTable from '../../components/ui/DataTable'
 import Button from '../../components/ui/Button'
 import { acceptDelivery, listDeliveries } from '../../api/deliveries'
 import { DEMO_ORDERS_ENABLED, demoDeliveriesResolved, getDemoDelivery, isDemoDelivery, patchDemoDelivery } from '../orders/orderDemoData'
@@ -105,11 +105,13 @@ export default function AssignedDeliveries() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">My Deliveries</h1>
-        <p className="mt-1 text-sm text-neutral-500">Everything assigned to you, newest first</p>
-      </div>
+    <div className="listing-page space-y-4">
+      <ListHeader>
+        <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">My Deliveries</h1>
+        <p className="mt-1 text-xs text-neutral-400">Everything assigned to you, newest first</p>
+        </div>
+      </ListHeader>
 
       <Card className="p-0">
         <div className="flex flex-wrap gap-2 border-b border-neutral-100 px-4 py-3">

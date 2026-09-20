@@ -1,3 +1,5 @@
+import { ListOverview, ListHeader, ListStatCard, ListSummary } from '../../components/ui/ListPresentation'
+import ActionMenu from '../../components/ui/ActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Eye, FileText, Plus, Upload } from 'lucide-react'
 import Card from '../../components/ui/Card'
@@ -420,14 +422,15 @@ export default function MyExpenses() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="listing-page space-y-4">
+      <ListOverview>
+      <ListHeader>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-neutral-900">Expenses</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Expenses</h1>
             {demo && <Badge variant="warning">Demo data</Badge>}
           </div>
-          <p className="mt-1 text-sm text-neutral-500">Track and submit your work-related expenses.</p>
+          <p className="mt-1 text-xs text-neutral-400">Track and submit your work-related expenses.</p>
         </div>
         {canCreate && (
           <Button onClick={openForm}>
@@ -435,21 +438,19 @@ export default function MyExpenses() {
             Add Expense
           </Button>
         )}
-      </div>
+      </ListHeader>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <ListSummary className="grid-cols-2 lg:grid-cols-4">
         {[
           ['Pending Claims', counts.pending],
           ['Approved Claims', counts.approved],
           ['Rejected Claims', counts.rejected],
           ['Total Claimed', formatCurrency(counts.total)],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
-            <p className="text-2xl font-semibold text-neutral-900">{value}</p>
-            <p className="mt-0.5 text-xs text-neutral-500">{label}</p>
-          </div>
+          <ListStatCard key={label} label={label} value={value} />
         ))}
-      </div>
+      </ListSummary>
+      </ListOverview>
 
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
@@ -469,7 +470,7 @@ export default function MyExpenses() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search category or description..."
-          className="ml-auto h-9 w-full max-w-64 rounded-full border border-neutral-200 bg-neutral-50 px-3.5 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none"
+          className="ml-auto h-9 w-full sm:w-60 rounded-xl border border-neutral-100 bg-white px-3.5 text-xs text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none"
         />
       </div>
 
@@ -493,52 +494,45 @@ export default function MyExpenses() {
           <>
             {/* Desktop */}
             <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-6xl text-left text-sm">
+              <table className="listing-table w-full min-w-6xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Description</th>
-                    <th className="px-4 py-3 text-right">Amount</th>
-                    <th className="px-4 py-3">Payment Mode</th>
-                    <th className="px-4 py-3">Receipt</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Submitted On</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                  <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                    <th className="px-6 py-6">Date</th>
+                    <th className="px-6 py-6">Category</th>
+                    <th className="px-6 py-6">Description</th>
+                    <th className="px-6 py-6 text-right">Amount</th>
+                    <th className="px-6 py-6">Payment Mode</th>
+                    <th className="px-6 py-6">Receipt</th>
+                    <th className="px-6 py-6">Status</th>
+                    <th className="px-6 py-6">Submitted On</th>
+                    <th className="px-6 py-6 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-50">
+                <tbody className="divide-y divide-neutral-100">
                   {visible.map((e) => (
                     <tr
                       key={e.id}
                       onClick={() => setDetailExpense(e)}
-                      className="cursor-pointer transition-colors hover:bg-primary-50/35"
+                      className="cursor-pointer transition-colors hover:bg-primary-50/30"
                     >
-                      <td className="px-4 py-3 font-medium text-neutral-900">{formatDate(e.expenseDate)}</td>
-                      <td className="px-4 py-3 text-neutral-600">{e.category || '—'}</td>
-                      <td className="max-w-64 truncate px-4 py-3 text-neutral-600" title={e.description}>{e.description || '—'}</td>
-                      <td className="px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(e.amount)}</td>
-                      <td className="px-4 py-3 text-neutral-600">{e.paymentMode || '—'}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-5 font-medium text-neutral-900">{formatDate(e.expenseDate)}</td>
+                      <td className="px-6 py-5 text-neutral-600">{e.category || '—'}</td>
+                      <td className="max-w-64 truncate px-6 py-5 text-neutral-600" title={e.description}>{e.description || '—'}</td>
+                      <td className="px-6 py-5 text-right font-medium text-neutral-900">{formatCurrency(e.amount)}</td>
+                      <td className="px-6 py-5 text-neutral-600">{e.paymentMode || '—'}</td>
+                      <td className="px-6 py-3">
                         <span className={`text-xs ${e.receiptUrl ? 'text-neutral-600' : 'text-neutral-400'}`}>
                           {e.receiptUrl ? 'Uploaded' : 'No receipt'}
                         </span>
                       </td>
-                      <td className="px-4 py-3"><Badge variant={STATUS_VARIANT[claimStatus(e)] || 'neutral'} dot>{claimStatus(e)}</Badge></td>
-                      <td className="px-4 py-3 text-neutral-500">{e.createdAt ? formatDate(e.createdAt) : '—'}</td>
-                      <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                        <div className="flex justify-end gap-1">
-                          <Button type="button" variant="ghost" size="sm" onClick={() => setDetailExpense(e)}>
-                            <Eye className="size-4" aria-hidden="true" />
-                            Details
-                          </Button>
-                          {needsClarification(e) && canEdit && (
-                            <Button type="button" variant="outline" size="sm" onClick={() => openEditForm(e)}>Update</Button>
-                          )}
-                          {e.approvalStatus === 'Pending' && canDelete && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => setCancelTarget(e)}>Cancel</Button>
-                          )}
-                        </div>
+                      <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[claimStatus(e)] || 'neutral'} dot>{claimStatus(e)}</Badge></td>
+                      <td className="px-6 py-5 text-neutral-500">{e.createdAt ? formatDate(e.createdAt) : '—'}</td>
+                      <td className="px-6 py-3" onClick={(event) => event.stopPropagation()}>
+                        <ActionMenu items={[
+                          { label: 'Details', icon: Eye, onClick: () => setDetailExpense(e) },
+                          ...(needsClarification(e) && canEdit ? [{ label: 'Update', onClick: () => openEditForm(e) }] : []),
+                          ...(e.approvalStatus === 'Pending' && canDelete ? [{ label: 'Cancel', onClick: () => setCancelTarget(e) }] : []),
+                        ]} />
                       </td>
                     </tr>
                   ))}
@@ -561,14 +555,12 @@ export default function MyExpenses() {
                   </div>
                   {e.description && <p className="mt-2 text-xs text-neutral-500">{e.description}</p>}
                   <p className="mt-1 text-[0.7rem] text-neutral-400">{e.receiptUrl ? 'Receipt uploaded' : 'No receipt'}</p>
-                  <div className="mt-3 flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => setDetailExpense(e)}>Details</Button>
-                    {needsClarification(e) && canEdit && (
-                      <Button type="button" variant="outline" size="sm" onClick={() => openEditForm(e)}>Update</Button>
-                    )}
-                    {e.approvalStatus === 'Pending' && canDelete && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setCancelTarget(e)}>Cancel</Button>
-                    )}
+                  <div className="mt-3 flex justify-end">
+                    <ActionMenu items={[
+                      { label: 'Details', icon: Eye, onClick: () => setDetailExpense(e) },
+                      ...(needsClarification(e) && canEdit ? [{ label: 'Update', onClick: () => openEditForm(e) }] : []),
+                      ...(e.approvalStatus === 'Pending' && canDelete ? [{ label: 'Cancel', onClick: () => setCancelTarget(e) }] : []),
+                    ]} />
                   </div>
                 </div>
               ))}

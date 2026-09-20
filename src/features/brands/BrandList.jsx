@@ -264,37 +264,21 @@ export default function BrandList() {
   return (
     <div className="listing-page space-y-4">
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-4 py-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="px-5 py-5">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-neutral-900">Brands</h2>
-              <p className="mt-1 text-sm text-neutral-500">Create and manage product brands used across catalog items.</p>
+              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Brands</h2>
+              <p className="mt-1 text-xs text-neutral-400">Create and manage product brands used across catalog items.</p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              {selectedIds.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={exportSelectedBrands}><Download className="size-4" aria-hidden="true" />Download</Button>
-                  <Button type="button" variant="danger" size="sm" onClick={() => setDeleteTarget({ type: 'bulk' })}><Trash2 className="size-4" aria-hidden="true" />Delete Selected</Button>
-                </div>
-              )}
-              <Button type="button" size="sm" onClick={() => openForm()}>
-                <Plus className="size-4" aria-hidden="true" />
-                Add Brand
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-b border-neutral-100 px-4 py-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-            <div className="relative w-full sm:w-96">
+            <div className="flex flex-wrap items-center justify-end gap-2 [&>button]:h-9 [&>button]:rounded-xl [&>button]:px-3.5">
+              <div className="relative w-full sm:w-60">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
               <input
                 type="search"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search brands"
-                className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
 
@@ -303,7 +287,7 @@ export default function BrandList() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-11 rounded-xl bg-white px-4"
+                className="h-9 rounded-xl bg-white px-3.5"
                 onClick={() => setIsFilterMenuOpen((current) => !current)}
                 aria-haspopup="menu"
                 aria-expanded={isFilterMenuOpen}
@@ -348,8 +332,23 @@ export default function BrandList() {
                 </div>
               )}
             </div>
+              {selectedIds.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={exportSelectedBrands}><Download className="size-4" aria-hidden="true" />Download</Button>
+                  <Button type="button" variant="danger" size="sm" onClick={() => setDeleteTarget({ type: 'bulk' })}><Trash2 className="size-4" aria-hidden="true" />Delete Selected</Button>
+                </div>
+              )}
+              <Button type="button" size="sm" onClick={() => openForm()}>
+                <Plus className="size-4" aria-hidden="true" />
+                Add Brand
+              </Button>
+
+            </div>
           </div>
         </div>
+      </Card>
+
+      <Card className="overflow-hidden p-0">
 
         <div className="overflow-x-auto bg-white px-0 py-0">
           {listError ? (
@@ -365,7 +364,7 @@ export default function BrandList() {
           ) : brands.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-sm font-medium text-neutral-900">No brands yet</p>
-              <p className="mt-1 text-sm text-neutral-500">Add your first brand to organize products.</p>
+              <p className="mt-1 text-xs text-neutral-400">Add your first brand to organize products.</p>
               <Button type="button" className="mt-4" onClick={() => openForm()}>
                 <Plus className="size-4" aria-hidden="true" />
                 Add Brand
@@ -392,7 +391,7 @@ export default function BrandList() {
                   <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-neutral-100">
                 {visibleBrands.map((brand) => (
                   <tr key={brand.id} className="bg-white transition-colors hover:bg-primary-50/30">
                     <td className="px-6 py-5">

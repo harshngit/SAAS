@@ -1,12 +1,12 @@
+import { ListHeader, ListSummary, ListTableToolbar, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import ActionMenu from '../../components/ui/ActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, BadgeCheck, Ban, Eye, HandCoins, Wallet } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
-import DataTable from '../../components/ui/DataTable'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import StatCard from '../../components/ui/StatCard'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
@@ -141,13 +141,15 @@ export default function CollectionReconciliation() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Collection Reconciliation</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+    <div className="listing-page space-y-4">
+      <ListHeader>
+        <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Collection Reconciliation</h1>
+        <p className="mt-1 text-xs text-neutral-400">
           Review driver collections before they are posted as customer payments.
         </p>
-      </div>
+        </div>
+      </ListHeader>
 
       {unavailable ? (
         <Card>
@@ -155,7 +157,7 @@ export default function CollectionReconciliation() {
             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-500" aria-hidden="true" />
             <div>
               <p className="text-sm font-semibold text-neutral-900">Couldn&apos;t load collections</p>
-              <p className="mt-1 text-sm text-neutral-500">
+              <p className="mt-1 text-xs text-neutral-400">
                 The delivery collections service didn&apos;t respond. Please retry in a moment.
               </p>
               <Button type="button" variant="outline" size="sm" className="mt-3" onClick={load}>Retry</Button>
@@ -164,25 +166,25 @@ export default function CollectionReconciliation() {
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <ListSummary className="grid-cols-2 lg:grid-cols-4">
             <StatCard icon={HandCoins} iconVariant="warning" label="Recorded Collections" value={String(stats.recordedCount)} />
             <StatCard icon={Wallet} iconVariant="primary" label="Recorded Amount" value={formatCurrency(stats.recordedAmount)} />
             <StatCard icon={BadgeCheck} iconVariant="success" label="Reconciled Today" value={String(stats.reconciledToday)} />
             <StatCard icon={Ban} iconVariant="neutral" label="Voided" value={String(stats.voided)} />
-          </div>
+          </ListSummary>
 
-          <Card
-            title="Collections"
-            actions={
+          <Card className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:m-5">
+            <div className={isLoading ? '' : 'md:hidden'}>
+              <ListTableToolbar title="Collections" actions={
               <Select
                 options={COLLECTION_STATUS_FILTERS}
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="w-40"
-                triggerClassName="bg-white"
+                className="w-full"
+                triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs"
               />
-            }
-          >
+              } />
+            </div>
             {loadError && !unavailable && (
               <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>
             )}
@@ -194,6 +196,8 @@ export default function CollectionReconciliation() {
                 {/* Desktop / tablet: compact table */}
                 <div className="hidden md:block">
                   <DataTable
+                    title="Collections"
+                    toolbarActions={<Select options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />}
                     columns={[
                       { key: 'collectionNumber', header: 'Collection #', sortable: true },
                       { key: 'deliveryNumber', header: 'Delivery #', sortable: true, render: (r) => r.deliveryNumber || '—' },
@@ -232,7 +236,7 @@ export default function CollectionReconciliation() {
                 </div>
 
                 {/* Mobile: cards, same actions */}
-                <div className="space-y-3 md:hidden">
+                <div className="space-y-3 px-5 pb-4 md:hidden">
                   {rows.length === 0 ? (
                     <p className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
                       {collections.length === 0 ? 'No collections recorded yet.' : 'No collections match these filters.'}
@@ -253,20 +257,12 @@ export default function CollectionReconciliation() {
                           <span className="font-semibold text-neutral-900">{formatCurrency(row._amount)}</span>
                           <span className="text-neutral-500">{row._modeLabel}</span>
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {canReconcile && isReconcilable(row) && (
-                            <Button type="button" size="sm" onClick={() => { setActionError(''); setReconcileTarget(row) }}>
-                              Reconcile
-                            </Button>
-                          )}
-                          <Button type="button" size="sm" variant="outline" onClick={() => setDetail(row)}>
-                            View Details
-                          </Button>
-                          {canReconcile && isVoidable(row) && (
-                            <Button type="button" size="sm" variant="secondary" onClick={() => { setActionError(''); setVoidReason(''); setVoidTarget(row) }}>
-                              Void
-                            </Button>
-                          )}
+                        <div className="mt-3 flex justify-end">
+                          <ActionMenu items={[
+                            ...(canReconcile && isReconcilable(row) ? [{ label: 'Reconcile', icon: BadgeCheck, onClick: () => { setActionError(''); setReconcileTarget(row) } }] : []),
+                            { label: 'View Details', icon: Eye, onClick: () => setDetail(row) },
+                            ...(canReconcile && isVoidable(row) ? [{ label: 'Void', icon: Ban, danger: true, onClick: () => { setActionError(''); setVoidReason(''); setVoidTarget(row) } }] : []),
+                          ]} />
                         </div>
                       </div>
                     ))

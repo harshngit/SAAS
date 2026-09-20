@@ -1,3 +1,4 @@
+import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarClock, ClipboardList, Eye, IndianRupee, Pencil, Plus, Search } from 'lucide-react'
@@ -7,7 +8,6 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
-import StatCard from '../../components/ui/StatCard'
 import { formatCurrency } from '../../utils/format'
 import { usePermission } from '../../auth/usePermission'
 import { DEMO_MODE } from '../../config/demoMode'
@@ -173,11 +173,12 @@ export default function SupplierInvoiceList() {
   const lifecycleFilterOptions = DEMO_MODE ? INVOICE_STATUS_OPTIONS : LIFECYCLE_FILTER_OPTIONS
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="listing-page space-y-4">
+      <ListOverview>
+      <ListHeader>
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Supplier Invoices</h1>
-          <p className="mt-1 text-sm text-neutral-500">What your suppliers billed you — distinct from Purchases and Goods Receipts.</p>
+          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Supplier Invoices</h1>
+          <p className="mt-1 text-xs text-neutral-400">What your suppliers billed you — distinct from Purchases and Goods Receipts.</p>
         </div>
         {canCreate && (
           <Button type="button" onClick={() => navigate(`${basePath}/new`)}>
@@ -185,17 +186,7 @@ export default function SupplierInvoiceList() {
             Add Supplier Invoice
           </Button>
         )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={ClipboardList} iconVariant="primary" label="Total Supplier Invoices" value={stats.total} />
-        <StatCard icon={IndianRupee} iconVariant="info" label="Total Invoice Value" value={formatCurrency(stats.totalValue)} />
-        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={formatCurrency(stats.outstanding)} />
-        <StatCard icon={CalendarClock} iconVariant="danger" label="Overdue Invoices" value={stats.overdue} />
-      </div>
-
-      <Card className="p-0">
-        <div className="flex flex-wrap items-center gap-3 border-b border-neutral-100 px-4 py-4">
+      <div className="flex w-full flex-wrap items-center gap-2">
           <div className="relative min-w-56 flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
             <input
@@ -203,33 +194,44 @@ export default function SupplierInvoiceList() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search Invoice # / Supplier / Purchase #"
-              className="w-full rounded-full border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
-          <Select options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-44" triggerClassName="bg-white" />
+          <Select options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-44" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
           <Select
             options={[{ value: 'all', label: 'All Statuses' }, ...lifecycleFilterOptions]}
             value={lifecycleFilter}
             onChange={(event) => setLifecycleFilter(event.target.value)}
             className="w-40"
-            triggerClassName="bg-white"
+            triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs"
           />
           <Select
             options={[{ value: 'all', label: 'All Verification' }, ...VERIFICATION_FILTER_OPTIONS]}
             value={verificationFilter}
             onChange={(event) => setVerificationFilter(event.target.value)}
             className="w-48"
-            triggerClassName="bg-white"
+            triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs"
           />
           <Select
             options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]}
             value={paymentStatusFilter}
             onChange={(event) => setPaymentStatusFilter(event.target.value)}
             className="w-44"
-            triggerClassName="bg-white"
+            triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs"
           />
-          <Select options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-36" triggerClassName="bg-white" />
+          <Select options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-36" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
         </div>
+      </ListHeader>
+
+      <ListSummary className="grid-cols-2 lg:grid-cols-4">
+        <StatCard icon={ClipboardList} iconVariant="primary" label="Total Supplier Invoices" value={stats.total} />
+        <StatCard icon={IndianRupee} iconVariant="info" label="Total Invoice Value" value={formatCurrency(stats.totalValue)} />
+        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={formatCurrency(stats.outstanding)} />
+        <StatCard icon={CalendarClock} iconVariant="danger" label="Overdue Invoices" value={stats.overdue} />
+      </ListSummary>
+      </ListOverview>
+
+      <Card className="overflow-hidden p-0">
 
         <div className="overflow-x-auto">
           {isLoading ? (
@@ -242,48 +244,48 @@ export default function SupplierInvoiceList() {
           ) : rows.length === 0 ? (
             <div className="p-10 text-center">
               <p className="text-sm font-medium text-neutral-900">No supplier invoices yet</p>
-              <p className="mt-1 text-sm text-neutral-500">Record your first supplier invoice to start tracking payables.</p>
+              <p className="mt-1 text-xs text-neutral-400">Record your first supplier invoice to start tracking payables.</p>
             </div>
           ) : filtered.length === 0 ? (
             <p className="py-10 text-center text-sm text-neutral-500">No supplier invoices match the selected filters.</p>
           ) : (
-            <table className="w-full min-w-4xl text-left text-sm">
+            <table className="listing-table w-full min-w-4xl text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  <th className="whitespace-nowrap px-4 py-3.5">Supplier Invoice #</th>
-                  <th className="whitespace-nowrap px-4 py-3.5">Supplier</th>
-                  <th className="whitespace-nowrap px-4 py-3.5">Purchase</th>
-                  <th className="whitespace-nowrap px-4 py-3.5">Invoice Date</th>
-                  <th className="whitespace-nowrap px-4 py-3.5">Due Date</th>
-                  <th className="whitespace-nowrap px-4 py-3.5 text-right">Total</th>
-                  <th className="whitespace-nowrap px-4 py-3.5 text-right">Outstanding</th>
-                  <th className="whitespace-nowrap px-4 py-3.5">Status</th>
-                  <th className="whitespace-nowrap px-4 py-3.5">Verification</th>
-                  <th className="whitespace-nowrap px-4 py-3.5">Payment</th>
-                  <th className="w-12 px-4 py-3" />
+                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                  <th className="whitespace-nowrap px-6 py-6">Supplier Invoice #</th>
+                  <th className="whitespace-nowrap px-6 py-6">Supplier</th>
+                  <th className="whitespace-nowrap px-6 py-6">Purchase</th>
+                  <th className="whitespace-nowrap px-6 py-6">Invoice Date</th>
+                  <th className="whitespace-nowrap px-6 py-6">Due Date</th>
+                  <th className="whitespace-nowrap px-6 py-6 text-right">Total</th>
+                  <th className="whitespace-nowrap px-6 py-6 text-right">Outstanding</th>
+                  <th className="whitespace-nowrap px-6 py-6">Status</th>
+                  <th className="whitespace-nowrap px-6 py-6">Verification</th>
+                  <th className="whitespace-nowrap px-6 py-6">Payment</th>
+                  <th className="w-12 px-6 py-6" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-50">
+              <tbody className="divide-y divide-neutral-100">
                 {filtered.map((row) => (
                   <tr key={row.id} className="cursor-pointer transition-colors hover:bg-primary-50/30" onClick={() => navigate(`${basePath}/${row.id}`)}>
-                    <td className="whitespace-nowrap px-4 py-3.5 font-medium text-primary-700">
+                    <td className="whitespace-nowrap px-6 py-5 font-medium text-primary-700">
                       {row.supplierInvoiceNumber || '—'}
                       {row.isDemo && (
                         <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-neutral-800">{row.supplierName || '—'}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-neutral-500">{row.purchaseNumber || '—'}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-neutral-500">{formatDate(row.invoiceDate)}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-neutral-500">{formatDate(row.dueDate)}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(row.grandTotal)}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right text-neutral-700">{formatCurrency(row.outstanding)}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5"><Badge variant={row.lifecycle.variant}>{row.lifecycle.label}</Badge></td>
-                    <td className="whitespace-nowrap px-4 py-3.5">
+                    <td className="whitespace-nowrap px-6 py-5 text-neutral-800">{row.supplierName || '—'}</td>
+                    <td className="whitespace-nowrap px-6 py-5 text-neutral-500">{row.purchaseNumber || '—'}</td>
+                    <td className="whitespace-nowrap px-6 py-5 text-neutral-500">{formatDate(row.invoiceDate)}</td>
+                    <td className="whitespace-nowrap px-6 py-5 text-neutral-500">{formatDate(row.dueDate)}</td>
+                    <td className="whitespace-nowrap px-6 py-5 text-right font-medium text-neutral-900">{formatCurrency(row.grandTotal)}</td>
+                    <td className="whitespace-nowrap px-6 py-5 text-right text-neutral-700">{formatCurrency(row.outstanding)}</td>
+                    <td className="whitespace-nowrap px-6 py-5"><Badge variant={row.lifecycle.variant}>{row.lifecycle.label}</Badge></td>
+                    <td className="whitespace-nowrap px-6 py-5">
                       {row.verification ? <Badge variant={row.verification.variant}>{row.verification.label}</Badge> : <span className="text-neutral-400">—</span>}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3.5"><Badge variant={row.payment.variant} dot>{row.payment.label}</Badge></td>
-                    <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
+                    <td className="whitespace-nowrap px-6 py-5"><Badge variant={row.payment.variant} dot>{row.payment.label}</Badge></td>
+                    <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
                       <ActionMenu
                         items={[
                           { label: 'View', icon: Eye, onClick: () => navigate(`${basePath}/${row.id}`) },

@@ -1,3 +1,5 @@
+import { ListStatCard, ListSummary, ListHeader } from '../../components/ui/ListPresentation'
+import ActionMenu from '../../components/ui/ActionMenu'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Boxes, PackageSearch, RotateCw, Truck } from 'lucide-react'
@@ -61,14 +63,11 @@ function SummaryTiles({ items }) {
   ]
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <ListSummary className="grid-cols-2 lg:grid-cols-4">
       {tiles.map((tile) => (
-        <div key={tile.label} className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
-          <p className={`text-2xl font-semibold ${tile.strong ? 'text-primary-700' : 'text-neutral-900'}`}>{tile.value}</p>
-          <p className="mt-0.5 text-xs text-neutral-500">{tile.label}</p>
-        </div>
+        <ListStatCard key={tile.label} label={tile.label} value={tile.value} />
       ))}
-    </div>
+    </ListSummary>
   )
 }
 
@@ -122,22 +121,22 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
         <Card className="p-0" bodyClassName="p-0">
           {/* Desktop table */}
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-3xl text-left text-sm">
+            <table className="listing-table w-full min-w-3xl text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                  <th className="px-4 py-3">Product</th>
-                  <th className="px-4 py-3">SKU / Variant</th>
-                  <th className="px-4 py-3">UOM</th>
-                  <th className="px-4 py-3 text-right">Loaded</th>
-                  <th className="px-4 py-3 text-right">Extra</th>
-                  <th className="px-4 py-3 text-right">Delivered</th>
-                  <th className="px-4 py-3 text-right">Returned</th>
-                  <th className="px-4 py-3 text-right">Available</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                  <th className="px-6 py-6">Product</th>
+                  <th className="px-6 py-6">SKU / Variant</th>
+                  <th className="px-6 py-6">UOM</th>
+                  <th className="px-6 py-6 text-right">Loaded</th>
+                  <th className="px-6 py-6 text-right">Extra</th>
+                  <th className="px-6 py-6 text-right">Delivered</th>
+                  <th className="px-6 py-6 text-right">Returned</th>
+                  <th className="px-6 py-6 text-right">Available</th>
+                  <th className="px-6 py-6">Status</th>
+                  <th className="px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-50">
+              <tbody className="divide-y divide-neutral-100">
                 {items.map((item, idx) => {
                   const status = stockStatus(item)
                   const name = friendly(item.productName)
@@ -145,33 +144,31 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
                     <tr
                       key={item.id || item.productId || idx}
                       onClick={() => onViewDetails(item)}
-                      className="cursor-pointer transition-colors hover:bg-primary-50/35"
+                      className="cursor-pointer transition-colors hover:bg-primary-50/30"
                     >
-                      <td className="px-4 py-3 font-medium text-neutral-900">{name || '—'}</td>
-                      <td className="px-4 py-3 text-neutral-500">{skuVariantLabel(item)}</td>
-                      <td className="px-4 py-3 text-neutral-500">{item.uom || '—'}</td>
-                      <td className="px-4 py-3 text-right text-neutral-600">
+                      <td className="px-6 py-5 font-medium text-neutral-900">{name || '—'}</td>
+                      <td className="px-6 py-5 text-neutral-500">{skuVariantLabel(item)}</td>
+                      <td className="px-6 py-5 text-neutral-500">{item.uom || '—'}</td>
+                      <td className="px-6 py-5 text-right text-neutral-600">
                         <QtyCell value={loadedOf(item)} />
                       </td>
-                      <td className="px-4 py-3 text-right text-neutral-600">
+                      <td className="px-6 py-5 text-right text-neutral-600">
                         <QtyCell value={extraOf(item)} />
                       </td>
-                      <td className="px-4 py-3 text-right text-neutral-600">
+                      <td className="px-6 py-5 text-right text-neutral-600">
                         <QtyCell value={item.deliveredQuantity} />
                       </td>
-                      <td className="px-4 py-3 text-right text-neutral-600">
+                      <td className="px-6 py-5 text-right text-neutral-600">
                         <QtyCell value={item.returnedQuantity} />
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-6 py-5 text-right">
                         <QtyCell value={availableOf(item)} className="text-base font-semibold text-neutral-900" />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-3">
                         <Badge variant={status.variant}>{status.label}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => onViewDetails(item)}>
-                          View Details
-                        </Button>
+                      <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
+                        <ActionMenu items={[{ label: 'View Details', onClick: () => onViewDetails(item) }]} />
                       </td>
                     </tr>
                   )
@@ -223,18 +220,9 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
                       </div>
                     ))}
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-3 w-full"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onViewDetails(item)
-                    }}
-                  >
-                    View Details
-                  </Button>
+                  <div className="mt-3 flex justify-end" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                    <ActionMenu items={[{ label: 'View Details', onClick: () => onViewDetails(item) }]} />
+                  </div>
                 </div>
               )
             })}
@@ -359,13 +347,15 @@ export default function VehicleStockOverview() {
   }, [currentUser?.id, isAdmin])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Vehicle Stock</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+    <div className="listing-page space-y-4">
+      <ListHeader>
+        <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Vehicle Stock</h1>
+        <p className="mt-1 text-xs text-neutral-400">
           {isAdmin ? 'Stock currently loaded on delivery vehicles.' : 'Current stock available on your assigned vehicle.'}
         </p>
-      </div>
+        </div>
+      </ListHeader>
 
       {isLoading ? (
         <Card>

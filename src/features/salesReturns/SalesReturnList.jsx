@@ -1,3 +1,4 @@
+import { ListHeader, ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, RotateCcw, RotateCw, Search, PackageCheck, Clock, CheckCircle2 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -6,7 +7,6 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
-import StatCard from '../../components/ui/StatCard'
 import { usePermission } from '../../auth/usePermission'
 import { listSalesReturns } from '../../api/salesReturns'
 import { SALES_RETURNS_DEMO_ENABLED, getDemoSalesReturns } from './salesReturnDemoData'
@@ -82,16 +82,11 @@ export default function SalesReturnList() {
   }, [salesReturns, searchTerm, statusFilter])
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={RotateCcw} iconVariant="primary" label="Total Returns" value={String(stats.total)} />
-        <StatCard icon={Clock} iconVariant="info" label="Pending" value={String(stats.pending)} />
-        <StatCard icon={PackageCheck} iconVariant="warning" label="Received" value={String(stats.received)} />
-        <StatCard icon={CheckCircle2} iconVariant="success" label="Completed" value={String(stats.completed)} />
-      </div>
+    <div className="listing-page space-y-4">
 
-      <Card className="p-0">
-        <div className="border-b border-neutral-100 px-4 py-4">
+      <ListOverview>
+        <ListHeader><div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Sales Returns</h1></div></ListHeader>
+<div className="border-b border-neutral-100 px-5 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative sm:w-72">
@@ -101,7 +96,7 @@ export default function SalesReturnList() {
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Search return #, customer or order #"
-                  className="h-9 w-full rounded-xl border border-neutral-100 bg-neutral-50 py-1.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
               </div>
               <Select
@@ -109,7 +104,7 @@ export default function SalesReturnList() {
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
                 className="sm:w-40"
-                triggerClassName="h-9 bg-neutral-50 py-1.5"
+                triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs"
               />
             </div>
             {canCreate && (
@@ -120,8 +115,16 @@ export default function SalesReturnList() {
             )}
           </div>
         </div>
+<ListSummary className="grid-cols-2  lg:grid-cols-4">
+        <StatCard icon={RotateCcw} iconVariant="primary" label="Total Returns" value={String(stats.total)} />
+        <StatCard icon={Clock} iconVariant="info" label="Pending" value={String(stats.pending)} />
+        <StatCard icon={PackageCheck} iconVariant="warning" label="Received" value={String(stats.received)} />
+        <StatCard icon={CheckCircle2} iconVariant="success" label="Completed" value={String(stats.completed)} />
+      </ListSummary>
+      </ListOverview>
 
-        <div className="overflow-x-auto bg-neutral-50/35 py-4">
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto bg-white px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -139,7 +142,7 @@ export default function SalesReturnList() {
               </p>
               {salesReturns.length === 0 && (
                 <>
-                  <p className="mt-1 text-sm text-neutral-500">Raise a return against a delivered order or its invoice.</p>
+                  <p className="mt-1 text-xs text-neutral-400">Raise a return against a delivered order or its invoice.</p>
                   {canCreate && (
                     <Button type="button" className="mt-4" onClick={() => navigate(`${basePath}/new`)}>
                       <Plus className="size-4" aria-hidden="true" />
@@ -150,41 +153,41 @@ export default function SalesReturnList() {
               )}
             </div>
           ) : (
-            <table className="w-full text-left text-sm">
+            <table className="listing-table w-full text-left text-sm">
               <thead>
-                <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  <th className="whitespace-nowrap px-4 py-3">Return</th>
-                  <th className="whitespace-nowrap px-4 py-3">Customer</th>
-                  <th className="whitespace-nowrap px-4 py-3">Order / Invoice</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">Items</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">Return Qty</th>
-                  <th className="whitespace-nowrap px-4 py-3">Created</th>
-                  <th className="whitespace-nowrap px-4 py-3">Status</th>
+                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                  <th className="whitespace-nowrap px-6 py-6">Return</th>
+                  <th className="whitespace-nowrap px-6 py-6">Customer</th>
+                  <th className="whitespace-nowrap px-6 py-6">Order / Invoice</th>
+                  <th className="whitespace-nowrap px-6 py-6 text-right">Items</th>
+                  <th className="whitespace-nowrap px-6 py-6 text-right">Return Qty</th>
+                  <th className="whitespace-nowrap px-6 py-6">Created</th>
+                  <th className="whitespace-nowrap px-6 py-6">Status</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-neutral-100">
                 {filteredSalesReturns.map((salesReturn) => {
                   const meta = srStatusMeta(salesReturn.status)
                   return (
                     <tr
                       key={salesReturn.id}
                       onClick={() => navigate(`${basePath}/${encodeURIComponent(salesReturn.id)}`)}
-                      className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                      className="cursor-pointer bg-white transition-colors hover:bg-primary-50/30"
                     >
-                      <td className="px-4 py-3.5">
+                      <td className="px-6 py-5">
                         <p className="font-semibold text-neutral-900">{salesReturn.returnNumber}</p>
                         {salesReturn.creditAmount > 0 && (
                           <p className="mt-0.5 text-xs text-neutral-400">Credit {formatCurrency(salesReturn.creditAmount)}</p>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 text-neutral-600">{salesReturn.customerName || '—'}</td>
-                      <td className="px-4 py-3.5 text-neutral-600">
+                      <td className="px-6 py-5 text-neutral-600">{salesReturn.customerName || '—'}</td>
+                      <td className="px-6 py-5 text-neutral-600">
                         {salesReturn.orderNumber || salesReturn.invoiceNumber || '—'}
                       </td>
-                      <td className="px-4 py-3.5 text-right text-neutral-600">{salesReturn.items.length}</td>
-                      <td className="px-4 py-3.5 text-right font-medium text-neutral-900">{totalReturnQty(salesReturn)}</td>
-                      <td className="px-4 py-3.5 text-neutral-600">{formatDate(salesReturn.createdAt || salesReturn.returnDate)}</td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-6 py-5 text-right text-neutral-600">{salesReturn.items.length}</td>
+                      <td className="px-6 py-5 text-right font-medium text-neutral-900">{totalReturnQty(salesReturn)}</td>
+                      <td className="px-6 py-5 text-neutral-600">{formatDate(salesReturn.createdAt || salesReturn.returnDate)}</td>
+                      <td className="px-6 py-5">
                         <Badge variant={meta.variant}>{meta.label}</Badge>
                       </td>
                     </tr>
