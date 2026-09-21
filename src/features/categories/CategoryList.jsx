@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { CalendarPlus, CalendarClock, Check, Download, Edit, Eye, Filter, ImageIcon, Plus, RotateCw, Search, Tags, Trash2, Upload } from 'lucide-react'
+import { CalendarPlus, CalendarClock, Check, Download, Edit, Eye, SlidersHorizontal, X, ImageIcon, Plus, RotateCw, Search, Tags, Trash2, Upload } from 'lucide-react'
 import {
   createCategory,
   deleteCategoriesBulk,
@@ -200,7 +201,8 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
 
 export default function CategoryList() {
   const navigate = useNavigate()
-  const filterMenuRef = useRef(null)
+  const filterTriggerRef = useRef(null)
+  const filterCloseRef = useRef(null)
   const sortMenuRef = useRef(null)
   const [categories, setCategories] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -278,9 +280,6 @@ export default function CategoryList() {
     if (!isFilterMenuOpen && !isSortMenuOpen) return
 
     const handleClickOutside = (event) => {
-      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target)) {
-        setIsFilterMenuOpen(false)
-      }
       if (sortMenuRef.current && !sortMenuRef.current.contains(event.target)) {
         setIsSortMenuOpen(false)
       }
@@ -300,6 +299,18 @@ export default function CategoryList() {
       document.removeEventListener('keydown', handleEscape)
     }
   }, [isFilterMenuOpen, isSortMenuOpen])
+
+  useEffect(() => {
+    if (!isFilterMenuOpen) return
+    const previousOverflow = document.body.style.overflow
+    const trigger = filterTriggerRef.current
+    document.body.style.overflow = 'hidden'
+    filterCloseRef.current?.focus()
+    return () => {
+      document.body.style.overflow = previousOverflow
+      trigger?.focus()
+    }
+  }, [isFilterMenuOpen])
 
   const openForm = (category = null) => {
     setEditingCategory(category)
@@ -418,8 +429,8 @@ export default function CategoryList() {
     <div className="listing-page space-y-4">
       <Card className="p-0">
         <div className="px-5 py-5">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
               <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Categories</h2>
               <p className="mt-1 text-xs text-neutral-400">Create and manage product categories used across catalog items.</p>
             </div>
@@ -435,58 +446,20 @@ export default function CategoryList() {
               />
             </div>
 
-            <div ref={filterMenuRef} className="relative shrink-0">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9 rounded-xl bg-white px-3.5"
-                onClick={() => setIsFilterMenuOpen((current) => !current)}
-                aria-haspopup="menu"
-                aria-expanded={isFilterMenuOpen}
-              >
-                <Filter className="size-4" aria-hidden="true" />
-                Filters
-              </Button>
-
-              {isFilterMenuOpen && (
-                <div
-                  role="menu"
-                  aria-label="Category filters"
-                  className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-56 rounded-2xl border border-neutral-100 bg-white p-2 shadow-(--shadow-popover)"
-                >
-                  <p className="px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                    Filter
-                  </p>
-                  {[
-                    { value: 'all', label: 'All categories' },
-                    { value: 'with-image', label: 'With image' },
-                    { value: 'without-image', label: 'Without image' },
-                  ].map((option) => {
-                    const active = categoryFilter === option.value
-
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={active}
-                        onClick={() => {
-                          setCategoryFilter(option.value)
-                          setIsFilterMenuOpen(false)
-                        }}
-                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
-                          active ? 'bg-primary-50 text-primary-700' : 'text-neutral-700 hover:bg-neutral-100'
-                        }`}
-                      >
-                        <span>{option.label}</span>
-                        {active && <Check className="size-4" aria-hidden="true" />}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+            <Button
+              ref={filterTriggerRef}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl px-3.5"
+              onClick={() => { setIsSortMenuOpen(false); setIsFilterMenuOpen(true) }}
+              aria-haspopup="dialog"
+              aria-expanded={isFilterMenuOpen}
+              aria-controls="category-filter-panel"
+            >
+              <SlidersHorizontal className="size-4" aria-hidden="true" />
+              Filter
+            </Button>
 
             <div ref={sortMenuRef} className="relative shrink-0">
               <Button
@@ -550,11 +523,7 @@ export default function CategoryList() {
             </div>
           </div>
         </div>
-      </Card>
-
-      <Card className="overflow-hidden p-0">
-
-        <div className="grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
+        <div className="grid grid-cols-2 overflow-hidden rounded-b-2xl border-t border-neutral-100 lg:grid-cols-4">
           {[
             { label: 'Total Categories', value: categories.length, detail: `${categories.filter((category) => category.image).length} with image`, icon: Tags },
             { label: 'With Image', value: categories.filter((category) => category.image).length, detail: 'catalog visuals', icon: ImageIcon },
@@ -564,7 +533,9 @@ export default function CategoryList() {
             <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-[#6b86ad]">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>
           ))}
         </div>
+      </Card>
 
+      <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto bg-white px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
@@ -674,6 +645,40 @@ export default function CategoryList() {
           <div className="flex items-center gap-1.5"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Previous page">‹</button><span className="min-w-14 text-center font-medium text-[#082445]">{currentPage} / {totalPages}</span><button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Next page">›</button></div>
         </div>
       </Card>
+
+      {isFilterMenuOpen && createPortal(
+        <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="category-filter-title" id="category-filter-panel">
+          <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterMenuOpen(false)} aria-label="Close filters" tabIndex={-1} />
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
+              <div>
+                <h2 id="category-filter-title" className="text-lg font-semibold text-neutral-900">Filter Categories</h2>
+                <p className="mt-0.5 text-xs text-neutral-400">Refine the categories shown in the table.</p>
+              </div>
+              <button ref={filterCloseRef} type="button" onClick={() => setIsFilterMenuOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" aria-label="Close filters">
+                <X className="size-5" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
+              <Select
+                label="Image"
+                options={[
+                  { value: 'all', label: 'All categories' },
+                  { value: 'with-image', label: 'With image' },
+                  { value: 'without-image', label: 'Without image' },
+                ]}
+                value={categoryFilter}
+                onChange={(event) => { setCategoryFilter(event.target.value); setPage(1) }}
+              />
+            </div>
+            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4">
+              <button type="button" onClick={() => { setCategoryFilter('all'); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+              <Button type="button" onClick={() => setIsFilterMenuOpen(false)}>Apply filters</Button>
+            </div>
+          </aside>
+        </div>,
+        document.body,
+      )}
 
       <Modal
         isOpen={isFormOpen}

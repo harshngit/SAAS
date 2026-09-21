@@ -1,3 +1,4 @@
+import ListFilterPanel from '../../components/ui/ListFilterPanel'
 import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import ActionMenu from '../../components/ui/ActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -139,14 +140,9 @@ function SalesInvoicesPanel({ header }) {
     setPage(1)
   }
 
-  return (
-    <div className="listing-page space-y-4">
-      <ListOverview>
-        {header}
-
-      <div className="bg-white px-5 pb-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[14rem] flex-1">
+  const filterControls = (
+    <>
+          <div className="relative w-full sm:w-60">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
             <input
               type="text"
@@ -156,7 +152,8 @@ function SalesInvoicesPanel({ header }) {
               className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
-          <Select options={INVOICE_STATUS_FILTERS} value={paymentStatus} onChange={updateFilter(setPaymentStatus)} className="w-44" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <ListFilterPanel title="Filter Sales Invoices">
+          <Select label="Payment status" options={INVOICE_STATUS_FILTERS} value={paymentStatus} onChange={updateFilter(setPaymentStatus)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
           <button
             type="button"
             onClick={() => { setSearch(''); setPaymentStatus('all'); setPage(1) }}
@@ -165,8 +162,14 @@ function SalesInvoicesPanel({ header }) {
           >
             <RefreshCw className="size-4" />
           </button>
-        </div>
-      </div>
+          </ListFilterPanel>
+    </>
+  )
+
+  return (
+    <div className="listing-page space-y-4">
+      <ListOverview>
+        {header(filterControls)}
 
         <ListSummary className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={IndianRupee} iconVariant="success" label="Total Receivables" value={formatCurrency(stats.totalReceivable)} />
@@ -335,13 +338,14 @@ export default function AdminInvoices() {
 
   return (
     <div className="listing-page space-y-4">
-      <SalesInvoicesPanel header={
+      <SalesInvoicesPanel header={(controls) => (
         <ListHeader>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Sales Invoices</h1>
           <p className="mt-1 text-xs text-neutral-400">Customer invoices and receivables. Supplier bills live under Supplier Invoices.</p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+          {controls}
           <Button type="button" onClick={() => setShowNewInvoiceChoice(true)}>
             <Plus className="size-4" />
             New Invoice
@@ -356,7 +360,7 @@ export default function AdminInvoices() {
           </button>
         </div>
       </ListHeader>
-      } />
+      )} />
 
       <Modal
         isOpen={showNewInvoiceChoice}

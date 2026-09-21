@@ -1,3 +1,4 @@
+import ListFilterPanel from '../../components/ui/ListFilterPanel'
 import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarClock, IndianRupee, Plus, Search, Users, Wallet } from 'lucide-react'
@@ -195,18 +196,12 @@ export default function SupplierPaymentsList() {
     <div className="listing-page space-y-4">
       <ListOverview>
       <ListHeader>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Supplier Payments</h1>
           <p className="mt-1 text-xs text-neutral-400">When, how much, and against which invoices each supplier was paid.</p>
         </div>
-        {canCreate && (
-          <Button type="button" onClick={() => setRecordOpen(true)}>
-            <Plus className="size-4" aria-hidden="true" />
-            Create Payment
-          </Button>
-        )}
-      <div className="flex w-full flex-wrap items-center gap-2">
-          <div className="relative min-w-56 flex-1">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+          <div className="relative w-full sm:w-60">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
             <input
               type="text"
@@ -219,11 +214,19 @@ export default function SupplierPaymentsList() {
               className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
-          <Select options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-44" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select options={[{ value: 'all', label: 'All Modes' }, ...PAYMENT_MODE_OPTIONS]} value={modeFilter} onChange={(event) => { setModeFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-40" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select options={PAYMENT_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-36" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select options={PAYMENT_DATE_FILTER_OPTIONS} value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="w-40" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select options={PAYMENT_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-40" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <ListFilterPanel title="Filter Supplier Payments">
+            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select label="Payment mode" options={[{ value: 'all', label: 'All Modes' }, ...PAYMENT_MODE_OPTIONS]} value={modeFilter} onChange={(event) => { setModeFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select label="Status" options={PAYMENT_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select label="Date" options={PAYMENT_DATE_FILTER_OPTIONS} value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select label="Sort by" options={PAYMENT_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          </ListFilterPanel>
+          {canCreate && (
+          <Button type="button" onClick={() => setRecordOpen(true)}>
+            <Plus className="size-4" aria-hidden="true" />
+            Create Payment
+          </Button>
+        )}
         </div>
       </ListHeader>
 

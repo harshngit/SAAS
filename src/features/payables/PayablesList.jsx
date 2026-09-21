@@ -1,3 +1,4 @@
+import ListFilterPanel from '../../components/ui/ListFilterPanel'
 import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import ListActionMenu from '../../components/ui/ListActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -191,12 +192,12 @@ export default function PayablesList() {
     <div className="listing-page space-y-4">
       <ListOverview>
       <ListHeader>
-        <div>
+        <div className="min-w-0 flex-1">
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Accounts Payable</h1>
         <p className="mt-1 text-xs text-neutral-400">What you still owe each supplier, derived from recorded supplier invoices. Read-only.</p>
         </div>
-      <div className="flex w-full flex-wrap items-center gap-2">
-          <div className="relative min-w-56 flex-1">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+          <div className="relative w-full sm:w-60">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
             <input
               type="text"
@@ -206,11 +207,14 @@ export default function PayablesList() {
               className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
-          <Select options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-44" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]} value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="w-44" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          {DEMO_MODE && <Select options={DUE_FILTER_OPTIONS} value={dueFilter} onChange={(event) => setDueFilter(event.target.value)} className="w-36" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />}
-          <Select options={ageingFilterOptions} value={ageingFilter} onChange={(event) => setAgeingFilter(event.target.value)} className="w-36" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select options={PAYABLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-44" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <ListFilterPanel title="Filter Accounts Payable">
+            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select label="Payment status" options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]} value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          {DEMO_MODE && <Select label="Due date" options={DUE_FILTER_OPTIONS} value={dueFilter} onChange={(event) => setDueFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />}
+          <Select label="Ageing" options={ageingFilterOptions} value={ageingFilter} onChange={(event) => setAgeingFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select label="Sort by" options={PAYABLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          </ListFilterPanel>
+
         </div>
       </ListHeader>
 

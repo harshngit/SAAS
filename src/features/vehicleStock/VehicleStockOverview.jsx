@@ -1,8 +1,8 @@
-import { ListStatCard, ListSummary, ListHeader } from '../../components/ui/ListPresentation'
+import { ListHeader } from '../../components/ui/ListPresentation'
 import ActionMenu from '../../components/ui/ActionMenu'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Boxes, PackageSearch, RotateCw, Truck } from 'lucide-react'
+import { Boxes, PackageSearch, PackageCheck, PackagePlus, RotateCw, Truck } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -56,18 +56,27 @@ function SummaryTiles({ items }) {
   }, [items])
 
   const tiles = [
-    { label: 'Products On Vehicle', value: items.filter((item) => availableOf(item) > 0).length },
-    { label: 'Loaded Units', value: totals.loaded },
-    { label: 'Delivered Units', value: totals.delivered },
-    { label: 'Available Units', value: totals.available, strong: true },
+    { label: 'Products On Vehicle', value: items.filter((item) => availableOf(item) > 0).length, detail: 'products with available stock', icon: Boxes },
+    { label: 'Loaded Units', value: totals.loaded, detail: 'opening and extra loads', icon: PackagePlus },
+    { label: 'Delivered Units', value: totals.delivered, detail: 'units delivered', icon: Truck },
+    { label: 'Available Units', value: totals.available, detail: 'remaining for delivery', icon: PackageCheck },
   ]
 
   return (
-    <ListSummary className="grid-cols-2 lg:grid-cols-4">
-      {tiles.map((tile) => (
-        <ListStatCard key={tile.label} label={tile.label} value={tile.value} />
+    <div className="grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
+      {tiles.map(({ label, value, detail, icon: Icon }, index) => (
+        <div key={label} className={`border-neutral-100 px-5 py-3 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-xs font-medium text-[#6b86ad]">{label}</p>
+            <span className="flex size-8 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]">
+              <Icon className="size-4" aria-hidden="true" />
+            </span>
+          </div>
+          <p className="mt-2 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p>
+          <p className="mt-1 text-xs font-medium text-emerald-600">{detail}</p>
+        </div>
       ))}
-    </ListSummary>
+    </div>
   )
 }
 
@@ -75,7 +84,7 @@ function QtyCell({ value, className = '' }) {
   return <span className={`tabular-nums ${className}`}>{Number(value) || 0}</span>
 }
 
-function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
+function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn, heading }) {
   const items = session.items || []
   const totalRemaining = items.reduce((sum, item) => sum + availableOf(item), 0)
   const contextBits = [
@@ -86,10 +95,27 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="overflow-hidden p-0">
+        <div className="px-5 py-3">
+          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            {heading || <h2 className="text-xl font-semibold tracking-tight text-neutral-900">{contextBits[0]}</h2>}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={session.status === 'active' ? 'success' : 'neutral'} dot>
+                {session.status === 'active' ? 'Active session' : session.status || 'Session'}
+              </Badge>
+      {onEndDayReturn && totalRemaining > 0 && (
+        <div className="shrink-0">
+          <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={onEndDayReturn}>
+            <Boxes className="size-4" aria-hidden="true" />
+            End Day Return
+          </Button>
+        </div>
+      )}
+            </div>
+          </div>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <span className="flex size-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-primary-50 text-primary-700">
               <Truck className="size-5" aria-hidden="true" />
             </span>
             <div>
@@ -97,7 +123,7 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
               <p className="mt-0.5 text-xs text-neutral-500">
                 {contextBits.slice(1).join(' · ') || 'Assigned vehicle'}
               </p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
                 {friendly(session.warehouseName) && <span>Warehouse: {session.warehouseName}</span>}
                 {(session.lastLoadedAt || session.date) && (
                   <span>Last loaded: {formatDateTime(session.lastLoadedAt || session.date)}</span>
@@ -105,13 +131,10 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
               </div>
             </div>
           </div>
-          <Badge variant={session.status === 'active' ? 'success' : 'neutral'} dot>
-            {session.status === 'active' ? 'Active session' : session.status || 'Session'}
-          </Badge>
         </div>
+        </div>
+        <SummaryTiles items={items} />
       </Card>
-
-      <SummaryTiles items={items} />
 
       {items.length === 0 ? (
         <Card>
@@ -230,14 +253,7 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn }) {
         </Card>
       )}
 
-      {onEndDayReturn && totalRemaining > 0 && (
-        <div className="flex justify-end">
-          <Button type="button" variant="outline" onClick={onEndDayReturn}>
-            <Boxes className="size-4" aria-hidden="true" />
-            End Day Return
-          </Button>
-        </div>
-      )}
+
     </div>
   )
 }
@@ -348,6 +364,7 @@ export default function VehicleStockOverview() {
 
   return (
     <div className="listing-page space-y-4">
+      {(isLoading || error || sessions.length === 0) && (
       <ListHeader>
         <div>
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Vehicle Stock</h1>
@@ -356,6 +373,7 @@ export default function VehicleStockOverview() {
         </p>
         </div>
       </ListHeader>
+      )}
 
       {isLoading ? (
         <Card>
@@ -390,10 +408,18 @@ export default function VehicleStockOverview() {
         </Card>
       ) : (
         <div className="space-y-8">
-          {sessions.map((session) => (
+          {sessions.map((session, index) => (
             <VehicleSessionPanel
               key={session.id}
               session={session}
+              heading={index === 0 ? (
+                <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Vehicle Stock</h1>
+        <p className="mt-1 text-xs text-neutral-400">
+          {isAdmin ? 'Stock currently loaded on delivery vehicles.' : 'Current stock available on your assigned vehicle.'}
+        </p>
+        </div>
+              ) : null}
               onViewDetails={setSelectedItem}
               // The EOD page runs against the signed-in user's own session, so it is a
               // delivery-partner action only. Admin gets no button until a proper

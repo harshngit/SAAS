@@ -1,7 +1,9 @@
-import { ListHeader, ListSummary, ListTableToolbar, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import { ListDataTable as DataTable } from '../../components/ui/ListPresentation'
+import { createPortal } from 'react-dom'
 import ActionMenu from '../../components/ui/ActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, BadgeCheck, Ban, Eye, HandCoins, Wallet } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, Ban, Eye, HandCoins, Search, Wallet } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -43,6 +45,7 @@ export default function CollectionReconciliation() {
   const [loadError, setLoadError] = useState('')
   const [unavailable, setUnavailable] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [searchHost, setSearchHost] = useState(null)
 
   const [detail, setDetail] = useState(null)
   const [reconcileTarget, setReconcileTarget] = useState(null)
@@ -142,14 +145,43 @@ export default function CollectionReconciliation() {
 
   return (
     <div className="listing-page space-y-4">
-      <ListHeader>
-        <div>
-        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Collection Reconciliation</h1>
-        <p className="mt-1 text-xs text-neutral-400">
-          Review driver collections before they are posted as customer payments.
-        </p>
+      <Card className="overflow-hidden p-0">
+        <div className="px-5 py-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Collection Reconciliation</h1>
+              <p className="mt-1 text-xs text-neutral-400">Review driver collections before they are posted as customer payments.</p>
+            </div>
+            {!unavailable && (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <div ref={setSearchHost} className={isLoading ? 'hidden' : 'hidden w-60 md:block'} />
+                <ListFilterPanel title="Filter Collections">
+                  <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+                </ListFilterPanel>
+              </div>
+            )}
+          </div>
         </div>
-      </ListHeader>
+        {!unavailable && (
+          <div className="grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
+            {[
+              { label: 'Recorded Collections', value: String(stats.recordedCount), detail: 'awaiting reconciliation', icon: HandCoins },
+              { label: 'Recorded Amount', value: formatCurrency(stats.recordedAmount), detail: 'amount awaiting reconciliation', icon: Wallet },
+              { label: 'Reconciled Today', value: String(stats.reconciledToday), detail: 'collections reconciled today', icon: BadgeCheck },
+              { label: 'Voided', value: String(stats.voided), detail: 'voided collections', icon: Ban },
+            ].map(({ label, value, detail, icon: Icon }, index) => (
+              <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs font-medium text-[#6b86ad]">{label}</p>
+                  <span className="flex size-9 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]"><Icon className="size-4" aria-hidden="true" /></span>
+                </div>
+                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p>
+                <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {unavailable ? (
         <Card>
@@ -166,24 +198,9 @@ export default function CollectionReconciliation() {
         </Card>
       ) : (
         <>
-          <ListSummary className="grid-cols-2 lg:grid-cols-4">
-            <StatCard icon={HandCoins} iconVariant="warning" label="Recorded Collections" value={String(stats.recordedCount)} />
-            <StatCard icon={Wallet} iconVariant="primary" label="Recorded Amount" value={formatCurrency(stats.recordedAmount)} />
-            <StatCard icon={BadgeCheck} iconVariant="success" label="Reconciled Today" value={String(stats.reconciledToday)} />
-            <StatCard icon={Ban} iconVariant="neutral" label="Voided" value={String(stats.voided)} />
-          </ListSummary>
-
           <Card className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:m-5">
-            <div className={isLoading ? '' : 'md:hidden'}>
-              <ListTableToolbar title="Collections" actions={
-              <Select
-                options={COLLECTION_STATUS_FILTERS}
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="w-full"
-                triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs"
-              />
-              } />
+            <div className={isLoading ? 'px-5 py-4' : 'px-5 py-4 md:hidden'}>
+              <h3 className="text-base font-semibold tracking-tight text-neutral-900">Collections</h3>
             </div>
             {loadError && !unavailable && (
               <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>
@@ -196,8 +213,21 @@ export default function CollectionReconciliation() {
                 {/* Desktop / tablet: compact table */}
                 <div className="hidden md:block">
                   <DataTable
-                    title="Collections"
-                    toolbarActions={<Select options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />}
+                    renderToolbar={({ search, onSearchChange, resultCount }) => (
+                      <>
+                        <div className="flex items-center gap-2 px-5 py-3">
+                          <h3 className="text-base font-semibold tracking-tight text-neutral-900">Collections</h3>
+                          <span className="text-xs text-neutral-400" aria-live="polite">{resultCount} {resultCount === 1 ? 'result' : 'results'}</span>
+                        </div>
+                        {searchHost && createPortal(
+                          <div className="relative">
+                            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+                            <input type="search" value={search} onChange={onSearchChange} placeholder="Search collections..." aria-label="Search collections"
+                              className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
+                          </div>, searchHost,
+                        )}
+                      </>
+                    )}
                     columns={[
                       { key: 'collectionNumber', header: 'Collection #', sortable: true },
                       { key: 'deliveryNumber', header: 'Delivery #', sortable: true, render: (r) => r.deliveryNumber || '—' },

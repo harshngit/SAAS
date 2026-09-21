@@ -1,3 +1,4 @@
+import ListFilterPanel from '../../components/ui/ListFilterPanel'
 import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -192,16 +193,12 @@ export default function VehicleList() {
     <div className="listing-page space-y-4">
       <ListOverview>
       <ListHeader>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Vehicles</h1>
           <p className="mt-1 text-xs text-neutral-400">Your delivery fleet — who each vehicle is assigned to and whether it can be used.</p>
         </div>
-        <Button type="button" onClick={() => openForm()}>
-          <Plus className="size-4" aria-hidden="true" />
-          Add Vehicle
-        </Button>
-      <div className="flex w-full flex-wrap items-center gap-2">
-          <div className="relative min-w-56 flex-1">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+          <div className="relative w-full sm:w-60">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
             <input
               type="text"
@@ -211,10 +208,16 @@ export default function VehicleList() {
               className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
-          <Select options={VEHICLE_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-40" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select options={AVAILABILITY_FILTER_OPTIONS} value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)} className="w-40" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select options={VEHICLE_TYPE_FILTER_OPTIONS} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-36" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select options={VEHICLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-40" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <ListFilterPanel title="Filter Vehicles">
+            <Select label="Status" options={VEHICLE_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select label="Availability" options={AVAILABILITY_FILTER_OPTIONS} value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select label="Vehicle type" options={VEHICLE_TYPE_FILTER_OPTIONS} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select label="Sort by" options={VEHICLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          </ListFilterPanel>
+          <Button type="button" onClick={() => openForm()}>
+          <Plus className="size-4" aria-hidden="true" />
+          Add Vehicle
+        </Button>
         </div>
       </ListHeader>
 

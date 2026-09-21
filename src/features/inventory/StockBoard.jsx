@@ -1,7 +1,8 @@
 import { ListHeader, ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Boxes, Eye, Package, PackagePlus, PowerOff, RotateCw, Search, XCircle } from 'lucide-react'
+import { AlertTriangle, Boxes, Eye, Package, PackagePlus, PowerOff, RotateCw, Search, SlidersHorizontal, X, XCircle } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -71,7 +72,7 @@ function ExpiringBatchesPanel() {
   )
 }
 
-const stockStatusTabs = [
+const stockStatusOptions = [
   { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
   { value: 'out', label: 'Out of Stock' },
@@ -120,6 +121,27 @@ export default function StockBoard({ readOnly = false }) {
   const [adjustingProduct, setAdjustingProduct] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const filterTriggerRef = useRef(null)
+  const filterCloseRef = useRef(null)
+
+  useEffect(() => {
+    if (!isFilterOpen) return
+    const trigger = filterTriggerRef.current
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    filterCloseRef.current?.focus()
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setIsFilterOpen(false)
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleEscape)
+      trigger?.focus()
+    }
+  }, [isFilterOpen])
+
 
   const categoryFilterOptions = useMemo(() => {
     const categories = items.reduce((options, item) => {
@@ -258,60 +280,27 @@ export default function StockBoard({ readOnly = false }) {
     <div className="listing-page space-y-4">
 
       <ListOverview>
-        <ListHeader><div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Inventory</h1></div></ListHeader>
-<div className="border-b border-neutral-100 px-5 py-4">
-          <div className="flex flex-wrap gap-5">
-            {stockStatusTabs.map((tab) => {
-              const isActive = statusFilter === tab.value
-
-              return (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => setStatusFilter(tab.value)}
-                  className={`relative py-2 text-sm font-medium transition-colors ${
-                    isActive ? 'text-primary-700' : 'text-neutral-500 hover:text-neutral-900'
-                  }`}
-                >
-                  {tab.label}
-                  {isActive && (
-                    <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-600" aria-hidden="true" />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="border-b border-neutral-100 px-5 py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative w-full sm:w-80">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search products, brands, SKU"
-                  className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                />
-              </div>
-              <Select
-                options={categoryFilterOptions}
-                value={categoryFilter}
-                onChange={(event) => setCategoryFilter(event.target.value)}
-                className="sm:w-52"
-              />
-              <Select
-                options={sortOptions}
-                value={sortBy}
-                onChange={(event) => setSortBy(event.target.value)}
-                className="sm:w-48"
+        <ListHeader>
+          <div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Inventory</h1></div>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-60">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search products, brands, SKU"
+                aria-label="Search products, brands, SKU"
+                className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
+            <Button ref={filterTriggerRef} type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)} aria-haspopup="dialog" aria-expanded={isFilterOpen} aria-controls="inventory-filter-panel">
+              <SlidersHorizontal className="size-4" aria-hidden="true" />
+              Filter
+            </Button>
           </div>
-        </div>
-<ListSummary className="grid-cols-2  lg:grid-cols-4">
+        </ListHeader>
+        <ListSummary className="grid-cols-2  lg:grid-cols-4">
         <StatCard icon={Boxes} iconVariant="primary" label="Tracked Products" value={stats.totalProducts} />
         <StatCard icon={Package} iconVariant="info" label="Total Stock Units" value={stats.totalStock.toLocaleString()} />
         <StatCard icon={XCircle} iconVariant="danger" label="Out of Stock" value={stats.outOfStock} />
@@ -422,6 +411,41 @@ export default function StockBoard({ readOnly = false }) {
           <span>Stock Items</span>
         </div>
       </Card>
+
+      {isFilterOpen && createPortal(
+        <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="inventory-filter-title" id="inventory-filter-panel">
+          <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" tabIndex={-1} />
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
+              <div>
+                <h2 id="inventory-filter-title" className="text-lg font-semibold text-neutral-900">Filter Inventory</h2>
+                <p className="mt-0.5 text-xs text-neutral-400">Refine the products shown in the table.</p>
+              </div>
+              <button ref={filterCloseRef} type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" aria-label="Close filters">
+                <X className="size-5" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
+              <Select label="Category" options={categoryFilterOptions} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} />
+              <Select label="Sort by" options={sortOptions} value={sortBy} onChange={(event) => setSortBy(event.target.value)} />
+              <fieldset className="space-y-2">
+                <legend className="mb-2 text-sm font-medium text-neutral-700">Stock status</legend>
+                {stockStatusOptions.map((option) => (
+                  <label key={option.value} className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm transition-colors ${statusFilter === option.value ? 'border-primary-200 bg-primary-50 text-primary-700' : 'border-neutral-100 text-neutral-700 hover:bg-neutral-50'}`}>
+                    <input type="radio" name="inventory-stock-status" value={option.value} checked={statusFilter === option.value} onChange={() => setStatusFilter(option.value)} className="size-4 accent-primary-600 focus-visible:outline-primary-500" />
+                    {option.label}
+                  </label>
+                ))}
+              </fieldset>
+            </div>
+            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4">
+              <button type="button" onClick={() => { setCategoryFilter('all'); setSortBy('name-asc'); setStatusFilter('all'); setSearchTerm('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+              <Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button>
+            </div>
+          </aside>
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }

@@ -107,26 +107,23 @@ export default function RolesList() {
                 Create custom roles and configure module-level access for staff.
               </p>
             </div>
-            <RequirePermission module="users" action="edit">
-              <Button type="button" size="sm" onClick={() => navigate('/admin/roles/new')}>
-                <Plus className="size-4" aria-hidden="true" />
-                New Role
-              </Button>
-            </RequirePermission>
-          </div>
-        </div>
-
-        <div className="border-b border-neutral-100 px-4 py-3">
-          <div className="flex justify-end">
-            <div className="relative w-full sm:w-96">
+            <div className="flex w-full items-center gap-2 lg:w-auto">
+            <div className="relative min-w-0 flex-1 sm:w-60 sm:flex-none">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
               <input
                 type="search"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search roles"
-                className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-9 w-full rounded-xl border border-neutral-100 bg-neutral-50 py-1.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
+            </div>
+            <RequirePermission module="users" action="edit">
+              <Button type="button" size="sm" className="h-9 shrink-0 whitespace-nowrap" onClick={() => navigate('/admin/roles/new')}>
+                <Plus className="size-4" aria-hidden="true" />
+                New Role
+              </Button>
+            </RequirePermission>
             </div>
           </div>
         </div>
