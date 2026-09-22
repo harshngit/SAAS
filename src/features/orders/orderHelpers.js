@@ -350,7 +350,16 @@ export function buildOrderTimeline(order, { invoices = [] } = {}) {
   }
 
   if (invoices.length > 0) {
-    events.push({ id: 'invoice', icon: FileText, iconClass: 'bg-green-50 text-green-600', title: 'Invoice created', subtitle: invoices[0].invoiceNumber || 'Receivable raised', timestamp: stamp })
+    const invoice = invoices[0]
+    events.push({
+      id: 'invoice',
+      icon: FileText,
+      iconClass: 'bg-green-50 text-green-600',
+      title: 'Invoice created',
+      subtitle: invoice.invoiceNumber || 'Receivable raised',
+      // The invoice's own date when the backend provides one - never invented on the frontend.
+      timestamp: invoice.invoiceDate || invoice.createdAt || stamp,
+    })
   }
   if (order.status === 'completed') {
     events.push({ id: 'completed', icon: Sparkles, iconClass: 'bg-green-50 text-green-600', title: 'Order completed', subtitle: 'Fulfilment and billing done', timestamp: stamp })

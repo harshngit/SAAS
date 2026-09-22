@@ -24,6 +24,7 @@ import { listPaymentReceipts } from '../../api/paymentReceipts'
 import { getOrganizationSettings } from '../../api/organizations'
 import { usePermission } from '../../auth/usePermission'
 import { templateComponents, money as formatPreviewMoney, buildInvoicePreviewData } from './invoiceTemplates'
+import { INVOICE_DEMO_ENABLED } from './invoiceDemoData'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
 import { FINANCIAL_STATUS_VARIANT, financialStatus } from './invoiceHelpers'
 import { formatCurrency } from '../../utils/format'
@@ -150,7 +151,6 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
         <div className="mt-4 overflow-auto rounded-xl border border-neutral-100 bg-neutral-50/60 p-4" style={{ maxHeight: '38rem' }}>
           <div
             ref={exportRef}
-            data-invoice-export-root
             className="mx-auto origin-top bg-white p-5 text-xs text-neutral-600 shadow-(--shadow-xs)"
             style={{ transform: `scale(${zoom / 100})`, width: '32rem' }}
           >
@@ -265,12 +265,16 @@ export default function InvoiceDetail() {
     )
   }
 
+  // The backend PDF endpoint is the canonical, fully-branded invoice PDF (logo, signature,
+  // stamp, QR, letterhead, primary color, footer text) — no separate frontend PDF generator
+  // for real invoices. Demo mode has no backend to call, so it still renders the on-screen
+  // preview to a PDF client-side, matching this project's "demo mode must stay usable" rule.
   const handleDownload = async (format) => {
     setIsDownloading(true)
     setDownloadError('')
 
     try {
-      if (format === 'detailed') {
+      if (INVOICE_DEMO_ENABLED) {
         await exportElementToPdf(previewExportRef.current, `${invoice.invoiceNumber || invoice.id}.pdf`)
         return
       }

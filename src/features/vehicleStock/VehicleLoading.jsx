@@ -9,7 +9,9 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { listDeliveries, loadDeliveryOntoVehicle, markDeliveryReady } from '../../api/deliveries'
 import { listProducts } from '../../api/products'
+import { listVehicles } from '../../api/vehicles'
 import {
+  DEMO_VEHICLES,
   demoDeliveriesResolved,
   isDemoDelivery,
   simulateDemoVehicleLoad,
@@ -52,6 +54,23 @@ const isLoadable = (delivery) => {
   return key === 'ready' || isFullyPicked(delivery)
 }
 
+// The demo driver's assigned vehicle - matches DEMO_VEHICLES[0], the same vehicle the shared
+// demo delivery records and the Vehicle Stock demo session already assume for this partner.
+const demoAssignedVehicle = () => {
+  const demoVehicle = DEMO_VEHICLES[0]
+  return demoVehicle
+    ? { number: demoVehicle.vehicleNumber, type: demoVehicle.vehicleType, capacityKg: demoVehicle.capacityKg }
+    : null
+}
+
+// The backend rejects /ready and /load when the delivery partner has no active vehicle
+// assigned to them - surface that as a clear, actionable message instead of the raw text.
+const VEHICLE_REQUIRED_PATTERN = /no active vehicle is assigned|vehicle is required for loading|assign a vehicle/i
+const friendlyLoadError = (rawError) =>
+  VEHICLE_REQUIRED_PATTERN.test(rawError || '')
+    ? 'No active vehicle is assigned to you. Please contact the administrator before loading deliveries.'
+    : rawError
+
 export default function VehicleLoading() {
   const navigate = useNavigate()
   const { showToast } = useToast()
@@ -64,23 +83,30 @@ export default function VehicleLoading() {
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  // The delivery partner's own active vehicle - fetched independently of the deliveries list,
+  // never derived from whichever delivery happens to already carry vehicle data.
+  const [assignedVehicle, setAssignedVehicle] = useState(null)
+  const [vehicleError, setVehicleError] = useState('')
 
   const load = useCallback(async () => {
     if (!currentUser?.id) return
     setIsLoading(true)
     setError('')
+    setVehicleError('')
 
-    // Explicit demo mode: demo deliveries only, no real API call.
+    // Explicit demo mode: demo deliveries + the demo driver's demo vehicle only, no real API call.
     if (DEMO_VEHICLE_STOCK_ENABLED) {
       setDeliveries(demoDeliveriesResolved())
       setProductMeta({})
+      setAssignedVehicle(demoAssignedVehicle())
       setIsLoading(false)
       return
     }
 
-    const [result, productsResult] = await Promise.all([
+    const [result, productsResult, vehiclesResult] = await Promise.all([
       listDeliveries({ delivery_partner_id: currentUser.id }),
       listProducts(),
+      listVehicles({ default_driver_id: currentUser.id, status: 'active' }),
     ])
 
     if (productsResult.success) {
@@ -89,6 +115,20 @@ export default function VehicleLoading() {
         meta[product.id] = { sku: product.sku || '', weight: Number(product.weight) || null }
       })
       setProductMeta(meta)
+    }
+
+    // The driver's assigned vehicle - real mode only, never a demo vehicle, never guessed from
+    // a delivery's own vehicle fields. A fetch failure is a real error, not "no vehicle".
+    if (vehiclesResult.success) {
+      const activeVehicle = vehiclesResult.vehicles[0] || null
+      setAssignedVehicle(
+        activeVehicle
+          ? { number: activeVehicle.vehicleNumber, type: activeVehicle.vehicleType, capacityKg: activeVehicle.capacityKg }
+          : null,
+      )
+    } else {
+      setAssignedVehicle(null)
+      setVehicleError(vehiclesResult.error)
     }
 
     // Real mode: the delivery list is authoritative. A failure shows the real error; an empty
@@ -141,16 +181,9 @@ export default function VehicleLoading() {
     })
   }, [eligible])
 
-  const vehicle = useMemo(() => {
-    const withVehicle = [...eligible, ...alreadyLoaded].find((delivery) => delivery.vehicleNumber)
-    return withVehicle
-      ? {
-          number: withVehicle.vehicleNumber,
-          type: withVehicle.vehicleType || '',
-          capacityKg: withVehicle.vehicleCapacityKg ?? null,
-        }
-      : null
-  }, [eligible, alreadyLoaded])
+  // The driver's actual assigned vehicle (state, fetched in `load`) - never derived from
+  // whichever delivery happens to carry vehicle data.
+  const vehicle = assignedVehicle
 
   const warehouses = useMemo(
     () => [...new Set(eligible.map((delivery) => delivery.warehouseName).filter(Boolean))],
@@ -221,11 +254,11 @@ export default function VehicleLoading() {
       // delivery loading path. If /ready fails we do NOT call /load.
       const readyResult = await markDeliveryReady(delivery.id)
       if (!readyResult.success && !/already|ready|state|status/i.test(readyResult.error || '')) {
-        failures.push(`${delivery.deliveryNumber || delivery.orderNumber}: ${readyResult.error}`)
+        failures.push(`${delivery.deliveryNumber || delivery.orderNumber}: ${friendlyLoadError(readyResult.error)}`)
         continue
       }
       const loadResult = await loadDeliveryOntoVehicle(delivery.id)
-      if (!loadResult.success) failures.push(`${delivery.deliveryNumber || delivery.orderNumber}: ${loadResult.error}`)
+      if (!loadResult.success) failures.push(`${delivery.deliveryNumber || delivery.orderNumber}: ${friendlyLoadError(loadResult.error)}`)
     }
 
     setIsSubmitting(false)
@@ -269,7 +302,9 @@ export default function VehicleLoading() {
       {/* Vehicle + warehouse */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card title="Assigned Vehicle">
-          {vehicle ? (
+          {vehicleError ? (
+            <p className="py-4 text-sm text-red-600">{vehicleError}</p>
+          ) : vehicle ? (
             <div className="flex items-center gap-3">
               <span className="flex size-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
                 <Truck className="size-5" aria-hidden="true" />

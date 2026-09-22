@@ -701,12 +701,20 @@ export default function PurchaseInvoiceDetail() {
                   verification: verificationMeta(invoice.verificationStatus),
                 }))
             if (rows.length === 0) {
+              // The backend creates/links the Supplier Invoice automatically - once this
+              // purchase is confirmed (or closed), an invoice is expected but may not have
+              // landed yet. Purely a passive, non-clickable state - never created from here.
+              const invoicePending = purchaseStatus.key === 'confirmed' || purchaseStatus.key === 'closed'
               return (
                 <Card>
                   <EmptyState
                     icon={FileText}
-                    title="No supplier invoices linked"
-                    description="Supplier invoices billed against this purchase will appear here."
+                    title={invoicePending ? 'Invoice being generated…' : 'No supplier invoices linked'}
+                    description={
+                      invoicePending
+                        ? 'The supplier invoice for this purchase is created automatically and will appear here shortly.'
+                        : 'Supplier invoices billed against this purchase will appear here.'
+                    }
                   />
                 </Card>
               )

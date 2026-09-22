@@ -12,6 +12,7 @@ import {
   Search,
   SlidersHorizontal,
   Trash2,
+  UploadCloud,
   UserCheck,
   Users,
   UserX,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
+import BulkImportModal from '../../components/ui/BulkImportModal'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -107,6 +109,7 @@ export default function CustomerList() {
   const [salesOfficerFilter, setSalesOfficerFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false)
   const [pageSize, setPageSize] = useState('10')
   const [page, setPage] = useState(1)
   const [selectedCustomerIds, setSelectedCustomerIds] = useState([])
@@ -447,6 +450,7 @@ export default function CustomerList() {
                 </div>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button>
                 <RequirePermission module="customers" action="create">
+                  <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" />Bulk Import</Button>
                   <Button onClick={() => handleOpenForm()} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Customer</Button>
                 </RequirePermission>
               </div>
@@ -711,6 +715,13 @@ export default function CustomerList() {
           </div>
         </div>
       </Modal>
+
+      <BulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        moduleKey="customers"
+        onImported={loadCustomers}
+      />
     </div>
   )
 }

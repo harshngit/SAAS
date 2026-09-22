@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, Edit, Eye, Plus, Power, RotateCw, Search, SlidersHorizontal, Trash2, Users, Wallet, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Edit, Eye, Plus, Power, RotateCw, Search, SlidersHorizontal, Trash2, UploadCloud, Users, Wallet, X } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
+import BulkImportModal from '../../components/ui/BulkImportModal'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -51,6 +52,7 @@ export default function SupplierList() {
   const [pageSize, setPageSize] = useState('10')
   const [page, setPage] = useState(1)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState(null)
@@ -428,6 +430,7 @@ export default function SupplierList() {
                 <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search suppliers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportSuppliersCsv()}><Download className="size-4" />Export</Button>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" />Bulk Import</Button>
                 <Button onClick={() => handleOpenForm()} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Supplier</Button>
               </div>
             </div>
@@ -681,6 +684,13 @@ export default function SupplierList() {
           </div>
         </div>
       </Modal>
+
+      <BulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        moduleKey="suppliers"
+        onImported={loadSuppliers}
+      />
     </div>
   )
 }

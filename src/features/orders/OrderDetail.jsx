@@ -694,6 +694,11 @@ export default function OrderDetail() {
 
   const canCreateInvoiceNow = invoiceMode === 'after_full_order' ? isDelivered : hasDeliveredQuantity
   const firstInvoice = orderInvoices[0]
+  // The backend auto-creates the sales invoice once the order reaches its invoice-trigger
+  // status (delivered / completed) - this only decides which passive state to SHOW, it never
+  // triggers creation itself. Cancelled orders never show a pending-invoice state, even if some
+  // quantity was delivered before cancellation.
+  const invoiceTriggerReached = order.status !== 'cancelled' && (canCreateInvoiceNow || order.status === 'completed')
 
   const primaryActions = (<>
           {actions.includes('viewDelivery') && (
@@ -708,27 +713,31 @@ export default function OrderDetail() {
               View Delivery
             </Button>
           )}
-          {!actions.includes('createInvoice') && !(actions.includes('viewInvoice') && hasMoreToInvoice) && (
-            <Button variant="primary" size="sm" className="od-invoice-action od-generate-action" disabled title={firstInvoice ? 'Invoice already generated. Open it from More Actions.' : 'Invoice generation is unavailable at this order stage'}>
+          {/* Sales invoices are created automatically by the backend once the order reaches its
+              invoice-trigger status - there is no manual "Generate Invoice" action here anymore.
+              View Invoice once the backend reports one exists; a non-clickable "being generated"
+              state while the order qualifies but no invoice has landed yet; nothing before that. */}
+          {firstInvoice ? (
+            <Button variant="primary" size="sm" className="od-invoice-action od-generate-action" onClick={handleViewInvoice}>
               <FileText className="size-4" aria-hidden="true" />
-              Generate Invoice
+              View Invoice
             </Button>
-          )}
-          {actions.includes('viewInvoice') && hasMoreToInvoice && (
-            <Button variant="primary" size="sm" className="od-invoice-action od-generate-action" onClick={handleCreateInvoice}>
-              <FileText className="size-4" aria-hidden="true" />
-              Generate Invoice
-            </Button>
-          )}
-          {actions.includes('createInvoice') && (
+          ) : invoiceTriggerReached ? (
             <Button
               variant="primary"
-              className="od-invoice-action od-generate-action"
               size="sm"
-              disabled={!isDemo && !canCreateInvoiceNow}
-              title={!isDemo && !canCreateInvoiceNow ? 'Complete a delivery before invoicing this order' : undefined}
-              onClick={handleCreateInvoice}
+              className="od-invoice-action od-generate-action"
+              disabled
+              title="The invoice for this order is generated automatically and will appear here shortly."
             >
+              <FileText className="size-4" aria-hidden="true" />
+              Invoice Pending
+            </Button>
+          ) : null}
+          {/* Per-delivery invoicing only: a second/third delivery on this order that still needs
+              its own invoice. Unrelated to automatic invoice creation above - left as-is. */}
+          {actions.includes('viewInvoice') && hasMoreToInvoice && (
+            <Button variant="primary" size="sm" className="od-invoice-action od-generate-action" onClick={handleCreateInvoice}>
               <FileText className="size-4" aria-hidden="true" />
               Generate Invoice
             </Button>
