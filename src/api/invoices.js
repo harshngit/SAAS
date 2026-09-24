@@ -165,6 +165,15 @@ function normalizeInvoiceItem(item) {
     taxRate,
     taxAmount: item.tax_amount ?? (fallbackLineTotal - discounted),
     lineTotal: item.line_total ?? item.amount ?? fallbackLineTotal,
+    unit: item.uom || item.unit || '',
+    description: item.description || '',
+    mrp: item.mrp ?? null,
+    batchNumber: item.batch_number || '',
+    expiryDate: item.expiry_date || '',
+    // Optional - only present if the backend starts sending it on invoice items; the Item Table
+    // Columns "Product Image" toggle stays honest either way (no image = no broken image, see
+    // invoiceTemplates.jsx).
+    productImage: item.product_image_url || item.product_image_id || item.cover_image || '',
   }
 }
 
@@ -182,9 +191,18 @@ function normalizeInvoice(invoice) {
     invoiceNumber: invoice.invoice_number || invoice.id,
     salesId: invoice.sales_id || '',
     orderId: invoice.order_id || null,
+    orderNumber: invoice.order_number || invoice.order?.order_number || '',
+    // Read defensively (no fabricated data) - Invoice/Order carry no po_number/eway_bill_number/
+    // vehicle_number columns today (see the backend-changes writeup), so these stay blank until
+    // that data exists; the Invoice Details toggles for them are already wired end to end.
+    poNumber: invoice.order?.customer_po_number || invoice.po_number || '',
+    ewayBillNumber: invoice.eway_bill_number || '',
+    vehicleNumber: invoice.vehicle_number || '',
     deliveryId: invoice.delivery_id || null,
     customerId: invoice.customer?.id || invoice.customer_id || '',
     customerName: invoice.customer?.name || invoice.customer?.customer_name || invoice.walk_in_name || '',
+    customerPhone: invoice.customer?.phone || invoice.customer?.mobile_number || invoice.walk_in_phone || '',
+    customerGstin: invoice.customer?.gst_number || invoice.customer?.gstin || '',
     walkInName: invoice.walk_in_name || '',
     walkInPhone: invoice.walk_in_phone || '',
     invoiceDate: invoice.invoice_date,
@@ -382,6 +400,11 @@ export async function creditNoteInvoice(invoiceId, payload = {}) {
   }
 }
 
+// Mirrors app/schemas/workflow_settings.py's InvoiceSettings exactly - this IS the real,
+// backend-confirmed shape (inspected directly in the backend repo), not a guess. `fields` is
+// the original 14-boolean block the PDF's per-row/section toggles use; everything else is its
+// own nested block matching a dedicated Pydantic model one-to-one. camelCase in React, snake_case
+// on the wire - normalized exactly once, here.
 const DEFAULT_INVOICE_FIELDS = {
   show_company_gstin: true,
   show_customer_gstin: true,
@@ -400,27 +423,177 @@ const DEFAULT_INVOICE_FIELDS = {
   show_signature: true,
 }
 
+const DEFAULT_TYPOGRAPHY = { fontFamily: 'Helvetica', headingSize: 16, bodySize: 9, tableSize: 8 }
+
+const DEFAULT_BUSINESS_DETAILS = {
+  showBusinessName: true,
+  showLogo: true,
+  showAddress: true,
+  showPhone: true,
+  showEmail: true,
+  showGstin: true,
+  showPan: false,
+}
+
+const DEFAULT_INVOICE_DETAILS = {
+  showInvoiceNumber: true,
+  showInvoiceDate: true,
+  showDueDate: true,
+  showOrderReference: true,
+  showPoNumber: false,
+  showEwayBillNumber: false,
+  showVehicleNumber: false,
+}
+
+const DEFAULT_PARTY_DETAILS = {
+  showCustomerName: true,
+  showCustomerGstin: true,
+  showBillingAddress: true,
+  showShippingAddress: true,
+  showCustomerPhone: true,
+}
+
+const DEFAULT_ITEM_TABLE = {
+  showProductImage: false,
+  showDescription: false,
+  columns: ['product', 'hsn_sac', 'quantity', 'rate', 'discount', 'tax_rate', 'tax_amount', 'amount'],
+}
+
+const DEFAULT_PAYMENT_DETAILS = { showBankDetails: true, showUpiQr: true }
+
+const DEFAULT_FOOTER = { showTerms: true, showSignature: true, showStamp: true, terms: '', footerText: '', notes: '' }
+
+const DEFAULT_REGULAR_PRINT = {
+  layout: 'standard',
+  paperSize: 'A4',
+  orientation: 'portrait',
+  marginTop: 10,
+  marginRight: 10,
+  marginBottom: 10,
+  marginLeft: 10,
+}
+
+const DEFAULT_THERMAL_PRINT = {
+  layout: 'standard',
+  paperWidth: '80mm',
+  printingType: 'text',
+  boldText: true,
+  autoCut: false,
+  openCashDrawer: false,
+  extraLines: 0,
+  copies: 1,
+}
+
 function normalizeInvoiceSettings(settings) {
   if (!settings) return settings
+  const biz = settings.business_details || {}
+  const inv = settings.invoice_details || {}
+  const party = settings.party_details || {}
+  const item = settings.item_table || {}
+  const pay = settings.payment_details || {}
+  const foot = settings.footer || {}
+  const reg = settings.regular_print || {}
+  const thermal = settings.thermal_print || {}
+  const typo = settings.typography || {}
 
   return {
     template: settings.template || 'classic',
+    // Not a real backend field yet (the backend's `template` is still restricted to
+    // classic/modern/compact/thermal) - the backend is adding `template_variant` to persist the
+    // exact selected theme preset (e.g. "GST Theme 3") on top of that. Read defensively so this
+    // stays a no-op fallback to session-only preset selection (InvoiceSettings.jsx) until the
+    // backend actually returns it; once it does, this starts round-tripping for real with no
+    // further frontend change.
+    templateVariant: settings.template_variant || '',
     paperSize: settings.paper_size || 'A4',
     branding: {
       logoFileId: settings.branding?.logo_file_id || '',
       signatureFileId: settings.branding?.signature_file_id || '',
-      primaryColor: settings.branding?.primary_color || '#16A34A',
+      // Same as above - not yet a real field on this backend snapshot (InvoiceBranding only has
+      // logo_file_id/signature_file_id/primary_color today), being added alongside
+      // template_variant. Reads back empty until then; see the backend-changes writeup.
+      stampFileId: settings.branding?.stamp_file_id || '',
+      paymentQrFileId: settings.branding?.payment_qr_file_id || '',
+      primaryColor: settings.branding?.primary_color || '#063b00',
     },
     fields: { ...DEFAULT_INVOICE_FIELDS, ...(settings.fields || {}) },
-    terms: settings.terms || '',
-    footerText: settings.footer_text || '',
-    notes: settings.notes || '',
+    typography: {
+      fontFamily: typo.font_family || DEFAULT_TYPOGRAPHY.fontFamily,
+      headingSize: typo.heading_size ?? DEFAULT_TYPOGRAPHY.headingSize,
+      bodySize: typo.body_size ?? DEFAULT_TYPOGRAPHY.bodySize,
+      tableSize: typo.table_size ?? DEFAULT_TYPOGRAPHY.tableSize,
+    },
+    businessDetails: {
+      showBusinessName: biz.show_business_name ?? DEFAULT_BUSINESS_DETAILS.showBusinessName,
+      showLogo: biz.show_logo ?? DEFAULT_BUSINESS_DETAILS.showLogo,
+      showAddress: biz.show_address ?? DEFAULT_BUSINESS_DETAILS.showAddress,
+      showPhone: biz.show_phone ?? DEFAULT_BUSINESS_DETAILS.showPhone,
+      showEmail: biz.show_email ?? DEFAULT_BUSINESS_DETAILS.showEmail,
+      showGstin: biz.show_gstin ?? DEFAULT_BUSINESS_DETAILS.showGstin,
+      showPan: biz.show_pan ?? DEFAULT_BUSINESS_DETAILS.showPan,
+    },
+    invoiceDetails: {
+      showInvoiceNumber: inv.show_invoice_number ?? DEFAULT_INVOICE_DETAILS.showInvoiceNumber,
+      showInvoiceDate: inv.show_invoice_date ?? DEFAULT_INVOICE_DETAILS.showInvoiceDate,
+      showDueDate: inv.show_due_date ?? DEFAULT_INVOICE_DETAILS.showDueDate,
+      showOrderReference: inv.show_order_reference ?? DEFAULT_INVOICE_DETAILS.showOrderReference,
+      showPoNumber: inv.show_po_number ?? DEFAULT_INVOICE_DETAILS.showPoNumber,
+      showEwayBillNumber: inv.show_eway_bill_number ?? DEFAULT_INVOICE_DETAILS.showEwayBillNumber,
+      showVehicleNumber: inv.show_vehicle_number ?? DEFAULT_INVOICE_DETAILS.showVehicleNumber,
+    },
+    partyDetails: {
+      showCustomerName: party.show_customer_name ?? DEFAULT_PARTY_DETAILS.showCustomerName,
+      showCustomerGstin: party.show_customer_gstin ?? DEFAULT_PARTY_DETAILS.showCustomerGstin,
+      showBillingAddress: party.show_billing_address ?? DEFAULT_PARTY_DETAILS.showBillingAddress,
+      showShippingAddress: party.show_shipping_address ?? DEFAULT_PARTY_DETAILS.showShippingAddress,
+      showCustomerPhone: party.show_customer_phone ?? DEFAULT_PARTY_DETAILS.showCustomerPhone,
+    },
+    itemTable: {
+      showProductImage: item.show_product_image ?? DEFAULT_ITEM_TABLE.showProductImage,
+      showDescription: item.show_description ?? DEFAULT_ITEM_TABLE.showDescription,
+      columns: Array.isArray(item.columns) && item.columns.length > 0 ? item.columns : [...DEFAULT_ITEM_TABLE.columns],
+    },
+    paymentDetails: {
+      showBankDetails: pay.show_bank_details ?? DEFAULT_PAYMENT_DETAILS.showBankDetails,
+      showUpiQr: pay.show_upi_qr ?? DEFAULT_PAYMENT_DETAILS.showUpiQr,
+    },
+    // Canonical terms/footer/notes source - the backend's top-level `terms`/`footer_text`/`notes`
+    // are a legacy duplicate `footer.*` already wins over in every PDF render (see
+    // _invoice_footer in pdf_docs.py: `footer_cfg.get("terms") or settings.get("terms")`), so this
+    // is the ONE place the UI reads/writes them - never the top-level fields, no competing copies.
+    footer: {
+      showTerms: foot.show_terms ?? DEFAULT_FOOTER.showTerms,
+      showSignature: foot.show_signature ?? DEFAULT_FOOTER.showSignature,
+      showStamp: foot.show_stamp ?? DEFAULT_FOOTER.showStamp,
+      terms: foot.terms ?? settings.terms ?? '',
+      footerText: foot.footer_text ?? settings.footer_text ?? '',
+      notes: foot.notes ?? settings.notes ?? '',
+    },
+    regularPrint: {
+      layout: reg.layout || DEFAULT_REGULAR_PRINT.layout,
+      paperSize: reg.paper_size || DEFAULT_REGULAR_PRINT.paperSize,
+      orientation: reg.orientation || DEFAULT_REGULAR_PRINT.orientation,
+      marginTop: reg.margin_top ?? DEFAULT_REGULAR_PRINT.marginTop,
+      marginRight: reg.margin_right ?? DEFAULT_REGULAR_PRINT.marginRight,
+      marginBottom: reg.margin_bottom ?? DEFAULT_REGULAR_PRINT.marginBottom,
+      marginLeft: reg.margin_left ?? DEFAULT_REGULAR_PRINT.marginLeft,
+    },
+    thermalPrint: {
+      layout: thermal.layout || DEFAULT_THERMAL_PRINT.layout,
+      paperWidth: thermal.paper_width || DEFAULT_THERMAL_PRINT.paperWidth,
+      printingType: thermal.printing_type || DEFAULT_THERMAL_PRINT.printingType,
+      boldText: thermal.bold_text ?? DEFAULT_THERMAL_PRINT.boldText,
+      autoCut: thermal.auto_cut ?? DEFAULT_THERMAL_PRINT.autoCut,
+      openCashDrawer: thermal.open_cash_drawer ?? DEFAULT_THERMAL_PRINT.openCashDrawer,
+      extraLines: thermal.extra_lines ?? DEFAULT_THERMAL_PRINT.extraLines,
+      copies: thermal.copies ?? DEFAULT_THERMAL_PRINT.copies,
+    },
   }
 }
 
 export async function getInvoiceSettings() {
   if (INVOICE_DEMO_ENABLED) {
-    return { success: true, settings: normalizeInvoiceSettings(null) }
+    return { success: true, settings: normalizeInvoiceSettings({}) }
   }
 
   try {
@@ -441,22 +614,12 @@ export async function getInvoiceSettings() {
 }
 
 export async function updateInvoiceSettings(payload) {
-  try {
-    const requestBody = {}
+  if (INVOICE_DEMO_ENABLED) {
+    return { success: true, settings: normalizeInvoiceSettings(denormalizeInvoiceSettings(payload)) }
+  }
 
-    if (payload.template) requestBody.template = payload.template
-    if (payload.paperSize) requestBody.paper_size = payload.paperSize
-    if (payload.branding) {
-      requestBody.branding = {
-        ...(payload.branding.logoFileId ? { logo_file_id: payload.branding.logoFileId } : {}),
-        ...(payload.branding.signatureFileId ? { signature_file_id: payload.branding.signatureFileId } : {}),
-        ...(payload.branding.primaryColor ? { primary_color: payload.branding.primaryColor } : {}),
-      }
-    }
-    if (payload.fields) requestBody.fields = payload.fields
-    if (payload.terms !== undefined) requestBody.terms = payload.terms
-    if (payload.footerText !== undefined) requestBody.footer_text = payload.footerText
-    if (payload.notes !== undefined) requestBody.notes = payload.notes
+  try {
+    const requestBody = denormalizeInvoiceSettings(payload)
 
     const { data } = await apiClient.patch('/invoice-settings', requestBody, {
       headers: authHeader(),
@@ -471,5 +634,120 @@ export async function updateInvoiceSettings(payload) {
     )
 
     return { success: false, error: message }
+  }
+}
+
+// `fields` (14 flat booleans) predates the nested blocks below, and pdf_docs.py has each nested
+// block win over its `fields` counterpart when both are present (e.g.
+// `payment_cfg.get("show_bank_details", fields.get("show_bank_details", True))`) - so once this
+// UI always sends the nested blocks, the overlapping flat keys become inert. Rather than expose
+// two controls for one visual outcome, this derives them FROM the nested state so `fields` never
+// holds a stale/contradictory value. show_discount/show_tax_amount have no nested equivalent
+// (they gate the Subtotal/Discount/Tax summary rows, not a column) and get their own control in
+// the Item Table section, so they pass through untouched. show_hsn_sac/show_mrp/
+// show_batch_number/show_expiry_date are never read anywhere in pdf_docs.py any more (superseded
+// by item_table.columns membership) - kept only so the stored shape stays complete.
+function deriveFlatFields(settings) {
+  return {
+    ...settings.fields,
+    show_company_gstin: settings.businessDetails.showGstin,
+    show_customer_gstin: settings.partyDetails.showCustomerGstin,
+    show_billing_address: settings.partyDetails.showBillingAddress,
+    show_shipping_address: settings.partyDetails.showShippingAddress,
+    show_bank_details: settings.paymentDetails.showBankDetails,
+    show_upi_qr: settings.paymentDetails.showUpiQr,
+    show_terms: settings.footer.showTerms,
+    show_signature: settings.footer.showSignature,
+  }
+}
+
+// The reverse of normalizeInvoiceSettings - only ever called with a full, already-normalized
+// settings object (camelCase), so every nested block is always present and this can send the
+// whole shape on every save without guessing which keys changed.
+function denormalizeInvoiceSettings(settings) {
+  return {
+    template: settings.template,
+    // See normalizeInvoiceSettings - sent unconditionally like every other field here (this
+    // function always receives a full, already-normalized object), harmless no-op against the
+    // current backend (unknown Pydantic fields are ignored, not rejected - confirmed by reading
+    // app/schemas/workflow_settings.py: no model forbids extra fields) until template_variant
+    // exists server-side, at which point it starts persisting with no frontend change needed.
+    template_variant: settings.templateVariant || null,
+    paper_size: settings.paperSize,
+    branding: {
+      logo_file_id: settings.branding.logoFileId || null,
+      signature_file_id: settings.branding.signatureFileId || null,
+      stamp_file_id: settings.branding.stampFileId || null,
+      payment_qr_file_id: settings.branding.paymentQrFileId || null,
+      primary_color: settings.branding.primaryColor || null,
+    },
+    fields: deriveFlatFields(settings),
+    typography: {
+      font_family: settings.typography.fontFamily,
+      heading_size: settings.typography.headingSize,
+      body_size: settings.typography.bodySize,
+      table_size: settings.typography.tableSize,
+    },
+    business_details: {
+      show_business_name: settings.businessDetails.showBusinessName,
+      show_logo: settings.businessDetails.showLogo,
+      show_address: settings.businessDetails.showAddress,
+      show_phone: settings.businessDetails.showPhone,
+      show_email: settings.businessDetails.showEmail,
+      show_gstin: settings.businessDetails.showGstin,
+      show_pan: settings.businessDetails.showPan,
+    },
+    invoice_details: {
+      show_invoice_number: settings.invoiceDetails.showInvoiceNumber,
+      show_invoice_date: settings.invoiceDetails.showInvoiceDate,
+      show_due_date: settings.invoiceDetails.showDueDate,
+      show_order_reference: settings.invoiceDetails.showOrderReference,
+      show_po_number: settings.invoiceDetails.showPoNumber,
+      show_eway_bill_number: settings.invoiceDetails.showEwayBillNumber,
+      show_vehicle_number: settings.invoiceDetails.showVehicleNumber,
+    },
+    party_details: {
+      show_customer_name: settings.partyDetails.showCustomerName,
+      show_customer_gstin: settings.partyDetails.showCustomerGstin,
+      show_billing_address: settings.partyDetails.showBillingAddress,
+      show_shipping_address: settings.partyDetails.showShippingAddress,
+      show_customer_phone: settings.partyDetails.showCustomerPhone,
+    },
+    item_table: {
+      show_product_image: settings.itemTable.showProductImage,
+      show_description: settings.itemTable.showDescription,
+      columns: settings.itemTable.columns,
+    },
+    payment_details: {
+      show_bank_details: settings.paymentDetails.showBankDetails,
+      show_upi_qr: settings.paymentDetails.showUpiQr,
+    },
+    footer: {
+      show_terms: settings.footer.showTerms,
+      show_signature: settings.footer.showSignature,
+      show_stamp: settings.footer.showStamp,
+      terms: settings.footer.terms || null,
+      footer_text: settings.footer.footerText || null,
+      notes: settings.footer.notes || null,
+    },
+    regular_print: {
+      layout: settings.regularPrint.layout,
+      paper_size: settings.regularPrint.paperSize,
+      orientation: settings.regularPrint.orientation,
+      margin_top: settings.regularPrint.marginTop,
+      margin_right: settings.regularPrint.marginRight,
+      margin_bottom: settings.regularPrint.marginBottom,
+      margin_left: settings.regularPrint.marginLeft,
+    },
+    thermal_print: {
+      layout: settings.thermalPrint.layout,
+      paper_width: settings.thermalPrint.paperWidth,
+      printing_type: settings.thermalPrint.printingType,
+      bold_text: settings.thermalPrint.boldText,
+      auto_cut: settings.thermalPrint.autoCut,
+      open_cash_drawer: settings.thermalPrint.openCashDrawer,
+      extra_lines: settings.thermalPrint.extraLines,
+      copies: settings.thermalPrint.copies,
+    },
   }
 }

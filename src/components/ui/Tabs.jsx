@@ -5,6 +5,14 @@ const TabsContext = React.createContext({})
 function Tabs({ defaultValue, value, onValueChange, children, className, ...props }) {
   const [activeTab, setActiveTab] = React.useState(value || defaultValue)
 
+  // Only a genuinely controlled usage (an explicit `value` prop) re-syncs from outside - every
+  // existing caller passes just `defaultValue` and owns its own tab state internally, so this
+  // never fires for them. Needed for a tab that can also change from a control outside <Tabs>
+  // itself (e.g. a toolbar dropdown bound to the same state).
+  React.useEffect(() => {
+    if (value !== undefined) setActiveTab(value)
+  }, [value])
+
   const handleValueChange = React.useCallback(
     (newValue) => {
       setActiveTab(newValue)

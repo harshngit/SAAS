@@ -7,6 +7,8 @@ import Select from '../../components/ui/Select'
 import { LEAD_SEGMENT_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_TYPE_OPTIONS, leadInterestedProductList, manualStatusOptionsFor } from '../../api/leads'
 import { formatLeadStatus } from './leadActivity'
 import InterestedProductsField from './InterestedProductsField'
+import MapPickerModal from '../../components/ui/MapPickerModal'
+import { parseMapsCoordinates } from '../../api/customers'
 
 export const customerCategoryOptions = ['Retail', 'Wholesale', 'Corporate', 'VIP', 'Dealer', 'Distributor'].map((value) => ({
   value,
@@ -239,10 +241,25 @@ export function ConvertLeadForm({ lead, salespersonOptions, saving, formError, o
     googleMapsLocation: '',
   }))
   const [errors, setErrors] = useState({})
+  const [mapPickerOpen, setMapPickerOpen] = useState(false)
+  const [mapPickerStart, setMapPickerStart] = useState(null)
 
   const updateField = (field, value) => {
     setFormData((current) => ({ ...current, [field]: value }))
     setErrors((current) => ({ ...current, [field]: '' }))
+  }
+
+  const openMapPicker = () => {
+    setMapPickerStart(parseMapsCoordinates(formData.googleMapsLocation))
+    setMapPickerOpen(true)
+  }
+
+  const handleMapLocationSelected = (place) => {
+    setFormData((current) => ({
+      ...current,
+      googleMapsLocation: `${place.lat}, ${place.lng}`,
+      billingAddress: current.billingAddress?.trim() ? current.billingAddress : place.formattedAddress || current.billingAddress,
+    }))
   }
 
   const validate = () => {
@@ -353,24 +370,29 @@ export function ConvertLeadForm({ lead, salespersonOptions, saving, formError, o
               <input
                 value={formData.googleMapsLocation}
                 onChange={(event) => updateField('googleMapsLocation', event.target.value)}
-                placeholder="Paste Google Maps link or coordinates"
+                placeholder="Click Pick, or paste a Google Maps link / coordinates"
                 className="min-w-0 flex-1 rounded-l-xl bg-transparent px-3.5 py-2.5 text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
               />
-              <a
-                href={
-                  formData.googleMapsLocation
-                    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.googleMapsLocation)}`
-                    : 'https://www.google.com/maps'
-                }
-                target="_blank"
-                rel="noreferrer"
-                title="Open map picker"
+              <button
+                type="button"
+                onClick={openMapPicker}
+                title="Pick location on map"
                 className="inline-flex shrink-0 items-center justify-center gap-2 rounded-r-xl border-l border-neutral-200 px-3.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50"
               >
                 <LocateFixed className="size-4" aria-hidden="true" />
                 Pick
-              </a>
+              </button>
             </div>
+            {formData.googleMapsLocation && (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.googleMapsLocation)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-medium text-primary-700 hover:underline"
+              >
+                View on Google Maps
+              </a>
+            )}
           </div>
           <Input
             label="Billing Address"
@@ -398,6 +420,12 @@ export function ConvertLeadForm({ lead, salespersonOptions, saving, formError, o
         <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>Cancel</Button>
         <Button type="submit" loading={saving}>Convert to Customer</Button>
       </div>
+      <MapPickerModal
+        isOpen={mapPickerOpen}
+        onClose={() => setMapPickerOpen(false)}
+        onSelect={handleMapLocationSelected}
+        initialPosition={mapPickerStart}
+      />
     </form>
   )
 }

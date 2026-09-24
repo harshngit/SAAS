@@ -65,19 +65,18 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
   const [zoom, setZoom] = useState(100)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
-  const previewData = buildInvoicePreviewData(invoice, orgSettings)
+  const previewData = buildInvoicePreviewData(invoice, orgSettings, invoiceSettings)
   const template = invoiceSettings?.template || 'classic'
   const TemplateComponent = templateComponents[template] || templateComponents.classic
-  const primaryColor = invoiceSettings?.branding?.primaryColor || '#16A34A'
-  const fields = invoiceSettings?.fields || {}
-  const footerText = invoiceSettings?.footerText || ''
-  const terms = invoiceSettings?.terms || ''
+  const primaryColor = invoiceSettings?.branding?.primaryColor || '#063b00'
   const templateLabel = template.charAt(0).toUpperCase() + template.slice(1)
 
   const previewDocument = (
     <div>
       {/* Payment-status pill on its own row above the document — an absolute overlay here
-          collided with the template header ("TAX INVOICE" in Classic, "Invoice" in Modern). */}
+          collided with the template header ("TAX INVOICE" in Classic, "Invoice" in Modern).
+          It lives OUTSIDE exportRef below: the printable invoice itself must never show
+          payment status (PAID/UNPAID/Paid Amount/Balance Due), only this admin-facing page may. */}
       <div className="mb-3 flex justify-end">
         <span
           className={`rounded-full px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-wide ${
@@ -87,7 +86,21 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
           {invoice.paymentStatus}
         </span>
       </div>
-      <TemplateComponent primaryColor={primaryColor} fields={fields} footerText={footerText} terms={terms} data={previewData} />
+      <div ref={exportRef}>
+        <TemplateComponent
+          primaryColor={primaryColor}
+          data={previewData}
+          businessDetails={invoiceSettings?.businessDetails}
+          invoiceDetails={invoiceSettings?.invoiceDetails}
+          partyDetails={invoiceSettings?.partyDetails}
+          itemTable={invoiceSettings?.itemTable}
+          paymentDetails={invoiceSettings?.paymentDetails}
+          footer={invoiceSettings?.footer}
+          fields={invoiceSettings?.fields}
+          typography={invoiceSettings?.typography}
+          thermalLayout={invoiceSettings?.thermalPrint?.layout}
+        />
+      </div>
       <div className="mt-4 grid grid-cols-2 gap-3 border-t border-neutral-100 pt-3">
         <div className="rounded-lg bg-neutral-50 px-3 py-2">
           <p className="text-[0.62rem] uppercase tracking-wide text-neutral-400">Amount Paid</p>
@@ -150,7 +163,6 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
 
         <div className="mt-4 overflow-auto rounded-xl border border-neutral-100 bg-neutral-50/60 p-4" style={{ maxHeight: '38rem' }}>
           <div
-            ref={exportRef}
             className="mx-auto origin-top bg-white p-5 text-xs text-neutral-600 shadow-(--shadow-xs)"
             style={{ transform: `scale(${zoom / 100})`, width: '32rem' }}
           >

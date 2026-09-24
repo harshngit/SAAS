@@ -23,6 +23,8 @@ import { ROLES } from '../../auth/roles'
 import { deleteCustomerDocument, listCustomerDocuments, updateCustomer } from '../../api/customers'
 import { deleteFile, getFileUrl, uploadFile, uploadFiles as uploadGenericFiles } from '../../api/files'
 import { formatCurrency } from '../../utils/format'
+import MapPickerModal from '../../components/ui/MapPickerModal'
+import { parseMapsCoordinates } from '../../api/customers'
 
 const documentTypeByField = {
   gstCertificate: 'gst_certificate',
@@ -209,7 +211,7 @@ const formSections = [
     { name: 'state', label: 'State', description: 'State or province.', type: 'Dropdown/Text', input: 'select' },
     { name: 'country', label: 'Country', description: 'Country.', type: 'Dropdown', input: 'select' },
     { name: 'pinZipCode', label: 'PIN/ZIP Code', description: 'Postal code.', type: 'Text' },
-    { name: 'googleMapsLocation', label: 'Google Maps Location', description: 'Geo-location of customer.', type: 'Map Picker', required: true, input: 'map', placeholder: 'Paste Google Maps link or coordinates' },
+    { name: 'googleMapsLocation', label: 'Google Maps Location', description: 'Geo-location of customer.', type: 'Map Picker', required: true, input: 'map', placeholder: 'Click Pick, or paste a Google Maps link / coordinates' },
   ]),
   section('Business & Tax Information', [
     { name: 'gstNumber', label: 'GSTIN / Tax ID', description: 'Tax registration number.', type: 'Text' },
@@ -606,6 +608,8 @@ export default function CustomerForm({
   const [documentsError, setDocumentsError] = useState('')
   const [profileImageUploading, setProfileImageUploading] = useState(false)
   const [profileImageError, setProfileImageError] = useState('')
+  const [mapPickerOpen, setMapPickerOpen] = useState(false)
+  const [mapPickerStart, setMapPickerStart] = useState(null)
 
   const salesOfficerOptions = useMemo(
     () => salesOfficers.map((user) => ({ value: user.id, label: user.name })),
@@ -1012,6 +1016,29 @@ export default function CustomerForm({
     })
   }
 
+  const openMapPicker = () => {
+    setMapPickerStart(parseMapsCoordinates(formData.googleMapsLocation))
+    setMapPickerOpen(true)
+  }
+
+  // Called when the user presses "Use this location" in the map popup.
+  // Saves the coordinates and fills empty address fields from the map.
+  const handleMapLocationSelected = (place) => {
+    setFormData((current) => {
+      const next = { ...current, googleMapsLocation: `${place.lat}, ${place.lng}` }
+      if (!current.billingAddress?.trim() && place.formattedAddress) {
+        next.billingAddress = place.formattedAddress
+        if (current.sameAsBilling) next.shippingAddress = place.formattedAddress
+      }
+      if (!current.city?.trim() && place.city) next.city = place.city
+      if (!current.pinZipCode?.trim() && place.pinZipCode) next.pinZipCode = place.pinZipCode
+      if (!current.state && optionValues.state.includes(place.state)) next.state = place.state
+      if (optionValues.country.includes(place.country)) next.country = place.country
+      return next
+    })
+    setErrors((current) => ({ ...current, googleMapsLocation: '', billingAddress: '' }))
+  }
+
   const renderField = (field) => {
     const commonProps = {
       label: field.label,
@@ -1074,17 +1101,21 @@ export default function CustomerForm({
               required={field.required}
               className="min-w-0 flex-1 rounded-l-xl bg-transparent px-3.5 py-2.5 text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
             />
-            <a
-              href={mapUrl}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={openMapPicker}
               className="inline-flex shrink-0 items-center justify-center gap-2 rounded-r-xl border-l border-neutral-200 px-3.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50"
-              title="Open map picker"
+              title="Pick location on map"
             >
               <LocateFixed className="size-4" aria-hidden="true" />
               Pick
-            </a>
+            </button>
           </div>
+          {formData[field.name] && (
+            <a href={mapUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary-700 hover:underline">
+              View on Google Maps
+            </a>
+          )}
           {errors[field.name] && <span className="text-xs text-red-600">{errors[field.name]}</span>}
         </div>
       )
@@ -1275,6 +1306,12 @@ export default function CustomerForm({
           </div>
         </div>
       </form>
+      <MapPickerModal
+        isOpen={mapPickerOpen}
+        onClose={() => setMapPickerOpen(false)}
+        onSelect={handleMapLocationSelected}
+        initialPosition={mapPickerStart}
+      />
     </div>
   )
 }

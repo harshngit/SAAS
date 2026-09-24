@@ -5,13 +5,15 @@ import { getOrganizationSettings } from '../../api/organizations'
 import { useAuthStore } from '../../store/authStore'
 import { templateComponents, buildInvoicePreviewData } from './invoiceTemplates'
 
-// Headless-render target for server-side PDF generation. Deliberately outside ProtectedRoute
-// (see AppRoutes.jsx) - there's no logged-in browser session here, so auth comes from a
-// short-lived token in the URL instead, which the backend mints when it launches the headless
-// browser. This page renders the EXACT same template components as InvoiceDetail.jsx's on-screen
-// preview (same buildInvoicePreviewData shaping, same templateComponents map) - the backend's
-// PDF is this page's print output, not a separate fpdf implementation, so drift becomes
-// structurally impossible instead of something to keep manually in sync.
+// NOTE (found while redesigning Invoice Settings): this page's original premise - "the backend
+// launches a headless browser against this route to render the PDF" - does not match the real
+// backend. Inspected app/routers/invoices.py directly: GET /invoices/{id}/pdf calls
+// invoice_simple_pdf/invoice_detailed_pdf from app/core/pdf_docs.py, a native FPDF renderer with
+// no headless-browser/Playwright/Puppeteer dependency anywhere in the backend repo. Nothing in
+// the frontend links to this route either (grepped). It is currently orphaned. Left in place and
+// kept in sync with the new settings shape (not deleted - removing a route/page is a bigger call
+// than this task's scope), but flagged here and in the redesign report for a decision on whether
+// to remove it or repurpose it.
 //
 // Query params:
 //   token    - short-lived bearer token scoped to this invoice (required)
@@ -118,15 +120,13 @@ export default function InvoicePrintView() {
   const template = templateOverride || invoiceSettings?.template || 'classic'
   const TemplateComponent = templateComponents[template] || templateComponents.classic
   const paperSize = invoiceSettings?.paperSize || 'A4'
-  const previewData = buildInvoicePreviewData(invoice, orgSettings)
+  const previewData = buildInvoicePreviewData(invoice, orgSettings, invoiceSettings)
   const fields = format === 'simple' ? SIMPLE_FIELDS_PRESET : invoiceSettings?.fields || {}
-  const primaryColor = (colorOverride && `#${colorOverride.replace(/^#/, '')}`) || invoiceSettings?.branding?.primaryColor || '#16A34A'
+  const primaryColor = (colorOverride && `#${colorOverride.replace(/^#/, '')}`) || invoiceSettings?.branding?.primaryColor || '#063b00'
+  const isSimple = format === 'simple'
 
   return (
     <div
-      // data-print-state="ready" is the signal the backend's headless browser waits on
-      // (page.waitForSelector('[data-print-state="ready"]')) before calling page.pdf() -
-      // without it, a PDF could be captured mid-fetch on a slow connection.
       data-print-state="ready"
       data-print-format={format}
       className={`mx-auto bg-white p-8 ${paperWidthClass[paperSize] || paperWidthClass.A4}`}
@@ -136,8 +136,14 @@ export default function InvoicePrintView() {
         data={previewData}
         primaryColor={primaryColor}
         fields={fields}
-        footerText={format === 'simple' ? '' : invoiceSettings?.footerText || ''}
-        terms={format === 'simple' ? '' : invoiceSettings?.terms || ''}
+        businessDetails={invoiceSettings?.businessDetails}
+        invoiceDetails={invoiceSettings?.invoiceDetails}
+        partyDetails={invoiceSettings?.partyDetails}
+        itemTable={invoiceSettings?.itemTable}
+        paymentDetails={isSimple ? { showBankDetails: false, showUpiQr: false } : invoiceSettings?.paymentDetails}
+        footer={isSimple ? { showTerms: false, showSignature: false, showStamp: false, terms: '', footerText: '' } : invoiceSettings?.footer}
+        typography={invoiceSettings?.typography}
+        thermalLayout={invoiceSettings?.thermalPrint?.layout}
       />
     </div>
   )

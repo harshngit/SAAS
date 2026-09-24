@@ -6,12 +6,14 @@ import {
   Check,
   Download,
   Info,
+  MessageCircle,
   Minus,
   Package,
   PackageCheck,
   PackageSearch,
   Pencil,
   Plus,
+  Receipt,
   Trash2,
   Truck,
   UserCog,
@@ -1039,6 +1041,25 @@ export default function DeliveryDetail() {
     if (!result.success) setActionError(result.error)
   }
 
+  // Share-intent only - no WhatsApp Business API is wired up anywhere in this project, so this
+  // pre-fills a message and lets the user attach the just-downloaded Delivery Receipt PDF
+  // themselves inside WhatsApp. Never claims automated document delivery. No payment status here.
+  const handleShareOnWhatsApp = () => {
+    if (isDemoDelivery(delivery.id)) {
+      showToast({ title: 'Demo delivery', message: 'Sharing is not available for demo records.' })
+      return
+    }
+    const deliveredUnits = delivery.deliveredTotal ?? 0
+    const message = [
+      `Hi ${customerLabel},`,
+      `Your delivery ${delivery.deliveryNumber || ''} (${delivery.orderNumber || ''}) has been completed — ${deliveredUnits} unit${deliveredUnits === 1 ? '' : 's'} delivered.`,
+      'The delivery receipt has been downloaded — please attach it here.',
+    ].join(' ')
+    const phone = customerPhone.replace(/[^\d+]/g, '')
+    const url = `https://wa.me/${phone ? phone.replace(/^\+/, '') : ''}?text=${encodeURIComponent(message)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
   const openManagement = () => {
     setIsManagementOpen(true)
   }
@@ -1644,6 +1665,22 @@ export default function DeliveryDetail() {
                   <WarehouseIcon className="size-4" aria-hidden="true" />
                   Vehicle / Return Stock
                 </Button>
+              )}
+              {/* Successfully completed only - "partially_delivered" still has quantity pending
+                  on the vehicle (see the amber notice below), so it isn't a completed delivery yet. */}
+              {stageKey === 'delivered' && (
+                <>
+                  <Button type="button" variant="outline" onClick={handleDownloadChallan}>
+                    <Receipt className="size-4" aria-hidden="true" />
+                    Delivery Receipt
+                  </Button>
+                  {customerPhone && (
+                    <Button type="button" variant="outline" onClick={handleShareOnWhatsApp}>
+                      <MessageCircle className="size-4" aria-hidden="true" />
+                      Share on WhatsApp
+                    </Button>
+                  )}
+                </>
               )}
             </div>
             {stageKey === 'partially_delivered' && (

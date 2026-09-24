@@ -353,10 +353,10 @@ export default function AdminInvoices() {
           <button
             type="button"
             onClick={() => navigate('/admin/invoices/settings')}
-            aria-label="Invoice settings"
-            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
+            className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-neutral-200 bg-white px-3.5 text-sm font-medium text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
           >
             <Settings className="size-4" />
+            Invoice Settings
           </button>
         </div>
       </ListHeader>
