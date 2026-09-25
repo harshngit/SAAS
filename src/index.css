@@ -67,8 +67,8 @@
   --color-neutral-900: #111827;
   --color-neutral-950: #0a0e14;
 
-  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Lexend', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Open Sans', system-ui, sans-serif;
+  --font-display: 'DM Sans', 'Open Sans', system-ui, sans-serif;
 
   /* Corner radius: every container box (cards, panels, inputs, selects, buttons,
      modals, drawers, dropdowns, table wrappers) lands on a single 1rem radius.
@@ -234,4 +234,69 @@ main table:not(.od-products):not(.dd-products):not(.listing-table) tbody td {
 .dashboard-page-content > :first-child > :first-child:has(> div > h1:first-child) > div:first-child > h1:first-child,
 .dashboard-page-content > :first-child > :first-child:has(> div > h1:first-child) > div:first-child > h1:first-child + p {
   display: none;
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  src: url('./assets/fonts/DM-Sans/DMSans-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  src: url('./assets/fonts/DM-Sans/DMSans-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  src: url('./assets/fonts/DM-Sans/DMSans-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  src: url('./assets/fonts/DM-Sans/DMSans-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+
+@font-face {
+  font-family: 'Open Sans';
+  src: url('./assets/fonts/Open-Sans/OpenSans-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  src: url('./assets/fonts/Open-Sans/OpenSans-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  src: url('./assets/fonts/Open-Sans/OpenSans-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  src: url('./assets/fonts/Open-Sans/OpenSans-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
