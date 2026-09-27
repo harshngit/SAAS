@@ -31,7 +31,7 @@ import { uploadFile } from '../../api/files'
 import { getOrganizationSettings, normalizeOrganizationBranding } from '../../api/organizations'
 import { exportElementToPdf } from '../../utils/pdfExport'
 import { sampleInvoice, RegularThemePreview, ThermalThemePreview } from './invoiceTemplates'
-import { REGULAR_THEME_PRESETS, THERMAL_THEME_PRESETS, presetForBaseTemplate } from './invoiceThemePresets'
+import { REGULAR_THEME_PRESETS, THERMAL_THEME_PRESETS, resolveRegularPresetId } from './invoiceThemePresets'
 import { ITEM_COLUMN_DEFS, MAX_ITEM_COLUMNS, moveColumn, normalizeItemColumns, toggleItemColumn } from './invoiceColumns'
 import { resolveInvoiceBranding } from './invoiceBranding'
 import { SettingsSection, ToggleRow, ColumnRow } from './InvoiceSettingsSection'
@@ -432,16 +432,6 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
   )
 }
 
-// The card to highlight on load/reset: the persisted `templateVariant` if it names a preset this
-// catalog still recognizes, otherwise the plain card matching the persisted `template` value
-// (e.g. a variant name the backend hasn't returned yet, or one no longer in the catalog).
-function resolveRegularPresetId(settings) {
-  if (settings.templateVariant && REGULAR_THEME_PRESETS.some((preset) => preset.id === settings.templateVariant)) {
-    return settings.templateVariant
-  }
-  return presetForBaseTemplate(settings.template).id
-}
-
 export default function InvoiceSettings() {
   const navigate = useNavigate()
   const { showToast } = useToast()
@@ -465,7 +455,8 @@ export default function InvoiceSettings() {
   // `baseTemplate`/`template` - see invoiceThemePresets.js and api/invoices.js). `regularPresetId`
   // is still local UI state (it drives which card is highlighted), but it's initialized FROM and
   // kept in sync WITH `settings.templateVariant`, so Save actually persists it - resolveRegularPresetId
-  // below is the one place that reconciles the two. Thermal preset selection stays scoped to
+  // (invoiceThemePresets.js, shared with InvoiceDetail.jsx) is the one place that reconciles the
+  // two. Thermal preset selection stays scoped to
   // `thermalPrint.layout` (4 base layouts) as before - the backend's template_variant field, per
   // its own spec, covers the regular theme picker only.
   const [regularPresetId, setRegularPresetId] = useState('classic')
@@ -480,7 +471,7 @@ export default function InvoiceSettings() {
       }
       setSettings(result.settings)
       setDefaults(result.settings)
-      setRegularPresetId(resolveRegularPresetId(result.settings))
+      setRegularPresetId(resolveRegularPresetId(result.settings.template, result.settings.templateVariant))
       const matchingThermal = THERMAL_THEME_PRESETS.find((preset) => preset.layout === result.settings.thermalPrint.layout)
       setThermalPresetId((matchingThermal || THERMAL_THEME_PRESETS[3]).id)
       setIsLoading(false)
@@ -619,7 +610,7 @@ export default function InvoiceSettings() {
   const handleReset = () => {
     if (!defaults) return
     setSettings(defaults)
-    setRegularPresetId(resolveRegularPresetId(defaults))
+    setRegularPresetId(resolveRegularPresetId(defaults.template, defaults.templateVariant))
     const matchingThermal = THERMAL_THEME_PRESETS.find((preset) => preset.layout === defaults.thermalPrint.layout)
     setThermalPresetId((matchingThermal || THERMAL_THEME_PRESETS[3]).id)
     // Part 24: Reset to Default also clears every invoice-specific branding override (logo,
@@ -835,7 +826,7 @@ export default function InvoiceSettings() {
                 </label>
               ))}
             </div>
-            <InfoNote>Font Family applies to the generated PDF today. Heading/Body/Table size are saved but not yet applied by the PDF engine.</InfoNote>
+            <InfoNote>Font Family, Heading Size, Body Size and Table Size all apply to the generated PDF.</InfoNote>
           </SettingsSection>
 
           <SettingsSection title="8. Footer" description="Notes, terms and signature" isOpen={openSection === 'footer'} onToggle={() => toggleSection('footer')}>
@@ -969,7 +960,7 @@ export default function InvoiceSettings() {
                 </div>
               </TabsContent>
             </Tabs>
-            <InfoNote>Paper size, orientation and paper width apply to the generated PDF today. Layout, bold styling, auto-cut, cash drawer and copies are saved but not yet used by the PDF/print engine.</InfoNote>
+            <InfoNote>Paper size, orientation, margins, paper width, extra lines and bold styling apply to the generated PDF today. Layout, auto-cut, cash drawer, copies and printing type are saved for client/POS use but not applied by the PDF engine itself.</InfoNote>
           </SettingsSection>
         </div>
 

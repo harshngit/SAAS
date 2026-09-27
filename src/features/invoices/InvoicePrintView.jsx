@@ -3,7 +3,8 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { getInvoice, getInvoiceSettings } from '../../api/invoices'
 import { getOrganizationSettings } from '../../api/organizations'
 import { useAuthStore } from '../../store/authStore'
-import { templateComponents, buildInvoicePreviewData } from './invoiceTemplates'
+import { templateComponents, RegularThemePreview, buildInvoicePreviewData } from './invoiceTemplates'
+import { resolveRegularPresetId } from './invoiceThemePresets'
 
 // NOTE (found while redesigning Invoice Settings): this page's original premise - "the backend
 // launches a headless browser against this route to render the PDF" - does not match the real
@@ -118,7 +119,13 @@ export default function InvoicePrintView() {
   }
 
   const template = templateOverride || invoiceSettings?.template || 'classic'
-  const TemplateComponent = templateComponents[template] || templateComponents.classic
+  const isThermalTemplate = template === 'thermal'
+  // Same preset-aware rendering as InvoiceDetail.jsx (see resolveRegularPresetId) - except an
+  // explicit `?template=` override means the caller wants that exact base template, not whatever
+  // theme preset the org has saved, so the persisted `template_variant` is only honored when
+  // nothing in the URL overrides it.
+  const TemplateComponent = isThermalTemplate ? templateComponents.thermal : RegularThemePreview
+  const regularPresetId = resolveRegularPresetId(template, templateOverride ? null : invoiceSettings?.templateVariant)
   const paperSize = invoiceSettings?.paperSize || 'A4'
   const previewData = buildInvoicePreviewData(invoice, orgSettings, invoiceSettings)
   const fields = format === 'simple' ? SIMPLE_FIELDS_PRESET : invoiceSettings?.fields || {}
@@ -133,6 +140,7 @@ export default function InvoicePrintView() {
     >
       <style>{'@page { size: ' + (paperSize === 'thermal' ? '80mm auto' : paperSize) + '; margin: 0; } body { margin: 0; }'}</style>
       <TemplateComponent
+        presetId={regularPresetId}
         data={previewData}
         primaryColor={primaryColor}
         fields={fields}

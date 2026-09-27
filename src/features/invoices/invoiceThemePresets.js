@@ -53,3 +53,16 @@ export function findThermalPreset(id) {
 export function presetForBaseTemplate(template) {
   return REGULAR_THEME_PRESETS.find((preset) => preset.id === template) || REGULAR_THEME_PRESETS[0]
 }
+
+// The preset id to actually render for a persisted (template, template_variant) pair: the exact
+// variant if it still names a preset in this catalog, otherwise the plain card matching the base
+// template (an unset, null, or since-removed variant is never fatal - see the backend's
+// "Invoice Branding, Company Asset Fallback & Template Variant" contract). Shared by
+// InvoiceSettings.jsx (which preset card to highlight) and InvoiceDetail.jsx/InvoicePrintView.jsx
+// (which preset to actually render for a real invoice) so this logic exists in exactly one place.
+export function resolveRegularPresetId(template, templateVariant) {
+  if (templateVariant && REGULAR_THEME_PRESETS.some((preset) => preset.id === templateVariant)) {
+    return templateVariant
+  }
+  return presetForBaseTemplate(template).id
+}

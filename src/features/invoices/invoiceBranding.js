@@ -7,13 +7,11 @@ import { getFileUrl } from '../../api/files'
 // Settings Live Preview, Print Preview, Invoice Detail, Invoice Print View) calls this one
 // function so the precedence can never drift between screens.
 //
-// All four assets now go through the same real backend field (branding.logo_file_id /
-// signature_file_id / stamp_file_id / payment_qr_file_id) - no more session-only state for
-// stamp/QR. On the current backend snapshot only logo_file_id/signature_file_id are live
-// (confirmed by reading app/schemas/workflow_settings.py's InvoiceBranding); stamp_file_id/
-// payment_qr_file_id are being added there per the backend team, and `settings.branding.
-// stampFileId`/`paymentQrFileId` already read/write that shape end to end (api/invoices.js) so
-// this starts persisting for real the moment the backend ships it - no further frontend change.
+// All four assets go through the same real backend field (branding.logo_file_id /
+// signature_file_id / stamp_file_id / payment_qr_file_id - confirmed shipped per the backend's
+// "Invoice Branding, Company Asset Fallback & Template Variant" contract) - no session-only state
+// for any of them. `null`/empty clears the override and restores the Company Settings fallback,
+// matching the backend's own two-tier resolution (invoice override -> Company Settings -> none).
 export function resolveInvoiceBranding(companyBranding, invoiceBrandingOverride) {
   const company = companyBranding || {}
   const invoiceOverride = invoiceBrandingOverride || {}

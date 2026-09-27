@@ -498,20 +498,18 @@ function normalizeInvoiceSettings(settings) {
 
   return {
     template: settings.template || 'classic',
-    // Not a real backend field yet (the backend's `template` is still restricted to
-    // classic/modern/compact/thermal) - the backend is adding `template_variant` to persist the
-    // exact selected theme preset (e.g. "GST Theme 3") on top of that. Read defensively so this
-    // stays a no-op fallback to session-only preset selection (InvoiceSettings.jsx) until the
-    // backend actually returns it; once it does, this starts round-tripping for real with no
-    // further frontend change.
+    // Persists the exact selected theme preset id (e.g. "gst_theme_1") on top of `template`
+    // (which stays restricted to classic/modern/compact/thermal) - confirmed backend field per
+    // the "Invoice Branding, Company Asset Fallback & Template Variant" contract. `null`/absent
+    // reads back as '', which InvoiceSettings.jsx's resolveRegularPresetId treats as "fall back
+    // to the plain card matching `template`" (an unknown/cleared variant is never fatal).
     templateVariant: settings.template_variant || '',
     paperSize: settings.paper_size || 'A4',
     branding: {
       logoFileId: settings.branding?.logo_file_id || '',
       signatureFileId: settings.branding?.signature_file_id || '',
-      // Same as above - not yet a real field on this backend snapshot (InvoiceBranding only has
-      // logo_file_id/signature_file_id/primary_color today), being added alongside
-      // template_variant. Reads back empty until then; see the backend-changes writeup.
+      // Confirmed backend fields (InvoiceBranding.stamp_file_id/payment_qr_file_id) - same
+      // invoice-override -> Company Settings fallback precedence as logo/signature.
       stampFileId: settings.branding?.stamp_file_id || '',
       paymentQrFileId: settings.branding?.payment_qr_file_id || '',
       primaryColor: settings.branding?.primary_color || '#063b00',
@@ -667,16 +665,16 @@ function deriveFlatFields(settings) {
 function denormalizeInvoiceSettings(settings) {
   return {
     template: settings.template,
-    // See normalizeInvoiceSettings - sent unconditionally like every other field here (this
-    // function always receives a full, already-normalized object), harmless no-op against the
-    // current backend (unknown Pydantic fields are ignored, not rejected - confirmed by reading
-    // app/schemas/workflow_settings.py: no model forbids extra fields) until template_variant
-    // exists server-side, at which point it starts persisting with no frontend change needed.
+    // Sent unconditionally like every other field here (this function always receives a full,
+    // already-normalized object) - `null` clears the persisted variant, matching the backend's
+    // documented "Clear Variant" contract exactly.
     template_variant: settings.templateVariant || null,
     paper_size: settings.paperSize,
     branding: {
       logo_file_id: settings.branding.logoFileId || null,
       signature_file_id: settings.branding.signatureFileId || null,
+      // `null` clears the override and restores the Company Settings fallback (backend's
+      // documented "Clear Stamp/Payment QR Override" contract) - same as logo/signature.
       stamp_file_id: settings.branding.stampFileId || null,
       payment_qr_file_id: settings.branding.paymentQrFileId || null,
       primary_color: settings.branding.primaryColor || null,

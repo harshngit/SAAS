@@ -23,7 +23,8 @@ import { downloadInvoicePdf, getInvoice, getInvoiceSettings } from '../../api/in
 import { listPaymentReceipts } from '../../api/paymentReceipts'
 import { getOrganizationSettings } from '../../api/organizations'
 import { usePermission } from '../../auth/usePermission'
-import { templateComponents, money as formatPreviewMoney, buildInvoicePreviewData } from './invoiceTemplates'
+import { templateComponents, RegularThemePreview, money as formatPreviewMoney, buildInvoicePreviewData } from './invoiceTemplates'
+import { resolveRegularPresetId } from './invoiceThemePresets'
 import { INVOICE_DEMO_ENABLED } from './invoiceDemoData'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
 import { FINANCIAL_STATUS_VARIANT, financialStatus } from './invoiceHelpers'
@@ -67,7 +68,14 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
 
   const previewData = buildInvoicePreviewData(invoice, orgSettings, invoiceSettings)
   const template = invoiceSettings?.template || 'classic'
-  const TemplateComponent = templateComponents[template] || templateComponents.classic
+  const isThermalTemplate = template === 'thermal'
+  // Regular invoices render through the persisted `template_variant` preset (e.g. "GST Theme 3"),
+  // not just the plain base `template` - RegularThemePreview + resolveRegularPresetId are the
+  // same preset-aware renderer/resolver the Invoice Settings Live Preview uses, so a real invoice
+  // actually looks like the theme the org selected, falling back safely to the base template card
+  // if `templateVariant` is unset or names a preset no longer in the catalog.
+  const TemplateComponent = isThermalTemplate ? templateComponents.thermal : RegularThemePreview
+  const regularPresetId = resolveRegularPresetId(template, invoiceSettings?.templateVariant)
   const primaryColor = invoiceSettings?.branding?.primaryColor || '#063b00'
   const templateLabel = template.charAt(0).toUpperCase() + template.slice(1)
 
@@ -88,6 +96,7 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
       </div>
       <div ref={exportRef}>
         <TemplateComponent
+          presetId={regularPresetId}
           primaryColor={primaryColor}
           data={previewData}
           businessDetails={invoiceSettings?.businessDetails}
