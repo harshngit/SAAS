@@ -164,3 +164,74 @@ export async function deleteBrandsBulk(brandIds) {
     return { success: false, error: message }
   }
 }
+
+// -----------------------------------------------------------------------------
+// Brand <-> Category many-to-many links - continues the catalog hierarchy one level down from
+// Supplier <-> Brand (see api/suppliers.js). Distinct from Product Category (a product's own
+// category_id) - this only links which categories a brand carries.
+//   GET    /brands/{brand_id}/categories
+//   POST   /brands/{brand_id}/categories   { category_id }
+//   DELETE /brands/{brand_id}/categories/{category_id}
+// -----------------------------------------------------------------------------
+function normalizeBrandCategoryLink(row) {
+  if (!row) return row
+  return {
+    id: row.id,
+    brandId: row.brand_id || null,
+    categoryId: row.category_id || row.category?.id || null,
+    categoryName: row.category_name || row.category?.name || '',
+    createdAt: row.created_at || null,
+  }
+}
+
+export async function getBrandCategories(brandId) {
+  try {
+    const { data } = await apiClient.get(`/brands/${brandId}/categories`, { headers: authHeader() })
+    const rows = Array.isArray(data) ? data : data?.categories || data?.items || []
+    return { success: true, links: rows.map(normalizeBrandCategoryLink) }
+  } catch (error) {
+    const errorData = error.response?.data
+    return {
+      success: false,
+      error: formatApiError(
+        errorData?.detail || errorData?.message || errorData?.error || errorData,
+        'Unable to load categories linked to this brand. Please try again.',
+      ),
+    }
+  }
+}
+
+export async function linkBrandCategory(brandId, categoryId) {
+  try {
+    const { data } = await apiClient.post(
+      `/brands/${brandId}/categories`,
+      { category_id: categoryId },
+      { headers: authHeader() },
+    )
+    return { success: true, link: normalizeBrandCategoryLink(data) }
+  } catch (error) {
+    const status = error.response?.status
+    const errorData = error.response?.data
+    const detail = errorData?.detail || errorData?.message || errorData?.error || errorData
+    if (status === 400 || status === 409) {
+      return { success: false, alreadyLinked: true, error: formatApiError(detail, 'This category is already linked to this brand.') }
+    }
+    return { success: false, error: formatApiError(detail, 'Unable to add this category. Please try again.') }
+  }
+}
+
+export async function unlinkBrandCategory(brandId, categoryId) {
+  try {
+    await apiClient.delete(`/brands/${brandId}/categories/${categoryId}`, { headers: authHeader() })
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    return {
+      success: false,
+      error: formatApiError(
+        errorData?.detail || errorData?.message || errorData?.error || errorData,
+        'Unable to remove this category. Please try again.',
+      ),
+    }
+  }
+}

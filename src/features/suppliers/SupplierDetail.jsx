@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Edit, Eye, FileText, IndianRupee, Link2, Link2Off, Plus, Power, ShoppingBag, Tag, Trash2, Wallet } from 'lucide-react'
+import { ArrowLeft, Award, ChevronDown, ChevronRight, Edit, Eye, FileText, IndianRupee, Link2, Link2Off, Plus, Power, ShoppingBag, Tag, Trash2, Wallet, X } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -13,12 +13,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Ta
 import {
   deleteSupplier,
   getSupplier,
+  getSupplierBrands,
   getSupplierProductLinks,
+  linkSupplierBrand,
   linkSupplierProduct,
+  unlinkSupplierBrand,
   unlinkSupplierProduct,
   updateSupplier,
   updateSupplierStatus,
 } from '../../api/suppliers'
+import { getBrandCategories, linkBrandCategory, listBrands, unlinkBrandCategory } from '../../api/brands'
+import { listCategories } from '../../api/categories'
 import { listProducts } from '../../api/products'
 import { listSupplierPurchases } from '../../api/purchases'
 import { formatCurrency } from '../../utils/format'
@@ -116,6 +121,27 @@ export default function SupplierDetail() {
   const [isLinking, setIsLinking] = useState(false)
   const [linkError, setLinkError] = useState('')
   const [unlinkBusyId, setUnlinkBusyId] = useState('')
+
+  // ---- Brands & Products tab: Supplier -> Brand -> Category catalog hierarchy -----------------
+  const [supplierBrandLinks, setSupplierBrandLinks] = useState(null) // null = not loaded/demo, [] = real empty
+  const [allBrands, setAllBrands] = useState([])
+  const [allCategories, setAllCategories] = useState([])
+  const [isLoadingBrands, setIsLoadingBrands] = useState(true)
+  const [addBrandModalOpen, setAddBrandModalOpen] = useState(false)
+  const [addBrandId, setAddBrandId] = useState('')
+  const [isAddingBrand, setIsAddingBrand] = useState(false)
+  const [addBrandError, setAddBrandError] = useState('')
+  const [removeBrandBusyId, setRemoveBrandBusyId] = useState('')
+  const [expandedBrandIds, setExpandedBrandIds] = useState(() => new Set())
+  // Categories linked to each expanded brand - loaded lazily (only when a brand row is expanded,
+  // never all brands at once) and cached by brandId so re-collapsing/re-expanding doesn't refetch.
+  const [brandCategoriesById, setBrandCategoriesById] = useState({})
+  const [loadingCategoriesBrandId, setLoadingCategoriesBrandId] = useState('')
+  const [addCategoryForBrandId, setAddCategoryForBrandId] = useState('')
+  const [addCategoryId, setAddCategoryId] = useState('')
+  const [isAddingCategory, setIsAddingCategory] = useState(false)
+  const [addCategoryError, setAddCategoryError] = useState('')
+  const [removeCategoryBusyId, setRemoveCategoryBusyId] = useState('')
   const [purchases, setPurchases] = useState([])
   const [isLoadingPurchases, setIsLoadingPurchases] = useState(true)
   const [purchasesError, setPurchasesError] = useState('')
@@ -208,14 +234,21 @@ export default function SupplierDetail() {
   const loadRelatedData = async () => {
     setIsLoadingProducts(true)
     setIsLoadingPurchases(true)
+    setIsLoadingBrands(true)
     setPurchasesError('')
 
     if (DEMO_MODE && !useDemoSuppliers) {
       setProducts([])
       setProductLinks(null)
       setPurchases([])
+      // No demo data exists for this brand-new catalog hierarchy (never fabricated) - the tab
+      // just shows its own empty state below, same as a fresh org with nothing linked yet.
+      setSupplierBrandLinks(null)
+      setAllBrands([])
+      setAllCategories([])
       setIsLoadingProducts(false)
       setIsLoadingPurchases(false)
+      setIsLoadingBrands(false)
       return
     }
 
@@ -223,23 +256,34 @@ export default function SupplierDetail() {
       setProducts(demoProducts)
       setProductLinks(null)
       setPurchases(getDemoSupplierPurchases(id))
+      setSupplierBrandLinks(null)
+      setAllBrands([])
+      setAllCategories([])
       setIsLoadingProducts(false)
       setIsLoadingPurchases(false)
+      setIsLoadingBrands(false)
       return
     }
 
-    const [productsResult, purchasesResult, linksResult] = await Promise.all([
+    const [productsResult, purchasesResult, linksResult, brandLinksResult, brandsResult, categoriesResult] = await Promise.all([
       listProducts(),
       listSupplierPurchases(id),
       getSupplierProductLinks(id),
+      getSupplierBrands(id),
+      listBrands(),
+      listCategories(),
     ])
     if (productsResult.success) setProducts(productsResult.products.map((product) => normalizeApiProduct(product)))
     if (purchasesResult.success) setPurchases(purchasesResult.purchases)
     else setPurchasesError(purchasesResult.error)
     // Real Supplier <-> Product M2M list. `null` means "not loaded / demo"; [] is a real empty.
     setProductLinks(linksResult.success ? linksResult.links : [])
+    setSupplierBrandLinks(brandLinksResult.success ? brandLinksResult.links : [])
+    setAllBrands(brandsResult.success ? brandsResult.brands : [])
+    setAllCategories(categoriesResult.success ? categoriesResult.categories : [])
     setIsLoadingProducts(false)
     setIsLoadingPurchases(false)
+    setIsLoadingBrands(false)
   }
 
   useEffect(() => {
@@ -279,6 +323,23 @@ export default function SupplierDetail() {
     () => [...new Set(supplierProducts.map((product) => product.categoryLabel || product.category).filter(Boolean))],
     [supplierProducts],
   )
+
+  // ---- Brands & Products tab: Supplier -> Brand -> Category -------------------------------
+  // Resolves each link's brand name against the full brand master (in case the link row itself
+  // didn't carry brand_name), same defensive pattern as supplierProducts above.
+  const supplierBrands = useMemo(() => {
+    if (!Array.isArray(supplierBrandLinks)) return []
+    return supplierBrandLinks.map((link) => {
+      const brand = allBrands.find((entry) => String(entry.id) === String(link.brandId))
+      return {
+        id: link.brandId,
+        name: link.brandName || brand?.name || link.brandId,
+        isActive: brand?.is_active ?? true,
+      }
+    })
+  }, [supplierBrandLinks, allBrands])
+  const linkedBrandIdSet = useMemo(() => new Set(supplierBrands.map((brand) => String(brand.id))), [supplierBrands])
+  const linkableBrands = allBrands.filter((brand) => !linkedBrandIdSet.has(String(brand.id)))
   const lastPurchase = useMemo(
     () => purchases.reduce((latest, purchase) => {
       if (!latest) return purchase
@@ -505,6 +566,118 @@ export default function SupplierDetail() {
     await loadRelatedData()
   }
 
+  // ---- Brands & Products tab: Supplier -> Brand -> Category link management (real mode) -------
+  const handleAddBrand = async () => {
+    if (!addBrandId) return
+    setIsAddingBrand(true)
+    setAddBrandError('')
+    if (DEMO_MODE) {
+      showToast({ title: 'Demo mode', message: 'Brand associations are simulated in demo mode.' })
+      setIsAddingBrand(false)
+      setAddBrandModalOpen(false)
+      setAddBrandId('')
+      return
+    }
+    const result = await linkSupplierBrand(supplier.id, addBrandId)
+    setIsAddingBrand(false)
+    if (!result.success) {
+      // Surfaces the backend's own message verbatim (e.g. "Brand is not associated with the
+      // selected supplier." doesn't apply here, but a duplicate-link 400 does) - never a raw
+      // stack trace, always the friendly formatApiError fallback from api/suppliers.js.
+      setAddBrandError(result.error)
+      return
+    }
+    setAddBrandModalOpen(false)
+    setAddBrandId('')
+    await loadRelatedData()
+  }
+
+  const handleRemoveBrand = async (brand) => {
+    setRemoveBrandBusyId(brand.id)
+    if (DEMO_MODE) {
+      showToast({ title: 'Demo mode', message: 'Brand associations are simulated in demo mode.' })
+      setRemoveBrandBusyId('')
+      return
+    }
+    const result = await unlinkSupplierBrand(supplier.id, brand.id)
+    setRemoveBrandBusyId('')
+    if (!result.success) {
+      showToast({ title: 'Unable to remove brand', message: result.error, variant: 'error' })
+      return
+    }
+    // The brand's own category associations aren't this supplier's data - just drop the local
+    // cache entry, nothing to delete server-side beyond the supplier<->brand link itself.
+    setBrandCategoriesById((current) => {
+      const next = { ...current }
+      delete next[brand.id]
+      return next
+    })
+    await loadRelatedData()
+  }
+
+  // Categories are only fetched for a brand once it's expanded (never all brands up front) -
+  // cached by brandId afterwards so collapsing/re-expanding doesn't refetch.
+  const handleToggleBrandExpanded = async (brandId) => {
+    const isExpanded = expandedBrandIds.has(brandId)
+    setExpandedBrandIds((current) => {
+      const next = new Set(current)
+      if (isExpanded) next.delete(brandId)
+      else next.add(brandId)
+      return next
+    })
+    if (isExpanded || brandCategoriesById[brandId] || DEMO_MODE) return
+
+    setLoadingCategoriesBrandId(brandId)
+    const result = await getBrandCategories(brandId)
+    setLoadingCategoriesBrandId('')
+    if (result.success) {
+      setBrandCategoriesById((current) => ({ ...current, [brandId]: result.links }))
+    }
+  }
+
+  const handleAddCategory = async () => {
+    if (!addCategoryForBrandId || !addCategoryId) return
+    setIsAddingCategory(true)
+    setAddCategoryError('')
+    if (DEMO_MODE) {
+      showToast({ title: 'Demo mode', message: 'Category associations are simulated in demo mode.' })
+      setIsAddingCategory(false)
+      setAddCategoryForBrandId('')
+      setAddCategoryId('')
+      return
+    }
+    const result = await linkBrandCategory(addCategoryForBrandId, addCategoryId)
+    setIsAddingCategory(false)
+    if (!result.success) {
+      setAddCategoryError(result.error)
+      return
+    }
+    const brandId = addCategoryForBrandId
+    setAddCategoryForBrandId('')
+    setAddCategoryId('')
+    const refreshed = await getBrandCategories(brandId)
+    if (refreshed.success) setBrandCategoriesById((current) => ({ ...current, [brandId]: refreshed.links }))
+  }
+
+  const handleRemoveCategory = async (brandId, category) => {
+    setRemoveCategoryBusyId(category.categoryId)
+    if (DEMO_MODE) {
+      showToast({ title: 'Demo mode', message: 'Category associations are simulated in demo mode.' })
+      setRemoveCategoryBusyId('')
+      return
+    }
+    const result = await unlinkBrandCategory(brandId, category.categoryId)
+    setRemoveCategoryBusyId('')
+    if (!result.success) {
+      showToast({ title: 'Unable to remove category', message: result.error, variant: 'error' })
+      return
+    }
+    setBrandCategoriesById((current) => ({
+      ...current,
+      [brandId]: (current[brandId] || []).filter((entry) => String(entry.categoryId) !== String(category.categoryId)),
+    }))
+  }
+
   if (isFormOpen) {
     // Preselect the products currently linked to this supplier so Edit doesn't open with an
     // empty picker. Real mode gets these from the Supplier <-> Product M2M list.
@@ -577,6 +750,7 @@ export default function SupplierDetail() {
         <div className="overflow-x-auto pb-1">
           <TabsList className="min-w-max">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="brands">Brands & Products</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="purchases">Purchases</TabsTrigger>
             <TabsTrigger value="supplier-invoices">Supplier Invoices</TabsTrigger>
@@ -634,6 +808,123 @@ export default function SupplierDetail() {
         <DetailField label="Credit Limit" value={supplier.creditLimit ? formatCurrency(supplier.creditLimit) : null} />
         <DetailField label="Purchase Currency" value={supplier.purchaseCurrency} />
       </DetailSection>
+        </TabsContent>
+
+        <TabsContent value="brands" className="mt-4">
+          <Card
+            title="Brands & Products"
+            subtitle="Which brands this supplier carries, and which categories each brand covers. Separate from the Supplier Category classification field."
+            className="p-0"
+            bodyClassName="p-0"
+            actions={
+              <Button type="button" size="sm" onClick={() => { setAddBrandError(''); setAddBrandId(''); setAddBrandModalOpen(true) }}>
+                <Plus className="size-4" aria-hidden="true" />
+                Add Brand
+              </Button>
+            }
+          >
+            {DEMO_MODE ? (
+              <p className="px-5 py-8 text-center text-sm text-neutral-500">Brand & category associations aren&apos;t available in demo mode.</p>
+            ) : isLoadingBrands ? (
+              <LoadingSpinner label="Loading brands..." />
+            ) : supplierBrands.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-neutral-500">No brands are linked to this supplier yet.</p>
+            ) : (
+              <ul className="divide-y divide-neutral-50">
+                {supplierBrands.map((brand) => {
+                  const isExpanded = expandedBrandIds.has(brand.id)
+                  const brandCategories = brandCategoriesById[brand.id] || []
+                  const linkedCategoryIdSet = new Set(brandCategories.map((entry) => String(entry.categoryId)))
+                  const linkableCategories = allCategories.filter((category) => !linkedCategoryIdSet.has(String(category.id)))
+
+                  return (
+                    <li key={brand.id}>
+                      <div className="flex items-center gap-2 px-5 py-3.5 hover:bg-primary-50/25">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleBrandExpanded(brand.id)}
+                          className="flex flex-1 items-center gap-2.5 text-left"
+                        >
+                          {isExpanded ? <ChevronDown className="size-4 shrink-0 text-neutral-400" aria-hidden="true" /> : <ChevronRight className="size-4 shrink-0 text-neutral-400" aria-hidden="true" />}
+                          <Award className="size-4 shrink-0 text-primary-600" aria-hidden="true" />
+                          <span className="font-medium text-neutral-900">{brand.name}</span>
+                        </button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          loading={removeBrandBusyId === brand.id}
+                          onClick={() => handleRemoveBrand(brand)}
+                        >
+                          <X className="size-4" aria-hidden="true" />
+                          Remove
+                        </Button>
+                      </div>
+                      {isExpanded && (
+                        <div className="bg-neutral-50/60 px-5 py-3 pl-11">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Categories</span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => { setAddCategoryError(''); setAddCategoryId(''); setAddCategoryForBrandId(brand.id) }}
+                            >
+                              <Plus className="size-3.5" aria-hidden="true" />
+                              Add Category
+                            </Button>
+                          </div>
+                          {loadingCategoriesBrandId === brand.id ? (
+                            <LoadingSpinner label="Loading categories..." />
+                          ) : brandCategories.length === 0 ? (
+                            <p className="py-2 text-sm text-neutral-400">No categories linked to this brand yet.</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {brandCategories.map((category) => (
+                                <span
+                                  key={category.categoryId}
+                                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-medium text-neutral-700 shadow-(--shadow-xs)"
+                                >
+                                  {category.categoryName || allCategories.find((entry) => String(entry.id) === String(category.categoryId))?.name || category.categoryId}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCategory(brand.id, category)}
+                                    disabled={removeCategoryBusyId === category.categoryId}
+                                    aria-label={`Remove ${category.categoryName || 'category'}`}
+                                    className="text-neutral-400 hover:text-red-600 disabled:opacity-50"
+                                  >
+                                    <X className="size-3" aria-hidden="true" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {addCategoryForBrandId === brand.id && (
+                            <div className="mt-3 flex flex-wrap items-end gap-2">
+                              <Select
+                                label="Category"
+                                className="w-56"
+                                options={linkableCategories.map((category) => ({ value: String(category.id), label: category.name || category.category_name || '' }))}
+                                value={addCategoryId}
+                                onChange={(event) => setAddCategoryId(event.target.value)}
+                                placeholder={linkableCategories.length ? 'Select a category' : 'All categories already linked'}
+                                searchable
+                              />
+                              <Button type="button" size="sm" loading={isAddingCategory} disabled={!addCategoryId} onClick={handleAddCategory}>Add</Button>
+                              <Button type="button" variant="outline" size="sm" onClick={() => { setAddCategoryForBrandId(''); setAddCategoryError('') }}>Cancel</Button>
+                            </div>
+                          )}
+                          {addCategoryForBrandId === brand.id && addCategoryError && (
+                            <p className="mt-2 text-sm text-red-600">{addCategoryError}</p>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </Card>
         </TabsContent>
 
         <TabsContent value="products" className="mt-4">
@@ -1008,6 +1299,38 @@ export default function SupplierDetail() {
           <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" disabled={isLinking} onClick={() => setLinkModalOpen(false)}>Cancel</Button>
             <Button type="button" loading={isLinking} disabled={!linkProductId} onClick={handleLinkProduct}>Link Product</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={addBrandModalOpen}
+        onClose={() => {
+          if (isAddingBrand) return
+          setAddBrandError('')
+          setAddBrandModalOpen(false)
+        }}
+        title="Add Brand"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-neutral-600">
+            Associate an existing brand with this supplier. This does not create a new brand.
+          </p>
+          <Select
+            label="Brand"
+            options={[
+              { value: '', label: linkableBrands.length ? 'Select a brand' : 'All brands are already linked' },
+              ...linkableBrands.map((brand) => ({ value: String(brand.id), label: brand.name || '' })),
+            ]}
+            value={addBrandId}
+            onChange={(event) => { setAddBrandId(event.target.value); setAddBrandError('') }}
+            disabled={linkableBrands.length === 0}
+            searchable
+          />
+          {addBrandError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{addBrandError}</div>}
+          <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" disabled={isAddingBrand} onClick={() => setAddBrandModalOpen(false)}>Cancel</Button>
+            <Button type="button" loading={isAddingBrand} disabled={!addBrandId} onClick={handleAddBrand}>Add Brand</Button>
           </div>
         </div>
       </Modal>

@@ -2,7 +2,7 @@ import axios from 'axios'
 import { showGlobalToast } from '../components/ui/toastContext'
 import { useAuthStore } from '../store/authStore'
 
-export const API_BASE_URL = 'https://api.asynk.in'
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://api.asynk.in').replace(/\/+$/, '')
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

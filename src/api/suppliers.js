@@ -344,3 +344,76 @@ export async function unlinkSupplierProduct(supplierId, productId) {
     }
   }
 }
+
+// -----------------------------------------------------------------------------
+// Supplier <-> Brand many-to-many links - the top of the catalog hierarchy
+// (Supplier -> Brand -> Category -> Product -> Variant). Entirely separate from
+// Supplier <-> Product above (both coexist) and from the Supplier Category classification
+// field on the supplier master (buildSupplierBody's `supplier_type`) - this only links which
+// brands this supplier carries.
+//   GET    /suppliers/{supplier_id}/brands
+//   POST   /suppliers/{supplier_id}/brands   { brand_id }
+//   DELETE /suppliers/{supplier_id}/brands/{brand_id}
+// -----------------------------------------------------------------------------
+function normalizeSupplierBrandLink(row) {
+  if (!row) return row
+  return {
+    id: row.id,
+    supplierId: row.supplier_id || null,
+    brandId: row.brand_id || row.brand?.id || null,
+    brandName: row.brand_name || row.brand?.name || '',
+    createdAt: row.created_at || null,
+  }
+}
+
+export async function getSupplierBrands(supplierId) {
+  try {
+    const { data } = await apiClient.get(`/suppliers/${supplierId}/brands`, { headers: authHeader() })
+    const rows = Array.isArray(data) ? data : data?.brands || data?.items || []
+    return { success: true, links: rows.map(normalizeSupplierBrandLink) }
+  } catch (error) {
+    const errorData = error.response?.data
+    return {
+      success: false,
+      error: formatApiError(
+        errorData?.detail || errorData?.message || errorData?.error || errorData,
+        'Unable to load brands linked to this supplier. Please try again.',
+      ),
+    }
+  }
+}
+
+export async function linkSupplierBrand(supplierId, brandId) {
+  try {
+    const { data } = await apiClient.post(
+      `/suppliers/${supplierId}/brands`,
+      { brand_id: brandId },
+      { headers: authHeader() },
+    )
+    return { success: true, link: normalizeSupplierBrandLink(data) }
+  } catch (error) {
+    const status = error.response?.status
+    const errorData = error.response?.data
+    const detail = errorData?.detail || errorData?.message || errorData?.error || errorData
+    if (status === 400 || status === 409) {
+      return { success: false, alreadyLinked: true, error: formatApiError(detail, 'This brand is already linked to this supplier.') }
+    }
+    return { success: false, error: formatApiError(detail, 'Unable to add this brand. Please try again.') }
+  }
+}
+
+export async function unlinkSupplierBrand(supplierId, brandId) {
+  try {
+    await apiClient.delete(`/suppliers/${supplierId}/brands/${brandId}`, { headers: authHeader() })
+    return { success: true }
+  } catch (error) {
+    const errorData = error.response?.data
+    return {
+      success: false,
+      error: formatApiError(
+        errorData?.detail || errorData?.message || errorData?.error || errorData,
+        'Unable to remove this brand. Please try again.',
+      ),
+    }
+  }
+}

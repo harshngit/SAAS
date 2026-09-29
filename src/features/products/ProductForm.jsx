@@ -20,8 +20,8 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { listCategories } from '../../api/categories'
-import { listBrands } from '../../api/brands'
-import { listSuppliers } from '../../api/suppliers'
+import { listBrands, getBrandCategories } from '../../api/brands'
+import { listSuppliers, getSupplierBrands } from '../../api/suppliers'
 import { mapProductBackendField } from '../../api/products'
 import { getImageFileError } from '../../utils/imageFile'
 import { getFileUrl, uploadFile } from '../../api/files'
@@ -213,9 +213,13 @@ const productSections = [
     { name: 'name', label: 'Product Name', required: true, maxLength: 150 },
     { name: 'shortName', label: 'Short Name' },
     { name: 'productType', label: 'Product Type', input: 'select' },
+    // Catalog hierarchy (Supplier -> Brand -> Category -> Subcategory): each field's options
+    // narrow to its parent's associations once the parent is chosen - see the cascading-options
+    // effects below. Order here matches that dependency chain.
+    { name: 'preferredSupplier', label: 'Preferred Supplier', input: 'select' },
+    { name: 'brand', label: 'Brand', input: 'select' },
     { name: 'category', label: 'Category', input: 'select', required: true },
     { name: 'subCategory', label: 'Sub Category', input: 'select' },
-    { name: 'brand', label: 'Brand', input: 'select' },
     { name: 'manufacturer', label: 'Manufacturer', input: 'select' },
     { name: 'modelNumber', label: 'Model Number' },
     { name: 'status', label: 'Product Status', input: 'select', required: true },
@@ -258,7 +262,6 @@ const productSections = [
     { name: 'taxInclusive', label: 'Tax Inclusive', input: 'checkbox' },
   ]),
   section('Purchase Information', [
-    { name: 'preferredSupplier', label: 'Preferred Supplier', input: 'select' },
     { name: 'supplierProductCode', label: 'Supplier Product Code' },
     { name: 'leadTime', label: 'Lead Time', placeholder: 'e.g. 7 days' },
     { name: 'minimumOrderQuantity', label: 'Minimum Order Quantity', input: 'number', step: '1' },
@@ -362,6 +365,16 @@ function hydrateProduct(product) {
   }
 }
 
+// If the field's current value isn't in the scoped (parent-filtered) options list - e.g. an
+// existing product whose Supplier<->Brand or Brand<->Category association hasn't been created
+// yet - fall back to the full, unscoped catalog list so the current selection still resolves to
+// a real label instead of silently disappearing (never auto-clear existing product data).
+function withCurrentOption(scopedOptions, currentValue, allOptions) {
+  if (!currentValue || scopedOptions.some((option) => option.value === currentValue)) return scopedOptions
+  const fallback = allOptions.find((option) => option.value === currentValue)
+  return fallback ? [fallback, ...scopedOptions] : scopedOptions
+}
+
 function ProductUploadField({ field, value, isUploading, onFileSelected, onRemove }) {
   return (
     <div className="flex min-h-28 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
@@ -429,6 +442,15 @@ export default function ProductForm({
   const [subCategoryOptionsAll, setSubCategoryOptionsAll] = useState([])
   const [brandOptions, setBrandOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
+  // Catalog hierarchy cascade: Brand options narrow to the selected supplier's linked brands
+  // (GET /suppliers/{id}/brands), Category options narrow to the selected brand's linked
+  // categories (GET /brands/{id}/categories). Empty when no parent is selected yet - the render
+  // below falls back to the full brandOptions/categoryOptions catalog in that case, so existing
+  // products with no supplier/brand set are never blocked from keeping/editing their category.
+  const [supplierBrandLinks, setSupplierBrandLinks] = useState([])
+  const [isLoadingSupplierBrands, setIsLoadingSupplierBrands] = useState(false)
+  const [brandCategoryLinks, setBrandCategoryLinks] = useState([])
+  const [isLoadingBrandCategories, setIsLoadingBrandCategories] = useState(false)
   const [activeSection, setActiveSection] = useState(productSections[0].id)
   const [errors, setErrors] = useState({})
   const [imageError, setImageError] = useState('')
@@ -517,6 +539,74 @@ export default function ProductForm({
       }
     })
   }, [isOpen])
+
+  // Cascading loads: fetch only the selected supplier's brands / selected brand's categories,
+  // never the whole catalog's associations at once (no unnecessary requests). Re-fires whenever
+  // the parent value changes, including the initial hydration of an existing product's saved
+  // preferredSupplierId/brandId - that's required so an edited product's Brand/Category dropdowns
+  // are correctly populated on open, not just after a user interaction.
+  useEffect(() => {
+    if (!isOpen || !formData.preferredSupplierId) {
+      setSupplierBrandLinks([])
+      return undefined
+    }
+    let cancelled = false
+    setIsLoadingSupplierBrands(true)
+    getSupplierBrands(formData.preferredSupplierId).then((result) => {
+      if (cancelled) return
+      setIsLoadingSupplierBrands(false)
+      setSupplierBrandLinks(result.success ? result.links : [])
+    })
+    return () => { cancelled = true }
+  }, [isOpen, formData.preferredSupplierId])
+
+  useEffect(() => {
+    if (!isOpen || !formData.brandId) {
+      setBrandCategoryLinks([])
+      return undefined
+    }
+    let cancelled = false
+    setIsLoadingBrandCategories(true)
+    getBrandCategories(formData.brandId).then((result) => {
+      if (cancelled) return
+      setIsLoadingBrandCategories(false)
+      setBrandCategoryLinks(result.success ? result.links : [])
+    })
+    return () => { cancelled = true }
+  }, [isOpen, formData.brandId])
+
+  const supplierBrandOptions = useMemo(
+    () => supplierBrandLinks
+      .map((link) => ({
+        value: String(link.brandId),
+        label: link.brandName || brandOptions.find((option) => option.value === String(link.brandId))?.label || '',
+      }))
+      .filter((option) => option.value && option.label),
+    [supplierBrandLinks, brandOptions],
+  )
+  const brandCategoryOptions = useMemo(
+    () => brandCategoryLinks
+      .map((link) => ({
+        value: String(link.categoryId),
+        label: link.categoryName || categoryOptions.find((option) => option.value === String(link.categoryId))?.label || '',
+      }))
+      .filter((option) => option.value && option.label),
+    [brandCategoryLinks, categoryOptions],
+  )
+
+  // Progressive narrowing, not a hard requirement: once a Supplier/Brand is chosen, its dependent
+  // field scopes to only the associated options (Part 3's step-by-step flow). Until then - or for
+  // an old product that already has a Brand/Category value but no association record yet (Part
+  // 12) - the field falls back to the full catalog list rather than disabling and hiding data the
+  // product already has.
+  const effectiveBrandOptions = formData.preferredSupplierId
+    ? withCurrentOption(supplierBrandOptions, formData.brandId, brandOptions)
+    : brandOptions
+  const brandFieldDisabled = !formData.preferredSupplierId && !formData.brandId
+  const effectiveCategoryOptions = formData.brandId
+    ? withCurrentOption(brandCategoryOptions, formData.categoryId, categoryOptions)
+    : categoryOptions
+  const categoryFieldDisabled = !formData.brandId && !formData.categoryId
 
   const subCategoryOptions = useMemo(
     () => subCategoryOptionsAll.filter((option) => option.parentId === formData.category),
@@ -878,8 +968,13 @@ export default function ProductForm({
             {...commonProps}
             className="w-full max-w-full"
             triggerClassName="w-full max-w-full"
-            options={categoryOptions}
-            placeholder={`Type or select ${field.label.toLowerCase()}`}
+            options={effectiveCategoryOptions}
+            placeholder={
+              formData.brandId
+                ? (isLoadingBrandCategories ? 'Loading categories…' : `Type or select ${field.label.toLowerCase()}`)
+                : (formData.categoryId ? `Type or select ${field.label.toLowerCase()}` : 'Select a brand first')
+            }
+            disabled={categoryFieldDisabled}
             onChange={(event) => {
               setFormData((current) => ({
                 ...current,
@@ -932,13 +1027,23 @@ export default function ProductForm({
             label={field.label}
             className="w-full max-w-full"
             triggerClassName="w-full max-w-full"
-            options={brandOptions}
+            options={effectiveBrandOptions}
             value={formData.brandId}
+            disabled={brandFieldDisabled}
             onChange={(event) => {
-              const option = brandOptions.find((opt) => opt.value === event.target.value)
-              setFormData((current) => ({ ...current, brandId: event.target.value, brand: option?.label || '' }))
+              const option = effectiveBrandOptions.find((opt) => opt.value === event.target.value)
+              // Brand changed -> everything downstream (Category, Subcategory) no longer applies.
+              setFormData((current) => ({
+                ...current,
+                brandId: event.target.value,
+                brand: option?.label || '',
+                categoryId: '',
+                category: '',
+                subCategoryId: '',
+                subCategory: '',
+              }))
             }}
-            placeholder="Search and select a brand"
+            placeholder={formData.preferredSupplierId ? (isLoadingSupplierBrands ? 'Loading brands…' : 'Search and select a brand') : (formData.brandId ? 'Search and select a brand' : 'Select a supplier first')}
             searchable
           />
         )
@@ -954,7 +1059,19 @@ export default function ProductForm({
             value={formData.preferredSupplierId}
             onChange={(event) => {
               const option = supplierOptions.find((opt) => opt.value === event.target.value)
-              setFormData((current) => ({ ...current, preferredSupplierId: event.target.value, preferredSupplier: option?.label || '' }))
+              // Supplier changed -> the whole downstream chain (Brand, Category, Subcategory)
+              // no longer applies (Part 10).
+              setFormData((current) => ({
+                ...current,
+                preferredSupplierId: event.target.value,
+                preferredSupplier: option?.label || '',
+                brandId: '',
+                brand: '',
+                categoryId: '',
+                category: '',
+                subCategoryId: '',
+                subCategory: '',
+              }))
             }}
             placeholder="Search and select a supplier"
             searchable

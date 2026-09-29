@@ -7,6 +7,7 @@ import {
   listBrands,
   updateBrand,
 } from '../../api/brands'
+import { listProducts } from '../../api/products'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -131,6 +132,22 @@ export default function BrandList() {
   const [formError, setFormError] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  // Product count per brand - derived from the existing listProducts() API (one call for the
+  // whole page, not per row), never a fake/invented number. Absent entries just show '-'.
+  const [productCountByBrandId, setProductCountByBrandId] = useState({})
+
+  useEffect(() => {
+    listProducts().then((result) => {
+      if (!result.success) return
+      const counts = {}
+      result.products.forEach((product) => {
+        const brandId = product.brand_id
+        if (!brandId) return
+        counts[brandId] = (counts[brandId] || 0) + 1
+      })
+      setProductCountByBrandId(counts)
+    })
+  }, [])
 
   const loadBrands = useCallback(async () => {
     setIsLoading(true)
@@ -387,6 +404,7 @@ export default function BrandList() {
                   </th>
                   <th className="whitespace-nowrap px-6 py-6">Brand</th>
                   <th className="whitespace-nowrap px-6 py-6">Description</th>
+                  <th className="whitespace-nowrap px-6 py-6">Products</th>
                   <th className="whitespace-nowrap px-6 py-6">Status</th>
                   <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
@@ -414,6 +432,7 @@ export default function BrandList() {
                     <td className="max-w-xl px-6 py-5 text-neutral-600">
                       <span className="line-clamp-2">{brand.description || '-'}</span>
                     </td>
+                    <td className="px-6 py-5 text-neutral-600">{productCountByBrandId[brand.id] || 0}</td>
                     <td className="px-6 py-5">
                       <Badge variant={brand.isActive ? 'success' : 'neutral'} dot>{brand.isActive ? 'Active' : 'Inactive'}</Badge>
                     </td>

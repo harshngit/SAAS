@@ -9,6 +9,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { listCategories } from '../../api/categories'
+import { listSuppliers } from '../../api/suppliers'
 import { createProduct, deleteProduct, listProducts, updateProduct } from '../../api/products'
 import { formatCurrency } from '../../utils/format'
 import { normalizeApiProduct } from './productUtils'
@@ -55,6 +56,9 @@ export default function ProductList() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
   const [categoryOptions, setCategoryOptions] = useState([])
+  // Preferred Supplier name lookup for the list table - one extra listSuppliers() call per page
+  // load (not per row), mirroring loadCategoryOptions below.
+  const [supplierNameById, setSupplierNameById] = useState({})
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [statusProduct, setStatusProduct] = useState(null)
@@ -120,6 +124,19 @@ export default function ProductList() {
   useEffect(() => {
     loadCategoryOptions()
   }, [loadCategoryOptions])
+
+  useEffect(() => {
+    listSuppliers().then((result) => {
+      if (!result.success) return
+      setSupplierNameById(
+        Object.fromEntries(
+          result.suppliers
+            .map((supplier) => [String(supplier.id), supplier.name || supplier.supplier_name || ''])
+            .filter(([supplierId, name]) => supplierId && name),
+        ),
+      )
+    })
+  }, [])
 
   const filteredProducts = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -370,7 +387,7 @@ export default function ProductList() {
               <thead>
                 <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
                   <th className="w-14 px-6 py-6"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all products" /></th>
-                  <th className="whitespace-nowrap px-6 py-6">Product</th><th className="whitespace-nowrap px-6 py-6">Brand</th><th className="whitespace-nowrap px-6 py-6">Category</th><th className="whitespace-nowrap px-6 py-6">Variants</th><th className="whitespace-nowrap px-6 py-6">Price</th><th className="whitespace-nowrap px-6 py-6">Status</th><th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
+                  <th className="whitespace-nowrap px-6 py-6">Product</th><th className="whitespace-nowrap px-6 py-6">Brand</th><th className="whitespace-nowrap px-6 py-6">Category</th><th className="whitespace-nowrap px-6 py-6">Preferred Supplier</th><th className="whitespace-nowrap px-6 py-6">Variants</th><th className="whitespace-nowrap px-6 py-6">Price</th><th className="whitespace-nowrap px-6 py-6">Status</th><th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -387,8 +404,12 @@ export default function ProductList() {
                         <span className="font-medium text-neutral-900">{product.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-neutral-600">{product.brand}</td>
-                    <td className="px-6 py-5 text-neutral-600">{product.categoryLabel || product.category || '-'}</td>
+                    <td className="px-6 py-5 text-neutral-600">{product.brand || '-'}</td>
+                    <td className="px-6 py-5 text-neutral-600">
+                      <div>{product.categoryLabel || product.category || '-'}</div>
+                      {product.subCategory && <div className="mt-0.5 text-xs text-neutral-400">{product.subCategory}</div>}
+                    </td>
+                    <td className="px-6 py-5 text-neutral-600">{(product.preferredSupplierId && supplierNameById[String(product.preferredSupplierId)]) || '-'}</td>
                     <td className="px-6 py-5 text-neutral-600">
                       {product.variants.length} {product.variants.length === 1 ? 'size' : 'sizes'}
                     </td>
