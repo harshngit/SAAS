@@ -85,7 +85,7 @@ export default function GoogleRegister() {
   if (infoError) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-neutral-50 p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-red-100 bg-white p-6 text-center shadow-popover">
+        <div className="w-full max-w-sm rounded-2xl border border-red-100 bg-surface p-6 text-center shadow-popover">
           <p className="text-sm font-medium text-neutral-900">Registration session expired</p>
           <p className="mt-1.5 text-sm text-neutral-500">{infoError}</p>
           <Link to="/login" className="mt-4 inline-block text-sm font-medium text-primary-600 hover:underline">
@@ -98,7 +98,7 @@ export default function GoogleRegister() {
 
   return (
     <div className="h-svh overflow-hidden bg-neutral-50 p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto flex h-[calc(100svh-2rem)] max-w-7xl overflow-hidden rounded-2xl border border-neutral-200 bg-white p-3 shadow-popover sm:h-[calc(100svh-3rem)] lg:h-[calc(100svh-4rem)]">
+      <div className="mx-auto flex h-[calc(100svh-2rem)] max-w-7xl overflow-hidden rounded-2xl border border-neutral-200 bg-surface p-3 shadow-popover sm:h-[calc(100svh-3rem)] lg:h-[calc(100svh-4rem)]">
         <AuthShowcase
           kicker="New workspace"
           title="Finish setting up your account"

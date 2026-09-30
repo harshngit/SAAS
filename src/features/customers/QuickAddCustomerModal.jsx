@@ -91,7 +91,7 @@ export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
                 value={form.mobileNumber}
                 onChange={updateField('mobileNumber')}
                 placeholder="Enter mobile number"
-                className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
           </div>
@@ -114,7 +114,7 @@ export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
             maxLength={300}
             onChange={updateField('billingAddress')}
             placeholder="Enter full billing address"
-            className="h-20 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            className="h-20 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
           />
           <p className="text-right text-xs text-neutral-400">{form.billingAddress.length} / 300</p>
         </div>
@@ -136,7 +136,7 @@ export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
             maxLength={200}
             onChange={updateField('notes')}
             placeholder="Enter any notes about this customer"
-            className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
           />
           <p className="text-right text-xs text-neutral-400">{form.notes.length} / 200</p>
         </div>

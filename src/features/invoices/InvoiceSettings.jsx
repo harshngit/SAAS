@@ -103,7 +103,7 @@ function BrandingAssetControl({ label, assetName, resolved, onReplace, onUseComp
     <div className="mb-3">
       <p className="text-sm font-medium text-neutral-700">{label}</p>
       <div className="mt-1.5 flex items-center gap-3 rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 p-2.5">
-        <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-surface">
           {hasAsset ? (
             <img src={resolved.url} alt="" className="size-full object-contain" onError={(event) => { event.currentTarget.style.display = 'none' }} />
           ) : (
@@ -140,7 +140,7 @@ function BrandingAssetControl({ label, assetName, resolved, onReplace, onUseComp
 // same renderer the full preview uses rather than a second illustration system.
 function ThemeThumbnail({ presetId, primaryColor }) {
   return (
-    <div className="aspect-3/4 w-full overflow-hidden rounded-lg border border-neutral-100 bg-white">
+    <div className="aspect-3/4 w-full overflow-hidden rounded-lg border border-neutral-100 bg-surface">
       <div className="pointer-events-none h-[400%] w-[400%] origin-top-left scale-[0.25] p-3">
         <RegularThemePreview presetId={presetId} primaryColor={primaryColor} data={sampleInvoice} />
       </div>
@@ -150,7 +150,7 @@ function ThemeThumbnail({ presetId, primaryColor }) {
 
 function ThermalThemeThumbnail({ presetId, primaryColor }) {
   return (
-    <div className="aspect-3/5 w-full overflow-hidden rounded-lg border border-neutral-100 bg-white">
+    <div className="aspect-3/5 w-full overflow-hidden rounded-lg border border-neutral-100 bg-surface">
       <div className="pointer-events-none h-[350%] w-[350%] origin-top-left scale-[0.286] p-2">
         <ThermalThemePreview presetId={presetId} primaryColor={primaryColor} data={sampleInvoice} />
       </div>
@@ -174,7 +174,7 @@ function ThemeCarousel({ children }) {
         type="button"
         onClick={() => scrollBy(-220)}
         aria-label="Scroll themes left"
-        className="absolute -left-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 shadow-(--shadow-xs) hover:bg-neutral-50"
+        className="absolute -left-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-surface text-neutral-500 shadow-(--shadow-xs) hover:bg-neutral-50"
       >
         <ChevronLeft className="size-3.5" aria-hidden="true" />
       </button>
@@ -182,7 +182,7 @@ function ThemeCarousel({ children }) {
         type="button"
         onClick={() => scrollBy(220)}
         aria-label="Scroll themes right"
-        className="absolute -right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 shadow-(--shadow-xs) hover:bg-neutral-50"
+        className="absolute -right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-surface text-neutral-500 shadow-(--shadow-xs) hover:bg-neutral-50"
       >
         <ChevronRight className="size-3.5" aria-hidden="true" />
       </button>
@@ -282,7 +282,7 @@ function ScaledDocument({ baseWidth, mode, manualZoom, onFitScaleChange, childre
     >
       <div
         ref={innerRef}
-        className="bg-white p-5 text-xs text-neutral-600 shadow-(--shadow-xs)"
+        className="bg-surface p-5 text-xs text-neutral-600 shadow-(--shadow-xs)"
         style={{ width: baseWidth, transform: `scale(${scale})`, transformOrigin: 'top left' }}
       >
         {children}
@@ -342,7 +342,7 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
   }
 
   return (
-    <div className="sticky top-4 flex flex-col rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
+    <div className="sticky top-4 flex flex-col rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)">
       {/* Scoped to this page only (unmounts with it) - hides everything else in the app during
           print and lets the invoice content print at its natural size, not the on-screen zoom. */}
       <style>{`
@@ -413,7 +413,7 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
           "Print Preview" (@media print above) actually capture, independent of the on-screen
           zoom level so neither output is ever distorted by it. */}
       <div ref={exportRef} aria-hidden="true" className="invoice-export-root" style={{ width: baseWidth }}>
-        <div className="bg-white p-5 text-xs text-neutral-600">
+        <div className="bg-surface p-5 text-xs text-neutral-600">
           {renderPreview(previewProps)}
         </div>
       </div>
@@ -497,7 +497,7 @@ export default function InvoiceSettings() {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl border border-neutral-100 bg-white p-10 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-10 shadow-(--shadow-card)">
         <LoadingSpinner label="Loading invoice settings..." />
       </div>
     )
@@ -505,7 +505,7 @@ export default function InvoiceSettings() {
 
   if (loadError || !settings) {
     return (
-      <div className="rounded-2xl border border-neutral-100 bg-white p-10 text-center shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-10 text-center shadow-(--shadow-card)">
         <p className="text-sm text-red-600">{loadError || 'Unable to load invoice settings.'}</p>
       </div>
     )
@@ -678,7 +678,7 @@ export default function InvoiceSettings() {
           ))}
         </nav>
 
-        <div className="rounded-2xl border border-neutral-100 bg-white px-4 shadow-(--shadow-card)">
+        <div className="rounded-2xl border border-neutral-100 bg-surface px-4 shadow-(--shadow-card)">
           <SettingsSection title="1. Template & Theme" description="Layout and accent color" isOpen={openSection === 'theme'} onToggle={() => toggleSection('theme')}>
             <ThemeCarousel>
               {REGULAR_THEME_PRESETS.map((preset) => (
@@ -860,7 +860,7 @@ export default function InvoiceSettings() {
                 value={settings.footer.footerText}
                 maxLength={500}
                 onChange={(event) => setFooter('footerText', event.target.value)}
-                className="mt-1.5 h-16 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="mt-1.5 h-16 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
             <div className="mt-3">
@@ -869,7 +869,7 @@ export default function InvoiceSettings() {
                 value={settings.footer.terms}
                 maxLength={2000}
                 onChange={(event) => setFooter('terms', event.target.value)}
-                className="mt-1.5 h-24 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="mt-1.5 h-24 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
           </SettingsSection>
@@ -945,7 +945,7 @@ export default function InvoiceSettings() {
                       type="number" min={0} max={20}
                       value={settings.thermalPrint.extraLines}
                       onChange={(event) => setThermalPrint('extraLines', Math.max(0, Math.min(20, Number(event.target.value) || 0)))}
-                      className="rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                      className="rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                     />
                   </label>
                   <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-700">
@@ -954,7 +954,7 @@ export default function InvoiceSettings() {
                       type="number" min={1} max={10}
                       value={settings.thermalPrint.copies}
                       onChange={(event) => setThermalPrint('copies', Math.max(1, Math.min(10, Number(event.target.value) || 1)))}
-                      className="rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                      className="rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                     />
                   </label>
                 </div>

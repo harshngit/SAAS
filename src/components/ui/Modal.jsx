@@ -45,17 +45,17 @@ export default function Modal({ isOpen, onClose, title, children, footer, size =
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'modal-title' : undefined}
-        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-xl border border-neutral-200 bg-[#fbfbfa] shadow-[0_1px_0_rgba(0,0,0,0.02)] ${hasWidthOverride ? '' : sizeClass} ${className}`}
+        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-xl border border-surface-border bg-surface shadow-[0_1px_0_rgba(0,0,0,0.02)] ${hasWidthOverride ? '' : sizeClass} ${className}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div
-          className={`relative flex shrink-0 items-center border-b border-neutral-200 px-5 py-4 ${
+          className={`relative flex shrink-0 items-center border-b border-surface-border px-5 py-4 ${
             centerTitle ? 'justify-center' : 'justify-between'
           }`}
         >
           <h2
             id="modal-title"
-            className={`text-sm font-semibold tracking-[-0.01em] text-neutral-900 ${centerTitle ? 'text-center' : ''}`}
+            className={`text-sm font-semibold tracking-[-0.01em] text-fg ${centerTitle ? 'text-center' : ''}`}
           >
             {title}
           </h2>
@@ -63,7 +63,7 @@ export default function Modal({ isOpen, onClose, title, children, footer, size =
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className={`rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 ${
+            className={`rounded-md p-1.5 text-fg-muted transition-colors hover:bg-neutral-100 hover:text-fg ${
               centerTitle ? 'absolute right-4 top-1/2 -translate-y-1/2' : ''
             }`}
           >
@@ -71,7 +71,7 @@ export default function Modal({ isOpen, onClose, title, children, footer, size =
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
-        {footer && <div className="flex shrink-0 justify-end gap-2 border-t border-neutral-200 px-5 py-5">{footer}</div>}
+        {footer && <div className="flex shrink-0 justify-end gap-2 border-t border-surface-border px-5 py-5">{footer}</div>}
       </div>
     </div>,
     document.body,

@@ -57,7 +57,7 @@ export function ToggleRow({ label, checked, onChange, disabled = false }) {
 export function ColumnRow({ column, index, total, onToggle, onMove, atCap = false, showReorder = true }) {
   const checkboxDisabled = column.core || (atCap && !column.selected)
   return (
-    <div className={`flex items-center justify-between gap-2.5 rounded-lg border border-neutral-100 bg-white px-2.5 py-1.5 ${checkboxDisabled && !column.core ? 'opacity-50' : ''}`}>
+    <div className={`flex items-center justify-between gap-2.5 rounded-lg border border-neutral-100 bg-surface px-2.5 py-1.5 ${checkboxDisabled && !column.core ? 'opacity-50' : ''}`}>
       <label className="flex min-w-0 items-center gap-2.5">
         <input
           type="checkbox"

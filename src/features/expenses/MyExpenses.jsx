@@ -470,7 +470,7 @@ export default function MyExpenses() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search category or description..."
-          className="ml-auto h-9 w-full sm:w-60 rounded-xl border border-neutral-100 bg-white px-3.5 text-xs text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none"
+          className="ml-auto h-9 w-full sm:w-60 rounded-xl border border-neutral-100 bg-surface px-3.5 text-xs text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none"
         />
       </div>
 

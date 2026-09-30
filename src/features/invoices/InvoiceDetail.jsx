@@ -125,7 +125,7 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
 
   return (
     <>
-      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-neutral-900">Invoice Preview</p>
@@ -172,7 +172,7 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
 
         <div className="mt-4 overflow-auto rounded-xl border border-neutral-100 bg-neutral-50/60 p-4" style={{ maxHeight: '38rem' }}>
           <div
-            className="mx-auto origin-top bg-white p-5 text-xs text-neutral-600 shadow-(--shadow-xs)"
+            className="mx-auto origin-top bg-surface p-5 text-xs text-neutral-600 shadow-(--shadow-xs)"
             style={{ transform: `scale(${zoom / 100})`, width: '32rem' }}
           >
             {previewDocument}
@@ -182,7 +182,7 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
 
       <Modal isOpen={isFullscreen} onClose={() => setIsFullscreen(false)} title={`Invoice Preview — ${invoice.invoiceNumber}`} className="max-w-3xl">
         <div className="max-h-[75vh] overflow-auto rounded-xl border border-neutral-100 bg-neutral-50/60 p-6">
-          <div className="mx-auto max-w-xl bg-white p-6 text-sm text-neutral-600 shadow-(--shadow-xs)">
+          <div className="mx-auto max-w-xl bg-surface p-6 text-sm text-neutral-600 shadow-(--shadow-xs)">
             {previewDocument}
           </div>
         </div>
@@ -269,7 +269,7 @@ export default function InvoiceDetail() {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl border border-neutral-100 bg-white p-10 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-10 shadow-(--shadow-card)">
         <LoadingSpinner label="Loading invoice..." />
       </div>
     )
@@ -277,7 +277,7 @@ export default function InvoiceDetail() {
 
   if (loadError || !invoice) {
     return (
-      <div className="rounded-2xl border border-neutral-100 bg-white p-10 text-center shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-10 text-center shadow-(--shadow-card)">
         <p className="text-sm text-neutral-500">{loadError || `Invoice ${invoiceNumber} was not found.`}</p>
         <Button type="button" variant="outline" className="mt-4" onClick={() => navigate(invoicesBase)}>
           Back to Invoices
@@ -358,7 +358,7 @@ export default function InvoiceDetail() {
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{downloadError}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card) sm:grid-cols-3">
         <HeaderInfoItem icon={User} iconClassName="bg-neutral-100 text-neutral-500" label="Customer">
           {invoice.customerName || invoice.walkInName || '—'}
         </HeaderInfoItem>
@@ -372,7 +372,7 @@ export default function InvoiceDetail() {
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
         <div className="space-y-5">
-          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
             <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
               <FileText className="size-4 text-neutral-400" aria-hidden="true" />
               Invoice Summary
@@ -407,7 +407,7 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
             <p className="text-sm font-semibold text-neutral-900">Payment Summary</p>
             <div className="mt-3 flex items-center gap-3">
               <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-700">
@@ -434,7 +434,7 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
             <div className="flex items-center justify-between gap-3">
               <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
                 <Wallet className="size-4 text-neutral-400" aria-hidden="true" />
@@ -488,7 +488,7 @@ export default function InvoiceDetail() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
             <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
               <FileText className="size-4 text-neutral-400" aria-hidden="true" />
               Invoice Items
@@ -557,7 +557,7 @@ export default function InvoiceDetail() {
           </div>
 
           {invoice.notes && (
-            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
               <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
                 <FileText className="size-4 text-neutral-400" /> Notes
               </p>
@@ -566,7 +566,7 @@ export default function InvoiceDetail() {
           )}
 
           {invoice.deliveryId && (
-            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
               <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
                 <Truck className="size-4 text-neutral-400" /> Linked Delivery
               </p>

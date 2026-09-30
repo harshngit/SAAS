@@ -61,7 +61,7 @@ function TabsTrigger({ value, children, className, ...props }) {
       onClick={() => setActiveTab(value)}
       className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:pointer-events-none disabled:opacity-50 ${
         isActive
-          ? 'bg-white text-primary-700 shadow-(--shadow-xs)'
+          ? 'bg-surface text-primary-700 shadow-(--shadow-xs)'
           : 'text-neutral-500 hover:text-neutral-900'
       } ${className}`}
       {...props}

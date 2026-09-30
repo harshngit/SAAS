@@ -100,7 +100,7 @@ function SummaryTiles({ totals }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {tiles.map((tile) => (
-        <div key={tile.label} className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+        <div key={tile.label} className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
           <p className={`text-2xl font-semibold ${tile.strong ? 'text-amber-600' : 'text-neutral-900'}`}>{tile.value}</p>
           <p className="mt-0.5 text-xs text-neutral-500">{tile.label}</p>
         </div>
@@ -110,7 +110,7 @@ function SummaryTiles({ totals }) {
 }
 
 const NUM_INPUT =
-  'h-9 w-16 rounded-lg border border-neutral-200 bg-white px-2 text-center text-sm font-semibold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25 disabled:bg-neutral-50 disabled:text-neutral-400'
+  'h-9 w-16 rounded-lg border border-neutral-200 bg-surface px-2 text-center text-sm font-semibold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25 disabled:bg-neutral-50 disabled:text-neutral-400'
 
 function ReturnLines({ lines, editable, onChange, lineErrors }) {
   return (
@@ -892,7 +892,7 @@ export default function EndOfDayReturn() {
                   </Button>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+                <div className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs text-neutral-500">
                       Good Return {totals.goodReturn} · Damaged {totals.damaged} · Shortage {totals.shortage} · Excess{' '}

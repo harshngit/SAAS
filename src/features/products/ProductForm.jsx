@@ -391,12 +391,12 @@ function ProductUploadField({ field, value, isUploading, onFileSelected, onRemov
             href={value}
             target="_blank"
             rel="noreferrer"
-            className="flex h-16 min-w-28 items-center justify-center rounded-lg border border-dashed border-primary-200 bg-white px-3 text-xs font-medium text-primary-600"
+            className="flex h-16 min-w-28 items-center justify-center rounded-lg border border-dashed border-primary-200 bg-surface px-3 text-xs font-medium text-primary-600"
           >
             Preview
           </a>
         ) : (
-          <span className="flex h-16 min-w-28 items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-400">
+          <span className="flex h-16 min-w-28 items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-surface px-3 text-xs font-medium text-neutral-400">
             {isUploading ? 'Uploading...' : 'No file'}
           </span>
         )}
@@ -1164,7 +1164,7 @@ export default function ProductForm({
 
       if (formData.variants.length === 0) {
         return (
-          <div className="rounded-2xl border border-neutral-100 bg-white shadow-[0_14px_35px_-32px_rgb(15_23_42/0.55)]">
+          <div className="rounded-2xl border border-neutral-100 bg-surface shadow-[0_14px_35px_-32px_rgb(15_23_42/0.55)]">
             <div className="border-b border-neutral-100 px-4 py-4 sm:px-5">
               <p className="text-base font-semibold text-neutral-950">{field.label}</p>
             </div>
@@ -1182,7 +1182,7 @@ export default function ProductForm({
           <div>
             <p className="text-sm font-semibold text-neutral-900">{field.label}</p>
           </div>
-          <div className="max-h-[350px] overflow-auto rounded-xl border border-neutral-100 bg-white shadow-(--shadow-xs)">
+          <div className="max-h-[350px] overflow-auto rounded-xl border border-neutral-100 bg-surface shadow-(--shadow-xs)">
             <table className="w-full min-w-[56rem] text-left text-sm">
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-neutral-100 bg-neutral-50/95 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
@@ -1213,7 +1213,7 @@ export default function ProductForm({
                               value={inventory[inventoryField.key] ?? ''}
                               onChange={(event) => updateVariantInventory(variant.id, inventoryField.key, event.target.value)}
                               aria-label={`${variantName} ${inventoryField.label}`}
-                              className={`h-9 ${inventoryField.width} rounded-lg border bg-neutral-50 px-2.5 text-sm text-neutral-900 transition-all focus:bg-white focus:outline-none focus:ring-4 ${
+                              className={`h-9 ${inventoryField.width} rounded-lg border bg-neutral-50 px-2.5 text-sm text-neutral-900 transition-all focus:bg-surface focus:outline-none focus:ring-4 ${
                                 errors[errorKey]
                                   ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15'
                                   : 'border-neutral-200 focus:border-primary-400 focus:ring-primary-500/12'
@@ -1241,7 +1241,7 @@ export default function ProductForm({
 
     if (field.input === 'variants') {
       return (
-        <div className="rounded-2xl border border-neutral-100 bg-white shadow-[0_14px_35px_-32px_rgb(15_23_42/0.55)]">
+        <div className="rounded-2xl border border-neutral-100 bg-surface shadow-[0_14px_35px_-32px_rgb(15_23_42/0.55)]">
           <div className="flex flex-col gap-4 border-b border-neutral-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -1319,7 +1319,7 @@ export default function ProductForm({
                                     event.preventDefault()
                                     updateVariant(index, 'imageUrl', '')
                                   }}
-                                  className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-white text-red-600 shadow-sm ring-1 ring-neutral-200"
+                                  className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-surface text-red-600 shadow-sm ring-1 ring-neutral-200"
                                 >
                                   <X className="size-2.5" aria-hidden="true" />
                                 </button>
@@ -1330,7 +1330,7 @@ export default function ProductForm({
                               value={variant.size}
                               placeholder="e.g. Red / Large"
                               onChange={(event) => updateVariant(index, 'size', event.target.value)}
-                              className="h-9 w-full min-w-0 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                              className="h-9 w-full min-w-0 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                             />
                           </div>
                         </td>
@@ -1339,7 +1339,7 @@ export default function ProductForm({
                             type="text"
                             value={variant.sku}
                             onChange={(event) => updateVariant(index, 'sku', event.target.value)}
-                            className="h-9 w-28 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                            className="h-9 w-28 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                           />
                         </td>
                         <td className="px-3 py-3.5">
@@ -1349,7 +1349,7 @@ export default function ProductForm({
                             step="1"
                             value={variantInventory.openingStock}
                             onChange={(event) => updateVariant(index, 'inventory', event.target.value)}
-                            className="h-9 w-20 rounded-lg border border-neutral-200 bg-white px-2.5 text-center text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                            className="h-9 w-20 rounded-lg border border-neutral-200 bg-surface px-2.5 text-center text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                           />
                         </td>
                         <td className="px-3 py-3.5">
@@ -1359,7 +1359,7 @@ export default function ProductForm({
                             step="1"
                             value={variant.sellingPrice}
                             onChange={(event) => updateVariant(index, 'sellingPrice', event.target.value)}
-                            className="h-9 w-24 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                            className="h-9 w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                           />
                         </td>
                         <td className="px-3 py-3.5">
@@ -1369,7 +1369,7 @@ export default function ProductForm({
                             step="1"
                             value={variant.mrp}
                             onChange={(event) => updateVariant(index, 'mrp', event.target.value)}
-                            className="h-9 w-24 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                            className="h-9 w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                           />
                         </td>
                         <td className="px-3 py-3.5 text-right">
@@ -1518,7 +1518,7 @@ export default function ProductForm({
             </div>
             <button
               type="button"
-              className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-dashed border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-400"
+              className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-dashed border-neutral-200 bg-surface px-3 text-xs font-medium text-neutral-400"
               style={{ height: '4.75rem', cursor: 'pointer' }}
             >
               {uploadingFields.coverImage ? (
@@ -1562,7 +1562,7 @@ export default function ProductForm({
             </div>
             {formData.images.length > 0 ? (
               <div
-                className="flex w-full cursor-pointer items-center rounded-lg border border-dashed border-neutral-200 bg-white p-2"
+                className="flex w-full cursor-pointer items-center rounded-lg border border-dashed border-neutral-200 bg-surface p-2"
                 style={{ height: '4.75rem', cursor: 'pointer' }}
               >
                 <div className="flex flex-wrap gap-2">
@@ -1580,7 +1580,7 @@ export default function ProductForm({
                         type="button"
                         onClick={() => removeImage(index)}
                         aria-label="Remove additional image"
-                        className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-neutral-500 shadow-(--shadow-xs) ring-1 ring-neutral-200 hover:text-red-600"
+                        className="absolute -right-1.5 -top-1.5 rounded-full bg-surface p-0.5 text-neutral-500 shadow-(--shadow-xs) ring-1 ring-neutral-200 hover:text-red-600"
                       >
                         <Trash2 className="size-3" />
                       </button>
@@ -1591,7 +1591,7 @@ export default function ProductForm({
             ) : (
               <button
                 type="button"
-                className="flex w-full cursor-pointer items-center rounded-lg border border-dashed border-neutral-200 bg-white p-2"
+                className="flex w-full cursor-pointer items-center rounded-lg border border-dashed border-neutral-200 bg-surface p-2"
                 style={{ height: '4.75rem', cursor: 'pointer' }}
               >
                 <span className="mx-auto text-xs font-medium text-neutral-400">Preview</span>
@@ -1626,7 +1626,7 @@ export default function ProductForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)"
+      className="w-full overflow-hidden rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)"
     >
       <div className="grid min-h-[34rem]" style={{ gridTemplateColumns: '17rem minmax(0, 1fr)' }}>
         <aside className="border-b border-neutral-100 p-4 lg:border-b-0 lg:border-r lg:p-5">
@@ -1642,7 +1642,7 @@ export default function ProductForm({
                   onClick={() => setActiveSection(sectionItem.id)}
                   className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-medium transition-all ${
                     isActive
-                      ? 'bg-white text-primary-700 shadow-(--shadow-xs) ring-1 ring-neutral-200'
+                      ? 'bg-surface text-primary-700 shadow-(--shadow-xs) ring-1 ring-neutral-200'
                       : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
                   }`}
                 >

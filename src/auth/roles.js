@@ -49,6 +49,7 @@ import {
   Undo2,
   Bus,
   HandCoins,
+  Palette,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -204,6 +205,7 @@ export const roleMenus = {
       items: [
         { label: 'Notifications', path: '/admin/notifications', icon: Bell },
         { label: 'Sales Workflow', path: '/admin/settings', icon: Settings, module: 'settings' },
+        { label: 'Appearance', path: '/admin/theme-settings', icon: Palette, module: 'settings' },
       ],
     },
   ],

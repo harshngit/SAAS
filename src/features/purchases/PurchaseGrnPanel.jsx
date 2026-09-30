@@ -584,17 +584,17 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
                         <td className="px-3 py-2.5 text-right">
                           <input type="number" min="0" step="1" value={line.receivingNow}
                             onChange={(event) => updateLine(index, 'receivingNow', event.target.value)}
-                            className="w-20 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-right text-sm" />
+                            className="w-20 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                         </td>
                         <td className="px-3 py-2.5 text-right">
                           <input type="number" min="0" step="1" value={line.damagedQty}
                             onChange={(event) => updateLine(index, 'damagedQty', event.target.value)}
-                            className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-right text-sm" />
+                            className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                         </td>
                         <td className="px-3 py-2.5 text-right">
                           <input type="number" min="0" step="1" value={line.rejectedQty}
                             onChange={(event) => updateLine(index, 'rejectedQty', event.target.value)}
-                            className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-right text-sm" />
+                            className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                         </td>
                         <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{computed.acceptedQty}</td>
                         <td className="px-3 py-2.5 text-right text-neutral-600">{computed.remainingQty}</td>

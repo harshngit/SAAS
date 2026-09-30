@@ -94,6 +94,7 @@ import InvoiceDetail from '../features/invoices/InvoiceDetail'
 import InvoicePrintView from '../features/invoices/InvoicePrintView'
 import InvoiceSettings from '../features/invoices/InvoiceSettings'
 import AdminSettings from '../features/settings/AdminSettings'
+import ThemeSettings from '../features/settings/ThemeSettings'
 import ObjectFieldsSettings from '../features/settings/ObjectFieldsSettings'
 import AdminAttendance from '../features/attendance/AdminAttendance'
 import AttendanceDetail from '../features/attendance/AttendanceDetail'
@@ -710,6 +711,14 @@ export default function AppRoutes() {
             element={
               <RequirePermissionRoute module="settings" action="view">
                 <AdminSettings />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/theme-settings"
+            element={
+              <RequirePermissionRoute module="settings" action="view">
+                <ThemeSettings />
               </RequirePermissionRoute>
             }
           />

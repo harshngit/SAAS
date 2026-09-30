@@ -793,7 +793,7 @@ export default function PurchaseInvoiceDetail() {
           <Card
             title="Attached Document"
             actions={
-              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3.5 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-neutral-200 bg-surface px-3.5 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
                 <Upload className="size-4" aria-hidden="true" />
                 {isUploading ? 'Uploading...' : 'Attach Document'}
                 <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleUploadDocument} disabled={isUploading} />
@@ -872,7 +872,7 @@ export default function PurchaseInvoiceDetail() {
                       value={values.quantity}
                       onChange={(event) => updateReturnItem(purchaseItem.productId, 'quantity', event.target.value)}
                       onBlur={roundReturnQuantityOnBlur(purchaseItem.productId, purchaseItem.quantity)}
-                      className="w-24 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
+                      className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                     />
                   </div>
                 </div>

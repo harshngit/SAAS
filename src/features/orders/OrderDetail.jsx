@@ -1047,7 +1047,7 @@ export default function OrderDetail() {
               type="date"
               value={planForm.scheduledDate}
               onChange={(event) => setPlanForm((current) => ({ ...current, scheduledDate: event.target.value }))}
-              className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -1057,7 +1057,7 @@ export default function OrderDetail() {
               onChange={(event) => setPlanForm((current) => ({ ...current, deliveryAddress: event.target.value }))}
               placeholder="Delivery address (optional)"
               maxLength={500}
-              className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -1083,7 +1083,7 @@ export default function OrderDetail() {
                       const clamped = Math.min(Math.max(Number.isFinite(rounded) ? rounded : 0, 0), item.quantity)
                       setPlanItemQuantities((current) => ({ ...current, [item.id]: clamped }))
                     }}
-                    className="h-9 w-24 shrink-0 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm"
+                    className="h-9 w-24 shrink-0 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm"
                   />
                 </div>
               ))}
@@ -1140,7 +1140,7 @@ export default function OrderDetail() {
                       const clamped = Math.min(Math.max(Number.isFinite(rounded) ? rounded : 0, 0), item.quantity)
                       setPickupItemQuantities((current) => ({ ...current, [item.id]: clamped }))
                     }}
-                    className="h-9 w-24 shrink-0 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm"
+                    className="h-9 w-24 shrink-0 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm"
                   />
                 </div>
               ))}
@@ -1153,7 +1153,7 @@ export default function OrderDetail() {
               onChange={(event) => setPickupNotesInput(event.target.value)}
               placeholder="Any additional notes about this pickup"
               maxLength={500}
-              className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
         </div>
@@ -1179,7 +1179,7 @@ export default function OrderDetail() {
               onChange={(event) => setCancelNotes(event.target.value)}
               placeholder="Add any context for this cancellation"
               maxLength={500}
-              className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

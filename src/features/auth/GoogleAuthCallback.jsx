@@ -66,7 +66,7 @@ export default function GoogleAuthCallback() {
   if (errorMessage) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-neutral-50 p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-red-100 bg-white p-6 text-center shadow-popover">
+        <div className="w-full max-w-sm rounded-2xl border border-red-100 bg-surface p-6 text-center shadow-popover">
           <div className="mx-auto flex size-11 items-center justify-center rounded-full bg-red-50 text-red-600">
             <AlertTriangle className="size-5" aria-hidden="true" />
           </div>

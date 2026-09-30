@@ -435,7 +435,7 @@ function UploadPreview({ previews = [] }) {
             target="_blank"
             rel="noreferrer"
             title={`Preview ${preview.name}`}
-            className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
+            className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-surface shadow-sm"
           >
             {isImage ? (
               <img src={preview.url} alt={preview.name} className="size-full object-cover" />
@@ -444,7 +444,7 @@ function UploadPreview({ previews = [] }) {
                 src={pdfPreviewSrc(preview.url)}
                 title={preview.name}
                 scrolling="no"
-                className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-white"
+                className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-surface"
               />
             ) : (
               <span className="flex size-full items-center justify-center text-neutral-500">
@@ -458,7 +458,7 @@ function UploadPreview({ previews = [] }) {
         )
       })}
       {remainingCount > 0 && (
-        <span className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-xs font-semibold text-neutral-500">
+        <span className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-surface text-xs font-semibold text-neutral-500">
           +{remainingCount}
         </span>
       )}
@@ -469,7 +469,7 @@ function UploadPreview({ previews = [] }) {
 function DocumentThumbnail({ preview }) {
   if (!preview) {
     return (
-      <div className="flex h-20 w-36 shrink-0 items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white text-neutral-300">
+      <div className="flex h-20 w-36 shrink-0 items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-surface text-neutral-300">
         <FileText className="size-6" aria-hidden="true" />
       </div>
     )
@@ -484,7 +484,7 @@ function DocumentThumbnail({ preview }) {
       target="_blank"
       rel="noreferrer"
       title={`Preview ${preview.name}`}
-      className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-white transition-colors hover:border-primary-300 hover:bg-primary-50/50"
+      className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-surface transition-colors hover:border-primary-300 hover:bg-primary-50/50"
     >
       {isImage ? (
         <img src={preview.url} alt={preview.name} className="size-full object-cover" />
@@ -493,7 +493,7 @@ function DocumentThumbnail({ preview }) {
           src={pdfPreviewSrc(preview.url)}
           title={preview.name}
           scrolling="no"
-          className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-white"
+          className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-surface"
         />
       ) : (
         <FileText className="size-6 text-neutral-400" aria-hidden="true" />
@@ -538,7 +538,7 @@ function CustomerUploadField({ field, value, previews, onChange, onRemove, error
               <button
                 type="button"
                 onClick={() => window.open(primaryPreview.url, '_blank', 'noreferrer')}
-                className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-white px-3.5 text-xs font-medium tracking-tight text-neutral-700 transition-all hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700"
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-surface px-3.5 text-xs font-medium tracking-tight text-neutral-700 transition-all hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700"
               >
                 <Eye className="size-3.5" aria-hidden="true" />
                 Preview
@@ -567,7 +567,7 @@ function CustomerUploadField({ field, value, previews, onChange, onRemove, error
               type="button"
               disabled={!hasValue || uploading}
               onClick={onRemove}
-              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-white px-3.5 text-xs font-medium tracking-tight text-neutral-700 transition-all hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-surface px-3.5 text-xs font-medium tracking-tight text-neutral-700 transition-all hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Trash2 className="size-3.5" aria-hidden="true" />
               Remove
@@ -1089,7 +1089,7 @@ export default function CustomerForm({
             {field.label}
             {field.required && <span className="text-red-500"> *</span>}
           </label>
-          <div className={`flex rounded-xl border bg-neutral-50 transition-all focus-within:bg-white focus-within:ring-4 ${
+          <div className={`flex rounded-xl border bg-neutral-50 transition-all focus-within:bg-surface focus-within:ring-4 ${
             errors[field.name]
               ? 'border-red-300 focus-within:border-red-400 focus-within:ring-red-500/15'
               : 'border-neutral-200 focus-within:border-primary-400 focus-within:ring-primary-500/12'
@@ -1194,7 +1194,7 @@ export default function CustomerForm({
     <div>
       <form
         onSubmit={handleSubmit}
-        className="w-full overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)"
+        className="w-full overflow-hidden rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)"
       >
         <div className="grid items-start" style={{ gridTemplateColumns: '22rem minmax(0, 1fr)' }}>
           <aside className="border-b border-neutral-100 p-4 lg:border-b-0 lg:border-r lg:p-4">
@@ -1210,7 +1210,7 @@ export default function CustomerForm({
                     onClick={() => setActiveSection(sectionItem.id)}
                     className={`flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium transition-all ${
                       isActive
-                        ? 'bg-white text-primary-700 shadow-(--shadow-xs) ring-1 ring-neutral-200'
+                        ? 'bg-surface text-primary-700 shadow-(--shadow-xs) ring-1 ring-neutral-200'
                         : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
                     }`}
                   >

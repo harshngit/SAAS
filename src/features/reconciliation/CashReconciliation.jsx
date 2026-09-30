@@ -219,7 +219,7 @@ export default function CashReconciliation() {
                           value={row.raw}
                           onChange={(event) => setActual(row.mode, event.target.value)}
                           placeholder="0"
-                          className="w-28 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-right text-sm disabled:bg-neutral-50 disabled:text-neutral-500"
+                          className="w-28 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm disabled:bg-neutral-50 disabled:text-neutral-500"
                         />
                       </td>
                       <td className={`px-4 py-2.5 text-right font-medium ${row.entered ? varianceClass(row.variance) : 'text-neutral-300'}`}>
@@ -265,7 +265,7 @@ export default function CashReconciliation() {
                   maxLength={500}
                   disabled={isReconciled}
                   onChange={(event) => setNotes(event.target.value)}
-                  className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12 disabled:opacity-70"
+                  className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12 disabled:opacity-70"
                   placeholder="Anything the accounts team should know about this day…"
                 />
               </div>

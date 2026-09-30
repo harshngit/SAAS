@@ -149,11 +149,11 @@ function SalesInvoicesPanel({ header }) {
               value={search}
               onChange={updateFilter(setSearch)}
               placeholder="Search invoices..."
-              className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
           <ListFilterPanel title="Filter Sales Invoices">
-          <Select label="Payment status" options={INVOICE_STATUS_FILTERS} value={paymentStatus} onChange={updateFilter(setPaymentStatus)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select label="Payment status" options={INVOICE_STATUS_FILTERS} value={paymentStatus} onChange={updateFilter(setPaymentStatus)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <button
             type="button"
             onClick={() => { setSearch(''); setPaymentStatus('all'); setPage(1) }}
@@ -179,7 +179,7 @@ function SalesInvoicesPanel({ header }) {
       </ListSummary>
       </ListOverview>
 
-      <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
+      <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)">
         {listError ? (
           <div className="p-10 text-center">
             <p className="text-sm text-red-600">{listError}</p>
@@ -353,7 +353,7 @@ export default function AdminInvoices() {
           <button
             type="button"
             onClick={() => navigate('/admin/invoices/settings')}
-            className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-neutral-200 bg-white px-3.5 text-sm font-medium text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
+            className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-neutral-200 bg-surface px-3.5 text-sm font-medium text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
           >
             <Settings className="size-4" />
             Invoice Settings

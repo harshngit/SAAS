@@ -48,7 +48,7 @@ function FieldToggle({ label, checked, onChange }) {
         }`}
       >
         <span
-          className={`inline-block size-3.5 transform rounded-full bg-white shadow transition-transform ${
+          className={`inline-block size-3.5 transform rounded-full bg-surface shadow transition-transform ${
             checked ? 'translate-x-4.5' : 'translate-x-1'
           }`}
         />
@@ -150,7 +150,7 @@ export default function ObjectFieldsSettings() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-t-xl border border-neutral-100 bg-white">
+      <div className="overflow-x-auto rounded-t-xl border border-neutral-100 bg-surface">
         <div className="flex min-w-max">
           {moduleKeys.map((moduleKey) => {
             const meta = moduleMeta[moduleKey] || { label: humanizeFieldKey(moduleKey), icon: Boxes }
@@ -184,7 +184,7 @@ export default function ObjectFieldsSettings() {
       {currentModuleFields && (
         <div className="space-y-4">
           {(currentModuleFields.mandatory || []).length > 0 && (
-            <div className="rounded-xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+            <div className="rounded-xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
               <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-400">
                 Mandatory fields · always visible
               </p>
@@ -203,7 +203,7 @@ export default function ObjectFieldsSettings() {
             </div>
           )}
 
-          <div className="rounded-xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+          <div className="rounded-xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-400">Optional fields</p>
             {(currentModuleFields.optional || []).length > 0 ? (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">

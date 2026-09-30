@@ -223,7 +223,7 @@ export default function MyLeaves() {
           ['Approved', counts.approved],
           ['Rejected', counts.rejected],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+          <div key={label} className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
             <p className="text-2xl font-semibold text-neutral-900">{value}</p>
             <p className="mt-0.5 text-xs text-neutral-500">{label}</p>
           </div>

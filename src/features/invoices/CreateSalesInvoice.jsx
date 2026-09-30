@@ -291,7 +291,7 @@ function OrderInvoicePanel({ orderId }) {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
         <p className="text-sm font-semibold text-neutral-900">Invoicing Order {order.orderNumber}</p>
         <p className="mt-1 text-sm text-neutral-500">Customer: {order.customerName}</p>
         <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-100">
@@ -325,7 +325,7 @@ function OrderInvoicePanel({ orderId }) {
       </div>
 
       {invoiceMode === 'per_delivery' && allDeliveries.length > 0 && (
-        <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+        <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
           <p className="text-sm font-semibold text-neutral-900">Deliveries</p>
           <p className="mt-1 text-xs text-neutral-400">This organization bills per delivery. Select which delivery this invoice covers.</p>
           <div className="mt-3 space-y-2">
@@ -502,7 +502,7 @@ function FromOrderFlow({ onBack }) {
         Back
       </button>
 
-      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
         <Select
           label="Select Customer"
           searchable
@@ -533,7 +533,7 @@ function FromOrderFlow({ onBack }) {
               return (
                 <div
                   key={order.id}
-                  className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card) sm:flex sm:items-center sm:justify-between sm:gap-4"
+                  className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card) sm:flex sm:items-center sm:justify-between sm:gap-4"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -919,7 +919,7 @@ function CreateSalesInvoiceForm() {
           <button
             type="button"
             onClick={() => setCreateMode('from-order')}
-            className="rounded-2xl border border-neutral-100 bg-white p-6 text-left shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card-hover)"
+            className="rounded-2xl border border-neutral-100 bg-surface p-6 text-left shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card-hover)"
           >
             <FileCheck2 className="size-6 text-primary-700" aria-hidden="true" />
             <p className="mt-3 text-base font-semibold text-neutral-900">From Sales Order</p>
@@ -928,7 +928,7 @@ function CreateSalesInvoiceForm() {
           <button
             type="button"
             onClick={() => setCreateMode('direct')}
-            className="rounded-2xl border border-neutral-100 bg-white p-6 text-left shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card-hover)"
+            className="rounded-2xl border border-neutral-100 bg-surface p-6 text-left shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card-hover)"
           >
             <Upload className="size-6 text-primary-700" aria-hidden="true" />
             <p className="mt-3 text-base font-semibold text-neutral-900">Direct / Walk-in Invoice</p>
@@ -965,7 +965,7 @@ function CreateSalesInvoiceForm() {
               </div>
             )}
 
-            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm font-medium text-neutral-700">
                   Customer<span className="text-red-500"> *</span>
@@ -977,7 +977,7 @@ function CreateSalesInvoiceForm() {
                       type="button"
                       onClick={() => setCustomerType(option.value)}
                       className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-all ${
-                        customerType === option.value ? 'bg-white text-primary-700 shadow-(--shadow-xs)' : 'text-neutral-500'
+                        customerType === option.value ? 'bg-surface text-primary-700 shadow-(--shadow-xs)' : 'text-neutral-500'
                       }`}
                     >
                       {option.label}
@@ -1003,7 +1003,7 @@ function CreateSalesInvoiceForm() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card) sm:grid-cols-2">
               <Input label="Invoice Date" type="date" required value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} />
               <Select
                 label="Warehouse"
@@ -1015,7 +1015,7 @@ function CreateSalesInvoiceForm() {
               />
             </div>
 
-            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
               <p className="text-sm font-semibold text-neutral-900">Invoice Items</p>
               <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-100">
                 <table className="w-full min-w-3xl text-left text-sm">
@@ -1052,7 +1052,7 @@ function CreateSalesInvoiceForm() {
                             value={item.quantity}
                             onChange={(event) => updateItem(index, 'quantity', event.target.value)}
                             onBlur={roundItemFieldOnBlur(index, 'quantity', { min: 1 })}
-                            className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
+                            className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                           />
                         </td>
                         <td className="px-3 py-2.5">
@@ -1062,7 +1062,7 @@ function CreateSalesInvoiceForm() {
                             step="1"
                             value={item.unitPrice}
                             onChange={(event) => updateItem(index, 'unitPrice', event.target.value)}
-                            className="w-24 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
+                            className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                           />
                         </td>
                         <td className="px-3 py-2.5">
@@ -1074,7 +1074,7 @@ function CreateSalesInvoiceForm() {
                             value={item.discount}
                             onChange={(event) => updateItem(index, 'discount', event.target.value)}
                             onBlur={roundItemFieldOnBlur(index, 'discount', { min: 0, max: 100 })}
-                            className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
+                            className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                           />
                         </td>
                         <td className="px-3 py-2.5">
@@ -1085,7 +1085,7 @@ function CreateSalesInvoiceForm() {
                             step="1"
                             value={item.taxRate}
                             onChange={(event) => updateItem(index, 'taxRate', event.target.value)}
-                            className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
+                            className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                           />
                         </td>
                         <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.amount)}</td>
@@ -1105,7 +1105,7 @@ function CreateSalesInvoiceForm() {
                                 value={item.batchNumber || ''}
                                 onChange={(event) => updateItem(index, 'batchNumber', event.target.value)}
                                 placeholder="Enter batch number"
-                                className="w-48 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
+                                className="w-48 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                               />
                             </div>
                           </td>
@@ -1123,7 +1123,7 @@ function CreateSalesInvoiceForm() {
                                     value={serial}
                                     onChange={(event) => updateSerialNumber(index, serialIndex, event.target.value)}
                                     placeholder={`Serial #${serialIndex + 1}`}
-                                    className="w-48 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm"
+                                    className="w-48 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                                   />
                                   <button
                                     type="button"
@@ -1161,20 +1161,20 @@ function CreateSalesInvoiceForm() {
               <Input label="Extra Discount (₹)" type="number" min="0" step="1" value={discount} onChange={(event) => setDiscount(event.target.value)} />
             </div>
 
-            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
               <p className="text-sm font-semibold text-neutral-900">Notes</p>
               <textarea
                 value={notes}
                 maxLength={200}
                 onChange={(event) => setNotes(event.target.value)}
-                className="mt-3 h-24 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="mt-3 h-24 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
               <p className="mt-1 text-right text-xs text-neutral-400">{notes.length}/200</p>
             </div>
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+            <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
               <p className="text-sm font-semibold text-neutral-900">Payment</p>
               <Select
                 className="mt-3"
@@ -1243,7 +1243,7 @@ function CreateSalesInvoiceForm() {
                     <textarea
                       value={paymentDetails.collectionInstructions}
                       onChange={(event) => setPaymentDetails((current) => ({ ...current, collectionInstructions: event.target.value }))}
-                      className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                      className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                     />
                     <p className="text-xs text-amber-700">Payment status stays pending until the cash is collected.</p>
                   </div>

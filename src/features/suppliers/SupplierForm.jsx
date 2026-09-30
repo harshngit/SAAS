@@ -74,7 +74,7 @@ const emptyForm = {
 
 function FormSection({ number, icon: Icon, title, children }) {
   return (
-    <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) sm:p-6">
+    <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card) sm:p-6">
       <div className="mb-5 flex items-center gap-2.5">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">
           {number}
@@ -153,7 +153,7 @@ function PhoneField({ value, onChange, error }) {
         Phone<span className="text-red-500"> *</span>
       </label>
       <div
-        className={`mt-1.5 flex overflow-hidden rounded-xl border bg-neutral-50 transition-all focus-within:bg-white focus-within:ring-4 ${
+        className={`mt-1.5 flex overflow-hidden rounded-xl border bg-neutral-50 transition-all focus-within:bg-surface focus-within:ring-4 ${
           error ? 'border-red-300 focus-within:border-red-400 focus-within:ring-red-500/15' : 'border-neutral-200 focus-within:border-primary-400 focus-within:ring-primary-500/12'
         }`}
       >
@@ -188,7 +188,7 @@ function EmailField({ value, onChange, error }) {
           value={value}
           onChange={onChange}
           placeholder="name@example.com"
-          className={`w-full rounded-xl border bg-neutral-50 py-2.5 pl-10 pr-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 transition-all focus:bg-white focus:outline-none focus:ring-4 ${
+          className={`w-full rounded-xl border bg-neutral-50 py-2.5 pl-10 pr-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 transition-all focus:bg-surface focus:outline-none focus:ring-4 ${
             error ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15' : 'border-neutral-200 focus:border-primary-400 focus:ring-primary-500/12'
           }`}
         />
@@ -211,7 +211,7 @@ function CurrencyField({ label, value, onChange, error, helper }) {
           placeholder="0.00"
           value={value}
           onChange={onChange}
-          className={`w-full rounded-xl border bg-neutral-50 py-2.5 pl-8 pr-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 transition-all focus:bg-white focus:outline-none focus:ring-4 ${
+          className={`w-full rounded-xl border bg-neutral-50 py-2.5 pl-8 pr-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 transition-all focus:bg-surface focus:outline-none focus:ring-4 ${
             error ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15' : 'border-neutral-200 focus:border-primary-400 focus:ring-primary-500/12'
           }`}
         />
@@ -533,7 +533,7 @@ export default function SupplierForm({
         </div>
 
         <div className="xl:sticky xl:top-5 xl:self-start">
-          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
             <h3 className="text-sm font-semibold text-neutral-900">Supplier Summary</h3>
             <div className="mt-2 divide-y divide-neutral-50">
               <SummaryRow icon={ShieldCheck} label="Status">

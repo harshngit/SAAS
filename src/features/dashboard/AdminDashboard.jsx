@@ -406,7 +406,7 @@ function StatMini({ label, sublabel, value, pct, tone = 'green' }) {
         </div>
         <span className="text-[0.7rem] font-semibold text-neutral-500">{value}</span>
       </div>
-      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white">
+      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-surface">
         <div className={`h-full rounded-full ${colors[tone]}`} style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
     </div>
@@ -432,7 +432,7 @@ function SignalRow({ label, value, positive }) {
 function CashflowTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl bg-white px-3 py-2 text-xs shadow-(--shadow-popover) ring-1 ring-black/5">
+    <div className="rounded-xl bg-surface px-3 py-2 text-xs shadow-(--shadow-popover) ring-1 ring-black/5">
       <p className="font-semibold text-neutral-900">{label}</p>
       {payload.map((item) => (
         <p key={item.dataKey} className="mt-1 text-neutral-500">
@@ -447,7 +447,7 @@ function DonutTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
   const item = payload[0]
   return (
-    <div className="rounded-xl bg-white px-3 py-2 text-xs shadow-(--shadow-popover) ring-1 ring-black/5">
+    <div className="rounded-xl bg-surface px-3 py-2 text-xs shadow-(--shadow-popover) ring-1 ring-black/5">
       <p className="font-semibold text-neutral-900">{item.name}</p>
       <p className="mt-1 text-neutral-500">{formatCurrency(item.value)}</p>
     </div>
@@ -783,14 +783,14 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-4 rounded-2xl bg-transparent">
-      <div className="overflow-hidden rounded-2xl border border-white/70 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+      <div className="overflow-hidden rounded-2xl border border-white/70 bg-surface p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
         <div className="grid w-full grid-cols-[1fr_repeat(4,minmax(0,1fr))_84px] items-end gap-1.5">
           <FilterField label="Period">
             <Select
               options={dateRangePresets}
               value={datePreset}
               onChange={(event) => setDatePreset(event.target.value)}
-              triggerClassName="h-10 !bg-white"
+              triggerClassName="h-10 !bg-surface"
             />
           </FilterField>
           <FilterField label="Company">
@@ -803,7 +803,7 @@ export default function AdminDashboard() {
               value={companyId}
               onChange={(event) => setCompanyId(event.target.value)}
               placeholder="Search companies…"
-              triggerClassName="h-10 !bg-white"
+              triggerClassName="h-10 !bg-surface"
             />
           </FilterField>
           <FilterField label="Warehouse">
@@ -816,7 +816,7 @@ export default function AdminDashboard() {
               value={warehouseId}
               onChange={(event) => setWarehouseId(event.target.value)}
               placeholder="Search warehouses…"
-              triggerClassName="h-10 !bg-white"
+              triggerClassName="h-10 !bg-surface"
             />
           </FilterField>
           <FilterField label="Customer">
@@ -829,7 +829,7 @@ export default function AdminDashboard() {
               value={customerId}
               onChange={(event) => setCustomerId(event.target.value)}
               placeholder="Search customers…"
-              triggerClassName="h-10 !bg-white"
+              triggerClassName="h-10 !bg-surface"
             />
           </FilterField>
           <FilterField label="Supplier">
@@ -842,7 +842,7 @@ export default function AdminDashboard() {
               value={supplierId}
               onChange={(event) => setSupplierId(event.target.value)}
               placeholder="Search suppliers…"
-              triggerClassName="h-10 !bg-white"
+              triggerClassName="h-10 !bg-surface"
             />
           </FilterField>
           <button
@@ -864,7 +864,7 @@ export default function AdminDashboard() {
                 value={customRange.from}
                 max={customRange.to || undefined}
                 onChange={(event) => setCustomRange((current) => ({ ...current, from: event.target.value }))}
-                className="h-9 rounded-xl border border-neutral-200 bg-white px-2.5 text-[0.78rem] text-neutral-900 shadow-[0_1px_2px_rgb(15_23_42/0.03)] focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-9 rounded-xl border border-neutral-200 bg-surface px-2.5 text-[0.78rem] text-neutral-900 shadow-[0_1px_2px_rgb(15_23_42/0.03)] focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </label>
             <label className="flex min-w-0 flex-col gap-1">
@@ -874,7 +874,7 @@ export default function AdminDashboard() {
                 value={customRange.to}
                 min={customRange.from || undefined}
                 onChange={(event) => setCustomRange((current) => ({ ...current, to: event.target.value }))}
-                className="h-9 rounded-xl border border-neutral-200 bg-white px-2.5 text-[0.78rem] text-neutral-900 shadow-[0_1px_2px_rgb(15_23_42/0.03)] focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-9 rounded-xl border border-neutral-200 bg-surface px-2.5 text-[0.78rem] text-neutral-900 shadow-[0_1px_2px_rgb(15_23_42/0.03)] focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </label>
             <p className="pb-1.5 text-[0.68rem] text-neutral-400">
@@ -949,35 +949,35 @@ export default function AdminDashboard() {
         <div className="space-y-4">
           <div className="border-0 bg-transparent p-0 shadow-none hover:shadow-none">
             <div className="grid grid-cols-5 gap-2">
-              <button className="flex min-h-[76px] min-w-0 bg-white flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 px-1 py-3 text-center text-primary-700 shadow-none">
+              <button className="flex min-h-[76px] min-w-0 bg-surface flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 px-1 py-3 text-center text-primary-700 shadow-none">
                 <ShoppingCart className="size-3.5 shrink-0  " />
                 <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
                   <span className="block whitespace-nowrap ">New</span>
                   <span className="block whitespace-nowrap">Sale</span>
                 </span>
               </button>
-              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-white px-1 py-3 text-center text-primary-700 shadow-none">
+              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-surface px-1 py-3 text-center text-primary-700 shadow-none">
                 <PackagePlus className="size-3.5 shrink-0" />
                 <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
                   <span className="block whitespace-nowrap">New</span>
                   <span className="block whitespace-nowrap">Purchase</span>
                 </span>
               </button>
-              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-white px-1 py-3 text-center text-primary-700 shadow-none">
+              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-surface px-1 py-3 text-center text-primary-700 shadow-none">
                 <Wallet className="size-3.5 shrink-0" />
                 <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
                   <span className="block whitespace-nowrap">Collect</span>
                   <span className="block whitespace-nowrap">Payment</span>
                 </span>
               </button>
-              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-white px-1 py-3 text-center text-primary-700 shadow-none">
+              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-surface px-1 py-3 text-center text-primary-700 shadow-none">
                 <Clock className="size-3.5 shrink-0" />
                 <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
                   <span className="block whitespace-nowrap">Pending</span>
                   <span className="block whitespace-nowrap">Orders</span>
                 </span>
               </button>
-              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-white px-1 py-3 text-center text-primary-700 shadow-none">
+              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-surface px-1 py-3 text-center text-primary-700 shadow-none">
                 <MoreHorizontal className="size-3.5 shrink-0" />
                 <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
                   <span className="block whitespace-nowrap">More</span>
@@ -1449,7 +1449,7 @@ export default function AdminDashboard() {
                     value={recentOrdersSearch}
                     onChange={(event) => setRecentOrdersSearch(event.target.value)}
                     placeholder="Search orders..."
-                    className="w-full rounded-full border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                    className="w-full rounded-full border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                   />
                 </div>
               }
@@ -1510,7 +1510,7 @@ export default function AdminDashboard() {
                   <button
                     key={label}
                     type="button"
-                    className="flex items-center gap-2.5 rounded-2xl border border-neutral-100 bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-colors hover:border-primary-200 hover:bg-primary-50/40"
+                    className="flex items-center gap-2.5 rounded-2xl border border-neutral-100 bg-surface px-4 py-3 text-left shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-colors hover:border-primary-200 hover:bg-primary-50/40"
                   >
                     <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-neutral-100 text-neutral-600">
                       <BarChart3 className="size-3.5" />

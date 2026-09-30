@@ -513,7 +513,7 @@ export default function SupplierInvoiceForm() {
                           step="1"
                           value={item.invoiceQty}
                           onChange={(event) => updateItem(index, 'invoiceQty', event.target.value)}
-                          className={`w-20 rounded-lg border bg-white px-2.5 py-1.5 text-right text-sm ${over ? 'border-amber-400' : 'border-neutral-200'}`}
+                          className={`w-20 rounded-lg border bg-surface px-2.5 py-1.5 text-right text-sm ${over ? 'border-amber-400' : 'border-neutral-200'}`}
                         />
                       </td>
                       <td className="px-3 py-2.5 text-right">
@@ -523,14 +523,14 @@ export default function SupplierInvoiceForm() {
                           step="1"
                           value={item.unitPrice}
                           onChange={(event) => updateItem(index, 'unitPrice', event.target.value)}
-                          className={`w-24 rounded-lg border bg-white px-2.5 py-1.5 text-right text-sm ${priceMismatch ? 'border-amber-400' : 'border-neutral-200'}`}
+                          className={`w-24 rounded-lg border bg-surface px-2.5 py-1.5 text-right text-sm ${priceMismatch ? 'border-amber-400' : 'border-neutral-200'}`}
                         />
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <input type="number" min="0" max="100" step="1" value={item.discount} onChange={(event) => updateItem(index, 'discount', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-right text-sm" />
+                        <input type="number" min="0" max="100" step="1" value={item.discount} onChange={(event) => updateItem(index, 'discount', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <input type="number" min="0" max="100" step="1" value={item.taxRate} onChange={(event) => updateItem(index, 'taxRate', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-right text-sm" />
+                        <input type="number" min="0" max="100" step="1" value={item.taxRate} onChange={(event) => updateItem(index, 'taxRate', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                       </td>
                       <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(line.lineTotal)}</td>
                       <td className="px-3 py-2.5 text-right">

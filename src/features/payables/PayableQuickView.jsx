@@ -46,7 +46,7 @@ export default function PayableQuickView({ invoiceId, isOpen, refreshKey = 0, on
     <div className="fixed inset-0 z-50 flex justify-end bg-neutral-900/60 backdrop-blur-sm" onClick={onClose}>
       <div
         onClick={(event) => event.stopPropagation()}
-        className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-white shadow-(--shadow-popover)"
+        className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-surface shadow-(--shadow-popover)"
       >
         <div className="flex items-start justify-between border-b border-neutral-100 px-6 py-5">
           <div>

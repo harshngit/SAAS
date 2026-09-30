@@ -597,7 +597,7 @@ export default function QuotationDetail() {
 
 function SummaryTile({ label, value, strong }) {
   return (
-    <div className={`rounded-2xl border p-4 shadow-(--shadow-card) ${strong ? 'border-primary-100 bg-primary-50/60' : 'border-neutral-100 bg-white'}`}>
+    <div className={`rounded-2xl border p-4 shadow-(--shadow-card) ${strong ? 'border-primary-100 bg-primary-50/60' : 'border-neutral-100 bg-surface'}`}>
       <p className="text-xs font-medium text-neutral-400">{label}</p>
       <p className={`mt-1.5 font-semibold ${strong ? 'text-lg text-primary-900' : 'text-base text-neutral-900'}`}>{value}</p>
     </div>

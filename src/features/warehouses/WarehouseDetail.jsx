@@ -387,11 +387,11 @@ export default function WarehouseDetail() {
                   value={stockSearch}
                   onChange={(event) => setStockSearch(event.target.value)}
                   placeholder="Search Product / SKU"
-                  className="w-full rounded-full border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  className="w-full rounded-full border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
               </div>
-              <Select options={categoryOptions} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="w-44" triggerClassName="bg-white" />
-              <Select options={STOCK_STATUS_FILTER_OPTIONS} value={stockStatusFilter} onChange={(event) => setStockStatusFilter(event.target.value)} className="w-40" triggerClassName="bg-white" />
+              <Select options={categoryOptions} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="w-44" triggerClassName="bg-surface" />
+              <Select options={STOCK_STATUS_FILTER_OPTIONS} value={stockStatusFilter} onChange={(event) => setStockStatusFilter(event.target.value)} className="w-40" triggerClassName="bg-surface" />
             </div>
 
             {stock.length === 0 ? (
@@ -405,7 +405,7 @@ export default function WarehouseDetail() {
                   {stockRows.map((row) => {
                     const st = deriveStockStatus(row)
                     return (
-                      <div key={row.productId} className="rounded-xl border border-neutral-100 bg-white p-4 shadow-(--shadow-xs)">
+                      <div key={row.productId} className="rounded-xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-xs)">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate font-medium text-neutral-900">{row.productName}</p>
@@ -754,7 +754,7 @@ function CreateTransferDrawer({ isOpen, isDemo, fromWarehouse, stock, destinatio
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end bg-neutral-900/60 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(event) => event.stopPropagation()} className="flex h-full w-full max-w-lg flex-col overflow-y-auto bg-white shadow-(--shadow-popover)">
+      <div onClick={(event) => event.stopPropagation()} className="flex h-full w-full max-w-lg flex-col overflow-y-auto bg-surface shadow-(--shadow-popover)">
         <div className="flex items-start justify-between border-b border-neutral-100 px-6 py-5">
           <div>
             <h2 className="text-lg font-semibold text-neutral-900">Create Transfer</h2>
@@ -803,7 +803,7 @@ function CreateTransferDrawer({ isOpen, isDemo, fromWarehouse, stock, destinatio
                             step="1"
                             value={quantities[item.productId] ?? ''}
                             onChange={(event) => setQuantities((current) => ({ ...current, [item.productId]: event.target.value }))}
-                            className="w-24 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-right text-sm"
+                            className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm"
                           />
                         </td>
                       </tr>

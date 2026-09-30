@@ -159,7 +159,7 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
                 setFormData((current) => ({ ...current, image: event.target.value }))
               }}
             />
-            <label className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-medium tracking-tight text-primary-700 transition-all hover:border-primary-300 hover:bg-primary-50/60">
+            <label className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-surface px-4 text-sm font-medium tracking-tight text-primary-700 transition-all hover:border-primary-300 hover:bg-primary-50/60">
               <Upload className="size-4" aria-hidden="true" />
               Upload Image
               <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={handleImageUpload} />
@@ -442,7 +442,7 @@ export default function CategoryList() {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search categories"
-                className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
 
@@ -466,7 +466,7 @@ export default function CategoryList() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-9 rounded-xl bg-white px-3.5"
+                className="h-9 rounded-xl bg-surface px-3.5"
                 onClick={() => setIsSortMenuOpen((current) => !current)}
                 aria-haspopup="menu"
                 aria-expanded={isSortMenuOpen}
@@ -479,7 +479,7 @@ export default function CategoryList() {
                 <div
                   role="menu"
                   aria-label="Category sorting"
-                  className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-52 rounded-2xl border border-neutral-100 bg-white p-2 shadow-(--shadow-popover)"
+                  className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-52 rounded-2xl border border-neutral-100 bg-surface p-2 shadow-(--shadow-popover)"
                 >
                   <p className="px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
                     Sort by
@@ -536,7 +536,7 @@ export default function CategoryList() {
       </Card>
 
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto bg-white px-0 py-0">
+        <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -580,7 +580,7 @@ export default function CategoryList() {
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {visibleCategories.map((category) => (
-                  <tr key={category.id} className="bg-white transition-colors hover:bg-primary-50/30">
+                  <tr key={category.id} className="bg-surface transition-colors hover:bg-primary-50/30">
                     <td className="px-6 py-5">
                       <input
                         type="checkbox"
@@ -641,7 +641,7 @@ export default function CategoryList() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-4 text-xs text-[#6f89b0]">
-          <div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredCategories.length}</span></span><span className="hidden text-neutral-300 sm:inline">|</span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-white py-1 text-xs" /></label></div>
+          <div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredCategories.length}</span></span><span className="hidden text-neutral-300 sm:inline">|</span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" /></label></div>
           <div className="flex items-center gap-1.5"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Previous page">‹</button><span className="min-w-14 text-center font-medium text-[#082445]">{currentPage} / {totalPages}</span><button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Next page">›</button></div>
         </div>
       </Card>
@@ -649,7 +649,7 @@ export default function CategoryList() {
       {isFilterMenuOpen && createPortal(
         <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="category-filter-title" id="category-filter-panel">
           <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterMenuOpen(false)} aria-label="Close filters" tabIndex={-1} />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-white shadow-2xl">
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
               <div>
                 <h2 id="category-filter-title" className="text-lg font-semibold text-neutral-900">Filter Categories</h2>
@@ -715,7 +715,7 @@ export default function CategoryList() {
               </div>
             )}
 
-            <div className="rounded-xl border border-neutral-200 bg-white p-5">
+            <div className="rounded-xl border border-neutral-200 bg-surface p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                 <div className="shrink-0">
                   {viewCategory?.image ? (
@@ -738,7 +738,7 @@ export default function CategoryList() {
                     </span>
                     <span className="text-xs text-neutral-400">Catalog record</span>
                     {viewCategory && categories.filter((item) => item.parentId === viewCategory.id).length > 0 ? (
-                      <span className="rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+                      <span className="rounded-md border border-neutral-200 bg-surface px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-500">
                         {categories.filter((item) => item.parentId === viewCategory.id).length} subcategories
                       </span>
                     ) : null}
@@ -762,7 +762,7 @@ export default function CategoryList() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-neutral-200 bg-white px-4 py-4">
+              <div className="rounded-xl border border-neutral-200 bg-surface px-4 py-4">
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-500">
                     <CalendarPlus className="size-4" aria-hidden="true" />
@@ -773,7 +773,7 @@ export default function CategoryList() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-neutral-200 bg-white px-4 py-4">
+              <div className="rounded-xl border border-neutral-200 bg-surface px-4 py-4">
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-500">
                     <CalendarClock className="size-4" aria-hidden="true" />

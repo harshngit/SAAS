@@ -201,7 +201,7 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, part
       <form
         onClick={(event) => event.stopPropagation()}
         onSubmit={handleSubmit}
-        className={`flex h-full w-full max-w-md flex-col bg-white shadow-(--shadow-popover) transition-transform duration-300 ease-out ${
+        className={`flex h-full w-full max-w-md flex-col bg-surface shadow-(--shadow-popover) transition-transform duration-300 ease-out ${
           isVisible ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -237,7 +237,7 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, part
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search name or phone"
-                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
               </div>
 
@@ -259,7 +259,7 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, part
                     key={row.id}
                     type="button"
                     onClick={() => selectCustomer(row)}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-white px-3.5 py-2.5 text-left transition-colors hover:border-primary-200 hover:bg-primary-50/40"
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-surface px-3.5 py-2.5 text-left transition-colors hover:border-primary-200 hover:bg-primary-50/40"
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium text-neutral-900">{row.name}</span>

@@ -5,7 +5,7 @@ import { CHART_PRIMARY, CHART_INK } from './chartTheme'
 function ChartTooltip({ active, payload, label, formatValue }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl bg-white px-3 py-2 text-xs shadow-lg ring-1 ring-black/5">
+    <div className="rounded-xl bg-surface px-3 py-2 text-xs shadow-lg ring-1 ring-black/5">
       <p className="text-neutral-400">{label}</p>
       <p className="mt-0.5 font-semibold text-neutral-900">{formatValue(payload[0].value)}</p>
     </div>

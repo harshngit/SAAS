@@ -286,7 +286,7 @@ const revokeUploadPreviewUrls = (previews = []) => {
 function UploadPreview({ previews = [] }) {
   if (!previews.length) {
     return (
-      <div className="flex h-16 min-w-28 cursor-pointer items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-400">
+      <div className="flex h-16 min-w-28 cursor-pointer items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-surface px-3 text-xs font-medium text-neutral-400">
         Preview
       </div>
     )
@@ -308,12 +308,12 @@ function UploadPreview({ previews = [] }) {
             target="_blank"
             rel="noreferrer"
             title={`Preview ${preview.name}`}
-              className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
+              className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-surface shadow-sm"
           >
             {isImage ? (
               <img src={preview.url} alt={preview.name} className="size-full object-cover" />
             ) : isPdf ? (
-              <iframe src={preview.url} title={preview.name} className="size-full pointer-events-none border-0 bg-white" />
+              <iframe src={preview.url} title={preview.name} className="size-full pointer-events-none border-0 bg-surface" />
             ) : (
               <span className="flex size-full items-center justify-center text-neutral-500">
                 <FileText className="size-5" aria-hidden="true" />
@@ -326,7 +326,7 @@ function UploadPreview({ previews = [] }) {
         )
       })}
       {remainingCount > 0 && (
-        <span className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-xs font-semibold text-neutral-500">
+        <span className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-surface text-xs font-semibold text-neutral-500">
           +{remainingCount}
         </span>
       )}
@@ -926,7 +926,7 @@ export default function UserManagement() {
         <div>
           <form
             onSubmit={handleSubmit}
-            className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)"
+            className="flex min-h-[calc(100vh-8rem)] w-full flex-col rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)"
           >
             <div className="grid flex-1 lg:grid-cols-[17rem_minmax(0,1fr)]">
               <aside className="border-b border-neutral-100 p-6 lg:border-b-0 lg:border-r">
@@ -1356,7 +1356,7 @@ export default function UserManagement() {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search staff"
-                className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
 
@@ -1378,7 +1378,7 @@ export default function UserManagement() {
         </Card>
 
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto bg-white px-0 py-0">
+        <div className="overflow-x-auto bg-surface px-0 py-0">
           {isLoadingUsers ? (
             <LoadingSpinner label="Loading staff..." />
           ) : listError ? (
@@ -1421,7 +1421,7 @@ export default function UserManagement() {
                     <tr
                       key={user.id}
                       onClick={() => navigate(`/admin/users/${user.id}`)}
-                      className="cursor-pointer bg-white transition-colors hover:bg-primary-50/30"
+                      className="cursor-pointer bg-surface transition-colors hover:bg-primary-50/30"
                     >
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">

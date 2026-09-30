@@ -100,7 +100,7 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
           type="button"
           data-datepicker-trigger="true"
           onClick={() => setOpen((prev) => !prev)}
-          className={`flex w-full items-center justify-between rounded-xl border bg-neutral-50 px-3.5 py-2.5 text-left text-sm transition-all focus:bg-white focus:outline-none focus:ring-4 ${
+          className={`flex w-full items-center justify-between rounded-xl border bg-neutral-50 px-3.5 py-2.5 text-left text-sm transition-all focus:bg-surface focus:outline-none focus:ring-4 ${
             error
               ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15'
               : 'border-neutral-200 focus:border-primary-400 focus:ring-primary-500/12'
@@ -116,7 +116,7 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
           <div
             ref={menuRef}
             style={menuStyle}
-            className="fixed z-50 rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-popover)"
+            className="fixed z-50 rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-popover)"
           >
             <div className="flex items-center justify-between">
               <button

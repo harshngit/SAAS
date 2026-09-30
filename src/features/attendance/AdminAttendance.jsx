@@ -309,7 +309,7 @@ export default function AdminAttendance() {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search by name or ID..."
-                className="h-9 w-full rounded-xl border border-neutral-100 bg-neutral-50 py-1.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-9 w-full rounded-xl border border-neutral-100 bg-neutral-50 py-1.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
 
@@ -317,7 +317,7 @@ export default function AdminAttendance() {
               type="button"
               onClick={loadAttendance}
               aria-label="Refresh"
-              className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-500 transition-colors hover:border-primary-300 hover:text-primary-700"
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-surface text-neutral-500 transition-colors hover:border-primary-300 hover:text-primary-700"
             >
               <RotateCw className="size-4" aria-hidden="true" />
             </button>
@@ -379,7 +379,7 @@ export default function AdminAttendance() {
                       <tr
                         key={row.key}
                         onClick={() => navigate(`/admin/attendance/${row.userId}`)}
-                        className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                        className="cursor-pointer bg-surface shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
                       >
                         <td className="px-4 py-3.5" onClick={(event) => event.stopPropagation()}>
                           <input

@@ -75,7 +75,7 @@ export default function RejectDeliveryModal({ delivery, isOpen, onClose, onRejec
             onChange={(event) => setReason(event.target.value)}
             placeholder="Why can't you take this delivery?"
             maxLength={500}
-            className="h-24 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            className="h-24 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
           />
         </div>
         {error && (

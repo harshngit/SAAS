@@ -296,7 +296,7 @@ export default function LeadList() {
                     value={searchTerm}
                     onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }}
                     placeholder="Search leads..."
-                    className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                    className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                   />
                 </div>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}>
@@ -342,7 +342,7 @@ export default function LeadList() {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
           <p className="text-sm font-medium text-primary-900">{selectedIds.length} lead{selectedIds.length === 1 ? '' : 's'} selected</p>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-white px-3" onClick={() => exportCsv(true)}>
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportCsv(true)}>
               <Download className="size-4" aria-hidden="true" />
               Download
             </Button>
@@ -355,7 +355,7 @@ export default function LeadList() {
       )}
 
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto bg-white px-0 py-0">
+        <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-10 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -402,7 +402,7 @@ export default function LeadList() {
                     <tr
                       key={lead.id}
                       onClick={() => navigate(`${leadBasePath}/${lead.id}`)}
-                      className="cursor-pointer bg-white transition-colors hover:bg-primary-50/30"
+                      className="cursor-pointer bg-surface transition-colors hover:bg-primary-50/30"
                     >
                       <td className="px-6 py-5 align-middle" onClick={(event) => event.stopPropagation()}>
                         <input type="checkbox" checked={selectedIds.includes(lead.id)} onChange={() => toggleSelection(lead.id)} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label={`Select ${lead.leadId}`} />
@@ -468,7 +468,7 @@ export default function LeadList() {
             </table>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-white px-5 py-4 text-xs text-[#6f89b0]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-surface px-5 py-4 text-xs text-[#6f89b0]">
           <div className="flex items-center gap-3">
             <span>
               Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of{' '}
@@ -486,7 +486,7 @@ export default function LeadList() {
                 value={pageSize}
                 onChange={(event) => { setPageSize(event.target.value); setPage(1) }}
                 className="w-20"
-                triggerClassName="h-8 bg-white py-1 text-xs"
+                triggerClassName="h-8 bg-surface py-1 text-xs"
               />
             </label>
           </div>
@@ -522,7 +522,7 @@ export default function LeadList() {
             onClick={() => setIsFilterOpen(false)}
             aria-label="Close filters"
           />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-white shadow-2xl">
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-neutral-900">Filter Leads</h2>

@@ -24,7 +24,7 @@ function Toggle({ checked, onChange, label, description }) {
         }`}
       >
         <span
-          className={`inline-block size-4 transform rounded-full bg-white shadow transition-transform ${
+          className={`inline-block size-4 transform rounded-full bg-surface shadow transition-transform ${
             checked ? 'translate-x-6' : 'translate-x-1'
           }`}
         />

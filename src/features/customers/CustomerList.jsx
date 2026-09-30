@@ -446,7 +446,7 @@ export default function CustomerList() {
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className="relative w-full sm:w-60">
                   <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                  <input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search customers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
+                  <input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search customers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
                 </div>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button>
                 <RequirePermission module="customers" action="create">
@@ -478,7 +478,7 @@ export default function CustomerList() {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
           <p className="text-sm font-medium text-primary-900">{selectedCustomerIds.length} customer{selectedCustomerIds.length === 1 ? '' : 's'} selected</p>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-white px-3" onClick={exportCustomersCsv}>
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={exportCustomersCsv}>
               <Download className="size-4" aria-hidden="true" />
               Download
             </Button>
@@ -491,7 +491,7 @@ export default function CustomerList() {
       )}
 
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto bg-white px-0 py-0">
+        <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -546,7 +546,7 @@ export default function CustomerList() {
                   <tr
                     key={customer.id}
                     onClick={() => navigate(`${basePath}/${customer.id}`)}
-                    className="cursor-pointer bg-white transition-colors hover:bg-primary-50/30"
+                    className="cursor-pointer bg-surface transition-colors hover:bg-primary-50/30"
                   >
                     <td className="px-6 py-5 align-middle" onClick={(event) => event.stopPropagation()}>
                       <input
@@ -643,12 +643,12 @@ export default function CustomerList() {
             </table>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-white px-5 py-4 text-xs text-[#6f89b0]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-surface px-5 py-4 text-xs text-[#6f89b0]">
           <div className="flex items-center gap-3">
             <span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredCustomers.length}</span></span>
             <span className="hidden text-neutral-300 sm:inline">|</span>
             <label className="flex items-center gap-2">Rows per page
-              <Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-white py-1 text-xs" />
+              <Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" />
             </label>
           </div>
           <div className="flex items-center gap-1.5">
@@ -662,7 +662,7 @@ export default function CustomerList() {
       {isFilterOpen && (
         <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Customer filters">
           <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-white shadow-2xl">
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4"><div><h2 className="text-lg font-semibold text-neutral-900">Filter Customers</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the customers shown in the table.</p></div><button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button></div>
             <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={[{ value: 'all', label: 'All Statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label>

@@ -185,7 +185,7 @@ export default function LeadFormPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <form
           onSubmit={handleSubmit}
-          className="overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-[0_24px_80px_-48px_rgb(15_23_42/0.35)]"
+          className="overflow-hidden rounded-2xl border border-neutral-100 bg-surface shadow-[0_24px_80px_-48px_rgb(15_23_42/0.35)]"
         >
           <div className="border-b border-neutral-100 px-6 py-5">
             <div className="flex items-center gap-4">
@@ -317,7 +317,7 @@ export default function LeadFormPage() {
         </form>
 
         <aside className="grid gap-4">
-          <section className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
+          <section className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
             <div className="flex items-center gap-3">
               <div className="flex size-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
                 <Lightbulb className="size-5" aria-hidden="true" />
@@ -342,7 +342,7 @@ export default function LeadFormPage() {
             </ul>
           </section>
 
-          <section className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
+          <section className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
             <div className="flex items-center gap-3">
               <div className="flex size-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
                 <Users className="size-5" aria-hidden="true" />
@@ -371,7 +371,7 @@ export default function LeadFormPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
+          <section className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-[0_18px_50px_-38px_rgb(15_23_42/0.35)]">
             <div className="flex items-center gap-3">
               <div className="flex size-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
                 <NotebookText className="size-5" aria-hidden="true" />

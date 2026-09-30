@@ -734,7 +734,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
           )}
 
           {/* Customer + Order Details */}
-          <div className="grid grid-cols-1 divide-y divide-neutral-100 rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card) lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+          <div className="grid grid-cols-1 divide-y divide-neutral-100 rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card) lg:grid-cols-2 lg:divide-x lg:divide-y-0">
             <div className="space-y-4 p-5">
               <div className="flex items-center gap-2.5">
                 <SectionBadge number={1} />
@@ -870,7 +870,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
           </div>
 
           {/* Products */}
-          <div className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)">
             <div className="flex items-center gap-2.5 border-b border-neutral-100 p-5">
               <SectionBadge number={3} />
               <div>
@@ -920,7 +920,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                         setDiscountValue(String(Number.isFinite(rounded) ? Math.max(rounded, 0) : 0))
                       }}
                       aria-label="Discount value"
-                      className="h-10 w-16 rounded-lg border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                      className="h-10 w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                     />
                     <span className="text-xs font-medium text-neutral-500">{discountType === 'percentage' ? '%' : '₹'}</span>
                   </div>
@@ -947,7 +947,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
           </div>
 
           {/* Delivery Method */}
-          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
             <div className="flex items-center gap-2.5">
               <SectionBadge number={4} />
               <h3 className="text-base font-semibold text-neutral-900">Delivery Method</h3>
@@ -971,7 +971,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       <label
                         key={option.value}
                         className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors ${
-                          isSelected ? 'border-primary-500 bg-primary-50' : 'border-neutral-200 bg-white hover:border-primary-200'
+                          isSelected ? 'border-primary-500 bg-primary-50' : 'border-neutral-200 bg-surface hover:border-primary-200'
                         }`}
                       >
                         <input
@@ -1019,7 +1019,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                         placeholder={customerDefaultAddress || 'Delivery address'}
                         disabled={!selectedCustomer}
                         maxLength={500}
-                        className={`h-24 resize-none rounded-xl border bg-neutral-50 p-3 text-sm text-neutral-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12 disabled:opacity-60 ${
+                        className={`h-24 resize-none rounded-xl border bg-neutral-50 p-3 text-sm text-neutral-900 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12 disabled:opacity-60 ${
                           errors.deliveryAddress ? 'border-red-300 focus:border-red-400' : 'border-neutral-200 focus:border-primary-400'
                         }`}
                       />
@@ -1065,7 +1065,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
           </div>
 
           {/* Notes */}
-          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
             <div className="flex items-center gap-2.5">
               <SectionBadge number={5} />
               <h3 className="text-base font-semibold text-neutral-900">Notes</h3>
@@ -1077,7 +1077,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   value={orderNotes}
                   maxLength={250}
                   onChange={(event) => setOrderNotes(event.target.value)}
-                  className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
                 <p className="text-right text-xs text-neutral-400">{orderNotes.length} / 250</p>
               </div>
@@ -1087,7 +1087,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   value={internalNotes}
                   maxLength={250}
                   onChange={(event) => setInternalNotes(event.target.value)}
-                  className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
                 <p className="text-right text-xs text-neutral-400">{internalNotes.length} / 250</p>
               </div>
@@ -1102,7 +1102,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
         {/* Order Summary */}
         <div className="xl:sticky xl:top-5 xl:self-start">
-          <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
             <h3 className="text-lg font-semibold text-neutral-900">Order Summary</h3>
 
             <div className="mt-5 space-y-4">
@@ -1440,7 +1440,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-neutral-500">Paid Amount</span>
-                  <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-white pl-2 pr-1">
+                  <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-surface pl-2 pr-1">
                     <span className="text-[0.7rem] text-neutral-400">₹</span>
                     <input
                       type="number"

@@ -479,7 +479,11 @@ function RegularInvoiceDocument({ preset, ...props }) {
   const accentHeading = preset.accent === 'bold'
 
   return (
-    <div className={DENSITY_GAP[preset.density] || DENSITY_GAP.normal} style={{ fontFamily, fontSize: style.body }}>
+    // Printable invoice paper never follows the org's Appearance theme (Part 2.10) - pinning
+    // data-mode/data-bg here overrides whatever [data-mode="dark"]/[data-bg="image"] the
+    // document root has, so the neutral color scale (and any bg-surface/bg-(--sidebar-bg) etc.
+    // a shared component this renders inside might carry) stays the plain light default.
+    <div data-mode="light" data-bg="none" className={DENSITY_GAP[preset.density] || DENSITY_GAP.normal} style={{ fontFamily, fontSize: style.body }}>
       {company.letterheadUrl && (
         <img src={company.letterheadUrl} alt="" className="max-h-14 w-full rounded object-contain" onError={(event) => { event.currentTarget.style.display = 'none' }} />
       )}
@@ -547,7 +551,8 @@ export function ThermalPreview(props) {
   const emphasizeTotal = thermalVariant === 2 || thermalVariant === 4
 
   return (
-    <div className={`space-y-2 font-mono leading-tight text-neutral-700 ${centerAll}`} style={{ fontSize: style.body }}>
+    // Same never-themed pin as RegularInvoiceDocument above (Part 2.10).
+    <div data-mode="light" data-bg="none" className={`space-y-2 font-mono leading-tight text-neutral-700 ${centerAll}`} style={{ fontSize: style.body }}>
       <div className="text-center">
         {businessDetails.showLogo && company.logoUrl && (
           <img src={company.logoUrl} alt="" className="mx-auto mb-1 size-7 object-contain" onError={(event) => { event.currentTarget.style.display = 'none' }} />

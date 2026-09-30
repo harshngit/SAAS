@@ -393,7 +393,7 @@ export default function VehicleLoading() {
             return (
               <div
                 key={delivery.id}
-                className={`rounded-2xl border bg-white shadow-(--shadow-card) transition-colors ${
+                className={`rounded-2xl border bg-surface shadow-(--shadow-card) transition-colors ${
                   isSelected ? 'border-primary-200' : 'border-neutral-100'
                 }`}
               >
@@ -460,7 +460,7 @@ export default function VehicleLoading() {
           )}
 
           {/* Confirm bar */}
-          <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-neutral-500">
                 {vehicle?.number || 'Vehicle'} · {warehouses[0] || 'Warehouse'} · {summary.deliveries} deliveries ·{' '}

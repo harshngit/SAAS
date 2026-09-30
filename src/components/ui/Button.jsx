@@ -7,7 +7,7 @@ const variantClasses = {
   secondary:
     'bg-neutral-100 text-neutral-800 hover:bg-neutral-200 active:scale-[0.98] focus-visible:outline-neutral-400',
   outline:
-    'border border-neutral-200 bg-white text-neutral-700 hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700 active:scale-[0.98] focus-visible:outline-primary-600',
+    'border border-(--btn-outline-border) bg-(--btn-outline-bg) text-(--btn-outline-text) hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700 active:scale-[0.98] focus-visible:outline-primary-600',
   ghost:
     'text-neutral-600 hover:bg-neutral-100 active:scale-[0.98] focus-visible:outline-neutral-400',
   danger:

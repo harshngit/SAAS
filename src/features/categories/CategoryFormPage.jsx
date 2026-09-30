@@ -152,7 +152,7 @@ export default function CategoryFormPage() {
           type="button"
           onClick={() => navigate('/admin/categories')}
           aria-label="Back to Categories"
-          className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-500 transition-colors hover:border-primary-300 hover:text-primary-700"
+          className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-surface text-neutral-500 transition-colors hover:border-primary-300 hover:text-primary-700"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
         </button>
@@ -177,7 +177,7 @@ export default function CategoryFormPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <section className="space-y-3.5 rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+        <section className="space-y-3.5 rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
           <p className="text-sm font-semibold text-neutral-900">Category Details</p>
 
           <div className="flex flex-col gap-1">
@@ -287,7 +287,7 @@ export default function CategoryFormPage() {
         </section>
 
         <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">
-          <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
             <div className="flex items-center gap-1.5">
               <p className="text-sm font-semibold text-neutral-900">Image Preview</p>
               <Info className="size-3.5 text-neutral-300" aria-hidden="true" />
@@ -297,7 +297,7 @@ export default function CategoryFormPage() {
                 <img src={formData.image} alt="Category preview" className="size-full rounded-lg object-cover" />
               ) : (
                 <>
-                  <span className="flex size-12 items-center justify-center rounded-full bg-white text-neutral-300 ring-1 ring-neutral-200">
+                  <span className="flex size-12 items-center justify-center rounded-full bg-surface text-neutral-300 ring-1 ring-neutral-200">
                     <ImageIcon className="size-6" aria-hidden="true" />
                   </span>
                   <div>
@@ -309,7 +309,7 @@ export default function CategoryFormPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+          <div className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
             <div className="flex items-center gap-2">
               <ClipboardList className="size-4 text-primary-600" aria-hidden="true" />
               <p className="text-sm font-semibold text-neutral-900">Preview Summary</p>
@@ -332,7 +332,7 @@ export default function CategoryFormPage() {
         </aside>
       </div>
 
-      <div className="sticky bottom-0 z-10 -mx-4 border-t border-neutral-100 bg-white/90 px-4 py-2.5 backdrop-blur sm:-mx-5 sm:px-5 lg:-mx-7 lg:px-7">
+      <div className="sticky bottom-0 z-10 -mx-4 border-t border-neutral-100 bg-surface/90 px-4 py-2.5 backdrop-blur sm:-mx-5 sm:px-5 lg:-mx-7 lg:px-7">
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" size="sm" disabled={isSaving} onClick={() => navigate('/admin/categories')}>
             Cancel

@@ -285,8 +285,8 @@ export default function AdminPlans() {
                     isFeatured
                       ? 'xl:min-h-[43rem] border-primary-700 bg-[#063B00] ring-1 ring-primary-700 xl:shadow-[0_10px_22px_-12px_rgb(6_59_0/0.22),0_34px_70px_-40px_rgb(6_59_0/0.42)]'
                     : isCurrent
-                        ? 'border-primary-300 bg-white ring-2 ring-primary-100'
-                        : 'border-neutral-100 bg-white'
+                        ? 'border-primary-300 bg-surface ring-2 ring-primary-100'
+                        : 'border-neutral-100 bg-surface'
                   }`}
                 >
                   <div className="flex w-full flex-col p-6">

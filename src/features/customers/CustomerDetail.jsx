@@ -218,7 +218,7 @@ function TopInfoItem({ icon: Icon, label, value }) {
 
 // Soft pastel accents for the overview metric cards - kept faint so the page still reads calm.
 const METRIC_TONES = {
-  neutral: { card: 'border-neutral-100 bg-white', chip: 'bg-primary-50 text-primary-700' },
+  neutral: { card: 'border-neutral-100 bg-surface', chip: 'bg-primary-50 text-primary-700' },
   emerald: { card: 'border-emerald-100 bg-emerald-50/70', chip: 'bg-emerald-100 text-emerald-700' },
   sky: { card: 'border-sky-100 bg-sky-50/70', chip: 'bg-sky-100 text-sky-700' },
   amber: { card: 'border-amber-100 bg-amber-50/70', chip: 'bg-amber-100 text-amber-700' },
@@ -280,7 +280,7 @@ function DocumentPreviewCard({ document }) {
           className="size-14 shrink-0 rounded-lg border border-neutral-100 object-cover"
         />
       ) : (
-        <div className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-neutral-100 bg-white">
+        <div className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-neutral-100 bg-surface">
           <FileText className="size-6 text-primary-600" aria-hidden="true" />
         </div>
       )}
@@ -294,7 +294,7 @@ function DocumentPreviewCard({ document }) {
 
 function Section({ number, title, icon: Icon, actions, children, className = '' }) {
   return (
-    <div className={`rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) ${className}`}>
+    <div className={`rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card) ${className}`}>
       <div className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-4">
         <div className="flex items-center gap-2.5">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
@@ -324,7 +324,7 @@ const visitStatusVariant = { planned: 'info', completed: 'success', cancelled: '
 
 function FollowUpRow({ task }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-sm">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface px-3 py-2 text-sm">
       <div className="min-w-0">
         <p className="truncate font-medium text-neutral-800">{task.title || 'Follow-up task'}</p>
         {task.dueDate && <p className="text-xs text-neutral-400">Due {formatDate(task.dueDate)}</p>}
@@ -876,7 +876,7 @@ export default function CustomerDetail() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
         <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
           <div className="flex items-start gap-4">
             <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary-50 text-lg font-semibold text-primary-700 ring-1 ring-primary-100">
@@ -915,7 +915,7 @@ export default function CustomerDetail() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)">
         <div className="flex gap-1 overflow-x-auto px-3">
           {CUSTOMER_TABS.map((tab) => (
             <button
@@ -1019,7 +1019,7 @@ export default function CustomerDetail() {
                     href={mapSearchUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center justify-center gap-1.5 border-t border-neutral-100 bg-white py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50/60"
+                    className="flex items-center justify-center gap-1.5 border-t border-neutral-100 bg-surface py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50/60"
                   >
                     <MapPin className="size-3.5" aria-hidden="true" />
                     View on Map

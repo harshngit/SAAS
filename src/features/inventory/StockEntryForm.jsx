@@ -68,7 +68,7 @@ export default function StockEntryForm({ isOpen, onClose, product, saving = fals
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full rounded-2xl border border-neutral-100 bg-white p-6 shadow-(--shadow-card)"
+      className="w-full rounded-2xl border border-neutral-100 bg-surface p-6 shadow-(--shadow-card)"
     >
       <div className="flex flex-col gap-4 border-b border-neutral-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -139,7 +139,7 @@ export default function StockEntryForm({ isOpen, onClose, product, saving = fals
                       onChange={(event) => handleQuantityChange(row, event.target.value)}
                       onBlur={handleQuantityBlur(row)}
                       placeholder="0"
-                      className="w-28 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-900 transition-all focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                      className="w-28 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm text-neutral-900 transition-all focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                     />
                   </td>
                 </tr>

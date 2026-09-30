@@ -14,7 +14,7 @@ const METHOD_OPTIONS = [
   { value: 'cod', label: 'Other' },
 ]
 
-const field = 'h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12'
+const field = 'h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12'
 
 // A Collection is money the Delivery Partner physically takes - NOT a payment and NOT a
 // delivery status. The Accountant later reconciles it, and the backend then creates one
@@ -129,7 +129,7 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
 
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-neutral-700">Notes (optional)</label>
-          <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} className="h-16 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
+          <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} className="h-16 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
         </div>
 
         {error && (

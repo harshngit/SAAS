@@ -136,7 +136,7 @@ export default function BulkImportModal({ isOpen, onClose, moduleKey, onImported
           <div>
             <label
               className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors ${
-                fileError ? 'border-red-200 bg-red-50/40' : 'border-neutral-200 bg-white hover:border-primary-300 hover:bg-primary-50/30'
+                fileError ? 'border-red-200 bg-red-50/40' : 'border-neutral-200 bg-surface hover:border-primary-300 hover:bg-primary-50/30'
               }`}
             >
               <FileSpreadsheet className="size-8 text-neutral-400" aria-hidden="true" />

@@ -1,11 +1,14 @@
 import AppRoutes from './routes/AppRoutes'
 import { ToastProvider } from './components/ui/Toast'
+import ThemeProvider from './theme/ThemeProvider'
 
 function App() {
   return (
-    <ToastProvider>
-      <AppRoutes />
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <AppRoutes />
+      </ToastProvider>
+    </ThemeProvider>
   )
 }
 

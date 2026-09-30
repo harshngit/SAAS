@@ -295,7 +295,7 @@ export default function BrandList() {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search brands"
-                className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
 
@@ -304,7 +304,7 @@ export default function BrandList() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-9 rounded-xl bg-white px-3.5"
+                className="h-9 rounded-xl bg-surface px-3.5"
                 onClick={() => setIsFilterMenuOpen((current) => !current)}
                 aria-haspopup="menu"
                 aria-expanded={isFilterMenuOpen}
@@ -317,7 +317,7 @@ export default function BrandList() {
                 <div
                   role="menu"
                   aria-label="Brand filters"
-                  className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-48 rounded-2xl border border-neutral-100 bg-white p-2 shadow-(--shadow-popover)"
+                  className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-48 rounded-2xl border border-neutral-100 bg-surface p-2 shadow-(--shadow-popover)"
                 >
                   <p className="px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Status</p>
                   {[
@@ -367,7 +367,7 @@ export default function BrandList() {
 
       <Card className="overflow-hidden p-0">
 
-        <div className="overflow-x-auto bg-white px-0 py-0">
+        <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -411,7 +411,7 @@ export default function BrandList() {
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {visibleBrands.map((brand) => (
-                  <tr key={brand.id} className="bg-white transition-colors hover:bg-primary-50/30">
+                  <tr key={brand.id} className="bg-surface transition-colors hover:bg-primary-50/30">
                     <td className="px-6 py-5">
                       <input
                         type="checkbox"
@@ -458,7 +458,7 @@ export default function BrandList() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-4 text-xs text-[#6f89b0]">
-          <div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredBrands.length}</span></span><span className="hidden text-neutral-300 sm:inline">|</span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-white py-1 text-xs" /></label></div>
+          <div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredBrands.length}</span></span><span className="hidden text-neutral-300 sm:inline">|</span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" /></label></div>
           <div className="flex items-center gap-1.5"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Previous page">‹</button><span className="min-w-14 text-center font-medium text-[#082445]">{currentPage} / {totalPages}</span><button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Next page">›</button></div>
         </div>
       </Card>

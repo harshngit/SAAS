@@ -231,7 +231,7 @@ export default function PurchaseReturnFormPage() {
                             step="1"
                             value={returnQty[line.purchaseItemId] ?? ''}
                             onChange={(event) => setQty(line, event.target.value)}
-                            className="w-24 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-right text-sm text-neutral-900"
+                            className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm text-neutral-900"
                           />
                         </td>
                       </tr>

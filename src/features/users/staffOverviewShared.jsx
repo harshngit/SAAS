@@ -60,7 +60,7 @@ export const emptyDeliveryPoints = ['9 AM', '11 AM', '1 PM', '3 PM', '5 PM', '7 
 
 export function StatCard({ icon: Icon, iconClassName, label, value, caption, sublabel, onAction, actionLabel }) {
   return (
-    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+    <div className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-medium text-neutral-500">{label}</p>
         <div className={`flex size-9 shrink-0 items-center justify-center rounded-full text-white ${iconClassName}`}>
@@ -84,7 +84,7 @@ export function StatCard({ icon: Icon, iconClassName, label, value, caption, sub
 // Pending) instead of one headline number.
 export function CompoundStatCard({ icon: Icon, iconClassName, title, metrics }) {
   return (
-    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-card)">
+    <div className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
       <div className="flex items-center gap-2.5">
         <div className={`flex size-10 shrink-0 items-center justify-center rounded-full ${iconClassName}`}>
           <Icon className="size-4.5" aria-hidden="true" />
@@ -105,7 +105,7 @@ export function CompoundStatCard({ icon: Icon, iconClassName, title, metrics }) 
 
 export function Panel({ title, action, children, className = '' }) {
   return (
-    <div className={`rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) ${className}`}>
+    <div className={`rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card) ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
         {action}

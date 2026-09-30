@@ -225,7 +225,7 @@ function Field({ label, value }) {
 
 function Section({ number, title, icon: Icon, actions, children }) {
   return (
-    <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+    <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
       <div className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-4">
         <div className="flex items-center gap-2.5">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
@@ -664,7 +664,7 @@ export default function UserDetail() {
         </Link>
       </div>
 
-      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
         <div className="grid gap-6 lg:grid-cols-[auto_1fr_auto]">
           <div className="flex items-start gap-4">
             <div className="relative shrink-0">
@@ -735,7 +735,7 @@ export default function UserDetail() {
         <SalesStaffStatCards overview={overview} todaysAttendance={todaysAttendance} />
       ) : null}
 
-      <div className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)">
         <div className="flex gap-1 overflow-x-auto border-b border-neutral-100 px-3">
           {activeTabsList.map((tab) => (
             <button

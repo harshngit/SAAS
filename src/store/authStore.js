@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { normalizeOrganizationTheme, DEFAULT_THEME } from '../api/theme'
 
 export const AUTH_PROFILE_STORAGE_KEY = 'aquapure-auth-profile'
 
@@ -50,6 +51,11 @@ export const useAuthStore = create(
       dataScope: storedAuthProfile?.dataScope || 'own',
       authProfile: storedAuthProfile,
       authTokens: null,
+      // Cached from the last /auth/me response (Part 2.8: no flash on load) - ThemeProvider
+      // applies this synchronously on first render, before its own GET /organization/theme
+      // refresh resolves. Org-scoped implicitly: it's part of the same persisted authProfile
+      // blob as `user`/`organization`, so a different login/org always overwrites it.
+      orgTheme: storedAuthProfile?.theme || DEFAULT_THEME,
 
       setAuthenticatedSession: ({
         user,
@@ -62,6 +68,7 @@ export const useAuthStore = create(
         permissions,
         full_access,
         data_scope,
+        theme,
       }) => {
         const nextTokens =
           tokens ||
@@ -102,18 +109,37 @@ export const useAuthStore = create(
           dataScope: data_scope || 'own',
         }
 
-        saveAuthProfile(authProfile)
+        set((state) => {
+          // Every /auth/me response carries `theme` per the current contract, but this setter is
+          // also reachable from other callers (e.g. token refresh) that may not - never wipe a
+          // good cached theme back to the default just because one particular call omitted it.
+          const nextTheme = theme !== undefined ? normalizeOrganizationTheme(theme) : state.orgTheme
+          saveAuthProfile({ ...authProfile, theme: nextTheme })
 
-        set((state) => ({
-          currentUser: normalizedUser,
-          currentOrganization: normalizedOrganization,
-          role: authProfile.role,
-          permissions: authProfile.permissions,
-          fullAccess: authProfile.fullAccess,
-          dataScope: authProfile.dataScope,
-          authProfile,
-          authTokens: nextTokens || state.authTokens,
-        }))
+          return {
+            currentUser: normalizedUser,
+            currentOrganization: normalizedOrganization,
+            role: authProfile.role,
+            permissions: authProfile.permissions,
+            fullAccess: authProfile.fullAccess,
+            dataScope: authProfile.dataScope,
+            authProfile,
+            authTokens: nextTokens || state.authTokens,
+            orgTheme: nextTheme,
+          }
+        })
+      },
+
+      // Called after a successful PATCH/reset/background upload so the cached copy (and thus the
+      // next page load's pre-paint state) stays authoritative without waiting for the next
+      // /auth/me call. Takes an ALREADY-normalized theme (api/theme.js's functions all return
+      // one) - never re-normalize here, that would read camelCase keys as if they were the
+      // snake_case wire shape and silently produce garbage.
+      setOrgTheme: (normalizedTheme) => {
+        set((state) => {
+          if (state.authProfile) saveAuthProfile({ ...state.authProfile, theme: normalizedTheme })
+          return { orgTheme: normalizedTheme }
+        })
       },
 
       setAuthTokens: (tokens) => {
@@ -138,6 +164,10 @@ export const useAuthStore = create(
           dataScope: 'own',
           authProfile: null,
           authTokens: null,
+          // Multi-tenant safety: never let the next login (possibly a different organization)
+          // render with the previous org's theme, even for the instant before the fresh
+          // /auth/me response comes back.
+          orgTheme: DEFAULT_THEME,
         })
       },
     }),

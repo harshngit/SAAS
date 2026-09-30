@@ -163,7 +163,7 @@ function SummaryItem({ icon: Icon, label, children }) {
 
 function Section({ title, icon: Icon, actions, children, className = '', bodyClassName = 'mt-4' }) {
   return (
-    <div className={`rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) ${className}`}>
+    <div className={`rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card) ${className}`}>
       <div className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-4">
         <div className="flex items-center gap-2.5">
           {Icon && (
@@ -256,7 +256,7 @@ function AddActivityMenu({ items }) {
           ref={menuRef}
           role="menu"
           style={{ position: 'fixed', top: pos.top, left: Math.max(8, pos.left), width: 208 }}
-          className="z-50 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-(--shadow-popover)"
+          className="z-50 rounded-xl border border-neutral-100 bg-surface p-1.5 shadow-(--shadow-popover)"
         >
           {items.map((item) => (
             <button
@@ -827,7 +827,7 @@ export default function LeadDetail() {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl border border-neutral-100 bg-white">
+      <div className="rounded-2xl border border-neutral-100 bg-surface">
         <LoadingSpinner label="Loading lead..." />
       </div>
     )
@@ -835,7 +835,7 @@ export default function LeadDetail() {
 
   if (loadError || !lead) {
     return (
-      <div className="rounded-2xl border border-neutral-100 bg-white py-16 text-center">
+      <div className="rounded-2xl border border-neutral-100 bg-surface py-16 text-center">
         <p className="text-sm text-red-600">{loadError || 'Lead not found.'}</p>
         <Button type="button" variant="outline" className="mt-4" onClick={() => navigate(leadBasePath)}>
           <ArrowLeft className="size-4" aria-hidden="true" />
@@ -914,7 +914,7 @@ export default function LeadDetail() {
       )}
 
       {/* Compact summary strip - the facts a rep needs at a glance, shown once. */}
-      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
         <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-5">
           <SummaryItem icon={Phone} label="Phone">
             {lead.mobileNumber ? (
@@ -1049,7 +1049,7 @@ export default function LeadDetail() {
       {/* Product interest - full-width strip */}
       <div className="flex flex-col gap-3 rounded-2xl border border-neutral-100 bg-primary-50/40 p-5 shadow-(--shadow-card) sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-primary-600 ring-1 ring-primary-100">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-primary-600 ring-1 ring-primary-100">
             <Package className="size-4" aria-hidden="true" />
           </span>
           <div className="min-w-0">
@@ -1250,7 +1250,7 @@ export default function LeadDetail() {
                     {visit.followUps.length > 0 && (
                       <div className="mt-3 space-y-2 border-t border-neutral-100 pt-3">
                         {visit.followUps.map((task) => (
-                          <div key={task.id} className="flex items-start gap-2.5 rounded-lg bg-white p-2.5 shadow-(--shadow-xs)">
+                          <div key={task.id} className="flex items-start gap-2.5 rounded-lg bg-surface p-2.5 shadow-(--shadow-xs)">
                             <ClipboardList className="mt-0.5 size-4 shrink-0 text-primary-600" aria-hidden="true" />
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1580,7 +1580,7 @@ export default function LeadDetail() {
           </label>
 
           {visitFormData.createFollowUpTask && (
-            <div className="space-y-4 rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-xs)">
+            <div className="space-y-4 rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-xs)">
               <Input
                 label="Task Title"
                 value={visitFormData.title}

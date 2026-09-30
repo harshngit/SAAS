@@ -124,7 +124,7 @@ const KPI_TONES = {
 
 function VisitKpiCard({ icon: Icon, tone = 'primary', label, value, hint }) {
   return (
-    <div className="rounded-2xl border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card) transition-all duration-200 hover:shadow-(--shadow-card-hover)">
+    <div className="rounded-2xl border border-neutral-100 bg-surface/95 p-5 shadow-(--shadow-card) transition-all duration-200 hover:shadow-(--shadow-card-hover)">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium leading-5 text-neutral-500">{label}</p>
         <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${KPI_TONES[tone]}`}>
@@ -299,7 +299,7 @@ function VisitInfoBody({ visit, visitStatus, followUpRequired, canAddFollowUp, o
           visit.followUps.map((task) => {
             const taskStatus = deriveFollowUpStatus(task)
             return (
-              <div key={task.id} className="mt-2 rounded-xl border border-neutral-100 bg-white p-3.5 first:mt-0">
+              <div key={task.id} className="mt-2 rounded-xl border border-neutral-100 bg-surface p-3.5 first:mt-0">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-semibold text-neutral-900">{task.title}</p>
                   <span className="flex items-center gap-1.5">
@@ -882,7 +882,7 @@ export default function VisitCheckIn() {
                         onClick={() => setCheckInData((current) => ({ ...current, visitFor: opt.value, customerId: '', leadId: '' }))}
                         className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                           checkInData.visitFor === opt.value
-                            ? 'bg-white text-primary-700 shadow-(--shadow-xs)'
+                            ? 'bg-surface text-primary-700 shadow-(--shadow-xs)'
                             : 'text-neutral-500 hover:text-neutral-800'
                         }`}
                       >
@@ -972,7 +972,7 @@ export default function VisitCheckIn() {
                     value={historySearch}
                     onChange={(event) => setHistorySearch(event.target.value)}
                     placeholder="Search visits..."
-                    className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2 pl-10 pr-3 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                    className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2 pl-10 pr-3 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                   />
                 </div>
               </div>

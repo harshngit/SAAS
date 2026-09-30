@@ -211,15 +211,15 @@ export default function SupplierPaymentsList() {
                 if (!DEMO_MODE) setPage(1)
               }}
               placeholder="Search Payment # / Supplier / Reference"
-              className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
           <ListFilterPanel title="Filter Supplier Payments">
-            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select label="Payment mode" options={[{ value: 'all', label: 'All Modes' }, ...PAYMENT_MODE_OPTIONS]} value={modeFilter} onChange={(event) => { setModeFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select label="Status" options={PAYMENT_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select label="Date" options={PAYMENT_DATE_FILTER_OPTIONS} value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
-          <Select label="Sort by" options={PAYMENT_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <Select label="Payment mode" options={[{ value: 'all', label: 'All Modes' }, ...PAYMENT_MODE_OPTIONS]} value={modeFilter} onChange={(event) => { setModeFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <Select label="Status" options={PAYMENT_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <Select label="Date" options={PAYMENT_DATE_FILTER_OPTIONS} value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <Select label="Sort by" options={PAYMENT_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           </ListFilterPanel>
           {canCreate && (
           <Button type="button" onClick={() => setRecordOpen(true)}>

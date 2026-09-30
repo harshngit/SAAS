@@ -1331,7 +1331,7 @@ function CompanyProfileCompletionModal({
                 background: `conic-gradient(rgb(22 101 52) ${completion.percent}%, rgb(229 231 235) 0)`,
               }}
             >
-              <div className="grid size-6.5 place-items-center rounded-full bg-white text-[0.62rem] font-bold text-neutral-900">
+              <div className="grid size-6.5 place-items-center rounded-full bg-surface text-[0.62rem] font-bold text-neutral-900">
                 {completion.percent}%
               </div>
             </div>
@@ -1340,7 +1340,7 @@ function CompanyProfileCompletionModal({
               <p className="text-xs font-semibold text-neutral-900">
                 {completion.completedRequiredFields} of {completion.totalRequiredFields} required fields completed
               </p>
-              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/70">
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface/70">
                 <div
                   className="h-full rounded-full bg-primary-600 transition-all duration-300"
                   style={{ width: `${completion.percent}%` }}
@@ -1358,7 +1358,7 @@ function CompanyProfileCompletionModal({
               return (
                 <article
                   key={section.id}
-                  className="rounded-lg border border-neutral-100 bg-white p-2.5 shadow-sm transition-shadow hover:shadow-md"
+                  className="rounded-lg border border-neutral-100 bg-surface p-2.5 shadow-sm transition-shadow hover:shadow-md"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -1456,7 +1456,7 @@ function MiniFilePreviewStrip({ files = [] }) {
           target="_blank"
           rel="noreferrer"
           title={file.name}
-          className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
+          className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-surface shadow-sm"
         >
           {file.kind === "image" ? (
             <img src={file.url} alt={file.name} className="size-full object-cover" />
@@ -1465,7 +1465,7 @@ function MiniFilePreviewStrip({ files = [] }) {
               src={pdfPreviewSrc(file.url)}
               title={file.name}
               scrolling="no"
-              className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-white"
+              className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-surface"
             />
           ) : (
             <span className="flex size-full items-center justify-center text-neutral-500">
@@ -1478,7 +1478,7 @@ function MiniFilePreviewStrip({ files = [] }) {
         </a>
       ))}
       {remainingCount > 0 && (
-        <span className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-xs font-semibold text-neutral-500">
+        <span className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-surface text-xs font-semibold text-neutral-500">
           +{remainingCount}
         </span>
       )}
@@ -1538,7 +1538,7 @@ function FileUploadField({
       src={pdfPreviewSrc(previewFiles[0].url)}
       title={`${label} preview`}
       scrolling="no"
-      className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-white"
+      className="h-full w-[calc(100%+20px)] -mr-5 pointer-events-none border-0 bg-surface"
     />
   ) : canPreview ? (
     <FileText className="size-6 text-neutral-500" aria-hidden="true" />
@@ -1557,14 +1557,14 @@ function FileUploadField({
           <button
             type="button"
             onClick={handlePreview}
-            className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-white text-xs font-medium text-neutral-400 transition-colors hover:border-primary-300 hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+            className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-surface text-xs font-medium text-neutral-400 transition-colors hover:border-primary-300 hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
             aria-label={`Open ${label}`}
             title={`Open ${label}`}
           >
             {previewContent}
           </button>
         ) : (
-          <div className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white text-xs font-medium text-neutral-400">
+          <div className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-surface text-xs font-medium text-neutral-400">
             {previewContent}
           </div>
         )}
@@ -1906,11 +1906,11 @@ function CompanyOverviewDashboard({
 
   return (
     <section className="min-w-0 max-w-full space-y-4 pb-5">
-      <div className="min-w-0 max-w-full rounded-xl border border-neutral-100 bg-white p-4 shadow-sm">
+      <div className="min-w-0 max-w-full rounded-xl border border-neutral-100 bg-surface p-4 shadow-sm">
         <div className="w-full min-w-0 overflow-x-auto pb-1">
         <div className="grid min-w-[46rem] grid-cols-[minmax(0,1.7fr)_minmax(0,5fr)] items-center gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-16 shrink-0 place-items-center rounded-full border border-neutral-100 bg-white text-2xl font-bold text-primary-700 shadow-sm 2xl:size-20">
+            <div className="grid size-16 shrink-0 place-items-center rounded-full border border-neutral-100 bg-surface text-2xl font-bold text-primary-700 shadow-sm 2xl:size-20">
               {logoUrl ? (
                 <img
                   src={logoUrl}
@@ -1977,7 +1977,7 @@ function CompanyOverviewDashboard({
           return (
             <div
               key={`${metric.label}-${index}`}
-              className="rounded-xl border border-neutral-100 bg-white p-4 shadow-sm"
+              className="rounded-xl border border-neutral-100 bg-surface p-4 shadow-sm"
             >
               <div className="flex items-center gap-3">
                 <span className={`flex size-12 items-center justify-center rounded-full ${toneClasses[metric.tone]}`}>
@@ -1999,7 +1999,7 @@ function CompanyOverviewDashboard({
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="flex h-full flex-col rounded-2xl border border-neutral-100 bg-white p-5 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset,0_12px_30px_-20px_rgba(15,23,42,0.35)]">
+        <div className="flex h-full flex-col rounded-2xl border border-neutral-100 bg-surface p-5 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset,0_12px_30px_-20px_rgba(15,23,42,0.35)]">
           <div className="flex items-start gap-3">
             <div className="grid size-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-900 shadow-[0_0_0_1px_rgba(6,95,70,0.08)]">
               <Building2 className="size-4" />
@@ -2052,7 +2052,7 @@ function CompanyOverviewDashboard({
           </div>
         </div>
 
-        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-neutral-100 bg-surface p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-neutral-900">
               Authorized Person
@@ -2101,7 +2101,7 @@ function CompanyOverviewDashboard({
           </div>
         </div>
 
-        <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-neutral-100 bg-surface p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-neutral-900">
               Documents Overview
@@ -2146,7 +2146,7 @@ function CompanyOverviewDashboard({
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.85fr)]">
         <div className="space-y-4">
-          <div className="rounded-xl border border-neutral-100 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-neutral-100 bg-surface p-4 shadow-sm">
             <div className="flex items-center gap-2">
               <MapPin className="size-4 text-neutral-500" />
               <h3 className="text-sm font-semibold text-neutral-900">
@@ -2183,7 +2183,7 @@ function CompanyOverviewDashboard({
                 <button
                   type="button"
                   onClick={() => onNavigate("general")}
-                  className="absolute bottom-3 right-3 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-primary-700 shadow-sm ring-1 ring-neutral-100"
+                  className="absolute bottom-3 right-3 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-primary-700 shadow-sm ring-1 ring-neutral-100"
                 >
                   View on Map
                 </button>
@@ -2191,7 +2191,7 @@ function CompanyOverviewDashboard({
             </div>
           </div>
 
-          <div className="rounded-xl border border-neutral-100 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-neutral-100 bg-surface p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-neutral-900">
                 Recent Activity
@@ -2231,7 +2231,7 @@ function CompanyOverviewDashboard({
           </div>
         </div>
 
-        <div className="self-start rounded-xl border border-neutral-100 bg-white p-4 shadow-sm h-[208px]">
+        <div className="self-start rounded-xl border border-neutral-100 bg-surface p-4 shadow-sm h-[208px]">
           <h3 className="text-sm font-semibold text-neutral-900">
             Quick Actions
           </h3>
@@ -2244,7 +2244,7 @@ function CompanyOverviewDashboard({
                   key={`${action.label}-${index}`}
                   type="button"
                   onClick={() => onNavigate(action.tab)}
-                  className="flex min-h-14 flex-col items-center justify-center gap-1.5 rounded-xl border border-neutral-100 bg-white px-1.5 py-2 text-center text-[10px] font-semibold leading-tight text-neutral-700 transition-colors hover:border-primary-100 hover:bg-primary-50/40"
+                  className="flex min-h-14 flex-col items-center justify-center gap-1.5 rounded-xl border border-neutral-100 bg-surface px-1.5 py-2 text-center text-[10px] font-semibold leading-tight text-neutral-700 transition-colors hover:border-primary-100 hover:bg-primary-50/40"
                 >
                   <span className={`flex size-7 items-center justify-center rounded-lg ${toneClasses[action.tone]}`}>
                     <Icon className="size-3.5" />

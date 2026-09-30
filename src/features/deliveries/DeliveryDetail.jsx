@@ -108,7 +108,7 @@ function PreviewGrid({ files }) {
             href={url || undefined}
             target={url ? '_blank' : undefined}
             rel={url ? 'noreferrer' : undefined}
-            className="group overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md"
+            className="group overflow-hidden rounded-xl border border-neutral-200 bg-surface shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md"
             title={label}
           >
             <div className="aspect-square bg-neutral-100">
@@ -154,7 +154,7 @@ function AddDeliveryProductModal({ isOpen, onClose, products, catalogProducts, o
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search van stock..."
-            className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
           />
         )}
         <div className="max-h-72 divide-y divide-neutral-50 overflow-y-auto rounded-xl border border-neutral-100">
@@ -187,7 +187,7 @@ function AddDeliveryProductModal({ isOpen, onClose, products, catalogProducts, o
                     step="1"
                     value={value}
                     onChange={(event) => setQty((current) => ({ ...current, [item.productId]: Math.max(1, Math.round(Number(event.target.value) || 1)) }))}
-                    className="h-9 w-16 shrink-0 rounded-lg border border-neutral-200 bg-white px-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                    className="h-9 w-16 shrink-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                     aria-label={`Quantity for ${item.productName}`}
                   />
                   <Button type="button" size="sm" onClick={() => onAdd(item, value)}>Add</Button>
@@ -1163,7 +1163,7 @@ export default function DeliveryDetail() {
                       const clamped = Math.min(Math.max(Number.isFinite(rounded) ? rounded : 0, 0), item.plannedQuantity)
                       setPickedQuantities((current) => ({ ...current, [item.id]: clamped }))
                     }}
-                    className="h-10 w-32 rounded-lg border border-neutral-200 bg-white px-3 text-sm"
+                    className="h-10 w-32 rounded-lg border border-neutral-200 bg-surface px-3 text-sm"
                   />
                 </div>
               </div>
@@ -1483,7 +1483,7 @@ export default function DeliveryDetail() {
                 value={receiverName}
                 maxLength={120}
                 onChange={(event) => setReceiverName(event.target.value)}
-                className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
 
@@ -1521,7 +1521,7 @@ export default function DeliveryDetail() {
                 value={notes}
                 maxLength={1000}
                 onChange={(event) => setNotes(event.target.value)}
-                className="h-20 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-20 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
 
@@ -1559,7 +1559,7 @@ export default function DeliveryDetail() {
               onChange={(event) => setFailureReason(event.target.value)}
               placeholder="Reason the delivery failed (required)"
               maxLength={500}
-              className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
             <div className="flex gap-3">
               <Button type="button" variant="secondary" onClick={() => setShowFailForm(false)}>
@@ -1734,7 +1734,7 @@ export default function DeliveryDetail() {
               type="date"
               value={reassignScheduledDate}
               onChange={(event) => setReassignScheduledDate(event.target.value)}
-              className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
         </div>
@@ -1778,7 +1778,7 @@ export default function DeliveryDetail() {
               type="date"
               value={editForm.scheduledDate}
               onChange={(event) => setEditForm((current) => ({ ...current, scheduledDate: event.target.value }))}
-              className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -1787,7 +1787,7 @@ export default function DeliveryDetail() {
               value={editForm.deliveryAddress}
               onChange={(event) => setEditForm((current) => ({ ...current, deliveryAddress: event.target.value }))}
               maxLength={500}
-              className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -1796,7 +1796,7 @@ export default function DeliveryDetail() {
               value={editForm.notes}
               onChange={(event) => setEditForm((current) => ({ ...current, notes: event.target.value }))}
               maxLength={1000}
-              className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
         </div>
@@ -1825,7 +1825,7 @@ export default function DeliveryDetail() {
             onChange={(event) => setCancelNotes(event.target.value)}
             placeholder="Reason for cancelling (optional)"
             maxLength={500}
-            className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
           />
         </div>
       </Modal>

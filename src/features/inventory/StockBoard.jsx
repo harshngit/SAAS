@@ -291,7 +291,7 @@ export default function StockBoard({ readOnly = false }) {
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search products, brands, SKU"
                 aria-label="Search products, brands, SKU"
-                className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
             <Button ref={filterTriggerRef} type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)} aria-haspopup="dialog" aria-expanded={isFilterOpen} aria-controls="inventory-filter-panel">
@@ -311,7 +311,7 @@ export default function StockBoard({ readOnly = false }) {
       {!readOnly && <ExpiringBatchesPanel />}
 
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto bg-white px-0 py-0">
+        <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -344,7 +344,7 @@ export default function StockBoard({ readOnly = false }) {
                     <tr
                       key={item.id}
                       onClick={readOnly ? undefined : () => navigate(`/admin/inventory/${item.id}`)}
-                      className={`bg-white transition-colors hover:bg-primary-50/30 ${readOnly ? '' : 'cursor-pointer'}`}
+                      className={`bg-surface transition-colors hover:bg-primary-50/30 ${readOnly ? '' : 'cursor-pointer'}`}
                     >
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
@@ -415,7 +415,7 @@ export default function StockBoard({ readOnly = false }) {
       {isFilterOpen && createPortal(
         <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="inventory-filter-title" id="inventory-filter-panel">
           <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" tabIndex={-1} />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-white shadow-2xl">
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
               <div>
                 <h2 id="inventory-filter-title" className="text-lg font-semibold text-neutral-900">Filter Inventory</h2>

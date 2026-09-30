@@ -132,7 +132,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
       <form
         onClick={(event) => event.stopPropagation()}
         onSubmit={handleSave}
-        className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-white shadow-(--shadow-popover)"
+        className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-surface shadow-(--shadow-popover)"
       >
         <div className="flex items-start justify-between border-b border-neutral-100 px-6 py-5">
           <div>
@@ -226,7 +226,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
                 <textarea
                   value={collectionInstructions}
                   onChange={(event) => setCollectionInstructions(event.target.value)}
-                  className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
                 <p className="text-xs text-amber-700">Payment status stays pending until the cash is collected.</p>
               </div>
@@ -239,7 +239,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
               value={notes}
               maxLength={250}
               onChange={(event) => setNotes(event.target.value)}
-              className="h-20 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-20 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
 

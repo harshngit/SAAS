@@ -151,7 +151,7 @@ const Select = forwardRef(function Select(
       className={`flex flex-col gap-1.5 ${className}`}
     >
       {label && (
-        <label htmlFor={selectId} className="text-sm font-medium text-neutral-700">
+        <label htmlFor={selectId} className="text-sm font-medium text-fg">
           {label}
           {required && <span className="text-red-500"> *</span>}
         </label>
@@ -173,10 +173,10 @@ const Select = forwardRef(function Select(
             aria-haspopup="listbox"
             aria-expanded={isOpen}
             aria-controls={`${selectId}-listbox`}
-            className={`flex w-full max-w-full items-center gap-2 rounded-xl border bg-neutral-50 py-2.5 pl-3.5 pr-3 text-sm text-neutral-900 transition-all focus-within:bg-white focus-within:outline-none focus-within:ring-4 ${
+            className={`flex w-full max-w-full items-center gap-2 rounded-xl border bg-(--input-bg) py-2.5 pl-3.5 pr-3 text-sm text-fg transition-all focus-within:bg-surface focus-within:outline-none focus-within:ring-4 ${
               error
                 ? 'border-red-300 focus-within:border-red-400 focus-within:ring-red-500/15'
-                : 'border-neutral-200 focus-within:border-primary-400 focus-within:ring-primary-500/12'
+                : 'border-surface-border focus-within:border-primary-400 focus-within:ring-primary-500/12'
             } ${disabled ? 'cursor-not-allowed opacity-60' : ''} ${triggerClassName}`}
             onClick={() => !disabled && setIsOpen(true)}
           >
@@ -209,7 +209,7 @@ const Select = forwardRef(function Select(
               }}
               placeholder={isOpen ? placeholder : selectedOption?.label || placeholder}
               disabled={disabled}
-              className="w-full bg-transparent text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
+              className="w-full bg-transparent text-sm text-fg placeholder:text-neutral-400 focus:outline-none"
             />
             <ChevronDown
               className={`size-4 shrink-0 text-neutral-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -227,10 +227,10 @@ const Select = forwardRef(function Select(
             onClick={() => !disabled && setIsOpen((current) => !current)}
             onKeyDown={handleKeyDown}
             onBlur={onBlur}
-            className={`flex w-full max-w-full cursor-pointer items-center justify-between rounded-xl border bg-neutral-50 py-2.5 pl-3.5 pr-3 text-sm text-neutral-900 transition-all focus:bg-white focus:outline-none focus:ring-4 ${
+            className={`flex w-full max-w-full cursor-pointer items-center justify-between rounded-xl border bg-(--input-bg) py-2.5 pl-3.5 pr-3 text-sm text-fg transition-all focus:bg-surface focus:outline-none focus:ring-4 ${
               error
                 ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15'
-                : 'border-neutral-200 focus:border-primary-400 focus:ring-primary-500/12'
+                : 'border-surface-border focus:border-primary-400 focus:ring-primary-500/12'
             } ${disabled ? 'cursor-not-allowed opacity-60' : ''} ${triggerClassName}`}
           >
             <span className={selectedOption ? 'truncate' : 'truncate text-neutral-400'}>
@@ -249,7 +249,7 @@ const Select = forwardRef(function Select(
             role="listbox"
             id={`${selectId}-listbox`}
             style={menuStyle}
-            className="fixed z-50 overflow-x-hidden overflow-y-auto rounded-xl border border-neutral-200 bg-white p-1 text-sm text-neutral-900 shadow-popover"
+            className="fixed z-50 overflow-x-hidden overflow-y-auto rounded-xl border border-surface-border bg-surface p-1 text-sm text-fg shadow-popover"
           >
             {visibleOptions.length === 0 ? (
               <div className="cursor-default rounded-lg px-3 py-2 text-neutral-400">No matches</div>
@@ -268,7 +268,7 @@ const Select = forwardRef(function Select(
                   className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 transition-colors ${
                     isSelected
                       ? 'bg-primary-50 font-medium text-primary-700'
-                      : 'text-neutral-700 hover:bg-primary-50 hover:text-primary-700'
+                      : 'text-fg hover:bg-primary-50 hover:text-primary-700'
                   }`}
                 >
                   <span className="truncate">{option.label}</span>

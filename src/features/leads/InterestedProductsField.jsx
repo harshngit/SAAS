@@ -103,7 +103,7 @@ export default function InterestedProductsField({
   return (
     <div className={`flex flex-col gap-1.5 ${className}`} ref={boxRef}>
       <label className="text-sm font-medium text-neutral-700">{label}</label>
-      <div className="relative rounded-xl border border-neutral-200 bg-neutral-50 p-2 transition-all focus-within:border-primary-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-primary-500/12">
+      <div className="relative rounded-xl border border-neutral-200 bg-neutral-50 p-2 transition-all focus-within:border-primary-400 focus-within:bg-surface focus-within:ring-4 focus-within:ring-primary-500/12">
         {selected.length > 0 && (
           <div className="mb-1.5 flex flex-wrap gap-1.5">
             {selected.map((product, index) => (
@@ -147,7 +147,7 @@ export default function InterestedProductsField({
         </div>
 
         {open && (suggestions.length > 0 || canAddFreeText) && (
-          <div className="absolute inset-x-0 top-full z-10 mt-1.5 max-h-52 overflow-y-auto rounded-lg border border-neutral-100 bg-white shadow-md">
+          <div className="absolute inset-x-0 top-full z-10 mt-1.5 max-h-52 overflow-y-auto rounded-lg border border-neutral-100 bg-surface shadow-md">
             {suggestions.map((product) => (
               <button
                 key={product.id || product.name}

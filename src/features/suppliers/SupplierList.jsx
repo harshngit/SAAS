@@ -427,7 +427,7 @@ export default function SupplierList() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Suppliers</h1><p className="mt-1 text-xs text-neutral-400">{filteredSuppliers.length} suppliers in view</p></div>
               <div className="flex flex-wrap items-center justify-end gap-2">
-                <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search suppliers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
+                <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search suppliers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportSuppliersCsv()}><Download className="size-4" />Export</Button>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" />Bulk Import</Button>
@@ -448,10 +448,10 @@ export default function SupplierList() {
         </div>
       </Card>
 
-      {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} supplier{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-white px-3" onClick={() => exportSuppliersCsv(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
+      {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} supplier{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportSuppliersCsv(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
 
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto bg-white px-0 py-0">
+        <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>
@@ -483,7 +483,7 @@ export default function SupplierList() {
             <>
             <div className="space-y-3 px-4 md:hidden">
               {filteredSuppliers.map((supplier) => (
-                <div key={supplier.id} className="rounded-xl border border-neutral-100 bg-white p-4 shadow-(--shadow-xs)">
+                <div key={supplier.id} className="rounded-xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-xs)">
                   <div className="flex items-start justify-between gap-3">
                     <button type="button" className="flex min-w-0 items-center gap-3 text-left" onClick={() => navigate(`/admin/suppliers/${supplier.id}`)}>
                       <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-50 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">{getInitials(supplier.name)}</div>
@@ -521,7 +521,7 @@ export default function SupplierList() {
                   <tr
                     key={supplier.id}
                     onClick={() => navigate(`/admin/suppliers/${supplier.id}`)}
-                    className="cursor-pointer bg-white transition-colors hover:bg-primary-50/30"
+                    className="cursor-pointer bg-surface transition-colors hover:bg-primary-50/30"
                   >
                     <td className="px-6 py-5 align-middle" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(supplier.id)} onChange={() => setSelectedIds((current) => current.includes(supplier.id) ? current.filter((id) => id !== supplier.id) : [...current, supplier.id])} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label={`Select ${supplier.name}`} /></td>
                     <td className="px-6 py-5">
@@ -583,8 +583,8 @@ export default function SupplierList() {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-white px-5 py-4 text-xs text-[#6f89b0]">
-          <div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredSuppliers.length}</span></span><span className="hidden text-neutral-300 sm:inline">|</span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-white py-1 text-xs" /></label></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-surface px-5 py-4 text-xs text-[#6f89b0]">
+          <div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredSuppliers.length}</span></span><span className="hidden text-neutral-300 sm:inline">|</span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" /></label></div>
           <div className="flex items-center gap-1.5"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Previous page"><ChevronLeft className="size-4" /></button><span className="min-w-14 text-center font-medium text-[#082445]">{currentPage} / {totalPages}</span><button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Next page"><ChevronRight className="size-4" /></button></div>
         </div>
       </Card>
@@ -592,7 +592,7 @@ export default function SupplierList() {
       {isFilterOpen && (
         <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Supplier filters">
           <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-white shadow-2xl">
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4"><div><h2 className="text-lg font-semibold text-neutral-900">Filter Suppliers</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the suppliers shown in the table.</p></div><button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button></div>
             <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={supplierStatusTabs.map((tab) => ({ value: tab.value, label: tab.label }))} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label>

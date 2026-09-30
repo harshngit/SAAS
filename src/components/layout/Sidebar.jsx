@@ -60,6 +60,7 @@ export default function Sidebar({
   onToggleExpanded,
   isMobileOpen,
   onCloseMobile,
+  hasBackground = false,
 }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -196,9 +197,9 @@ export default function Sidebar({
 
       <aside
         id={id}
-        className={`fixed inset-y-3 left-3 z-50 flex w-[14rem] flex-col overflow-visible rounded-2xl bg-[#eef6eb] shadow-(--shadow-card) transition-transform duration-300 md:static md:inset-auto md:h-full md:translate-x-0 md:rounded-none md:shadow-none md:transition-[width] md:duration-300 md:ease-in-out ${
+        className={`fixed inset-y-3 left-3 z-50 flex w-[14rem] flex-col overflow-visible rounded-2xl bg-(--sidebar-bg) shadow-(--shadow-card) transition-transform duration-300 md:static md:inset-auto md:h-full md:translate-x-0 md:rounded-none md:shadow-none md:transition-[width] md:duration-300 md:ease-in-out ${
           isExpanded ? 'md:w-[14rem]' : 'md:w-[4.75rem]'
-        } ${isMobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'}`}
+        } ${isMobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'} ${hasBackground ? 'theme-glass' : ''}`}
       >
         
         <button
@@ -207,7 +208,7 @@ export default function Sidebar({
   aria-label={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
   aria-expanded={isExpanded}
   aria-controls={id}
-  className="group absolute right-[-0.65rem] top-1/2 z-20 hidden size-8 -translate-y-1/2 items-center justify-center rounded-full bg-white text-primary-700 shadow-(--shadow-card) ring-2 ring-neutral-200 transition-colors hover:text-primary-900 focus:outline-none focus:ring-2 focus:ring-neutral-200 md:flex"
+  className="group absolute right-[-0.65rem] top-1/2 z-20 hidden size-8 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-primary-700 shadow-(--shadow-card) ring-2 ring-neutral-200 transition-colors hover:text-primary-900 focus:outline-none focus:ring-2 focus:ring-neutral-200 md:flex"
 >
   {isExpanded ? (
     <ChevronLeft className="size-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
@@ -222,13 +223,13 @@ export default function Sidebar({
               <Droplet className="size-5" aria-hidden="true" />
             </div>
             <div className={`hidden min-w-0 flex-col overflow-hidden transition-all duration-150 md:flex ${labelVisibilityClass}`}>
-              <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-neutral-900">
+              <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-fg">
                 SAAS CRM
               </span>
               <span className="truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
             </div>
             <div className="flex min-w-0 flex-col md:hidden">
-              <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-neutral-900">
+              <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-fg">
                 SAAS CRM
               </span>
               <span className="truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
@@ -269,7 +270,7 @@ export default function Sidebar({
                     className={`group relative hidden items-center justify-center rounded-2xl py-2.5 text-sm font-medium transition-all duration-150 md:flex ${
                       isSectionActive
                         ? 'bg-[#bdeaa5] text-primary-700 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
-                        : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
+                        : 'text-fg-muted hover:bg-neutral-50 hover:text-fg'
                     }`}
                   >
                     <span
@@ -295,13 +296,13 @@ export default function Sidebar({
                       {keepMenuAlwaysOpen ? (
                         <>
                           <div
-                            className={`hidden items-center overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 md:flex ${
+                            className={`hidden items-center overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-fg md:flex ${
                               isExpanded ? sectionLabelVisibilityClass : 'invisible h-0 max-w-0 pb-0 opacity-0'
                             }`}
                           >
                             <span className="truncate">{group.section}</span>
                           </div>
-                          <div className="flex w-full items-center rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 md:hidden">
+                          <div className="flex w-full items-center rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-fg md:hidden">
                             <span>{group.section}</span>
                           </div>
                         </>
@@ -311,7 +312,7 @@ export default function Sidebar({
                             type="button"
                             onClick={() => toggleSection(group.section)}
                             aria-expanded={openSections[group.section] !== false}
-                            className={`hidden w-full items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 transition-all duration-150 md:flex ${
+                            className={`hidden w-full items-center justify-between overflow-hidden rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-fg transition-all duration-150 md:flex ${
                               isExpanded ? sectionLabelVisibilityClass : 'invisible h-0 max-w-0 pb-0 opacity-0'
                             }`}
                           >
@@ -325,7 +326,7 @@ export default function Sidebar({
                             type="button"
                             onClick={() => toggleSection(group.section)}
                             aria-expanded={openSections[group.section] !== false}
-                            className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-neutral-900 transition-colors md:hidden"
+                            className="flex w-full items-center justify-between rounded-lg px-3 pb-2 text-left text-[0.68rem] font-semibold uppercase tracking-wide text-fg transition-colors md:hidden"
                           >
                             <span>{group.section}</span>
                             <ChevronDown
@@ -355,8 +356,8 @@ export default function Sidebar({
                               : 'gap-3 px-3.5 md:gap-0 md:rounded-2xl md:px-0 md:justify-center'
                           } ${
                             isActive
-                              ? 'bg-[#c4eba9] text-neutral-900 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.12)]'
-                              : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
+                              ? 'bg-(--sidebar-active-bg) text-neutral-900 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.12)]'
+                              : 'text-fg-muted hover:bg-neutral-50 hover:text-fg'
                           }`
                         }
                       >
@@ -372,7 +373,7 @@ export default function Sidebar({
                               <item.icon className="size-4.5" aria-hidden="true" />
                               {!isExpanded && badgeCount > 0 && (
                                 <span
-                                  className="absolute -right-1 -top-1 size-2 rounded-full bg-red-500 ring-2 ring-[#eef6eb]"
+                                  className="absolute -right-1 -top-1 size-2 rounded-full bg-red-500 ring-2 ring-(--sidebar-bg)"
                                   aria-hidden="true"
                                 />
                               )}
@@ -416,7 +417,7 @@ export default function Sidebar({
           return (
           <div className="px-3 pb-3">
             {isExpanded ? (
-              <div className="max-w-full rounded-2xl bg-white px-4 py-4 shadow-[0_12px_26px_-20px_rgb(15_23_42/0.22)]">
+              <div className="max-w-full rounded-2xl bg-surface px-4 py-4 shadow-[0_12px_26px_-20px_rgb(15_23_42/0.22)]">
                 <div className="flex items-start gap-3">
                   <span
                     className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-white ${
@@ -475,7 +476,7 @@ export default function Sidebar({
                 <NavLink
                   to="/admin/plans"
                   onClick={onCloseMobile}
-                  className="mt-1.5 inline-flex w-full items-center justify-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[0.62rem] font-semibold text-primary-700 shadow-(--shadow-xs) transition-colors hover:bg-primary-50"
+                  className="mt-1.5 inline-flex w-full items-center justify-center gap-1 rounded-full bg-surface px-2.5 py-1.5 text-[0.62rem] font-semibold text-primary-700 shadow-(--shadow-xs) transition-colors hover:bg-primary-50"
                 >
                   <Crown className="size-3" aria-hidden="true" />
                   Upgrade
@@ -504,7 +505,7 @@ export default function Sidebar({
             <NavLink
               to="/admin/plans"
               onClick={onCloseMobile}
-              className="mt-1.5 inline-flex w-full items-center justify-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[0.62rem] font-semibold text-primary-700 shadow-(--shadow-xs) transition-colors hover:bg-primary-50"
+              className="mt-1.5 inline-flex w-full items-center justify-center gap-1 rounded-full bg-surface px-2.5 py-1.5 text-[0.62rem] font-semibold text-primary-700 shadow-(--shadow-xs) transition-colors hover:bg-primary-50"
             >
               <Crown className="size-3" aria-hidden="true" />
               Upgrade

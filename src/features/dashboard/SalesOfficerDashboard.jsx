@@ -91,7 +91,7 @@ function QuickAction({ icon: Icon, label, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex h-20 flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-neutral-100 bg-white px-2 text-center shadow-(--shadow-xs) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card)"
+      className="flex h-20 flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-neutral-100 bg-surface px-2 text-center shadow-(--shadow-xs) transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-(--shadow-card)"
     >
       <Icon className="size-5 text-primary-700" aria-hidden="true" />
       <span className="text-xs font-medium leading-tight text-neutral-700">{label}</span>
@@ -101,7 +101,7 @@ function QuickAction({ icon: Icon, label, onClick }) {
 
 function StatCard({ icon: Icon, iconClassName, label, value, sublabel }) {
   return (
-    <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+    <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-neutral-500">{label}</p>
         <div className={`flex size-10 shrink-0 items-center justify-center rounded-full text-white ${iconClassName}`}>
@@ -144,7 +144,7 @@ function OrderStatusTile({ icon: Icon, iconClassName, label, count }) {
 
 function SectionCard({ icon: Icon, title, action, children, className = '' }) {
   return (
-    <div className={`rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card) ${className}`}>
+    <div className={`rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card) ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Icon className="size-4.5 text-primary-700" aria-hidden="true" />
@@ -292,7 +292,7 @@ export default function SalesOfficerDashboard() {
 
   return (
     <div className="space-y-5 lg:space-y-6">
-      <div className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white/95 p-5 shadow-(--shadow-card) lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-surface/95 p-5 shadow-(--shadow-card) lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-start gap-4">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-500">
             <Sun className="size-6" aria-hidden="true" />
@@ -330,7 +330,7 @@ export default function SalesOfficerDashboard() {
         <StatCard icon={ShoppingCart} iconClassName="bg-emerald-500" label="Orders This Month" value={ordersThisMonth.length} sublabel="Total orders created" />
       </div>
 
-      <div className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-(--shadow-card)">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
         <h2 className="text-base font-semibold text-neutral-900">Monthly Sales Target</h2>
         <p className="mt-1 text-sm text-neutral-500">{formatCurrency(monthlySales)} of {formatCurrency(MONTHLY_TARGET)} target</p>
         <div className="mt-4 flex items-center gap-4">

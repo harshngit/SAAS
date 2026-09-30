@@ -83,7 +83,7 @@ export default function DataTable({
               value={search}
               onChange={handleSearchChange}
               placeholder={searchPlaceholder}
-              className="w-full rounded-full border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="w-full rounded-full border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
           <p className="text-xs font-medium text-neutral-400">
@@ -92,10 +92,10 @@ export default function DataTable({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-2xl border border-neutral-100 bg-white">
+      <div className="overflow-x-auto rounded-2xl border border-neutral-100 bg-surface">
         <table className="listing-table w-full text-left text-sm">
           <thead>
-            <tr className="border-y border-neutral-100 bg-white">
+            <tr className="border-y border-neutral-100 bg-surface">
               {columns.map((column) => (
                 <th
                   key={column.key}

@@ -207,7 +207,7 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
     const moduleLabel = moduleLabelFor(module.key, module.label)
     return (
       <tr key={module.key} className="border-b border-neutral-50 last:border-b-0">
-        <td className="sticky left-0 z-10 bg-white px-4 py-3 font-medium text-neutral-900">{moduleLabel}</td>
+        <td className="sticky left-0 z-10 bg-surface px-4 py-3 font-medium text-neutral-900">{moduleLabel}</td>
         <td className="px-3 py-3 text-center">
           <input
             type="checkbox"
@@ -274,7 +274,7 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
                   if (!isEditing && !dataScopeTouched) setDataScope(WORKSPACE_DEFAULT_SCOPE[entry.value] || 'own')
                 }}
                 className={`flex flex-col gap-2 rounded-xl border p-3.5 text-left transition-colors ${
-                  isSelected ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500' : 'border-neutral-200 bg-white hover:border-primary-300'
+                  isSelected ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500' : 'border-neutral-200 bg-surface hover:border-primary-300'
                 }`}
               >
                 <span className="flex items-center gap-2 text-sm font-semibold text-neutral-900">

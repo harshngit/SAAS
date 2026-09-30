@@ -167,13 +167,13 @@ export default function Topbar() {
           <input
             type="search"
             placeholder="Search customers, jobs, quotes..."
-            className="w-full rounded-xl border border-[#dfe6f2] bg-[#f8faff] py-2.5 pl-11 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-[#9fb0cf] focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/10"
+            className="w-full rounded-xl border border-[#dfe6f2] bg-(--input-bg) py-2.5 pl-11 pr-4 text-sm text-fg shadow-(--shadow-xs) transition-all placeholder:text-[#9fb0cf] focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/10"
           />
         </div>
         <button
           type="button"
           aria-label="Help"
-          className="hidden rounded-full bg-white p-2.5 text-neutral-500 shadow-(--shadow-xs) ring-1 ring-neutral-100 transition-colors hover:text-neutral-900 sm:inline-flex"
+          className="hidden rounded-full bg-surface p-2.5 text-fg-muted shadow-(--shadow-xs) ring-1 ring-neutral-100 transition-colors hover:text-fg sm:inline-flex"
         >
           <HelpCircle className="size-4.5" />
         </button>
@@ -184,7 +184,7 @@ export default function Topbar() {
             aria-haspopup="menu"
             aria-expanded={isNotificationsOpen}
             onClick={toggleNotifications}
-            className="relative rounded-full bg-white p-2.5 text-neutral-500 shadow-(--shadow-xs) ring-1 ring-neutral-100 transition-colors hover:text-neutral-900"
+            className="relative rounded-full bg-surface p-2.5 text-fg-muted shadow-(--shadow-xs) ring-1 ring-neutral-100 transition-colors hover:text-fg"
           >
             <Bell className="size-4.5" />
             {unreadCount > 0 && (
@@ -195,10 +195,10 @@ export default function Topbar() {
           {isNotificationsOpen && (
             <div
               role="menu"
-              className="absolute right-0 z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-popover)"
+              className="absolute right-0 z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-surface-border bg-surface shadow-(--shadow-popover)"
             >
               <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
-                <p className="text-sm font-semibold text-neutral-900">Notifications</p>
+                <p className="text-sm font-semibold text-fg">Notifications</p>
                 {unreadCount > 0 && (
                   <button type="button" onClick={handleMarkAllRead} className="flex items-center gap-1 text-xs font-medium text-primary-700 hover:underline">
                     <CheckCheck className="size-3.5" aria-hidden="true" />
@@ -219,7 +219,7 @@ export default function Topbar() {
                       onClick={() => handleNotificationClick(notification)}
                       className={`flex w-full flex-col gap-0.5 border-b border-neutral-50 px-4 py-3 text-left transition-colors hover:bg-neutral-50 ${!notification.isRead ? 'bg-primary-50/40' : ''}`}
                     >
-                      <p className="text-sm font-medium text-neutral-900">{notification.title}</p>
+                      <p className="text-sm font-medium text-fg">{notification.title}</p>
                       <p className="line-clamp-2 text-xs text-neutral-500">{notification.body}</p>
                       <p className="mt-0.5 text-[0.65rem] text-neutral-400">{formatNotificationTime(notification.createdAt)}</p>
                     </button>
@@ -245,13 +245,13 @@ export default function Topbar() {
             onClick={() => setIsMenuOpen((prev) => !prev)}
             aria-haspopup="menu"
             aria-expanded={isMenuOpen}
-            className="flex items-center gap-2 rounded-full bg-transparent py-1 pl-1 pr-1.5 transition-colors hover:bg-white"
+            className="flex items-center gap-2 rounded-full bg-transparent py-1 pl-1 pr-1.5 transition-colors hover:bg-(--input-bg)"
           >
             <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary-500 to-primary-700 text-xs font-semibold text-white ring-2 ring-white">
               {initials}
             </div>
             <div className="hidden pr-3 text-left sm:block">
-              <p className="text-sm font-medium leading-tight text-neutral-900">{currentUser.name}</p>
+              <p className="text-sm font-medium leading-tight text-fg">{currentUser.name}</p>
               <span className="text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
             </div>
             <ChevronDown
@@ -263,10 +263,10 @@ export default function Topbar() {
           {isMenuOpen && (
             <div
               role="menu"
-              className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-2xl border border-neutral-100 bg-white p-1.5 shadow-(--shadow-popover)"
+              className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-2xl border border-surface-border bg-surface p-1.5 shadow-(--shadow-popover)"
             >
               <div className="px-3 py-2.5 sm:hidden">
-                <p className="text-sm font-medium leading-tight text-neutral-900">{currentUser.name}</p>
+                <p className="text-sm font-medium leading-tight text-fg">{currentUser.name}</p>
                 <span className="text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
               </div>
               <button

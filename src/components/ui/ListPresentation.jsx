@@ -5,7 +5,7 @@ import DataTable from './DataTable'
 // keep their current appearance and behavior.
 export function ListHeader({ children }) {
   return (
-    <div className="rounded-2xl border border-neutral-100 bg-white/95 shadow-(--shadow-card)">
+    <div className="rounded-2xl border border-neutral-100 bg-surface/95 shadow-(--shadow-card)">
       <div className="flex flex-col flex-wrap gap-3 px-5 py-5 sm:flex-row sm:items-start sm:justify-between [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:tracking-tight [&_h2]:text-xl [&_h2]:tracking-tight [&_p]:text-xs [&_p]:text-neutral-400 [&_button]:h-9 [&_button]:rounded-xl [&_button]:text-xs">
         {children}
       </div>
@@ -15,7 +15,7 @@ export function ListHeader({ children }) {
 
 export function ListSummary({ children, className = '' }) {
   return (
-    <div className={`grid gap-px overflow-hidden rounded-2xl border border-neutral-100 bg-neutral-100 shadow-(--shadow-card) [&>*]:min-w-0 [&>*]:bg-white ${className}`}>
+    <div className={`grid gap-px overflow-hidden rounded-2xl border border-neutral-100 bg-neutral-100 shadow-(--shadow-card) [&>*]:min-w-0 [&>*]:bg-surface ${className}`}>
       {children}
     </div>
   )
@@ -23,7 +23,7 @@ export function ListSummary({ children, className = '' }) {
 
 export function ListOverview({ children }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-white/95 shadow-(--shadow-card) [&>div]:rounded-none [&>div]:border-0 [&>div]:shadow-none [&>div+div]:border-t [&>div+div]:border-neutral-100">
+    <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-surface/95 shadow-(--shadow-card) [&>div]:rounded-none [&>div]:border-0 [&>div]:shadow-none [&>div+div]:border-t [&>div+div]:border-neutral-100">
       {children}
     </div>
   )
@@ -31,7 +31,7 @@ export function ListOverview({ children }) {
 
 export function ListStatCard({ icon: Icon, label, value, delta, actions, className = '' }) {
   return (
-    <div className={`h-full min-h-32 bg-white px-5 py-4 lg:px-6 ${className}`}>
+    <div className={`h-full min-h-32 bg-surface px-5 py-4 lg:px-6 ${className}`}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-medium text-[#6b86ad]">{label}</p>
         <div className="flex shrink-0 items-center gap-1">
@@ -69,7 +69,7 @@ export function ListTableToolbar({ title, subtitle, search, onSearchChange, sear
           <div className="relative min-w-0 flex-1 lg:w-64">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
             <input type="search" aria-label={searchPlaceholder || `Search ${title}`} value={search} onChange={onSearchChange} placeholder={searchPlaceholder}
-              className="h-9 w-full rounded-xl border border-neutral-200 bg-white py-1.5 pl-9 pr-3 text-xs text-neutral-700 shadow-(--shadow-xs) transition-colors placeholder:text-neutral-400 hover:border-neutral-300 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
+              className="h-9 w-full rounded-xl border border-neutral-200 bg-surface py-1.5 pl-9 pr-3 text-xs text-neutral-700 shadow-(--shadow-xs) transition-colors placeholder:text-neutral-400 hover:border-neutral-300 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
           </div>
         )}
         {actions && <div className="w-full shrink-0 sm:w-44">{actions}</div>}
@@ -89,7 +89,7 @@ export function ListDataTable({ title, subtitle, toolbarActions, ...props }) {
     )
   }
   return (
-    <div className="[&_input]:h-9 [&_input]:rounded-xl [&_input]:bg-white [&_input]:py-1.5 [&_input]:text-xs [&>div>div:first-child]:px-5 [&>div>div:first-child]:pt-4 [&>div>div:first-child]:sm:flex-row-reverse [&>div>div.overflow-x-auto]:rounded-none [&>div>div.overflow-x-auto]:border-x-0 [&>div>div:last-child:not(.overflow-x-auto)]:px-5 [&>div>div:last-child:not(.overflow-x-auto)]:pb-4">
+    <div className="[&_input]:h-9 [&_input]:rounded-xl [&_input]:bg-surface [&_input]:py-1.5 [&_input]:text-xs [&>div>div:first-child]:px-5 [&>div>div:first-child]:pt-4 [&>div>div:first-child]:sm:flex-row-reverse [&>div>div.overflow-x-auto]:rounded-none [&>div>div.overflow-x-auto]:border-x-0 [&>div>div:last-child:not(.overflow-x-auto)]:px-5 [&>div>div:last-child:not(.overflow-x-auto)]:pb-4">
       <DataTable {...props} />
     </div>
   )

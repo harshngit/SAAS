@@ -156,7 +156,7 @@ export default function CollectionReconciliation() {
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div ref={setSearchHost} className={isLoading ? 'hidden' : 'hidden w-60 md:block'} />
                 <ListFilterPanel title="Filter Collections">
-                  <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+                  <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
                 </ListFilterPanel>
               </div>
             )}
@@ -223,7 +223,7 @@ export default function CollectionReconciliation() {
                           <div className="relative">
                             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
                             <input type="search" value={search} onChange={onSearchChange} placeholder="Search collections..." aria-label="Search collections"
-                              className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
+                              className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
                           </div>, searchHost,
                         )}
                       </>
@@ -273,7 +273,7 @@ export default function CollectionReconciliation() {
                     </p>
                   ) : (
                     rows.map((row) => (
-                      <div key={row.id} className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-(--shadow-xs)">
+                      <div key={row.id} className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-xs)">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-neutral-900">{row.customerName || '—'}</p>
@@ -364,7 +364,7 @@ export default function CollectionReconciliation() {
                 value={voidReason}
                 onChange={(event) => setVoidReason(event.target.value)}
                 maxLength={300}
-                className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 placeholder="Why is this collection being voided?"
               />
             </div>

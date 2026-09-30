@@ -366,7 +366,7 @@ export function ConvertLeadForm({ lead, salespersonOptions, saving, formError, o
           />
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <label className="text-sm font-medium text-neutral-700">Google Maps Location</label>
-            <div className="flex rounded-xl border border-neutral-200 bg-neutral-50 transition-all focus-within:border-primary-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-primary-500/12">
+            <div className="flex rounded-xl border border-neutral-200 bg-neutral-50 transition-all focus-within:border-primary-400 focus-within:bg-surface focus-within:ring-4 focus-within:ring-primary-500/12">
               <input
                 value={formData.googleMapsLocation}
                 onChange={(event) => updateField('googleMapsLocation', event.target.value)}

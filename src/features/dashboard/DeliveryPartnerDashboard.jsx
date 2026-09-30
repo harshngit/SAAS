@@ -49,7 +49,7 @@ function todayIso() {
 
 function StatCard({ icon: Icon, iconClassName, label, value, footer, footerClassName = 'text-primary-700', onClick }) {
   return (
-    <article className="rounded-2xl border border-neutral-100 bg-white p-5 shadow-[0_14px_32px_-26px_rgb(15_23_42/0.22)]">
+    <article className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-[0_14px_32px_-26px_rgb(15_23_42/0.22)]">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm text-neutral-500">{label}</p>
         <div className={`flex size-11 items-center justify-center rounded-2xl ${iconClassName}`}>
@@ -68,7 +68,7 @@ function StatCard({ icon: Icon, iconClassName, label, value, footer, footerClass
 
 function ShellCard({ title, action, children, className = '' }) {
   return (
-    <section className={`rounded-2xl border border-neutral-100 bg-white p-5 shadow-[0_16px_36px_-26px_rgb(15_23_42/0.22)] ${className}`}>
+    <section className={`rounded-2xl border border-neutral-100 bg-surface p-5 shadow-[0_16px_36px_-26px_rgb(15_23_42/0.22)] ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold tracking-tight text-neutral-900">{title}</h2>
         {action}
@@ -110,7 +110,7 @@ function DonutTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
   const item = payload[0]
   return (
-    <div className="rounded-xl bg-white px-3 py-2 text-xs shadow-(--shadow-popover) ring-1 ring-black/5">
+    <div className="rounded-xl bg-surface px-3 py-2 text-xs shadow-(--shadow-popover) ring-1 ring-black/5">
       <p className="font-semibold text-neutral-900">{item.name}</p>
       <p className="mt-1 text-neutral-500">
         {item.value} {item.value === 1 ? 'delivery' : 'deliveries'}

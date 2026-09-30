@@ -162,7 +162,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, customer, onSaved
       <form
         onClick={(event) => event.stopPropagation()}
         onSubmit={handleSubmit}
-        className={`flex h-full w-full max-w-md flex-col overflow-y-auto bg-white shadow-(--shadow-popover) transition-transform duration-300 ease-out ${
+        className={`flex h-full w-full max-w-md flex-col overflow-y-auto bg-surface shadow-(--shadow-popover) transition-transform duration-300 ease-out ${
           isVisible ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -290,7 +290,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, customer, onSaved
             <textarea
               value={paymentForm.collectionInstructions}
               onChange={(event) => setPaymentForm((current) => ({ ...current, collectionInstructions: event.target.value }))}
-              className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
             <p className="text-xs text-amber-700">Payment status stays pending until the cash is collected.</p>
           </div>

@@ -93,7 +93,7 @@ export default function AdminDeliveries() {
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
                 className="w-full"
-                triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs"
+                triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
               />
               }
               loading={isLoading}

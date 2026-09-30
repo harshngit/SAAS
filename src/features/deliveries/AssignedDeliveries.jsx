@@ -125,7 +125,7 @@ export default function AssignedDeliveries() {
                 className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                   isActive
                     ? 'border-primary-600 bg-primary-600 text-white'
-                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-primary-300 hover:text-primary-700'
+                    : 'border-neutral-200 bg-surface text-neutral-600 hover:border-primary-300 hover:text-primary-700'
                 }`}
               >
                 {filter.label}

@@ -93,7 +93,7 @@ export function SalesStaffOverviewPanels({
             </ResponsiveContainer>
             {!hasSalesPerformance && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <p className="rounded-full bg-white/90 px-3 py-1 text-xs text-neutral-400 shadow-(--shadow-xs)">
+                <p className="rounded-full bg-surface/90 px-3 py-1 text-xs text-neutral-400 shadow-(--shadow-xs)">
                   No sales data tracked for this employee yet
                 </p>
               </div>

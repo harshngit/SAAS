@@ -72,7 +72,7 @@ export default function ProductPickerList({
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search products by name or SKU..."
           disabled={isLoading}
-          className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12 disabled:opacity-60"
+          className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12 disabled:opacity-60"
         />
       </div>
 
@@ -89,7 +89,7 @@ export default function ProductPickerList({
                 className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
                   isActive
                     ? 'border-primary-600 bg-primary-600 text-white'
-                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-primary-300 hover:text-primary-700'
+                    : 'border-neutral-200 bg-surface text-neutral-600 hover:border-primary-300 hover:text-primary-700'
                 }`}
               >
                 {entry === 'all' ? 'All' : entry}
@@ -123,7 +123,7 @@ export default function ProductPickerList({
                 className={`flex items-center gap-3 rounded-2xl border p-3 transition-colors ${
                   isSelected
                     ? 'border-primary-600 bg-primary-50/50 ring-1 ring-primary-600'
-                    : 'border-neutral-100 bg-white hover:border-neutral-200'
+                    : 'border-neutral-100 bg-surface hover:border-neutral-200'
                 }`}
               >
                 <div className="relative size-14 shrink-0">
@@ -181,7 +181,7 @@ export default function ProductPickerList({
 
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   {isSelected && (
-                    <div className="flex items-center gap-1 rounded-md border border-neutral-200 bg-white pl-2 pr-1">
+                    <div className="flex items-center gap-1 rounded-md border border-neutral-200 bg-surface pl-2 pr-1">
                       <span className="text-[0.7rem] text-neutral-400">₹</span>
                       <input
                         type="number"

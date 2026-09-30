@@ -883,7 +883,7 @@ export default function SupplierDetail() {
                               {brandCategories.map((category) => (
                                 <span
                                   key={category.categoryId}
-                                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-medium text-neutral-700 shadow-(--shadow-xs)"
+                                  className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-xs font-medium text-neutral-700 shadow-(--shadow-xs)"
                                 >
                                   {category.categoryName || allCategories.find((entry) => String(entry.id) === String(category.categoryId))?.name || category.categoryId}
                                   <button

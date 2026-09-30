@@ -43,7 +43,7 @@ export default function Register() {
 
   return (
     <div className="h-svh overflow-hidden bg-neutral-50 p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto flex h-[calc(100svh-2rem)] max-w-7xl overflow-hidden rounded-2xl border border-neutral-200 bg-white p-3 shadow-popover sm:h-[calc(100svh-3rem)] lg:h-[calc(100svh-4rem)]">
+      <div className="mx-auto flex h-[calc(100svh-2rem)] max-w-7xl overflow-hidden rounded-2xl border border-neutral-200 bg-surface p-3 shadow-popover sm:h-[calc(100svh-3rem)] lg:h-[calc(100svh-4rem)]">
         <AuthShowcase
           kicker="New workspace"
           title="Set up your admin account"
@@ -70,7 +70,7 @@ export default function Register() {
                   <LogIn className="size-4" />
                   Login
                 </Link>
-                <Link to="/register" className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 font-medium text-neutral-900 shadow-xs">
+                <Link to="/register" className="inline-flex items-center gap-1.5 rounded-lg bg-surface px-3 py-1.5 font-medium text-neutral-900 shadow-xs">
                   <UserPlus className="size-4" />
                   Sign Up
                 </Link>

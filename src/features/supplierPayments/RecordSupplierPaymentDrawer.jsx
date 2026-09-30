@@ -221,7 +221,7 @@ export default function RecordSupplierPaymentDrawer({ isOpen, onClose, onRecorde
     <div className="fixed inset-0 z-50 flex justify-end bg-neutral-900/60 backdrop-blur-sm" onClick={onClose}>
       <div
         onClick={(event) => event.stopPropagation()}
-        className="flex h-full w-full max-w-xl flex-col overflow-y-auto bg-white shadow-(--shadow-popover)"
+        className="flex h-full w-full max-w-xl flex-col overflow-y-auto bg-surface shadow-(--shadow-popover)"
       >
         <div className="flex items-start justify-between border-b border-neutral-100 px-6 py-5">
           <div>
@@ -288,7 +288,7 @@ export default function RecordSupplierPaymentDrawer({ isOpen, onClose, onRecorde
                               step="1"
                               value={allocations[invoice.id] ?? ''}
                               onChange={(event) => setAllocations((current) => ({ ...current, [invoice.id]: event.target.value }))}
-                              className="w-24 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-right text-sm"
+                              className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm"
                             />
                           </td>
                         </tr>

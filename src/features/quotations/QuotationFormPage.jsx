@@ -392,7 +392,7 @@ export default function QuotationFormPage() {
 
   if (isLoadingSource) {
     return (
-      <div className="rounded-2xl border border-neutral-100 bg-white p-10">
+      <div className="rounded-2xl border border-neutral-100 bg-surface p-10">
         <LoadingSpinner label="Loading quotation..." />
       </div>
     )
@@ -430,7 +430,7 @@ export default function QuotationFormPage() {
 
         <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
         {/* 1 - Quotation Details */}
-        <div className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
+        <div className="rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)">
           <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-3">
             <SectionBadge number={1} />
             <h3 className="text-sm font-semibold text-neutral-900">Quotation Details</h3>
@@ -506,7 +506,7 @@ export default function QuotationFormPage() {
         </div>
 
         {/* 2 - Terms Details */}
-        <div className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
+        <div className="rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)">
           <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-3">
             <SectionBadge number={2} />
             <h3 className="text-sm font-semibold text-neutral-900">Terms Details</h3>
@@ -521,7 +521,7 @@ export default function QuotationFormPage() {
         </div>
 
         {/* 3 - Quotation Items */}
-        <div className="rounded-2xl border border-neutral-100 bg-white shadow-(--shadow-card)">
+        <div className="rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)">
           <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-3">
             <SectionBadge number={3} />
             <h3 className="text-sm font-semibold text-neutral-900">Quotation Items</h3>
@@ -563,7 +563,7 @@ export default function QuotationFormPage() {
                         setDiscountValue(String(Number.isFinite(rounded) ? Math.max(rounded, 0) : 0))
                       }}
                       aria-label="Discount value"
-                      className="h-9 w-14 shrink-0 rounded-lg border border-neutral-200 bg-white px-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                      className="h-9 w-14 shrink-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                     />
                     <span className="shrink-0 text-xs font-medium text-neutral-500">{discountType === 'percentage' ? '%' : '₹'}</span>
                   </div>

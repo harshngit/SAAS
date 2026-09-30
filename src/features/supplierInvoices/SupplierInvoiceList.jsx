@@ -189,33 +189,33 @@ export default function SupplierInvoiceList() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search Invoice # / Supplier / Purchase #"
-              className="h-9 w-full rounded-xl border border-neutral-100 bg-white py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+              className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
           <ListFilterPanel title="Filter Supplier Invoices">
-            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <Select label="Invoice status"
             options={[{ value: 'all', label: 'All Statuses' }, ...lifecycleFilterOptions]}
             value={lifecycleFilter}
             onChange={(event) => setLifecycleFilter(event.target.value)}
             className="w-full"
-            triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs"
+            triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
           />
           <Select label="Verification"
             options={[{ value: 'all', label: 'All Verification' }, ...VERIFICATION_FILTER_OPTIONS]}
             value={verificationFilter}
             onChange={(event) => setVerificationFilter(event.target.value)}
             className="w-full"
-            triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs"
+            triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
           />
           <Select label="Payment status"
             options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]}
             value={paymentStatusFilter}
             onChange={(event) => setPaymentStatusFilter(event.target.value)}
             className="w-full"
-            triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs"
+            triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
           />
-          <Select label="Sort by" options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />
+          <Select label="Sort by" options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           </ListFilterPanel>
           {canCreate && (
           <Button type="button" onClick={() => navigate(`${basePath}/new`)}>

@@ -97,7 +97,7 @@ export default function PurchaseReturnList() {
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Search return #, supplier, purchase # or GRN #"
-                  className="h-9 w-full rounded-xl border border-neutral-100 bg-neutral-50 py-1.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-neutral-50 py-1.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
               </div>
               <Select
@@ -150,7 +150,7 @@ export default function PurchaseReturnList() {
                     <tr
                       key={pr.id}
                       onClick={() => navigate(`${basePath}/${encodeURIComponent(pr.id)}`)}
-                      className="cursor-pointer bg-white shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
+                      className="cursor-pointer bg-surface shadow-(--shadow-xs) transition-colors hover:bg-primary-50/35"
                     >
                       <td className="px-4 py-3.5 font-semibold text-neutral-900">{pr.returnNumber}</td>
                       <td className="px-4 py-3.5 text-neutral-600">{pr.supplierName || '—'}</td>

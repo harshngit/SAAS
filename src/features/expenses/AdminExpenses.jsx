@@ -194,7 +194,7 @@ export default function AdminExpenses() {
         <DataTable
           title="All Expenses"
           subtitle="Submitted by sales officers, delivery partners, and staff"
-          toolbarActions={<Select options={FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-white py-1.5 text-xs" />}
+          toolbarActions={<Select options={FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />}
           loading={isLoading}
           columns={[
             { key: 'expenseNumber', header: 'Expense #', sortable: true, render: (row) => row.expenseNumber || row.expenseId || '—' },
@@ -258,7 +258,7 @@ export default function AdminExpenses() {
             onChange={(event) => setReviewReason(event.target.value)}
             placeholder={reviewTarget?.mode === 'reject' ? 'Reason for rejection (required)' : 'What does the submitter need to fix? (required)'}
             maxLength={500}
-            className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+            className="h-20 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
           />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" onClick={() => setReviewTarget(null)}>Cancel</Button>

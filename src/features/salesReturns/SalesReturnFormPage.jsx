@@ -413,7 +413,7 @@ export default function SalesReturnFormPage() {
                                 disabled={!isSelected}
                                 value={returnQuantities[line.invoiceItemId] ?? ''}
                                 onChange={(event) => updateQuantity(line, event.target.value)}
-                                className="w-24 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-right text-sm text-neutral-900 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
+                                className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm text-neutral-900 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
                               />
                             </td>
                           </tr>

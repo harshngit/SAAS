@@ -145,7 +145,7 @@ export default function SupplierPaymentQuickView({ paymentId, isOpen, onClose, o
     <div className="fixed inset-0 z-50 flex justify-end bg-neutral-900/60 backdrop-blur-sm" onClick={onClose}>
       <div
         onClick={(event) => event.stopPropagation()}
-        className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-white shadow-(--shadow-popover)"
+        className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-surface shadow-(--shadow-popover)"
       >
         <div className="flex items-start justify-between border-b border-neutral-100 px-6 py-5">
           <div>
@@ -219,7 +219,7 @@ export default function SupplierPaymentQuickView({ paymentId, isOpen, onClose, o
 
             <div className="flex flex-wrap gap-3 border-t border-neutral-100 px-6 py-4">
               {supplierBasePath && payment.supplierId && (
-                <a href={`${supplierBasePath}/${payment.supplierId}`} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+                <a href={`${supplierBasePath}/${payment.supplierId}`} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-neutral-200 bg-surface px-3.5 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
                   <ExternalLink className="size-4" aria-hidden="true" />
                   View Supplier
                 </a>

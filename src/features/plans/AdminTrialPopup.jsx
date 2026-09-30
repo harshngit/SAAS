@@ -61,7 +61,7 @@ export default function AdminTrialPopup() {
     >
       <div className="space-y-5">
         <div className="flex items-start gap-4 rounded-2xl border border-primary-100 bg-primary-50/60 p-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-700 shadow-(--shadow-xs)">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-surface text-primary-700 shadow-(--shadow-xs)">
             <Crown className="size-6" aria-hidden="true" />
           </div>
           <div>
@@ -79,7 +79,7 @@ export default function AdminTrialPopup() {
             <span>Trial progress</span>
             <span className="text-neutral-900">{trialDaysLeft} days left</span>
           </div>
-          <div className="mt-3 h-4 overflow-hidden rounded-full bg-white shadow-inner">
+          <div className="mt-3 h-4 overflow-hidden rounded-full bg-surface shadow-inner">
             <div
               className="h-full rounded-full bg-linear-to-r from-orange-500 to-amber-400 shadow-[0_8px_18px_-10px_rgb(249_115_22/0.9)]"
               style={{ width: `${trialProgress}%` }}

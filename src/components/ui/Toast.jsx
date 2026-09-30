@@ -37,7 +37,7 @@ export function ToastProvider({ children }) {
           <div
             key={toast.id}
             role="status"
-            className="flex items-start gap-3 rounded-2xl border border-primary-100 bg-white p-4 shadow-(--shadow-popover)"
+            className="flex items-start gap-3 rounded-2xl border border-primary-100 bg-surface p-4 shadow-(--shadow-popover)"
           >
             <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
               <CheckCircle className="size-5" aria-hidden="true" />
