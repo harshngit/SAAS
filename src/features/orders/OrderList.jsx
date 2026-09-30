@@ -42,10 +42,10 @@ function OrderSummaryCard({ label, value, detail, index }) {
   return (
     <div className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-medium text-[#6b86ad]">{label}</p>
-        <span className="flex size-9 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]" aria-hidden="true"><MoreHorizontal className="size-4" /></span>
+        <p className="text-xs font-medium text-fg-muted">{label}</p>
+        <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted" aria-hidden="true"><MoreHorizontal className="size-4" /></span>
       </div>
-      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p>
+      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
       <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
     </div>
   )
@@ -254,7 +254,7 @@ export default function OrderList() {
           ) : (
             <table className="listing-table w-full min-w-7xl text-left text-sm">
               <thead>
-                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="w-14 px-6 py-6"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all orders" /></th>
                   <th className="whitespace-nowrap px-6 py-6">Order #</th>
                   <th className="whitespace-nowrap px-6 py-6">Customer</th>
@@ -365,8 +365,8 @@ export default function OrderList() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-4">
-          <div className="flex items-center gap-3 text-xs text-[#6f89b0]">
-            <span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredOrders.length}</span></span>
+          <div className="flex items-center gap-3 text-xs text-fg-muted">
+            <span>Showing <span className="font-semibold text-fg">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-fg">{filteredOrders.length}</span></span>
             <span className="hidden text-neutral-300 sm:inline">|</span>
             <label className="flex items-center gap-2">Rows per page
               <Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" />
@@ -382,7 +382,7 @@ export default function OrderList() {
             >
               <ChevronLeft className="size-4" />
             </button>
-            <span className="min-w-14 text-center font-medium text-[#082445]">{currentPage} / {totalPages}</span>
+            <span className="min-w-14 text-center font-medium text-fg">{currentPage} / {totalPages}</span>
             <button
               type="button"
               disabled={currentPage === totalPages}

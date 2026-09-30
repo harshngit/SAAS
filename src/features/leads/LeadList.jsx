@@ -324,12 +324,12 @@ export default function LeadList() {
             ].map(({ label, value, detail, icon: Icon }, index) => (
               <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs font-medium text-[#6b86ad]">{label}</p>
-                  <span className="flex size-9 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]">
+                  <p className="text-xs font-medium text-fg-muted">{label}</p>
+                  <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted">
                     <Icon className="size-4" aria-hidden="true" />
                   </span>
                 </div>
-                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p>
+                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
                 <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
               </div>
             ))}
@@ -369,7 +369,7 @@ export default function LeadList() {
           ) : (
             <table className="listing-table w-full min-w-280 text-left text-sm">
               <thead>
-                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="w-10 px-6 py-6">
                     <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all leads" />
                   </th>
@@ -413,16 +413,16 @@ export default function LeadList() {
                             {getInitials(lead.name || lead.customerName || lead.mobileNumber)}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-[#082445]">{lead.name || lead.customerName || 'New prospect'}</p>
-                            <p className="mt-0.5 text-sm text-[#6f89b0]">{lead.leadId}</p>
+                            <p className="font-semibold text-fg">{lead.name || lead.customerName || 'New prospect'}</p>
+                            <p className="mt-0.5 text-sm text-fg-muted">{lead.leadId}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-5" onClick={(event) => event.stopPropagation()}>
-                        <a href={`tel:${lead.mobileNumber}`} className="font-medium text-[#315987] hover:text-primary-700">
+                        <a href={`tel:${lead.mobileNumber}`} className="font-medium text-fg-muted hover:text-primary-700">
                           {lead.mobileNumber || '—'}
                         </a>
-                        {lead.email && <p className="mt-0.5 max-w-48 truncate text-sm text-[#6f89b0]" title={lead.email}>{lead.email}</p>}
+                        {lead.email && <p className="mt-0.5 max-w-48 truncate text-sm text-fg-muted" title={lead.email}>{lead.email}</p>}
                       </td>
                       <td className="px-6 py-5">
                         <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-600">
@@ -436,16 +436,16 @@ export default function LeadList() {
                               {getInitials(lead.assignedSalespersonName)}
                             </span>
                           )}
-                          <span className="max-w-28 text-[#315987]">{lead.assignedSalespersonName || 'Unassigned'}</span>
+                          <span className="max-w-28 text-fg-muted">{lead.assignedSalespersonName || 'Unassigned'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-5">
                         <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLeadStatus(lead.leadStatus)}</Badge>
                       </td>
-                      <td className={`px-6 py-5 ${activity.nextFollowUp.tone === 'danger' ? 'font-medium text-red-600' : activity.nextFollowUp.tone === 'warning' ? 'font-medium text-amber-600' : 'text-[#315987]'}`}>
+                      <td className={`px-6 py-5 ${activity.nextFollowUp.tone === 'danger' ? 'font-medium text-red-600' : activity.nextFollowUp.tone === 'warning' ? 'font-medium text-amber-600' : 'text-fg-muted'}`}>
                         {activity.nextFollowUp.label}
                       </td>
-                      <td className="px-6 py-5 text-[#315987]">{formatDate(lead.createdAt)}</td>
+                      <td className="px-6 py-5 text-fg-muted">{formatDate(lead.createdAt)}</td>
                       <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
                         <ActionMenu
                           items={[
@@ -468,11 +468,11 @@ export default function LeadList() {
             </table>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-surface px-5 py-4 text-xs text-[#6f89b0]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-surface px-5 py-4 text-xs text-fg-muted">
           <div className="flex items-center gap-3">
             <span>
-              Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of{' '}
-              <span className="font-semibold text-[#082445]">{filteredLeads.length}</span>
+              Showing <span className="font-semibold text-fg">{rangeStart}-{rangeEnd}</span> of{' '}
+              <span className="font-semibold text-fg">{filteredLeads.length}</span>
             </span>
             <span className="hidden text-neutral-300 sm:inline">|</span>
             <label className="flex items-center gap-2">
@@ -500,7 +500,7 @@ export default function LeadList() {
             >
               <ChevronLeft className="size-4" />
             </button>
-            <span className="min-w-14 text-center font-medium text-[#082445]">{currentPage} / {totalPages}</span>
+            <span className="min-w-14 text-center font-medium text-fg">{currentPage} / {totalPages}</span>
             <button
               type="button"
               disabled={currentPage === totalPages}

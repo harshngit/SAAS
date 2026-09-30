@@ -145,12 +145,12 @@ export default function SalesReturnList() {
             ].map(({ label, value, detail, icon: Icon }, index) => (
               <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs font-medium text-[#6b86ad]">{label}</p>
-                  <span className="flex size-9 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]">
+                  <p className="text-xs font-medium text-fg-muted">{label}</p>
+                  <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted">
                     <Icon className="size-4" aria-hidden="true" />
                   </span>
                 </div>
-                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p>
+                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
                 <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
               </div>
             ))}
@@ -190,7 +190,7 @@ export default function SalesReturnList() {
           ) : (
             <table className="listing-table w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="whitespace-nowrap px-6 py-6">Return</th>
                   <th className="whitespace-nowrap px-6 py-6">Customer</th>
                   <th className="whitespace-nowrap px-6 py-6">Order / Invoice</th>

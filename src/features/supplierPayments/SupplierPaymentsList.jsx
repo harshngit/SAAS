@@ -255,7 +255,7 @@ export default function SupplierPaymentsList() {
           ) : (
             <table className="listing-table w-full min-w-4xl text-left text-sm">
               <thead>
-                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="whitespace-nowrap px-6 py-6">Payment #</th>
                   <th className="whitespace-nowrap px-6 py-6">Supplier</th>
                   <th className="whitespace-nowrap px-6 py-6">Payment Date</th>

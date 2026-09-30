@@ -7,6 +7,7 @@ import PageWrapper from './PageWrapper'
 import AdminTrialPopup from '../../features/plans/AdminTrialPopup'
 import { getCurrentProfile } from '../../api/auth'
 import { useTheme } from '../../theme/useTheme'
+import { resolveGlassSurfaceStyle } from '../../theme/themeConfig'
 
 export default function Layout() {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(() => {
@@ -71,8 +72,10 @@ export default function Layout() {
     }
   }, [location.pathname])
 
+  const glassSurfaceStyle = resolveGlassSurfaceStyle(theme, hasBackground)
+
   return (
-    <div className="relative h-svh overflow-hidden bg-(--app-bg)">
+    <div className="relative h-svh overflow-hidden bg-(--app-bg)" style={glassSurfaceStyle || undefined}>
       {/* Background image layer: position: fixed so it never scrolls/re-paints with content,
           cover/center, behind everything (z-0). Overlay sits on top of the image (also z-0,
           painted after it) at theme.background.overlayOpacity - black in dark mode, white in

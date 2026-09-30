@@ -172,10 +172,10 @@ export default function CollectionReconciliation() {
             ].map(({ label, value, detail, icon: Icon }, index) => (
               <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs font-medium text-[#6b86ad]">{label}</p>
-                  <span className="flex size-9 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]"><Icon className="size-4" aria-hidden="true" /></span>
+                  <p className="text-xs font-medium text-fg-muted">{label}</p>
+                  <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" aria-hidden="true" /></span>
                 </div>
-                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p>
+                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
                 <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
               </div>
             ))}

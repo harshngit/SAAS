@@ -156,18 +156,18 @@ export default function Topbar() {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3">
       <div className="ml-4 min-w-0">
-        <h1 className="truncate text-xl font-semibold tracking-tight text-[#082445]">{pageTitle}</h1>
-        {pageSubtitle && <p className="mt-0.5 hidden truncate text-sm text-[#6f89b0] sm:block">{pageSubtitle}</p>}
+        <h1 className="truncate text-xl font-semibold tracking-tight text-fg">{pageTitle}</h1>
+        {pageSubtitle && <p className="mt-0.5 hidden truncate text-sm text-fg-muted sm:block">{pageSubtitle}</p>}
       </div>
 
       <div className="ml-auto flex min-w-0 items-center gap-3 sm:gap-5">
         {logoutError && <p className="hidden text-sm text-red-600 md:block">{logoutError}</p>}
         <div className="relative hidden min-w-0 w-[min(34rem,42vw)] md:block">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-4.5 -translate-y-1/2 text-[#8fa5c6]" />
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-4.5 -translate-y-1/2 text-fg-muted" />
           <input
             type="search"
             placeholder="Search customers, jobs, quotes..."
-            className="w-full rounded-xl border border-[#dfe6f2] bg-(--input-bg) py-2.5 pl-11 pr-4 text-sm text-fg shadow-(--shadow-xs) transition-all placeholder:text-[#9fb0cf] focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/10"
+            className="w-full rounded-xl border border-surface-border bg-(--input-bg) py-2.5 pl-11 pr-4 text-sm text-fg shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/10"
           />
         </div>
         <button

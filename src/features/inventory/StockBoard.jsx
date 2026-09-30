@@ -43,7 +43,7 @@ function ExpiringBatchesPanel() {
       <div className="max-h-56 overflow-y-auto px-5 py-3">
         <table className="listing-table w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+            <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
               <th className="py-6 pr-4">Product</th>
               <th className="py-6 pr-4">Batch</th>
               <th className="py-6 pr-4">Warehouse</th>
@@ -327,7 +327,7 @@ export default function StockBoard({ readOnly = false }) {
           ) : (
             <table className="listing-table w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="whitespace-nowrap px-6 py-6">Product</th>
                   <th className="whitespace-nowrap px-6 py-6">SKU</th>
                   <th className="whitespace-nowrap px-6 py-6">Variants</th>

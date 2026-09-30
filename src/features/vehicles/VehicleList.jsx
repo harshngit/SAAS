@@ -280,7 +280,7 @@ export default function VehicleList() {
               {/* Desktop table */}
               <table className="listing-table hidden w-full min-w-4xl text-left text-sm md:table">
                 <thead>
-                  <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                     <th className="whitespace-nowrap px-6 py-6">Vehicle</th>
                     <th className="whitespace-nowrap px-6 py-6">Vehicle Number</th>
                     <th className="whitespace-nowrap px-6 py-6">Type</th>

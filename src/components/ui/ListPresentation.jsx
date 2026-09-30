@@ -33,17 +33,17 @@ export function ListStatCard({ icon: Icon, label, value, delta, actions, classNa
   return (
     <div className={`h-full min-h-32 bg-surface px-5 py-4 lg:px-6 ${className}`}>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-medium text-[#6b86ad]">{label}</p>
+        <p className="text-xs font-medium text-fg-muted">{label}</p>
         <div className="flex shrink-0 items-center gap-1">
           {Icon && (
-            <span className="flex size-9 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]">
+            <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted">
               <Icon className="size-4" aria-hidden="true" />
             </span>
           )}
           {actions}
         </div>
       </div>
-      <p className="mt-4 break-words font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p>
+      <p className="mt-4 break-words font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
       {delta && (
         <p className={`mt-2 flex items-center gap-1 text-xs font-medium ${delta.positive ? 'text-emerald-600' : 'text-red-600'}`}>
           {delta.trend === 'up' ? <ArrowUp className="size-3" aria-hidden="true" /> : <ArrowDown className="size-3" aria-hidden="true" />}

@@ -176,6 +176,49 @@ export function applyThemeToDocument(theme) {
   })
 }
 
+// Belt-and-suspenders fallback for the glass/background-image surface tokens, applied as an
+// inline `style` object directly on Layout.jsx's root wrapper (not just via the
+// document.documentElement data-mode/data-bg attributes index.css reacts to). Inline styles set
+// directly on an element take precedence over any stylesheet rule regardless of selector
+// specificity, and a CSS custom property set this way cascades to every descendant that reads it
+// via var(--x) - so this guarantees the glass surfaces render correctly even if, for any reason,
+// the attribute-selector mechanism above doesn't end up applying. Mirrors index.css's
+// [data-mode="X"][data-bg="image"] blocks value-for-value; returns null (no override) when no
+// background image is actually active, so index.css's own defaults are untouched otherwise.
+export function resolveGlassSurfaceStyle(theme, hasLoadedBackground) {
+  if (!hasLoadedBackground) return null
+  const isDark = theme?.mode === 'dark'
+  if (isDark) {
+    return {
+      '--app-bg': 'transparent',
+      '--color-surface': 'rgba(10, 25, 47, 0.55)',
+      '--color-surface-muted': 'rgba(255, 255, 255, 0.05)',
+      '--color-surface-border': 'rgba(255, 255, 255, 0.14)',
+      '--color-fg': '#ffffff',
+      '--color-fg-muted': 'rgba(255, 255, 255, 0.72)',
+      '--row-divider': 'rgba(255, 255, 255, 0.08)',
+      '--input-bg': 'rgba(255, 255, 255, 0.06)',
+      '--input-border': 'rgba(255, 255, 255, 0.20)',
+      '--sidebar-bg': 'rgba(10, 25, 47, 0.55)',
+      '--btn-outline-bg': 'transparent',
+      '--btn-outline-border': 'rgba(255, 255, 255, 0.35)',
+      '--btn-outline-text': '#ffffff',
+      '--glass-blur': 'blur(6px) saturate(140%)',
+    }
+  }
+  return {
+    '--app-bg': 'transparent',
+    '--color-surface': 'rgba(255, 255, 255, 0.05)',
+    '--color-surface-muted': 'rgba(255, 255, 255, 0.03)',
+    '--color-surface-border': 'rgba(15, 23, 42, 0.16)',
+    '--row-divider': 'rgba(15, 23, 42, 0.14)',
+    '--input-bg': 'rgba(255, 255, 255, 0.05)',
+    '--input-border': 'rgba(15, 23, 42, 0.2)',
+    '--sidebar-bg': 'rgba(238, 246, 235, 0.05)',
+    '--glass-blur': 'blur(6px) saturate(140%)',
+  }
+}
+
 // Removes every inline override / attribute this module can set, falling back to the stylesheet's
 // own default (Light, no accent override, no background) - byte-for-byte the existing CRM look.
 // Called on logout/org switch (multi-tenant safety) or if the theme API fails on load.

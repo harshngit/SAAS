@@ -465,8 +465,8 @@ export default function CustomerList() {
               { label: 'Outstanding', value: formatCurrency(customerSummary.outstanding), detail: 'total balance', icon: Wallet },
             ].map(({ label, value, detail, icon: Icon }, index) => (
               <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
-                <div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-[#6b86ad]">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]"><Icon className="size-4" /></span></div>
-                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p>
+                <div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div>
+                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
                 <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
               </div>
             ))}
@@ -520,7 +520,7 @@ export default function CustomerList() {
           ) : (
             <table className="listing-table w-full min-w-[72rem] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="w-14 px-6 py-6">
                     <input
                       type="checkbox"
@@ -572,15 +572,15 @@ export default function CustomerList() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-[#315987]">{customer.contactPerson || '—'}</td>
-                    <td className="px-6 py-5 text-[#315987]">{customer.city || '—'}</td>
-                    <td className="px-6 py-5 text-[#315987]">
+                    <td className="px-6 py-5 text-fg-muted">{customer.contactPerson || '—'}</td>
+                    <td className="px-6 py-5 text-fg-muted">{customer.city || '—'}</td>
+                    <td className="px-6 py-5 text-fg-muted">
                       {salesOfficerById.get(customer.assignedSalesOfficerId) || 'Unassigned'}
                     </td>
-                    <td className="px-6 py-5 text-[#315987]">
+                    <td className="px-6 py-5 text-fg-muted">
                       {formatListDate(customer.lastOrderDate, 'No order yet')}
                     </td>
-                    <td className="px-6 py-5 text-[#315987]">
+                    <td className="px-6 py-5 text-fg-muted">
                       {formatListDate(customer.lastVisitDate, 'No visit yet')}
                     </td>
                     <td className="px-6 py-5">
@@ -643,9 +643,9 @@ export default function CustomerList() {
             </table>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-surface px-5 py-4 text-xs text-[#6f89b0]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-surface px-5 py-4 text-xs text-fg-muted">
           <div className="flex items-center gap-3">
-            <span>Showing <span className="font-semibold text-[#082445]">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-[#082445]">{filteredCustomers.length}</span></span>
+            <span>Showing <span className="font-semibold text-fg">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-fg">{filteredCustomers.length}</span></span>
             <span className="hidden text-neutral-300 sm:inline">|</span>
             <label className="flex items-center gap-2">Rows per page
               <Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" />
@@ -653,7 +653,7 @@ export default function CustomerList() {
           </div>
           <div className="flex items-center gap-1.5">
             <button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Previous page"><ChevronLeft className="size-4" /></button>
-            <span className="min-w-14 text-center font-medium text-[#082445]">{currentPage} / {totalPages}</span>
+            <span className="min-w-14 text-center font-medium text-fg">{currentPage} / {totalPages}</span>
             <button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Next page"><ChevronRight className="size-4" /></button>
           </div>
         </div>

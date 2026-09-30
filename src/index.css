@@ -203,7 +203,7 @@
    surfaces below all read --color-surface/--color-surface-muted/--color-surface-border, so this
    is the ONE place the "glass" treatment is defined - no component sets its own blur/opacity. */
 [data-bg="image"] {
-  --glass-blur: blur(14px) saturate(140%);
+  --glass-blur: blur(6px) saturate(140%);
   /* The fixed image/overlay layer (Layout.jsx) is a sibling painted behind the app chrome, but
      every full-height wrapper between <html> and the page content (this outer app-bg, the
      content panel, <main>) still needs to not paint its own opaque fill on top of it - --app-bg
@@ -213,7 +213,19 @@
   --app-bg: transparent;
 }
 
+/* Cards are nearly transparent now, so fixed-color text sitting directly over a busy photo has
+   no reliable contrast against it - some patches of the photo are bright, some dark, and a
+   single text color can't win against both. A halo the OPPOSITE brightness of the text
+   (--text-glow, set per-mode below) fixes this everywhere at once via inheritance from body,
+   instead of hunting down every text-color utility class in the app. No-op outside image mode -
+   --text-glow is only ever declared there. */
+body {
+  text-shadow: var(--text-glow, none);
+}
+
 [data-mode="dark"][data-bg="image"] {
+  /* White text needs a DARK halo to stay readable over bright patches of the photo. */
+  --text-glow: 0 1px 3px rgba(0, 0, 0, 0.6), 0 1px 8px rgba(0, 0, 0, 0.4);
   --color-surface: rgba(10, 25, 47, 0.55);
   --color-surface-muted: rgba(255, 255, 255, 0.05);
   --color-surface-border: rgba(255, 255, 255, 0.14);
@@ -246,14 +258,18 @@
 }
 
 [data-mode="light"][data-bg="image"] {
-  --color-surface: rgba(255, 255, 255, 0.82);
-  --color-surface-muted: rgba(255, 255, 255, 0.6);
-  --color-surface-border: rgba(15, 23, 42, 0.08);
-  /* Text stays the normal light neutral-900 per spec - only surfaces go translucent. */
-  --row-divider: rgba(15, 23, 42, 0.06);
-  --input-bg: rgba(255, 255, 255, 0.7);
-  --input-border: rgba(15, 23, 42, 0.12);
-  --sidebar-bg: rgba(238, 246, 235, 0.82);
+  /* Pushed further per explicit request ("more less white"): barely a tint at all now, almost
+   * pure glass - the border + blur is what still reads as "a card", not the fill color. Text
+   * stays the normal light neutral-900 per spec - only surfaces go translucent. */
+  /* Dark text needs a LIGHT halo to stay readable over dark patches of the photo. */
+  --text-glow: 0 1px 2px rgba(255, 255, 255, 0.85), 0 1px 8px rgba(255, 255, 255, 0.6);
+  --color-surface: rgba(255, 255, 255, 0.05);
+  --color-surface-muted: rgba(255, 255, 255, 0.03);
+  --color-surface-border: rgba(15, 23, 42, 0.16);
+  --row-divider: rgba(15, 23, 42, 0.14);
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --input-border: rgba(15, 23, 42, 0.2);
+  --sidebar-bg: rgba(238, 246, 235, 0.05);
 }
 
 /* Applied by the shared components that should actually blur (Layout's content panel/header,

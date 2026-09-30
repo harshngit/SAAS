@@ -496,7 +496,7 @@ export default function MyExpenses() {
             <div className="hidden overflow-x-auto lg:block">
               <table className="listing-table w-full min-w-6xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                     <th className="px-6 py-6">Date</th>
                     <th className="px-6 py-6">Category</th>
                     <th className="px-6 py-6">Description</th>

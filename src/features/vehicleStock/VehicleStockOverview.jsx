@@ -67,12 +67,12 @@ function SummaryTiles({ items }) {
       {tiles.map(({ label, value, detail, icon: Icon }, index) => (
         <div key={label} className={`border-neutral-100 px-5 py-3 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
           <div className="flex items-start justify-between gap-3">
-            <p className="text-xs font-medium text-[#6b86ad]">{label}</p>
-            <span className="flex size-8 items-center justify-center rounded-full bg-[#f5f7fb] text-[#55749f]">
+            <p className="text-xs font-medium text-fg-muted">{label}</p>
+            <span className="flex size-8 items-center justify-center rounded-full bg-surface-muted text-fg-muted">
               <Icon className="size-4" aria-hidden="true" />
             </span>
           </div>
-          <p className="mt-2 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-[#082445]">{value}</p>
+          <p className="mt-2 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
           <p className="mt-1 text-xs font-medium text-emerald-600">{detail}</p>
         </div>
       ))}
@@ -146,7 +146,7 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn, heading }
           <div className="hidden overflow-x-auto md:block">
             <table className="listing-table w-full min-w-3xl text-left text-sm">
               <thead>
-                <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="px-6 py-6">Product</th>
                   <th className="px-6 py-6">SKU / Variant</th>
                   <th className="px-6 py-6">UOM</th>

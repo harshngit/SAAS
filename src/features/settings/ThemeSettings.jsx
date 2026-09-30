@@ -116,7 +116,9 @@ function ColorField({ label, value, onChange, disabled, warning }) {
           onClick={() => onChange('')}
           title="Use the CRM's default color - clears this custom override"
           className={`flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            !value ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 text-neutral-500 hover:border-neutral-300'
+            // Literal hex, not border/bg-neutral-900: this "selected" chip is always dark with
+            // white text, but --color-neutral-900 inverts to a light value in dark mode.
+            !value ? 'border-[#111827] bg-[#111827] text-white' : 'border-neutral-200 text-neutral-500 hover:border-neutral-300'
           }`}
         >
           <RotateCcw className="size-3.5" aria-hidden="true" />
@@ -160,6 +162,7 @@ export default function ThemeSettings() {
   const [isResetting, setIsResetting] = useState(false)
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false)
   const [assetError, setAssetError] = useState('')
+  const [thumbnailFailedUrl, setThumbnailFailedUrl] = useState('')
   const backgroundInputRef = useRef(null)
 
   // Re-seed the draft whenever the provider's real theme changes (initial load, or a refresh
@@ -220,9 +223,17 @@ export default function ThemeSettings() {
       setAssetError(result.error)
       return
     }
+    // The upload endpoint already persists this to the backend on its own (it returns the full
+    // updated theme, not just a bare url) - PATCH /organization/theme never carries
+    // background.url, so waiting for a later "Save Changes" click to sync the rest of the app
+    // would leave every other page on the old image (and "Save" would say "Nothing to save",
+    // since nothing IT tracks changed). Sync the real app-wide theme immediately here, matching
+    // what the backend already has.
+    const nextTheme = { ...theme, customEnabled: true, background: { ...theme.background, url: result.url } }
+    setOptimisticTheme(nextTheme)
     updateDraft({ customEnabled: true })
     updateBackground({ url: result.url })
-    showToast({ title: 'Background uploaded', message: 'Background image updated.' })
+    showToast({ title: 'Background uploaded', message: 'Applied across the CRM immediately.' })
   }
 
   const handleRemoveBackground = async () => {
@@ -235,9 +246,12 @@ export default function ThemeSettings() {
       setAssetError(result.error)
       return
     }
+    // Same immediate app-wide sync as upload above - DELETE also persists on its own.
+    const nextTheme = result.theme || { ...theme, customEnabled: false, background: { ...theme.background, url: '' } }
+    setOptimisticTheme(nextTheme)
     updateBackground({ url: '' })
     updateDraft({ customEnabled: false })
-    showToast({ title: 'Background removed', message: 'Reverted to a plain background.' })
+    showToast({ title: 'Background removed', message: 'Applied across the CRM immediately.' })
   }
 
   const handleSave = async () => {
@@ -340,8 +354,13 @@ export default function ThemeSettings() {
 
         <div className={`mt-4 flex items-center gap-3 ${!draft.customEnabled ? 'opacity-50' : ''}`}>
           <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
-            {draft.background?.url ? (
-              <img src={draft.background.url} alt="" className="size-full object-cover" />
+            {draft.background?.url && draft.background.url !== thumbnailFailedUrl ? (
+              <img
+                src={draft.background.url}
+                alt=""
+                className="size-full object-cover"
+                onError={() => setThumbnailFailedUrl(draft.background.url)}
+              />
             ) : (
               <ImageIcon className="size-5 text-neutral-300" aria-hidden="true" />
             )}

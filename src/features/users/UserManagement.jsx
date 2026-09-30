@@ -1407,7 +1407,7 @@ export default function UserManagement() {
             <>
               <table className="listing-table w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#e3e9f3] bg-[#f8faff] text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a0b0cf]">
+                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                     <th className="whitespace-nowrap px-6 py-6">User</th>
                     <th className="whitespace-nowrap px-6 py-6">Email</th>
                     <th className="whitespace-nowrap px-6 py-6">Role</th>

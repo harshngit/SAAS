@@ -44,10 +44,14 @@ const sectionIcons = {
 }
 
 function CollapsedTooltip({ label }) {
+  // Deliberately literal hex, not bg-neutral-800/border-neutral-800: this tooltip is always dark
+  // with white text regardless of app mode, but --color-neutral-800 INVERTS to a light value
+  // under [data-mode="dark"] (Part 2.3), which would silently turn this into near-invisible
+  // white-on-light. A fixed, non-token color is the correct choice here, not an oversight.
   return (
     <span
       role="tooltip"
-      className="pointer-events-none absolute left-[calc(100%+0.75rem)] top-1/2 z-30 hidden -translate-y-1/2 whitespace-nowrap rounded-lg border border-neutral-100 bg-neutral-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-(--shadow-popover) transition-opacity group-hover:opacity-100 group-focus:opacity-100 group-focus-visible:opacity-100 md:block"
+      className="pointer-events-none absolute left-[calc(100%+0.75rem)] top-1/2 z-30 hidden -translate-y-1/2 whitespace-nowrap rounded-lg border border-[#1f2937] bg-[#1f2937] px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-(--shadow-popover) transition-opacity group-hover:opacity-100 group-focus:opacity-100 group-focus-visible:opacity-100 md:block"
     >
       {label}
     </span>
@@ -269,7 +273,7 @@ export default function Sidebar({
                     title={group.section}
                     className={`group relative hidden items-center justify-center rounded-2xl py-2.5 text-sm font-medium transition-all duration-150 md:flex ${
                       isSectionActive
-                        ? 'bg-[#bdeaa5] text-primary-700 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
+                        ? 'bg-(--sidebar-active-bg) text-primary-700 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
                         : 'text-fg-muted hover:bg-neutral-50 hover:text-fg'
                     }`}
                   >
@@ -356,7 +360,12 @@ export default function Sidebar({
                               : 'gap-3 px-3.5 md:gap-0 md:rounded-2xl md:px-0 md:justify-center'
                           } ${
                             isActive
-                              ? 'bg-(--sidebar-active-bg) text-neutral-900 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.12)]'
+                              // text-primary-900, not text-neutral-900: --sidebar-active-bg is
+                              // always a light accent tint (Part 2.6), even in dark mode, but
+                              // --color-neutral-900 INVERTS to a light value there (Part 2.3) -
+                              // that pairing went light-on-light. --color-primary-900 is a fixed
+                              // dark shade of the accent ramp and isn't part of that inversion.
+                              ? 'bg-(--sidebar-active-bg) text-primary-900 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.12)]'
                               : 'text-fg-muted hover:bg-neutral-50 hover:text-fg'
                           }`
                         }

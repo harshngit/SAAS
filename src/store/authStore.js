@@ -171,7 +171,26 @@ export const useAuthStore = create(
         })
       },
     }),
-    { name: 'aquapure-auth-storage' },
+    {
+      // Keep the ORIGINAL key name - renaming it would orphan every already-logged-in browser's
+      // saved authTokens (nothing else restores them across a reload), silently logging everyone
+      // out on their next visit. The one-time rehydration of a stale orgTheme this key name might
+      // still carry over is harmless: ThemeProvider's own self-heal GET (see ThemeProvider.jsx)
+      // corrects it moments later, and every set() from then on is already partialized below, so
+      // the stale extra fields stop being written back and the key cleans itself up permanently.
+      name: 'aquapure-auth-storage',
+      // BUG FOUND 2026-09-30: zustand's persist, unrestricted, snapshots the WHOLE state
+      // (including orgTheme/currentUser/role/...) to this SEPARATE localStorage key on every
+      // set() call, and rehydrates it ASYNCHRONOUSLY on load via a shallow merge that OVERWRITES
+      // current state. That collided with the manual authProfile/orgTheme scheme above (which
+      // seeds those same fields SYNCHRONOUSLY from the 'aquapure-auth-profile' key, specifically
+      // to avoid a flash of unauthenticated/unthemed content) - a stale value sitting in THIS
+      // key from any earlier session would silently stomp a freshly-seeded-correct orgTheme
+      // moments after mount, with no visible error. `authTokens` is the one field that has no
+      // manual counterpart (nothing else restores it across a reload), so it's the only thing
+      // this middleware needs to own; everything else stays exclusively on the manual scheme.
+      partialize: (state) => ({ authTokens: state.authTokens }),
+    },
   ),
 )
 
