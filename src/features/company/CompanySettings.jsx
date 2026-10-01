@@ -54,6 +54,7 @@ import { updateUser } from "../../api/users";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import { useToast } from "../../components/ui/toastContext";
+import OnlinePayments from "../settings/OnlinePayments";
 
 const maxCompanyFileSize = 5 * 1024 * 1024;
 const supportedCompanyFileExtensions = /\.(doc|docx|pdf)$/i;
@@ -304,6 +305,12 @@ const settingsNav = [
     label: "Billings",
     icon: CreditCard,
     description: "Manage digital payment and bank details.",
+  },
+  {
+    id: "online-payments",
+    label: "Online Payments",
+    icon: CreditCard,
+    description: "Configure your Razorpay payment connection.",
   },
   {
     id: "branding",
@@ -3481,7 +3488,7 @@ export default function CompanySettings() {
           </aside>
 
           <div className="p-5 sm:p-7">
-            {activeTab !== "account" && (
+            {activeTab !== "account" && activeTab !== "online-payments" && (
               <div className="border-b border-neutral-100 pb-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -3524,7 +3531,9 @@ export default function CompanySettings() {
               </div>
             )}
 
-            {activeTab === "account" ? (
+            {activeTab === "online-payments" ? (
+              <OnlinePayments />
+            ) : activeTab === "account" ? (
               <CompanyOverviewDashboard
                 overview={overview}
                 isLoading={isLoadingOverview}

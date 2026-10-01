@@ -49,7 +49,6 @@ import {
   HandCoins,
   Palette,
   UserCircle,
-  Link2,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -202,7 +201,6 @@ export const roleMenus = {
       items: [
         { label: 'My Profile', path: '/profile', icon: UserCircle },
         { label: 'Appearance & Branding', path: '/admin/theme-settings', icon: Palette, module: 'settings' },
-        { label: 'Online Payments', path: '/admin/online-payments', icon: Link2, module: 'settings' },
       ],
     },
   ],
