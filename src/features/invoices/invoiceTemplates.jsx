@@ -545,13 +545,20 @@ export function RegularThemePreview({ presetId, ...props }) {
 }
 
 // Thermal is its own compact receipt layout (never a scaled-down A4 template): centered header,
-// dashed dividers, monospace-leaning stack instead of a bordered table. `thermalLayout` covers
-// the 4 backend-recognized layout names; `thermalVariant` (1-4, from the extra "Theme N"
-// thermal presets) adds small presentational differences on top of the same structure - not 4
-// more bespoke components, matching Part 6/10's "own layout configuration, not a full rebuild".
+// dashed dividers, monospace-leaning stack instead of a bordered table. `thermalPresetId` is the
+// single source of truth for layout/variant/showExtras (resolved via findThermalPreset) - the
+// exact same resolution used for persistence (thermal_print.layout), so a real invoice and the
+// Invoice Settings Live Preview can never disagree about what a given preset looks like.
 export function ThermalPreview(props) {
-  const { primaryColor, data = sampleInvoice, businessDetails, invoiceDetails, itemTable, footer, thermalLayout = 'standard', thermalVariant, showExtras, typography, thermalBoldText, thermalExtraLines } = withDefaults(props)
+  // thermalPresetId/thermalBoldText/thermalExtraLines are read straight off props, not off
+  // withDefaults(props)'s return value - withDefaults only ever returns its own fixed set of
+  // keys (primaryColor/data/businessDetails/.../typography), so destructuring these three from
+  // it silently produced `undefined` every time regardless of what was actually passed in,
+  // meaning Bold/Extra Lines never actually reached the rendered receipt.
+  const { thermalPresetId, thermalBoldText, thermalExtraLines } = props
+  const { primaryColor, data = sampleInvoice, businessDetails, itemTable, footer, typography } = withDefaults(props)
   const { company, items } = data
+  const { layout: thermalLayout = 'standard', variant: thermalVariant, showExtras } = findThermalPreset(thermalPresetId)
   const style = resolveTemplateStyle('thermal', typography)
   const activeColumns = resolveActiveColumns(itemTable.columns, { showProductImage: itemTable.showProductImage })
   const showTax = activeColumns.some((col) => col.key === 'tax_rate')
@@ -572,18 +579,22 @@ export function ThermalPreview(props) {
   return (
     // Same never-themed pin as RegularInvoiceDocument above (Part 2.10).
     <div data-mode="light" data-bg="none" className={`space-y-2 font-mono leading-tight text-neutral-700 ${centerAll} ${thermalBoldText ? 'font-semibold' : ''}`} style={{ fontSize: style.body }}>
+      {/* Business name/GSTIN, invoice number and date are a thermal receipt's minimum legal/
+          functional content (same for every handover) - shown whenever the real data exists,
+          never gated behind the optional Business/Invoice Details toggles that make sense for
+          the full A4 document but would otherwise let a short counter receipt omit them. */}
       <div className="text-center">
         {businessDetails.showLogo && company.logoUrl && (
           <img src={company.logoUrl} alt="" className="mx-auto mb-1 size-7 object-contain" onError={(event) => { event.currentTarget.style.display = 'none' }} />
         )}
-        {businessDetails.showBusinessName && <p className="font-bold" style={{ color: primaryColor, fontSize: style.heading }}>{company.name}</p>}
+        {company.name && <p className="font-bold" style={{ color: primaryColor, fontSize: style.heading }}>{company.name}</p>}
         {businessDetails.showAddress && <p className="text-neutral-500">{company.address}</p>}
         {businessDetails.showAddress && <p className="text-neutral-500">{company.cityLine}</p>}
-        {businessDetails.showGstin && company.gstin && <p className="text-neutral-500">GSTIN {company.gstin}</p>}
+        {company.gstin && <p className="text-neutral-500">GSTIN {company.gstin}</p>}
       </div>
       <div className={`${dividerClass} ${spacing} text-center text-neutral-500`}>
-        {invoiceDetails.showInvoiceNumber && <p style={{ fontSize: style.heading }}>{data.invoiceNo}</p>}
-        {invoiceDetails.showInvoiceDate && <p style={{ fontSize: style.heading }}>{data.invoiceDate}</p>}
+        {data.invoiceNo && <p style={{ fontSize: style.heading }}>{data.invoiceNo}</p>}
+        {data.invoiceDate && <p style={{ fontSize: style.heading }}>{data.invoiceDate}</p>}
       </div>
       <div className={`${dividerClass} ${spacing} ${itemsWrapClass}`} style={{ fontSize: style.table }}>
         {items.map((item, index) => (
@@ -625,11 +636,10 @@ export function ThermalPreview(props) {
   )
 }
 
-// Thermal preset -> ThermalPreview prop wiring (layout + variant), used by the Thermal Printer
-// theme picker in InvoiceSettings.jsx.
+// Thin wrapper kept for the Invoice Settings Live Preview call site (passes `presetId`, not
+// `thermalPresetId`) - ThermalPreview itself now does the findThermalPreset resolution.
 export function ThermalThemePreview({ presetId, ...props }) {
-  const preset = findThermalPreset(presetId)
-  return <ThermalPreview {...props} thermalLayout={preset.layout} thermalVariant={preset.variant} showExtras={preset.showExtras} />
+  return <ThermalPreview {...props} thermalPresetId={presetId} />
 }
 
 export const templateComponents = {

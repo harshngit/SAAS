@@ -38,6 +38,7 @@ import {
   updateUserStatus,
 } from '../../api/users'
 import { listCustomers } from '../../api/customers'
+import { getFileUrl } from '../../api/files'
 import { getAttendance } from '../../api/attendance'
 import { formatTimeLabel } from '../attendance/attendanceUtils'
 import { normalizeApiUser } from './userRoleUtils'
@@ -240,7 +241,8 @@ function Section({ number, title, icon: Icon, actions, children }) {
   )
 }
 
-function FileCard({ name, subtitle, url, isClearing = false, onClear }) {
+function FileCard({ name, subtitle, url: rawUrl, isClearing = false, onClear }) {
+  const url = getFileUrl(rawUrl)
   const { kind, badgeClass } = getFileMeta(url)
 
   return (
@@ -668,7 +670,7 @@ export default function UserDetail() {
         <div className="grid gap-6 lg:grid-cols-[auto_1fr_auto]">
           <div className="flex items-start gap-4">
             <div className="relative shrink-0">
-              <Avatar name={user.name} photoUrl={user.profilePhoto} size="size-24" textSize="text-2xl" />
+              <Avatar name={user.name} photoUrl={getFileUrl(user.profilePhoto)} size="size-24" textSize="text-2xl" />
               <Link
                 to={`/admin/users/edit/${userId}`}
                 className="absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-white bg-primary-600 text-white shadow-(--shadow-xs) transition-colors hover:bg-primary-700"

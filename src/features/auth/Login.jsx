@@ -8,6 +8,7 @@ import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import FullScreenLoader from "../../components/ui/FullScreenLoader";
 import AuthShowcase from "../../components/auth/AuthShowcase";
+import AuthFooterLinks from "../../components/auth/AuthFooterLinks";
 import { zodResolver } from "../../utils/zodResolver";
 import { forgotPassword, googleLoginRedirect, login, resetPassword } from "../../api/auth";
 import { roleHomePath } from "../../auth/roles";
@@ -144,7 +145,7 @@ export default function Login() {
           kicker="Live workspace"
           title="Run distribution from one dashboard"
           description="Track orders, stock, invoices, deliveries and payments with role-based access for every team."
-          quote="SAAS CRM keeps our sales, delivery and accounts teams aligned from first order to final collection."
+          quote="Beas Suite keeps our sales, delivery and accounts teams aligned from first order to final collection."
           name="Isabella Garcia"
           role="Operations Director"
         />
@@ -156,7 +157,7 @@ export default function Login() {
                 <Droplet className="size-5" />
               </div>
               <span className="font-(--font-display) text-lg font-semibold tracking-tight text-primary-700">
-                SAAS CRM
+                Beas Suite
               </span>
             </div>
 
@@ -308,6 +309,7 @@ export default function Login() {
                 Register here
               </Link>
             </p>
+            <AuthFooterLinks />
           </div>
         </main>
       </div>

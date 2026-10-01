@@ -12,6 +12,7 @@ import { LEAVE_TYPE_OPTIONS, calculateDaysCount, createLeave, deleteLeave, getMy
 import { useToast } from '../../components/ui/toastContext'
 import { formatDate, formatDateTime } from '../../utils/format'
 import { demoLeavesResolved, simulateDemoCancelLeave, simulateDemoCreateLeave } from './leaveDemo'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 
 const STATUS_VARIANT = { pending: 'warning', approved: 'success', rejected: 'danger', cancelled: 'neutral' }
 const FILTERS = [
@@ -76,7 +77,6 @@ export default function MyLeaves() {
   const { showToast } = useToast()
 
   const [leaves, setLeaves] = useState([])
-  const [demo, setDemo] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [filter, setFilter] = useState('all')
@@ -90,28 +90,28 @@ export default function MyLeaves() {
   const [cancelTarget, setCancelTarget] = useState(null)
   const [isCancelling, setIsCancelling] = useState(false)
 
+  // Demo data comes ONLY from the explicit DEMO_MODE switch (src/config/demoMode.js) - never
+  // from "the real API returned zero requests". A brand-new employee's first real leave request
+  // must reach the backend, not get silently redirected into local-only demo fixtures.
   const load = useCallback(async () => {
     setIsLoading(true)
     setListError('')
+
+    if (DEMO_MODE) {
+      setLeaves(DEMO_EMPTY ? [] : demoLeavesResolved())
+      setIsLoading(false)
+      return
+    }
+
     const result = await getMyLeaves()
 
     if (!result.success) {
-      setDemo(false)
       setLeaves([])
       setListError(result.error)
       setIsLoading(false)
       return
     }
 
-    if (result.leaves.length === 0) {
-      // No real requests yet - show the demo world so the flow stays testable.
-      setDemo(true)
-      setLeaves(demoLeavesResolved())
-      setIsLoading(false)
-      return
-    }
-
-    setDemo(false)
     setLeaves(result.leaves.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)))
     setIsLoading(false)
   }, [])
@@ -159,7 +159,7 @@ export default function MyLeaves() {
     setIsSubmitting(true)
     setFormError('')
 
-    if (demo) {
+    if (DEMO_MODE) {
       simulateDemoCreateLeave(formData)
       setLeaves(demoLeavesResolved())
       setIsSubmitting(false)
@@ -184,7 +184,7 @@ export default function MyLeaves() {
     if (!cancelTarget) return
     setIsCancelling(true)
 
-    if (demo) {
+    if (DEMO_MODE) {
       simulateDemoCancelLeave(cancelTarget.id)
       setLeaves(demoLeavesResolved())
       setIsCancelling(false)

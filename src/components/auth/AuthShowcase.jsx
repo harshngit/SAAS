@@ -16,7 +16,7 @@ export default function AuthShowcase() {
           <div className="flex size-9 items-center justify-center rounded-xl bg-linear-to-br from-primary-500 to-primary-700 text-white shadow-(--shadow-glow-primary)">
             <Droplet className="size-5" />
           </div>
-          <span className="font-(--font-display) text-lg font-semibold tracking-tight text-neutral-900">SAAS CRM</span>
+          <span className="font-(--font-display) text-lg font-semibold tracking-tight text-neutral-900">Beas Suite</span>
         </div>
       </div>
     </aside>

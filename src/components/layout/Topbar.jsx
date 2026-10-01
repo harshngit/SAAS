@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bell, CheckCheck, ChevronDown, LogOut, Search, UserCircle } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Bell, CheckCheck, ChevronDown, FileText, HelpCircle, LogOut, Search, ShieldCheck, UserCircle } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { ROLES, roleLabels, roleMenus } from '../../auth/roles'
 import { logout } from '../../api/auth'
 import { listNotifications, markAllNotificationsRead, markNotificationRead, getUnreadNotificationCount } from '../../api/notifications'
+
+const NOTIFICATIONS_PANEL_WIDTH = 320
+const MENU_PANEL_WIDTH = 240
 
 function formatNotificationTime(value) {
   if (!value) return ''
@@ -21,6 +25,33 @@ function formatPathTitle(pathname) {
     .join(' ')
 }
 
+// Computes a portaled panel's fixed position from its trigger button's rect, right-aligned to
+// the trigger, and keeps it in sync on scroll/resize while open - same pattern as
+// ActionMenu.jsx/Select.jsx/DatePicker.jsx.
+function usePortalPosition(isOpen, triggerRef, panelWidth) {
+  const [position, setPosition] = useState(null)
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    const updatePosition = () => {
+      if (!triggerRef.current) return
+      const rect = triggerRef.current.getBoundingClientRect()
+      setPosition({ top: rect.bottom + 8, left: rect.right - panelWidth })
+    }
+
+    updatePosition()
+    window.addEventListener('scroll', updatePosition, true)
+    window.addEventListener('resize', updatePosition)
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', updatePosition)
+    }
+  }, [isOpen, triggerRef, panelWidth])
+
+  return position
+}
+
 export default function Topbar() {
   const currentUser = useAuthStore((state) => state.currentUser)
   const navigate = useNavigate()
@@ -28,19 +59,34 @@ export default function Topbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [logoutError, setLogoutError] = useState('')
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-  const menuRef = useRef(null)
+  const menuTriggerRef = useRef(null)
+  const menuPanelRef = useRef(null)
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [notifications, setNotifications] = useState([])
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false)
-  const notificationsRef = useRef(null)
+  const notificationsTriggerRef = useRef(null)
+  const notificationsPanelRef = useRef(null)
+
+  // Both panels are portaled to document.body (below) rather than rendered as plain descendants
+  // of this header - the header carries .theme-glass (backdrop-filter: blur) in Image background
+  // mode (Layout.jsx), and a Chromium compositing quirk corrupts/blurs text in descendants of a
+  // backdrop-filter ancestor. Portaling out of that ancestor entirely is the real fix, not a
+  // color/opacity tweak.
+  const menuPosition = usePortalPosition(isMenuOpen, menuTriggerRef, MENU_PANEL_WIDTH)
+  const notificationsPosition = usePortalPosition(isNotificationsOpen, notificationsTriggerRef, NOTIFICATIONS_PANEL_WIDTH)
 
   useEffect(() => {
-    if (!isMenuOpen) return
+    if (!isMenuOpen) return undefined
 
     const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+      if (
+        menuTriggerRef.current &&
+        !menuTriggerRef.current.contains(event.target) &&
+        menuPanelRef.current &&
+        !menuPanelRef.current.contains(event.target)
+      ) {
         setIsMenuOpen(false)
       }
     }
@@ -76,10 +122,15 @@ export default function Topbar() {
   }, [currentUser])
 
   useEffect(() => {
-    if (!isNotificationsOpen) return
+    if (!isNotificationsOpen) return undefined
 
     const handleClickOutside = (event) => {
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+      if (
+        notificationsTriggerRef.current &&
+        !notificationsTriggerRef.current.contains(event.target) &&
+        notificationsPanelRef.current &&
+        !notificationsPanelRef.current.contains(event.target)
+      ) {
         setIsNotificationsOpen(false)
       }
     }
@@ -142,6 +193,26 @@ export default function Topbar() {
     navigate('/profile')
   }
 
+  const handleHelp = () => {
+    setIsMenuOpen(false)
+    navigate('/help')
+  }
+
+  const handlePrivacyPolicy = () => {
+    setIsMenuOpen(false)
+    navigate('/privacy')
+  }
+
+  const handleTerms = () => {
+    setIsMenuOpen(false)
+    navigate('/terms')
+  }
+
+  const handleViewAllPolicies = () => {
+    setIsMenuOpen(false)
+    navigate('/legal')
+  }
+
   const handleLogout = async () => {
     setIsMenuOpen(false)
     setLogoutError('')
@@ -167,11 +238,12 @@ export default function Topbar() {
           <input
             type="search"
             placeholder="Search customers, jobs, quotes..."
-            className="w-full rounded-xl border border-surface-border bg-(--input-bg) py-2.5 pl-11 pr-4 text-sm text-fg shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/10"
+            className="w-full rounded-xl border border-surface-border bg-(--input-bg) py-2.5 pl-11 pr-4 text-sm text-fg shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 focus:ring-primary-500/10"
           />
         </div>
-        <div className="relative" ref={notificationsRef}>
+        <div className="relative">
           <button
+            ref={notificationsTriggerRef}
             type="button"
             aria-label="Notifications"
             aria-haspopup="menu"
@@ -185,55 +257,61 @@ export default function Topbar() {
             )}
           </button>
 
-          {isNotificationsOpen && (
-            <div
-              role="menu"
-              className="absolute right-0 z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-surface-border bg-surface shadow-(--shadow-popover)"
-            >
-              <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
-                <p className="text-sm font-semibold text-fg">Notifications</p>
-                {unreadCount > 0 && (
-                  <button type="button" onClick={handleMarkAllRead} className="flex items-center gap-1 text-xs font-medium text-primary-700 hover:underline">
-                    <CheckCheck className="size-3.5" aria-hidden="true" />
-                    Mark all read
+          {isNotificationsOpen &&
+            notificationsPosition &&
+            createPortal(
+              <div
+                ref={notificationsPanelRef}
+                role="menu"
+                style={{ position: 'fixed', top: notificationsPosition.top, left: notificationsPosition.left, width: NOTIFICATIONS_PANEL_WIDTH }}
+                className="z-50 overflow-hidden rounded-2xl border border-surface-border bg-(--modal-bg) shadow-(--shadow-popover)"
+              >
+                <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
+                  <p className="text-sm font-semibold text-fg">Notifications</p>
+                  {unreadCount > 0 && (
+                    <button type="button" onClick={handleMarkAllRead} className="flex items-center gap-1 text-xs font-medium text-primary-700 hover:underline">
+                      <CheckCheck className="size-3.5" aria-hidden="true" />
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {isLoadingNotifications ? (
+                    <p className="px-4 py-6 text-center text-sm text-neutral-400">Loading...</p>
+                  ) : notifications.length === 0 ? (
+                    <p className="px-4 py-6 text-center text-sm text-neutral-400">No notifications yet.</p>
+                  ) : (
+                    notifications.slice(0, 10).map((notification) => (
+                      <button
+                        key={notification.id}
+                        type="button"
+                        onClick={() => handleNotificationClick(notification)}
+                        className={`flex w-full flex-col gap-0.5 border-b border-neutral-50 px-4 py-3 text-left transition-colors hover:bg-neutral-50 ${!notification.isRead ? 'bg-primary-50/40' : ''}`}
+                      >
+                        <p className="text-sm font-medium text-fg">{notification.title}</p>
+                        <p className="line-clamp-2 text-xs text-neutral-500">{notification.body}</p>
+                        <p className="mt-0.5 text-[0.65rem] text-neutral-400">{formatNotificationTime(notification.createdAt)}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+                {currentUser.role === ROLES.ADMIN && (
+                  <button
+                    type="button"
+                    onClick={() => { setIsNotificationsOpen(false); navigate('/admin/notifications') }}
+                    className="block w-full border-t border-neutral-100 px-4 py-2.5 text-center text-xs font-medium text-primary-700 hover:bg-neutral-50"
+                  >
+                    View all notifications
                   </button>
                 )}
-              </div>
-              <div className="max-h-80 overflow-y-auto">
-                {isLoadingNotifications ? (
-                  <p className="px-4 py-6 text-center text-sm text-neutral-400">Loading...</p>
-                ) : notifications.length === 0 ? (
-                  <p className="px-4 py-6 text-center text-sm text-neutral-400">No notifications yet.</p>
-                ) : (
-                  notifications.slice(0, 10).map((notification) => (
-                    <button
-                      key={notification.id}
-                      type="button"
-                      onClick={() => handleNotificationClick(notification)}
-                      className={`flex w-full flex-col gap-0.5 border-b border-neutral-50 px-4 py-3 text-left transition-colors hover:bg-neutral-50 ${!notification.isRead ? 'bg-primary-50/40' : ''}`}
-                    >
-                      <p className="text-sm font-medium text-fg">{notification.title}</p>
-                      <p className="line-clamp-2 text-xs text-neutral-500">{notification.body}</p>
-                      <p className="mt-0.5 text-[0.65rem] text-neutral-400">{formatNotificationTime(notification.createdAt)}</p>
-                    </button>
-                  ))
-                )}
-              </div>
-              {currentUser.role === ROLES.ADMIN && (
-                <button
-                  type="button"
-                  onClick={() => { setIsNotificationsOpen(false); navigate('/admin/notifications') }}
-                  className="block w-full border-t border-neutral-100 px-4 py-2.5 text-center text-xs font-medium text-primary-700 hover:bg-neutral-50"
-                >
-                  View all notifications
-                </button>
-              )}
-            </div>
-          )}
+              </div>,
+              document.body,
+            )}
         </div>
 
-        <div className="relative" ref={menuRef}>
+        <div className="relative">
           <button
+            ref={menuTriggerRef}
             type="button"
             onClick={() => setIsMenuOpen((prev) => !prev)}
             aria-haspopup="menu"
@@ -253,36 +331,82 @@ export default function Topbar() {
             />
           </button>
 
-          {isMenuOpen && (
-            <div
-              role="menu"
-              className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-2xl border border-surface-border bg-surface p-1.5 shadow-(--shadow-popover)"
-            >
-              <div className="px-3 py-2.5 sm:hidden">
-                <p className="text-sm font-medium leading-tight text-fg">{currentUser.name}</p>
-                <span className="text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
-              </div>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={handleProfileSettings}
-                className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+          {isMenuOpen &&
+            menuPosition &&
+            createPortal(
+              <div
+                ref={menuPanelRef}
+                role="menu"
+                style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, width: MENU_PANEL_WIDTH }}
+                className="z-50 overflow-hidden rounded-2xl border border-surface-border bg-(--modal-bg) p-1.5 shadow-(--shadow-popover)"
               >
-                <UserCircle className="size-4" aria-hidden="true" />
-                My Profile
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-              >
-                <LogOut className="size-4" aria-hidden="true" />
-                {isLoggingOut ? 'Logging out...' : 'Logout'}
-              </button>
-            </div>
-          )}
+                <div className="px-3 py-2.5 sm:hidden">
+                  <p className="text-sm font-medium leading-tight text-fg">{currentUser.name}</p>
+                  <span className="text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
+                </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleProfileSettings}
+                  className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+                >
+                  <UserCircle className="size-4" aria-hidden="true" />
+                  My Profile
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleHelp}
+                  className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+                >
+                  <HelpCircle className="size-4" aria-hidden="true" />
+                  Help & FAQ
+                </button>
+
+                <div className="my-1.5 border-t border-neutral-100" />
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handlePrivacyPolicy}
+                  className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+                >
+                  <ShieldCheck className="size-4" aria-hidden="true" />
+                  Privacy Policy
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleTerms}
+                  className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+                >
+                  <FileText className="size-4" aria-hidden="true" />
+                  Terms of Service
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleViewAllPolicies}
+                  className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-xs font-medium text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+                >
+                  View all policies
+                </button>
+
+                <div className="my-1.5 border-t border-neutral-100" />
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                >
+                  <LogOut className="size-4" aria-hidden="true" />
+                  {isLoggingOut ? 'Logging out...' : 'Logout'}
+                </button>
+              </div>,
+              document.body,
+            )}
         </div>
       </div>
     </div>

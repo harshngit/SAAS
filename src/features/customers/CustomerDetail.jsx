@@ -60,6 +60,7 @@ import {
 } from '../collections/collectionHelpers'
 import { ORDER_STATUS_VARIANT, formatOrderStatus, getDeliveryStatus } from '../orders/orderHelpers'
 import { getCustomerFollowUps, getCustomerVisits } from '../../api/visits'
+import { getFileUrl } from '../../api/files'
 import { useAuthStore } from '../../store/authStore'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 import { formatCurrency } from '../../utils/format'
@@ -267,14 +268,14 @@ function DocumentPreviewCard({ document }) {
 
   return (
     <a
-      href={document.url}
+      href={getFileUrl(document.url)}
       target="_blank"
       rel="noreferrer"
       className="flex items-center gap-3 rounded-xl border border-neutral-100 bg-neutral-50 p-2.5 hover:border-primary-200 hover:bg-primary-50/40"
     >
       {showImage ? (
         <img
-          src={document.url}
+          src={getFileUrl(document.url)}
           alt={document.name}
           onError={() => setImageFailed(true)}
           className="size-14 shrink-0 rounded-lg border border-neutral-100 object-cover"
@@ -881,7 +882,7 @@ export default function CustomerDetail() {
           <div className="flex items-start gap-4">
             <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary-50 text-lg font-semibold text-primary-700 ring-1 ring-primary-100">
               {customer.profileImage ? (
-                <img src={customer.profileImage} alt={customer.name} className="size-full object-cover" />
+                <img src={getFileUrl(customer.profileImage)} alt={customer.name} className="size-full object-cover" />
               ) : (
                 getInitials(customer.name)
               )}

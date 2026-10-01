@@ -7,6 +7,7 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import { readImageAsDataUrl } from '../../utils/imageFile'
+import { getFileUrl } from '../../api/files'
 
 const emptyForm = {
   name: '',
@@ -294,7 +295,7 @@ export default function CategoryFormPage() {
             </div>
             <div className="mt-3 flex h-40 flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border border-dashed border-neutral-200 bg-neutral-50 p-3 text-center">
               {hasImage ? (
-                <img src={formData.image} alt="Category preview" className="size-full rounded-lg object-cover" />
+                <img src={getFileUrl(formData.image)} alt="Category preview" className="size-full rounded-lg object-cover" />
               ) : (
                 <>
                   <span className="flex size-12 items-center justify-center rounded-full bg-surface text-neutral-300 ring-1 ring-neutral-200">

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Activity, ArrowRightCircle, ChevronLeft, ChevronRight, Download, Edit, Eye, Globe2, Plus, RotateCw, Search, SlidersHorizontal, Target, Trash2, TrendingUp, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ActionMenu from '../../components/ui/ActionMenu'
@@ -514,7 +515,7 @@ export default function LeadList() {
         </div>
       </Card>
 
-      {isFilterOpen && (
+      {isFilterOpen && createPortal(
         <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Lead filters">
           <button
             type="button"
@@ -522,7 +523,7 @@ export default function LeadList() {
             onClick={() => setIsFilterOpen(false)}
             aria-label="Close filters"
           />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl">
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-neutral-900">Filter Leads</h2>
@@ -573,7 +574,8 @@ export default function LeadList() {
               <Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button>
             </div>
           </aside>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <LeadEditForm

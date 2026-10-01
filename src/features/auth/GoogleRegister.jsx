@@ -7,6 +7,7 @@ import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import AuthShowcase from '../../components/auth/AuthShowcase'
+import AuthFooterLinks from '../../components/auth/AuthFooterLinks'
 import { zodResolver } from '../../utils/zodResolver'
 import { completeGoogleRegistration, getGoogleRegistrationInfo } from '../../api/auth'
 import { resolveHomePath } from '../../auth/roles'
@@ -115,7 +116,7 @@ export default function GoogleRegister() {
                 <Droplet className="size-5" />
               </div>
               <span className="font-(--font-display) text-lg font-semibold tracking-tight text-primary-700">
-                SAAS CRM
+                Beas Suite
               </span>
             </div>
 
@@ -180,6 +181,7 @@ export default function GoogleRegister() {
                 Sign in
               </Link>
             </p>
+            <AuthFooterLinks />
           </div>
         </main>
       </div>

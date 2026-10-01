@@ -30,7 +30,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { ROLES, roleLabels } from '../../auth/roles'
 import { RequirePermission } from '../../auth/RequirePermission'
 import { useAuthStore } from '../../store/authStore'
-import { uploadFiles as uploadGenericFiles } from '../../api/files'
+import { getFileUrl, uploadFiles as uploadGenericFiles } from '../../api/files'
 import { createUser, listRoles, listUsers, permanentlyDeleteUser, updateUserStatus } from '../../api/users'
 import { getSystemRoleFromRoleName, normalizeApiUser, staffRoleOptions } from './userRoleUtils'
 import ResetPasswordModal from './ResetPasswordModal'
@@ -304,16 +304,16 @@ function UploadPreview({ previews = [] }) {
         return (
           <a
             key={`${preview.name}-${preview.url}`}
-            href={preview.url}
+            href={getFileUrl(preview.url)}
             target="_blank"
             rel="noreferrer"
             title={`Preview ${preview.name}`}
               className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-surface shadow-sm"
           >
             {isImage ? (
-              <img src={preview.url} alt={preview.name} className="size-full object-cover" />
+              <img src={getFileUrl(preview.url)} alt={preview.name} className="size-full object-cover" />
             ) : isPdf ? (
-              <iframe src={preview.url} title={preview.name} className="size-full pointer-events-none border-0 bg-surface" />
+              <iframe src={getFileUrl(preview.url)} title={preview.name} className="size-full pointer-events-none border-0 bg-surface" />
             ) : (
               <span className="flex size-full items-center justify-center text-neutral-500">
                 <FileText className="size-5" aria-hidden="true" />
@@ -1425,7 +1425,7 @@ export default function UserManagement() {
                     >
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
-                          <StaffAvatar name={user.name} photoUrl={user.profilePhoto} />
+                          <StaffAvatar name={user.name} photoUrl={getFileUrl(user.profilePhoto)} />
                           <div>
                             <Link
                               to={`/admin/users/${user.id}`}

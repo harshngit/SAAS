@@ -22,6 +22,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import StatCard from '../../components/ui/StatCard'
+import { getFileUrl } from '../../api/files'
 import {
   addProductAttachments,
   deleteProduct,
@@ -309,7 +310,7 @@ export default function ProductDetail() {
             <ArrowLeft className="size-4" aria-hidden="true" />
             Back
           </Button>
-          <HeroThumbnail src={product.coverImage} alt={product.name} />
+          <HeroThumbnail src={getFileUrl(product.coverImage)} alt={product.name} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold text-neutral-900">{product.name}</h1>
@@ -369,7 +370,7 @@ export default function ProductDetail() {
           <div className="flex flex-wrap gap-3">
             {product.coverImage && (
               <img
-                src={product.coverImage}
+                src={getFileUrl(product.coverImage)}
                 alt={product.name}
                 className="size-32 rounded-xl border-2 border-primary-100 object-cover"
               />
@@ -377,14 +378,14 @@ export default function ProductDetail() {
             {product.images?.map((image, index) => (
               <img
                 key={index}
-                src={image}
+                src={getFileUrl(image)}
                 alt={`${product.name} ${index + 1}`}
                 className="size-24 rounded-xl border border-neutral-100 object-cover"
               />
             ))}
             {product.videoUrl && (
               <a
-                href={product.videoUrl}
+                href={getFileUrl(product.videoUrl)}
                 target="_blank"
                 rel="noreferrer"
                 className="flex size-24 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-neutral-200 bg-neutral-50 text-neutral-500 hover:border-primary-200 hover:bg-primary-50/40 hover:text-primary-700"
@@ -538,7 +539,7 @@ export default function ProductDetail() {
                   <tr key={`${product.id}-${index}`} className="transition-colors hover:bg-primary-50/35">
                     <td className="px-5 py-2">
                       {variant.imageUrl ? (
-                        <img src={variant.imageUrl} alt={variant.size} className="size-9 rounded-lg border border-neutral-100 object-cover" />
+                        <img src={getFileUrl(variant.imageUrl)} alt={variant.size} className="size-9 rounded-lg border border-neutral-100 object-cover" />
                       ) : (
                         <div className="flex size-9 items-center justify-center rounded-lg border border-neutral-100 bg-neutral-50 text-neutral-300">
                           <Package className="size-4" aria-hidden="true" />

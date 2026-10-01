@@ -15,6 +15,7 @@ import {
   uploadThemeBackground,
 } from '../../api/theme'
 import { resolveAccentContrast, resolveThemeTokens } from '../../theme/themeConfig'
+import { getFileUrl } from '../../api/files'
 
 const COLOR_PRESETS = ['#063b00', '#16A34A', '#2563EB', '#DC2626', '#7C3AED', '#EA580C']
 const DEFAULT_OVERLAY_BY_MODE = { dark: 0.45, light: 0.2 }
@@ -41,7 +42,7 @@ function ThemePreview({ draft }) {
       <div className="relative bg-(--app-bg)">
         {hasBackground && (
           <>
-            <div aria-hidden="true" className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${draft.background.url})` }} />
+            <div aria-hidden="true" className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${getFileUrl(draft.background.url)})` }} />
             <div
               aria-hidden="true"
               className="absolute inset-0"
@@ -362,7 +363,7 @@ export default function ThemeSettings() {
           <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
             {draft.background?.url && draft.background.url !== thumbnailFailedUrl ? (
               <img
-                src={draft.background.url}
+                src={getFileUrl(draft.background.url)}
                 alt=""
                 className="size-full object-cover"
                 onError={() => setThumbnailFailedUrl(draft.background.url)}

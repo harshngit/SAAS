@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, Copy, Download, Eye, Pencil, Plus, RotateCw, Search, SlidersHorizontal, Target, Trash2, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ActionMenu from '../../components/ui/ActionMenu'
@@ -323,10 +324,10 @@ export default function QuotationList() {
         </div>
       </Card>
 
-      {isFilterOpen && (
+      {isFilterOpen && createPortal(
         <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Quotation filters">
           <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl">
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4"><div><h2 className="text-lg font-semibold text-neutral-900">Filter Quotations</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the quotations shown in the table.</p></div><button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button></div>
             <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={[{ value: 'all', label: 'All status' }, ...QUOTATION_FILTER_STATUS_OPTIONS]} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label>
@@ -334,7 +335,8 @@ export default function QuotationList() {
             </div>
             <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setSalespersonFilter('all'); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
           </aside>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <Modal

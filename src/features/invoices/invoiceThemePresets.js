@@ -5,12 +5,13 @@
 // renderer branches on (header/table/totals/accent/density) - this is what lets 14 regular +
 // 8 thermal presets exist without 22 bespoke components or a backend schema change.
 //
-// IMPORTANT PERSISTENCE CAVEAT: only `baseTemplate` round-trips through the backend today. The
-// specific preset id (e.g. "gst-3" vs "classic") is NOT a real backend field, so it is kept in
-// local React state only - never localStorage, per this project's standing rule against faking
-// backend persistence. On reload, the picker falls back to whichever preset's id equals the
-// loaded `template` value (the plain Classic/Modern/Compact/Thermal card). See the redesign
-// report for the exact backend field this would need to fully persist.
+// PERSISTENCE: the exact regular preset id (e.g. "gst-3") round-trips via the real
+// `template_variant` field (`settings.templateVariant` / api/invoices.js). The exact thermal
+// preset id (e.g. "thermal-theme-2") round-trips via `thermal_print.layout` - the backend is
+// adding validation for these preset-id strings there (replacing the older 4 plain layout names
+// compact/standard/simple/classic). findThermalPreset below accepts either: a real preset id, or
+// one of those 4 legacy layout names (what an org saved before this change), which maps to that
+// layout's plain/no-variant card - so an older saved value is never fatal.
 
 export const REGULAR_THEME_PRESETS = [
   { id: 'classic', name: 'Classic', baseTemplate: 'classic', header: 'plain', table: 'bordered', totals: 'plain', accent: 'standard', density: 'normal' },
@@ -44,8 +45,35 @@ export function findRegularPreset(id) {
   return REGULAR_THEME_PRESETS.find((preset) => preset.id === id) || REGULAR_THEME_PRESETS[0]
 }
 
+// A legacy save only ever had one of these 4 base layout names (no variant/showExtras info) -
+// map each to the one preset that represents that layout with nothing extra turned on.
+const LEGACY_LAYOUT_TO_PRESET_ID = {
+  compact: 'thermal-compact',
+  standard: 'thermal-advanced',
+  simple: 'thermal-simple',
+  classic: 'thermal-classic',
+}
+
 export function findThermalPreset(id) {
-  return THERMAL_THEME_PRESETS.find((preset) => preset.id === id) || THERMAL_THEME_PRESETS[0]
+  const direct = THERMAL_THEME_PRESETS.find((preset) => preset.id === id)
+  if (direct) return direct
+  const legacyId = LEGACY_LAYOUT_TO_PRESET_ID[id]
+  const legacy = legacyId && THERMAL_THEME_PRESETS.find((preset) => preset.id === legacyId)
+  return legacy || THERMAL_THEME_PRESETS[0]
+}
+
+// The base-layout preset for a given layout name (used by the standalone "Layout" dropdown,
+// which only offers the 4 plain looks as a quick-pick shortcut alongside the full Theme carousel).
+export function findBaseThermalPresetForLayout(layout) {
+  return THERMAL_THEME_PRESETS.find((preset) => preset.layout === layout && !preset.variant) || THERMAL_THEME_PRESETS[0]
+}
+
+// mm -> px at 96dpi (the CSS reference pixel), so the on-screen/export thermal receipt is sized
+// to the actually-selected paper width ('58mm'/'80mm'/'110mm') instead of one fixed guess -
+// shared by the Invoice Settings Live Preview and a real invoice's Print Receipt (Thermal).
+export function thermalWidthPx(paperWidth) {
+  const mm = parseInt(paperWidth, 10) || 80
+  return Math.round(mm * (96 / 25.4))
 }
 
 // Preset whose id matches a bare backend `template` value - what a freshly-loaded page (or a

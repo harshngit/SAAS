@@ -411,7 +411,7 @@ const revokeUploadPreviewUrls = (previews = []) => {
 // instead of a miniature scrollable viewer (still `pointer-events-none`d on top, as a fallback
 // for viewers that don't honor the hash).
 function pdfPreviewSrc(url) {
-  return `${url}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&view=FitH`
+  return `${getFileUrl(url)}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&view=FitH`
 }
 
 function UploadPreview({ previews = [] }) {
@@ -431,14 +431,14 @@ function UploadPreview({ previews = [] }) {
         return (
           <a
             key={`${preview.name}-${preview.url}`}
-            href={preview.url}
+            href={getFileUrl(preview.url)}
             target="_blank"
             rel="noreferrer"
             title={`Preview ${preview.name}`}
             className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-surface shadow-sm"
           >
             {isImage ? (
-              <img src={preview.url} alt={preview.name} className="size-full object-cover" />
+              <img src={getFileUrl(preview.url)} alt={preview.name} className="size-full object-cover" />
             ) : isPdf ? (
               <iframe
                 src={pdfPreviewSrc(preview.url)}
@@ -480,14 +480,14 @@ function DocumentThumbnail({ preview }) {
 
   return (
     <a
-      href={preview.url}
+      href={getFileUrl(preview.url)}
       target="_blank"
       rel="noreferrer"
       title={`Preview ${preview.name}`}
       className="flex h-20 w-36 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-surface transition-colors hover:border-primary-300 hover:bg-primary-50/50"
     >
       {isImage ? (
-        <img src={preview.url} alt={preview.name} className="size-full object-cover" />
+        <img src={getFileUrl(preview.url)} alt={preview.name} className="size-full object-cover" />
       ) : isPdf ? (
         <iframe
           src={pdfPreviewSrc(preview.url)}

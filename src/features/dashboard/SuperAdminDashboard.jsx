@@ -235,7 +235,7 @@ export default function SuperAdminDashboard() {
         <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
       )}
 
-      <Card title="Organizations" subtitle="All organizations on the SAAS CRM platform">
+      <Card title="Organizations" subtitle="All organizations on the Beas Suite platform">
         <DataTable
           columns={[
             { key: 'name', header: 'Organization', sortable: true },

@@ -103,6 +103,13 @@ import Profile from '../features/profile/Profile'
 import SalesReturnList from '../features/salesReturns/SalesReturnList'
 import SalesReturnFormPage from '../features/salesReturns/SalesReturnFormPage'
 import SalesReturnDetail from '../features/salesReturns/SalesReturnDetail'
+import HelpFaq from '../features/legal/HelpFaq'
+import PrivacyPolicy from '../features/legal/PrivacyPolicy'
+import TermsOfService from '../features/legal/TermsOfService'
+import RefundPolicy from '../features/legal/RefundPolicy'
+import AcceptableUsePolicy from '../features/legal/AcceptableUsePolicy'
+import ContactSupport from '../features/legal/ContactSupport'
+import LegalIndex from '../features/legal/LegalIndex'
 
 function RootRedirect() {
   const currentUser = useAuthStore((state) => state.currentUser)
@@ -121,6 +128,17 @@ export default function AppRoutes() {
         <Route path="/auth/callback" element={<GoogleAuthCallback />} />
         <Route path="/auth/register/google" element={<GoogleRegister />} />
         <Route path="/superadmin/login" element={<Navigate to="/login" replace />} />
+
+        {/* Help & Legal - public (reachable pre-login from the auth-page footer, and from the
+            authenticated profile dropdown once signed in). Each renders its own standalone
+            LegalPageLayout, not the authenticated Sidebar/Topbar. */}
+        <Route path="/help" element={<HelpFaq />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/refund-policy" element={<RefundPolicy />} />
+        <Route path="/acceptable-use" element={<AcceptableUsePolicy />} />
+        <Route path="/support" element={<ContactSupport />} />
+        <Route path="/legal" element={<LegalIndex />} />
         {/* Public headless-render target for backend PDF generation - see InvoicePrintView.jsx.
             No ProtectedRoute: auth is a short-lived token in the URL, not a logged-in session. */}
         <Route path="/print/invoices/:id" element={<InvoicePrintView />} />

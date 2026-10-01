@@ -11,6 +11,7 @@ import { attendanceLifecycleLabel, durationLabel, normalizeAttendanceRecord } fr
 import { ATTENDANCE_CHECK_IN_TYPE, ATTENDANCE_CHECK_OUT_TYPE, formatTime } from './attendanceConstants'
 import { attendanceDemoResolved, simulateDemoCheckIn, simulateDemoCheckOut } from './attendanceDemo'
 import { useToast } from '../../components/ui/toastContext'
+import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 
 const LIFECYCLE_VARIANT = {
   not_checked_in: 'neutral',
@@ -116,7 +117,6 @@ function Field({ label, value, icon: Icon }) {
 export default function MyAttendance() {
   const { showToast } = useToast()
   const [rawRecords, setRawRecords] = useState([])
-  const [demo, setDemo] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isActing, setIsActing] = useState(false)
@@ -125,28 +125,28 @@ export default function MyAttendance() {
   const [detailRecord, setDetailRecord] = useState(null)
   const [now, setNow] = useState(() => new Date().toISOString())
 
+  // Demo data comes ONLY from the explicit DEMO_MODE switch (src/config/demoMode.js) - never
+  // from "the real API returned zero records". A brand-new employee's first real Check In must
+  // reach the backend, not get silently redirected into local-only demo fixtures.
   const load = useCallback(async () => {
     setIsLoading(true)
     setLoadError('')
+
+    if (DEMO_MODE) {
+      setRawRecords(DEMO_EMPTY ? [] : attendanceDemoResolved().history)
+      setIsLoading(false)
+      return
+    }
+
     const result = await getMyAttendance({})
 
     if (!result.success) {
-      setDemo(false)
       setRawRecords([])
       setLoadError(result.error)
       setIsLoading(false)
       return
     }
 
-    if (result.records.length === 0) {
-      // No real attendance yet - show the demo world so the flow stays testable.
-      setDemo(true)
-      setRawRecords(attendanceDemoResolved().history)
-      setIsLoading(false)
-      return
-    }
-
-    setDemo(false)
     setRawRecords(result.records)
     setIsLoading(false)
   }, [])
@@ -175,7 +175,7 @@ export default function MyAttendance() {
     setIsActing(true)
     setActionError('')
 
-    if (demo) {
+    if (DEMO_MODE) {
       if (kind === 'in') simulateDemoCheckIn()
       else simulateDemoCheckOut()
       setRawRecords(attendanceDemoResolved().history)

@@ -93,6 +93,10 @@ export default function AdminPlans() {
   const [payingPlanId, setPayingPlanId] = useState(null)
   const [payError, setPayError] = useState('')
   const [onlinePaymentUnavailable, setOnlinePaymentUnavailable] = useState(false)
+  // Known only once an order has actually been created (the key_id only comes back from that
+  // call) - stays visible for the rest of this page's session once discovered, since the
+  // environment's key doesn't change between one payment attempt and the next.
+  const [isTestModePayment, setIsTestModePayment] = useState(false)
 
   const plansGridRef = useRef(null)
 
@@ -212,6 +216,7 @@ export default function AdminPlans() {
         setPayError(message)
         showToast({ title: 'Payment failed', message, variant: 'error' })
       },
+      onOrderCreated: ({ isTestMode }) => setIsTestModePayment(isTestMode),
     })
 
     setPayingPlanId(null)
@@ -326,6 +331,13 @@ export default function AdminPlans() {
       {onlinePaymentUnavailable && (
         <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           Online payment isn&apos;t set up for this CRM yet. Use &quot;Request Upgrade&quot; below and a Super Admin will approve it manually.
+        </div>
+      )}
+
+      {isTestModePayment && (
+        <div className="flex items-center gap-2 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          <Badge variant="warning">TEST MODE</Badge>
+          Razorpay is in test mode for this checkout - no real money will be charged.
         </div>
       )}
 

@@ -6,9 +6,13 @@ import { loadRazorpayCheckout } from '../../utils/loadRazorpayCheckout'
 
 // `accentColor` is the live theme accent (falls back to the brand green) - Razorpay's own
 // `theme.color` option, purely cosmetic on their checkout modal.
-export async function payForPlan({ plan, billingCycle, accentColor, onFailed, onCancelled }) {
+export async function payForPlan({ plan, billingCycle, accentColor, onFailed, onCancelled, onOrderCreated }) {
   const orderResult = await createRazorpayOrder({ planId: plan.id, billingCycle })
   if (!orderResult.success) return orderResult
+
+  // Lets the caller show a "TEST MODE" indicator the moment we know the key - rzp_test_* keys
+  // are Razorpay's own well-documented test-mode prefix, never used for a live key.
+  onOrderCreated?.({ keyId: orderResult.keyId, isTestMode: (orderResult.keyId || '').startsWith('rzp_test_') })
 
   let Razorpay
   try {
@@ -23,7 +27,7 @@ export async function payForPlan({ plan, billingCycle, accentColor, onFailed, on
       order_id: orderResult.orderId,
       amount: orderResult.amount,
       currency: orderResult.currency,
-      name: 'SAAS CRM',
+      name: 'Beas Suite',
       description: `${orderResult.planName || plan.name} - ${orderResult.billingCycle || billingCycle}`,
       prefill: orderResult.prefill,
       theme: { color: accentColor || '#063b00' },

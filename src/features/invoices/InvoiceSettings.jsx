@@ -31,7 +31,14 @@ import { uploadFile } from '../../api/files'
 import { getOrganizationSettings, normalizeOrganizationBranding } from '../../api/organizations'
 import { exportElementToPdf } from '../../utils/pdfExport'
 import { sampleInvoice, RegularThemePreview, ThermalThemePreview } from './invoiceTemplates'
-import { REGULAR_THEME_PRESETS, THERMAL_THEME_PRESETS, resolveRegularPresetId } from './invoiceThemePresets'
+import {
+  REGULAR_THEME_PRESETS,
+  THERMAL_THEME_PRESETS,
+  resolveRegularPresetId,
+  findThermalPreset,
+  findBaseThermalPresetForLayout,
+  thermalWidthPx,
+} from './invoiceThemePresets'
 import { ITEM_COLUMN_DEFS, MAX_ITEM_COLUMNS, moveColumn, normalizeItemColumns, toggleItemColumn } from './invoiceColumns'
 import { resolveInvoiceBranding } from './invoiceBranding'
 import { SettingsSection, ToggleRow, ColumnRow } from './InvoiceSettingsSection'
@@ -205,7 +212,6 @@ function buildPreviewProps(settings, printMode, regularPresetId, previewData) {
     footer: settings.footer,
     fields: settings.fields,
     typography: settings.typography,
-    thermalLayout: settings.thermalPrint.layout,
     thermalPaperWidth: settings.thermalPrint.paperWidth,
     thermalBoldText: settings.thermalPrint.boldText,
     thermalExtraLines: settings.thermalPrint.extraLines,
@@ -312,9 +318,8 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
   const renderPreview = (props) => (isThermal
     ? <ThermalThemePreview presetId={thermalPresetId} {...props} />
     : <RegularThemePreview presetId={regularPresetId} {...props} />)
-  const thermalWidth = { '58mm': 220, '80mm': BASE_WIDTH_PX.thermal, '110mm': 380 }
   const baseWidth = isThermal
-    ? thermalWidth[settings.thermalPrint.paperWidth] || BASE_WIDTH_PX.thermal
+    ? thermalWidthPx(settings.thermalPrint.paperWidth)
     : BASE_WIDTH_PX[settings.regularPrint.paperSize] || BASE_WIDTH_PX.A4
   const displayedZoom = Math.round((zoomMode === 'fit' ? fitScale : manualZoom / 100) * 100)
 
@@ -339,7 +344,7 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
   const handleDownloadSample = async () => {
     setIsExporting(true)
     try {
-      await exportElementToPdf(exportRef.current, `sample-invoice-${previewProps.template}.pdf`, { widthRem: isThermal ? 13 : 32 })
+      await exportElementToPdf(exportRef.current, `sample-invoice-${previewProps.template}.pdf`, { widthRem: baseWidth / 16 })
     } catch (error) {
       showToast({ title: 'Download failed', message: error?.message || 'Unable to export the sample PDF.', variant: 'error' })
     } finally {
@@ -350,7 +355,9 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
   return (
     <div className="sticky top-4 flex flex-col rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)">
       {/* Scoped to this page only (unmounts with it) - hides everything else in the app during
-          print and lets the invoice content print at its natural size, not the on-screen zoom. */}
+          print and lets the invoice content print at its natural size, not the on-screen zoom.
+          @page is sized to the actual selected thermal paper width (58/80/110mm) with minimal
+          margins, so a thermal printer driver prints at real size instead of scaling down to A4. */}
       <style>{`
         .invoice-export-root { position: absolute; left: -10000px; top: 0; }
         @media print {
@@ -359,6 +366,10 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
           .invoice-export-root {
             position: fixed; inset: 0; left: 0; margin: 0; width: auto !important; height: auto !important;
             box-shadow: none !important;
+          }
+          @page {
+            size: ${isThermal ? `${settings.thermalPrint.paperWidth} auto` : settings.regularPrint.paperSize};
+            margin: ${isThermal ? '2mm' : '10mm'};
           }
         }
       `}</style>
@@ -462,9 +473,10 @@ export default function InvoiceSettings() {
   // is still local UI state (it drives which card is highlighted), but it's initialized FROM and
   // kept in sync WITH `settings.templateVariant`, so Save actually persists it - resolveRegularPresetId
   // (invoiceThemePresets.js, shared with InvoiceDetail.jsx) is the one place that reconciles the
-  // two. Thermal preset selection stays scoped to
-  // `thermalPrint.layout` (4 base layouts) as before - the backend's template_variant field, per
-  // its own spec, covers the regular theme picker only.
+  // two. The specific thermal preset (e.g. "thermal-theme-2") now persists the same way, through
+  // `thermalPrint.layout` itself - the backend is adding validation for these preset-id strings
+  // there (findThermalPreset still accepts the 4 old plain layout names too, for an org that
+  // saved before this change - see invoiceThemePresets.js).
   const [regularPresetId, setRegularPresetId] = useState('classic')
   const [thermalPresetId, setThermalPresetId] = useState('thermal-classic')
 
@@ -478,8 +490,7 @@ export default function InvoiceSettings() {
       setSettings(result.settings)
       setDefaults(result.settings)
       setRegularPresetId(resolveRegularPresetId(result.settings.template, result.settings.templateVariant))
-      const matchingThermal = THERMAL_THEME_PRESETS.find((preset) => preset.layout === result.settings.thermalPrint.layout)
-      setThermalPresetId((matchingThermal || THERMAL_THEME_PRESETS[3]).id)
+      setThermalPresetId(findThermalPreset(result.settings.thermalPrint.layout).id)
       setIsLoading(false)
     })
     // Independent of the invoice-settings load above (Part 10: "do not block the entire page
@@ -551,9 +562,9 @@ export default function InvoiceSettings() {
   const setThermalPrint = setBlock('thermalPrint')
 
   // Picking a preset never touches business/invoice/party/item-table/payment/footer settings
-  // (Part 11) - only `template` + `templateVariant` (the exact preset id, now a real persisted
-  // field - see api/invoices.js) change for a regular preset; thermal stays scoped to
-  // `thermalPrint.layout`.
+  // (Part 11) - only `template` + `templateVariant` change for a regular preset, and only
+  // `thermalPrint.layout` for a thermal preset (both now the exact preset id, a real persisted
+  // field - see api/invoices.js / invoiceThemePresets.js).
   const handleSelectRegularPreset = (preset) => {
     setRegularPresetId(preset.id)
     setTop('template', preset.baseTemplate)
@@ -561,7 +572,7 @@ export default function InvoiceSettings() {
   }
   const handleSelectThermalPreset = (preset) => {
     setThermalPresetId(preset.id)
-    setThermalPrint('layout', preset.layout)
+    setThermalPrint('layout', preset.id)
   }
 
   const selectedColumnCount = normalizeItemColumns(settings.itemTable.columns).length
@@ -617,8 +628,7 @@ export default function InvoiceSettings() {
     if (!defaults) return
     setSettings(defaults)
     setRegularPresetId(resolveRegularPresetId(defaults.template, defaults.templateVariant))
-    const matchingThermal = THERMAL_THEME_PRESETS.find((preset) => preset.layout === defaults.thermalPrint.layout)
-    setThermalPresetId((matchingThermal || THERMAL_THEME_PRESETS[3]).id)
+    setThermalPresetId(findThermalPreset(defaults.thermalPrint.layout).id)
     // Part 24: Reset to Default also clears every invoice-specific branding override (logo,
     // signature, stamp, QR alike - all four now live in `defaults.branding`) - every asset falls
     // back to Company Settings, nothing in Company Settings itself is touched.
@@ -928,11 +938,11 @@ export default function InvoiceSettings() {
                     Layout
                     <Select
                       options={THERMAL_LAYOUT_OPTIONS}
-                      value={settings.thermalPrint.layout}
+                      value={findThermalPreset(settings.thermalPrint.layout).layout}
                       onChange={(event) => {
-                        setThermalPrint('layout', event.target.value)
-                        const matching = THERMAL_THEME_PRESETS.find((preset) => preset.layout === event.target.value)
-                        if (matching) setThermalPresetId(matching.id)
+                        const basePreset = findBaseThermalPresetForLayout(event.target.value)
+                        setThermalPrint('layout', basePreset.id)
+                        setThermalPresetId(basePreset.id)
                       }}
                     />
                   </label>
@@ -942,8 +952,17 @@ export default function InvoiceSettings() {
                   </label>
                 </div>
                 <ToggleRow label="Use Text Styling / Bold" checked={settings.thermalPrint.boldText} onChange={(v) => setThermalPrint('boldText', v)} />
-                <ToggleRow label="Auto Cut Paper" checked={settings.thermalPrint.autoCut} onChange={(v) => setThermalPrint('autoCut', v)} />
-                <ToggleRow label="Open Cash Drawer" checked={settings.thermalPrint.openCashDrawer} onChange={(v) => setThermalPrint('openCashDrawer', v)} />
+                {/* Auto-cut/cash-drawer/copies are raw ESC/POS printer commands a browser print
+                    dialog has no way to issue - disabled rather than hidden, so a saved value
+                    stays visible, with an honest reason instead of silently doing nothing. */}
+                <div>
+                  <ToggleRow label="Auto Cut Paper" checked={settings.thermalPrint.autoCut} onChange={(v) => setThermalPrint('autoCut', v)} disabled />
+                  <p className="-mt-1 text-xs text-neutral-400">Not supported for browser printing.</p>
+                </div>
+                <div>
+                  <ToggleRow label="Open Cash Drawer" checked={settings.thermalPrint.openCashDrawer} onChange={(v) => setThermalPrint('openCashDrawer', v)} disabled />
+                  <p className="-mt-1 text-xs text-neutral-400">Not supported for browser printing.</p>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-700">
                     Extra Lines at End
@@ -959,14 +978,15 @@ export default function InvoiceSettings() {
                     <input
                       type="number" min={1} max={10}
                       value={settings.thermalPrint.copies}
-                      onChange={(event) => setThermalPrint('copies', Math.max(1, Math.min(10, Number(event.target.value) || 1)))}
-                      className="rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                      disabled
+                      className="cursor-not-allowed rounded-xl border border-neutral-200 bg-neutral-100 px-3.5 py-2.5 text-sm text-neutral-400"
                     />
                   </label>
                 </div>
+                <p className="-mt-2 text-xs text-neutral-400">Copies is not supported for browser printing - use your printer dialog's own copy count instead.</p>
               </TabsContent>
             </Tabs>
-            <InfoNote>Paper size, orientation, margins, paper width, extra lines and bold styling apply to the backend-generated Simple PDF / Download PDF on an actual invoice. Theme, Layout, auto-cut, cash drawer, copies and printing type are fully reflected in Print Preview and Download Sample PDF above, and in the Print Preview button on an invoice's own page — but not by the backend PDF engine itself, which always renders a fixed per-template look regardless of these choices.</InfoNote>
+            <InfoNote>Paper size, orientation and margins apply to the backend-generated Simple PDF / Download PDF for a regular (A4) invoice. Thermal Theme, Layout, Paper Width, Bold and Extra Lines are fully reflected everywhere a thermal receipt is actually produced: Print Preview and Download Sample PDF above, and the Print Receipt (Thermal) button on an invoice's own page — printed via the browser, sized to the selected paper width. Auto-cut, cash drawer and copies are raw printer commands a browser print dialog cannot issue, so they are saved but have no effect on browser printing.</InfoNote>
           </SettingsSection>
         </div>
 

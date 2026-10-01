@@ -228,13 +228,13 @@ export default function Sidebar({
             </div>
             <div className={`hidden min-w-0 flex-col overflow-hidden transition-all duration-150 md:flex ${labelVisibilityClass}`}>
               <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-fg">
-                SAAS CRM
+                Beas Suite
               </span>
               <span className="truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
             </div>
             <div className="flex min-w-0 flex-col md:hidden">
               <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-fg">
-                SAAS CRM
+                Beas Suite
               </span>
               <span className="truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
             </div>

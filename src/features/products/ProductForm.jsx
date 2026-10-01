@@ -1288,7 +1288,7 @@ export default function ProductForm({
                           <div className="flex items-center gap-3">
                             <label className="group relative flex size-10 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
                               {variant.imageUrl ? (
-                                <img src={variant.imageUrl} alt="" className="h-full w-full object-cover" />
+                                <img src={getFileUrl(variant.imageUrl)} alt="" className="h-full w-full object-cover" />
                               ) : (
                                 <ImagePlus className="size-4 text-neutral-300" aria-hidden="true" />
                               )}

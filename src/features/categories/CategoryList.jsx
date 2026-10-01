@@ -18,6 +18,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { readImageAsDataUrl } from '../../utils/imageFile'
+import { getFileUrl } from '../../api/files'
 
 const emptyForm = {
   name: '',
@@ -140,7 +141,7 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
         <div className="flex items-start gap-4">
           {formData.image && !previewFailed ? (
             <img
-              src={formData.image}
+              src={getFileUrl(formData.image)}
               alt=""
               className="size-20 shrink-0 rounded-2xl border border-neutral-100 object-cover"
               onError={() => setPreviewFailed(true)}
@@ -606,7 +607,7 @@ export default function CategoryList() {
                     <td className="px-6 py-5">
                       {category.image ? (
                       <img
-                          src={category.image}
+                          src={getFileUrl(category.image)}
                           alt={`${category.name} category image`}
                           className="size-10 rounded-lg border border-neutral-100 object-cover"
                         />
@@ -649,7 +650,7 @@ export default function CategoryList() {
       {isFilterMenuOpen && createPortal(
         <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="category-filter-title" id="category-filter-panel">
           <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterMenuOpen(false)} aria-label="Close filters" tabIndex={-1} />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl">
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
               <div>
                 <h2 id="category-filter-title" className="text-lg font-semibold text-neutral-900">Filter Categories</h2>
@@ -720,7 +721,7 @@ export default function CategoryList() {
                 <div className="shrink-0">
                   {viewCategory?.image ? (
                     <img
-                      src={viewCategory.image}
+                      src={getFileUrl(viewCategory.image)}
                       alt={`${viewCategory?.name || 'Category'} image`}
                       className="size-20 rounded-lg border border-neutral-200 object-cover"
                     />

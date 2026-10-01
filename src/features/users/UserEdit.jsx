@@ -27,7 +27,7 @@ import {
   updateUser,
   updateUserStatus,
 } from '../../api/users'
-import { uploadFile, uploadFiles } from '../../api/files'
+import { getFileUrl, uploadFile, uploadFiles } from '../../api/files'
 import { getSystemRoleFromRoleName, normalizeApiUser, staffRoleOptions } from './userRoleUtils'
 
 const staffRoleSelectOptions = staffRoleOptions.map((role) => ({
@@ -165,7 +165,7 @@ function DocumentUploadRow({ label, description, accept, multiple = false, exist
               {existingItems.map((item, index) => (
                 <a
                   key={item.url || item.id || index}
-                  href={item.url}
+                  href={getFileUrl(item.url)}
                   target="_blank"
                   rel="noreferrer"
                   className="truncate text-xs font-medium text-primary-700 hover:underline"
@@ -263,7 +263,9 @@ export default function UserEdit() {
   const [profilePictureRemoved, setProfilePictureRemoved] = useState(false)
   const [profilePicturePreviewUrl, setProfilePicturePreviewUrl] = useState('')
   const [photoLoadFailed, setPhotoLoadFailed] = useState(false)
-  const effectivePhotoUrl = profilePicturePreviewUrl || (!profilePictureRemoved ? user?.profilePhoto : '')
+  // getFileUrl is safe on the blob: preview URL too (passed through unchanged) - only
+  // user?.profilePhoto (a raw backend file reference) actually needs resolving.
+  const effectivePhotoUrl = profilePicturePreviewUrl || getFileUrl(!profilePictureRemoved ? user?.profilePhoto : '')
   const showPhotoPreview = Boolean(effectivePhotoUrl) && !photoLoadFailed
 
   const [singleDocFiles, setSingleDocFiles] = useState({ identityDocuments: null, resumeCv: null, offerLetter: null, appointmentLetter: null })

@@ -243,7 +243,7 @@ export default function SalesReturnList() {
       {isFilterOpen && createPortal(
         <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="sales-return-filter-title" id="sales-return-filter-panel">
           <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" tabIndex={-1} />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl">
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
               <div>
                 <h2 id="sales-return-filter-title" className="text-lg font-semibold text-neutral-900">Filter Sales Returns</h2>

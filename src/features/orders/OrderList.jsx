@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ChevronLeft, ChevronRight, Copy, Download, Eye, MoreHorizontal, Pencil, Plus, RotateCw, Search, ShoppingCart, SlidersHorizontal, Trash2, UploadCloud, X } from 'lucide-react'
@@ -396,10 +397,10 @@ export default function OrderList() {
         </div>
       </Card>
 
-      {isFilterOpen && (
+      {isFilterOpen && createPortal(
         <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Order filters">
           <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl">
+          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
               <div><h2 className="text-lg font-semibold text-neutral-900">Filter Orders</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the orders shown in the table.</p></div>
               <button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button>
@@ -413,7 +414,8 @@ export default function OrderList() {
             </div>
             <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setDeliveryPartnerFilter('all'); setSourceFilter('all'); setStatusTab('all'); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
           </aside>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => { if (!isDeleting) { setDeleteTarget(null); setDeleteError('') } }} title="Delete Order">

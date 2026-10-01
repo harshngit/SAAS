@@ -51,6 +51,7 @@ import {
   uploadOrganizationSignature,
 } from "../../api/organizations";
 import { updateUser } from "../../api/users";
+import { getFileUrl } from "../../api/files";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import { useToast } from "../../components/ui/toastContext";
@@ -149,7 +150,7 @@ function getPreviewFileKind({ name = "", type = "", url = "" }) {
 // own toolbar/side-panel/scrollbar chrome so an embedded PDF reads as a plain content thumbnail
 // instead of a miniature scrollable viewer.
 function pdfPreviewSrc(url) {
-  return `${url}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&view=FitH`;
+  return `${getFileUrl(url)}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&view=FitH`;
 }
 
 function buildPreviewFiles({ value, displayName, fileType }) {
@@ -182,8 +183,9 @@ function createObjectUrlFromDataUrl(dataUrl) {
   return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
 }
 
-function openFileInNewTab(fileUrl) {
-  if (!fileUrl) return;
+function openFileInNewTab(rawFileUrl) {
+  if (!rawFileUrl) return;
+  const fileUrl = getFileUrl(rawFileUrl);
 
   if (fileUrl.startsWith("data:")) {
     const objectUrl = createObjectUrlFromDataUrl(fileUrl);
@@ -1459,14 +1461,14 @@ function MiniFilePreviewStrip({ files = [] }) {
       {visibleFiles.map((file) => (
         <a
           key={`${file.name}-${file.url}`}
-          href={file.url}
+          href={getFileUrl(file.url)}
           target="_blank"
           rel="noreferrer"
           title={file.name}
           className="group relative flex size-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-surface shadow-sm"
         >
           {file.kind === "image" ? (
-            <img src={file.url} alt={file.name} className="size-full object-cover" />
+            <img src={getFileUrl(file.url)} alt={file.name} className="size-full object-cover" />
           ) : file.kind === "pdf" ? (
             <iframe
               src={pdfPreviewSrc(file.url)}
@@ -1536,7 +1538,7 @@ function FileUploadField({
   const isPdfPreview = !isImagePreview && previewFiles[0]?.kind === "pdf";
   const previewContent = isImagePreview ? (
     <img
-      src={value}
+      src={getFileUrl(value)}
       alt={`${label} preview`}
       className="max-h-16 max-w-32 object-contain"
     />
@@ -1920,7 +1922,7 @@ function CompanyOverviewDashboard({
             <div className="grid size-16 shrink-0 place-items-center rounded-full border border-neutral-100 bg-surface text-2xl font-bold text-primary-700 shadow-sm 2xl:size-20">
               {logoUrl ? (
                 <img
-                  src={logoUrl}
+                  src={getFileUrl(logoUrl)}
                   alt={`${displayName} logo`}
                   className="size-14 rounded-full object-contain 2xl:size-16"
                 />
@@ -2075,7 +2077,7 @@ function CompanyOverviewDashboard({
             <div className="grid size-16 shrink-0 place-items-center rounded-full bg-neutral-100 text-lg font-bold text-neutral-600">
               {authorizedPhoto ? (
                 <img
-                  src={authorizedPhoto}
+                  src={getFileUrl(authorizedPhoto)}
                   alt={authorizedName || "Authorized person"}
                   className="size-16 rounded-full object-cover"
                 />

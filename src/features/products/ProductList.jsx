@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Download, Edit, Eye, Package, Plus, Power, RotateCw, ScanBarcode, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
@@ -11,6 +12,7 @@ import Select from '../../components/ui/Select'
 import { listCategories } from '../../api/categories'
 import { listSuppliers } from '../../api/suppliers'
 import { createProduct, deleteProduct, listProducts, updateProduct } from '../../api/products'
+import { getFileUrl } from '../../api/files'
 import { formatCurrency } from '../../utils/format'
 import { normalizeApiProduct } from './productUtils'
 import ProductForm from './ProductForm'
@@ -400,7 +402,7 @@ export default function ProductList() {
                     <td className="px-6 py-5 align-middle" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => setSelectedIds((current) => current.includes(product.id) ? current.filter((id) => id !== product.id) : [...current, product.id])} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label={`Select ${product.name}`} /></td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
-                        <ProductThumbnail src={product.coverImage} alt={product.name} />
+                        <ProductThumbnail src={getFileUrl(product.coverImage)} alt={product.name} />
                         <span className="font-medium text-neutral-900">{product.name}</span>
                       </div>
                     </td>
@@ -453,7 +455,7 @@ export default function ProductList() {
         </div>
       </Card>
 
-      {isFilterOpen && <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Product filters"><button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" /><aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl"><div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4"><div><h2 className="text-lg font-semibold text-neutral-900">Filter Products</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the products shown in the table.</p></div><button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button></div><div className="flex-1 space-y-5 overflow-y-auto px-5 py-6"><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={productStatusTabs} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category<Select options={categoryFilterOptions} value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1) }} /></label><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort<Select options={[{ value: 'recent', label: 'Recent' }, { value: 'oldest', label: 'Oldest' }]} value={sortFilter} onChange={(event) => { setSortFilter(event.target.value); setPage(1) }} /></label></div><div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSortFilter('recent'); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div></aside></div>}
+      {isFilterOpen && createPortal(<div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Product filters"><button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" /><aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl"><div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4"><div><h2 className="text-lg font-semibold text-neutral-900">Filter Products</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the products shown in the table.</p></div><button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button></div><div className="flex-1 space-y-5 overflow-y-auto px-5 py-6"><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={productStatusTabs} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category<Select options={categoryFilterOptions} value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1) }} /></label><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort<Select options={[{ value: 'recent', label: 'Recent' }, { value: 'oldest', label: 'Oldest' }]} value={sortFilter} onChange={(event) => { setSortFilter(event.target.value); setPage(1) }} /></label></div><div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSortFilter('recent'); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div></aside></div>, document.body)}
 
       <Modal
         isOpen={Boolean(statusProduct)}

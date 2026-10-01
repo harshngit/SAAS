@@ -14,7 +14,10 @@ export function getFileUrl(fileOrId) {
 
   const value = String(fileOrId).trim()
   if (!value) return ''
-  if (value.startsWith('data:')) return value
+  // data:/blob: are local-browser references (a FileReader preview or URL.createObjectURL for
+  // an unsaved upload) - never something to resolve against the API, and mangling one into a
+  // bogus /files/... path would break every local file-preview call site that wraps this.
+  if (value.startsWith('data:') || value.startsWith('blob:')) return value
   if (isAbsoluteUrl(value)) return value
   if (value.startsWith('/files/')) return `${API_BASE_URL.replace(/\/$/, '')}${value}`
 

@@ -20,6 +20,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import { getAttendance } from '../../api/attendance'
 import { listUsers } from '../../api/users'
+import { getFileUrl } from '../../api/files'
 import { roleLabels } from '../../auth/roles'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 import {
@@ -397,7 +398,7 @@ export default function AdminAttendance() {
                             className="flex items-center gap-3 text-left"
                           >
                             {row.photo ? (
-                              <img src={row.photo} alt="" className="size-9 shrink-0 rounded-full object-cover" />
+                              <img src={getFileUrl(row.photo)} alt="" className="size-9 shrink-0 rounded-full object-cover" />
                             ) : (
                               <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-50 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">
                                 {getInitials(row.name) || <UsersRound className="size-4" aria-hidden="true" />}

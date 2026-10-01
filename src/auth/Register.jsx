@@ -6,6 +6,7 @@ import { Droplet } from 'lucide-react'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import AuthShowcase from '../components/auth/AuthShowcase'
+import AuthFooterLinks from '../components/auth/AuthFooterLinks'
 import { zodResolver } from '../utils/zodResolver'
 import { registerOrganization } from '../api/auth'
 import { resolveHomePath } from './roles'
@@ -60,7 +61,7 @@ export default function Register() {
                 <Droplet className="size-5" />
               </div>
               <span className="font-(--font-display) text-lg font-semibold tracking-tight text-primary-700">
-                SAAS CRM
+                Beas Suite
               </span>
             </div>
 
@@ -80,7 +81,7 @@ export default function Register() {
             <h1 className="text-center font-(--font-display) text-3xl font-semibold tracking-tight text-neutral-950">
               Register admin account
             </h1>
-            <p className="mt-2 text-center text-base text-neutral-500">Create your SAAS CRM admin login</p>
+            <p className="mt-2 text-center text-base text-neutral-500">Create your Beas Suite admin login</p>
 
             <form onSubmit={handleSubmit(onSubmit)} className="mt-10 flex flex-col gap-6">
               <div className="pr-1">
@@ -126,6 +127,7 @@ export default function Register() {
                 Sign in
               </Link>
             </p>
+            <AuthFooterLinks />
           </div>
         </main>
       </div>

@@ -527,7 +527,7 @@ export default function QuotationFormPage() {
             <h3 className="text-sm font-semibold text-neutral-900">Quotation Items</h3>
           </div>
 
-          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
+          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
             <div>
               <ProductPickerList
                 products={products}
