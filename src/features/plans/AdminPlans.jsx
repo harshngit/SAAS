@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, CreditCard, Crown } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Check, CreditCard, Crown, Wallet } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -7,10 +8,20 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/Tabs'
+import { useToast } from '../../components/ui/toastContext'
 import { listActivePlans } from '../../api/plans'
 import { getCurrentOrganizationState, requestPlanUpgrade } from '../../api/organizations'
+import { getCurrentProfile } from '../../api/auth'
+import { payForPlan } from './planPayment'
 import { useAuthStore } from '../../store/authStore'
+import { useTheme } from '../../theme/useTheme'
 import { formatCurrency } from '../../utils/format'
+
+function formatDateLabel(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
 const getFeatureDescription = (feature) => {
   const normalizedFeature = feature.toLowerCase()
@@ -63,6 +74,7 @@ const getFeatureDescription = (feature) => {
 }
 
 export default function AdminPlans() {
+  const navigate = useNavigate()
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const [billingCycle, setBillingCycle] = useState('monthly')
   const [plans, setPlans] = useState([])
@@ -74,6 +86,13 @@ export default function AdminPlans() {
   const [requestedPlanId, setRequestedPlanId] = useState(null)
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [requestError, setRequestError] = useState('')
+
+  // Razorpay online payment - separate from the manual upgrade-request state above.
+  const { showToast } = useToast()
+  const { theme } = useTheme()
+  const [payingPlanId, setPayingPlanId] = useState(null)
+  const [payError, setPayError] = useState('')
+  const [onlinePaymentUnavailable, setOnlinePaymentUnavailable] = useState(false)
 
   const plansGridRef = useRef(null)
 
@@ -122,6 +141,7 @@ export default function AdminPlans() {
     return () => {
       isMounted = false
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const currentPlanId = organizationState?.plan_id || organizationState?.plan?.id
@@ -176,6 +196,55 @@ export default function AdminPlans() {
     }
   }
 
+  // Disabled while processing (via payingPlanId) so a double-click can't open two Razorpay
+  // orders for the same plan.
+  const handlePayForPlan = async (plan) => {
+    if (payingPlanId) return
+
+    setPayError('')
+    setPayingPlanId(plan.id)
+
+    const result = await payForPlan({
+      plan,
+      billingCycle,
+      accentColor: theme?.primaryColor,
+      onFailed: (message) => {
+        setPayError(message)
+        showToast({ title: 'Payment failed', message, variant: 'error' })
+      },
+    })
+
+    setPayingPlanId(null)
+
+    if (result.cancelled) {
+      showToast({ title: 'Payment cancelled', message: 'You can try again anytime.' })
+      return
+    }
+
+    if (result.notConfigured) {
+      setOnlinePaymentUnavailable(true)
+      return
+    }
+
+    if (!result.success) {
+      setPayError(result.error)
+      showToast({ title: 'Payment failed', message: result.error, variant: 'error' })
+      return
+    }
+
+    // verify's response is the full OrganizationOut - apply it immediately, then refresh the
+    // auth store's copy (GET /auth/me) so the rest of the app picks up the new plan too.
+    setOrganizationState(result.organization)
+    setRequestedPlanId(null)
+    getCurrentProfile()
+    showToast({
+      title: 'Plan activated',
+      message: result.organization?.plan_expires_at
+        ? `Valid till ${formatDateLabel(result.organization.plan_expires_at)}.`
+        : 'Your plan has been activated.',
+    })
+  }
+
   return (
     <div className="space-y-8 pb-6">
       <Modal
@@ -226,14 +295,26 @@ export default function AdminPlans() {
                 <h2 className="text-xl font-semibold tracking-tight text-neutral-900">{currentPlanName || 'No active plan'}</h2>
                 <Badge variant="primary" dot>Current plan</Badge>
               </div>
-              {isOnTrial && (
+              {isOnTrial ? (
                 <p className="mt-1.5 text-sm text-neutral-500">{trialDaysLeft} days Free Trial left</p>
+              ) : (
+                organizationState?.plan_expires_at && (
+                  <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-neutral-500">
+                    <span className="capitalize">{organizationState.billing_cycle || 'monthly'} billing</span>
+                    <span>Valid till {formatDateLabel(organizationState.plan_expires_at)}</span>
+                    {typeof organizationState.days_left === 'number' && (
+                      <Badge variant={organizationState.days_left <= 7 ? 'warning' : 'neutral'}>
+                        {organizationState.days_left} days left
+                      </Badge>
+                    )}
+                  </p>
+                )
               )}
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/billing-history')}>
               <CreditCard className="size-4" aria-hidden="true" />
               Manage Billing
             </Button>
@@ -241,6 +322,16 @@ export default function AdminPlans() {
           </div>
         </div>
       </section>
+
+      {onlinePaymentUnavailable && (
+        <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          Online payment isn&apos;t set up for this CRM yet. Use &quot;Request Upgrade&quot; below and a Super Admin will approve it manually.
+        </div>
+      )}
+
+      {payError && (
+        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{payError}</div>
+      )}
 
       {requestError && (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -276,7 +367,7 @@ export default function AdminPlans() {
               const price = billingCycle === 'monthly' ? plan.price_monthly : plan.price_yearly
               const originalPrice = billingCycle === 'monthly' ? plan.original_price_monthly : plan.original_price_yearly
               const cycleLabel = billingCycle === 'monthly' ? 'month' : 'year'
-              const isRequesting = requestingPlanId === plan.id
+              const isPaying = payingPlanId === plan.id
 
               return (
                 <div
@@ -361,27 +452,47 @@ export default function AdminPlans() {
                         </p>
                       </div>
 
-                      <Button
-                        variant={isFeatured ? 'outline' : 'primary'}
-                        className={`mt-5 w-full transition-transform duration-200 group-hover:scale-[1.01] ${
-                          isCurrent
-                            ? 'disabled:opacity-100 disabled:hover:from-primary-500 disabled:hover:to-primary-600'
-                            : ''
-                        } ${
-                          isFeatured
-                            ? 'border-primary-200 bg-[#bdeaa5] text-primary-700 shadow-[0_10px_24px_-12px_rgb(6_59_0/0.35)] hover:border-primary-300 hover:bg-[#aee391] hover:text-primary-900'
-                            : ''
-                        } ${
-                          isRequested && !isFeatured
-                            ? 'border-amber-200 bg-amber-50 text-amber-700 disabled:opacity-100'
-                            : ''
-                        }`}
-                        disabled={isCurrent || isRequested}
-                        loading={isRequesting}
-                        onClick={() => handleChoosePlan(plan)}
-                      >
-                        {isCurrent ? 'Current Plan' : isRequested ? 'Requested' : 'Select Plan'}
-                      </Button>
+                      {!isCurrent && !onlinePaymentUnavailable && (
+                        <Button
+                          variant={isFeatured ? 'outline' : 'primary'}
+                          className={`mt-5 w-full transition-transform duration-200 group-hover:scale-[1.01] ${
+                            isFeatured
+                              ? 'border-primary-200 bg-[#bdeaa5] text-primary-700 shadow-[0_10px_24px_-12px_rgb(6_59_0/0.35)] hover:border-primary-300 hover:bg-[#aee391] hover:text-primary-900'
+                              : ''
+                          }`}
+                          disabled={Boolean(payingPlanId) && !isPaying}
+                          loading={isPaying}
+                          onClick={() => handlePayForPlan(plan)}
+                        >
+                          <Wallet className="size-4" aria-hidden="true" />
+                          Pay {formatCurrency(price)} and activate
+                        </Button>
+                      )}
+
+                      {isCurrent ? (
+                        <Button
+                          variant={isFeatured ? 'outline' : 'primary'}
+                          className={`mt-5 w-full disabled:opacity-100 ${
+                            isFeatured
+                              ? 'border-primary-200 bg-[#bdeaa5] text-primary-700 hover:border-primary-200 hover:bg-[#bdeaa5]'
+                              : ''
+                          }`}
+                          disabled
+                        >
+                          Current Plan
+                        </Button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isRequested || Boolean(requestingPlanId) || Boolean(payingPlanId)}
+                          onClick={() => handleChoosePlan(plan)}
+                          className={`mt-3 w-full text-center text-xs font-medium underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:no-underline ${
+                            isFeatured ? 'text-white/70 hover:text-white' : 'text-neutral-500 hover:text-neutral-800'
+                          } ${isRequested ? 'text-amber-600' : ''}`}
+                        >
+                          {isRequested ? 'Upgrade requested - awaiting approval' : 'Request upgrade (manual)'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -390,6 +501,7 @@ export default function AdminPlans() {
           </div>
         )}
       </div>
+
     </div>
   )
 }

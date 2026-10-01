@@ -45,7 +45,7 @@ export default function Modal({ isOpen, onClose, title, children, footer, size =
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'modal-title' : undefined}
-        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-xl border border-surface-border bg-surface shadow-[0_1px_0_rgba(0,0,0,0.02)] ${hasWidthOverride ? '' : sizeClass} ${className}`}
+        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-xl border border-neutral-200 bg-(--modal-bg) shadow-[0_1px_0_rgba(0,0,0,0.02)] ${hasWidthOverride ? '' : sizeClass} ${className}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div

@@ -27,7 +27,7 @@ const Input = forwardRef(function Input(
           ref={ref}
           required={required}
           type={isPassword ? (showPassword ? 'text' : 'password') : type}
-          className={`w-full rounded-xl border bg-(--input-bg) px-3.5 text-sm text-fg transition-all placeholder:text-neutral-400 focus:bg-surface focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:placeholder:text-neutral-300 ${
+          className={`w-full rounded-xl border bg-(--input-bg) px-3.5 text-sm text-fg transition-all placeholder:text-neutral-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:placeholder:text-neutral-300 ${
             compact ? 'py-1.5' : 'py-2.5'
           } ${
             isPassword ? 'pr-10' : ''

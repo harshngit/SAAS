@@ -49,7 +49,9 @@ export default function ListFilterPanel({ title, children }) {
       {open && createPortal(
         <div id={id} className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`}>
           <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setOpen(false)} aria-label="Close filters" tabIndex={-1} />
-          <aside ref={panelRef} className="relative z-10 flex h-full w-full max-w-sm flex-col bg-surface shadow-2xl">
+          {/* bg-(--modal-bg), not bg-surface: this portaled slide-over panel must stay solid and
+              readable regardless of image-background mode - same token Modal.jsx/Tabs.jsx use. */}
+          <aside ref={panelRef} className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
               <div>
                 <h2 id={`${id}-title`} className="text-lg font-semibold text-neutral-900">{title}</h2>

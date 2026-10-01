@@ -12,13 +12,19 @@ const DEMO_USER = { id: 'demo-user-ravi', name: 'Ravi Kumar' }
 
 // Fallback categories, only used when GET /expenses/categories returns nothing.
 export const DEMO_EXPENSE_CATEGORIES = [
-  'Fuel',
-  'Toll',
-  'Parking',
-  'Loading / Unloading',
-  'Vehicle Repair',
-  'Food / Travel',
-  'Miscellaneous',
+  'Petrol / Diesel',
+  'Toll / Parking',
+  'Travel / Conveyance',
+  'Client Visit Expenses',
+  'Meals',
+  'Office Rent',
+  'Electricity',
+  'Internet',
+  'Software Subscription',
+  'Marketing',
+  'Repairs',
+  'Stationery',
+  'Other',
 ]
 
 // Inline SVG data-URI stand-in receipt (no network, demo only).
@@ -81,22 +87,22 @@ function expense({ id, category, description, amount, paymentMode, expenseDate, 
 }
 
 const STATIC = [
-  expense({ id: 'demo-exp-1', category: 'Fuel', description: 'Diesel refill before the Baner route', amount: 1500, paymentMode: 'Cash', expenseDate: iso(-1), receipt: true, status: 'Pending', createdOffset: -1 }),
-  expense({ id: 'demo-exp-2', category: 'Toll', description: 'Mumbai–Pune expressway toll', amount: 350, paymentMode: 'UPI', expenseDate: iso(-3), receipt: true, status: 'Approved', approverName: 'Operations Manager', paymentStatus: 'Paid', createdOffset: -3 }),
-  expense({ id: 'demo-exp-3', category: 'Vehicle Repair', description: 'Rear tyre puncture + tube replacement', amount: 4500, paymentMode: 'Card', expenseDate: iso(-5), receipt: true, status: 'Rejected', approverName: 'Operations Manager', rejectionReason: 'Receipt total does not match the claimed amount.', createdOffset: -6 }),
-  expense({ id: 'demo-exp-4', category: 'Parking', description: 'Market yard parking, no printed slip available', amount: 120, paymentMode: 'Cash', expenseDate: iso(-2), receipt: false, status: 'Pending', createdOffset: -2 }),
-  expense({ id: 'demo-exp-5', category: 'Food / Travel', description: 'Lunch during the long Nashik run', amount: 260, paymentMode: 'Bank Transfer', expenseDate: iso(-8), receipt: true, status: 'Approved', approverName: 'Operations Manager', paymentStatus: 'Pending', createdOffset: -9 }),
-  expense({ id: 'demo-exp-6', category: 'Miscellaneous', description: 'Replacement cargo straps and rope', amount: 12750, paymentMode: 'UPI', expenseDate: iso(-4), receipt: true, status: 'Pending', createdOffset: -4 }),
+  expense({ id: 'demo-exp-1', category: 'Petrol / Diesel', description: 'Petrol for client visits across Pune', amount: 1500, paymentMode: 'Cash', expenseDate: iso(-1), receipt: true, status: 'Pending', createdOffset: -1 }),
+  expense({ id: 'demo-exp-2', category: 'Toll / Parking', description: 'Parking during the Mumbai client meeting', amount: 350, paymentMode: 'UPI', expenseDate: iso(-3), receipt: true, status: 'Approved', approverName: 'Finance Admin', paymentStatus: 'Paid', createdOffset: -3 }),
+  expense({ id: 'demo-exp-3', category: 'Software Subscription', description: 'Monthly CRM collaboration subscription', amount: 4500, paymentMode: 'Card', expenseDate: iso(-5), receipt: true, status: 'Rejected', approverName: 'Finance Admin', rejectionReason: 'Please attach the subscription invoice.', createdOffset: -6 }),
+  expense({ id: 'demo-exp-4', category: 'Stationery', description: 'Printer paper and presentation folders', amount: 120, paymentMode: 'Cash', expenseDate: iso(-2), receipt: false, status: 'Pending', createdOffset: -2 }),
+  expense({ id: 'demo-exp-5', category: 'Meals', description: 'Client meeting lunch for the sales team', amount: 260, paymentMode: 'Bank Transfer', expenseDate: iso(-8), receipt: true, status: 'Approved', approverName: 'Finance Admin', paymentStatus: 'Pending', createdOffset: -9 }),
+  expense({ id: 'demo-exp-6', category: 'Marketing', description: 'Local business event promotion material', amount: 12750, paymentMode: 'UPI', expenseDate: iso(-4), receipt: true, status: 'Pending', createdOffset: -4 }),
   {
-    ...expense({ id: 'demo-exp-7', category: 'Fuel', description: 'Diesel top-up, Pune depot', amount: 2100, paymentMode: 'UPI', expenseDate: iso(-3), receipt: false, status: 'Pending', createdOffset: -3 }),
+    ...expense({ id: 'demo-exp-7', category: 'Travel / Conveyance', description: 'Local conveyance for a customer presentation', amount: 2100, paymentMode: 'UPI', expenseDate: iso(-3), receipt: false, status: 'Pending', createdOffset: -3 }),
     approvalStatus: 'Clarification Required',
     statusKey: 'clarification_requested',
     statusLabel: 'Clarification Required',
     approvedBy: 'demo-mgr',
     approverName: 'Operations Manager',
     reviewedAt: stamp(-2),
-    clarificationNote: 'Please attach the fuel bill / GST receipt.',
-    rejectReason: 'Please attach the fuel bill / GST receipt.',
+    clarificationNote: 'Please attach the supporting bill or receipt.',
+    rejectReason: 'Please attach the supporting bill or receipt.',
   },
 ]
 

@@ -48,7 +48,6 @@ import {
   reassignDelivery,
   updateDeliveryPlan,
 } from '../../api/deliveries'
-import { getSalesWorkflowSettings } from '../../api/settings'
 import { getFileUrl, uploadFiles } from '../../api/files'
 import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
@@ -241,8 +240,7 @@ export default function DeliveryDetail() {
   const [addedProducts, setAddedProducts] = useState([]) // [{ productId, productName, sku, unitPrice, quantity, vehicleQty }]
   const [isAddProductOpen, setIsAddProductOpen] = useState(false)
 
-  // Collection (financial action, gated by the firm's delivery_collection_allowed setting)
-  const [collectionAllowed, setCollectionAllowed] = useState(true)
+  // Collection (financial action) - delivery collections are always supported, no per-org toggle.
   const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false)
   const [deliveryCollections, setDeliveryCollections] = useState([])
   const [collectionDetail, setCollectionDetail] = useState(null)
@@ -326,12 +324,6 @@ export default function DeliveryDetail() {
   useEffect(() => {
     if (!isAdminView) return
     let isMounted = true
-
-    // Only the admin/back-office can read settings and record collections - the delivery
-    // partner role is 403'd on both, so it gets a read-only hand-off note instead.
-    getSalesWorkflowSettings().then((result) => {
-      if (isMounted && result.success) setCollectionAllowed(result.settings.deliveryCollectionAllowed !== false)
-    })
 
     Promise.all([listDeliveryPartners(), listVehicles(), listWarehouses()]).then(([partnersResult, vehiclesResult, warehousesResult]) => {
       if (!isMounted) return
@@ -472,13 +464,12 @@ export default function DeliveryDetail() {
     !parentOrderCancelled &&
     (deliveryCollections.length > 0 ||
       (COLLECTION_STAGES.includes(stageKey) && (totalAmountDue > 0 || collectedAmount > 0)))
-  // Gated on the canonical `delivery_collections:create` permission (no role check). Admin also
-  // respects the firm's delivery_collection_allowed setting; a real backend error is never faked.
+  // Gated on the canonical `delivery_collections:create` permission (no role check) - delivery
+  // collections are always supported, no per-org toggle to also check.
   const canRecordCollection =
     showCollectionSection &&
     remainingReceivable > 0 &&
-    can('delivery_collections', 'create') &&
-    (!isAdminView || collectionAllowed)
+    can('delivery_collections', 'create')
   // Never surface a raw UUID as the visible value - show the name, or nothing.
   const warehouseName = delivery.warehouseName || warehouses.find((warehouse) => warehouse.id === delivery.warehouseId)?.name || ''
   const podPhotoFileIds = Array.isArray(delivery.pod?.photo_file_ids) ? delivery.pod.photo_file_ids.filter(Boolean) : []

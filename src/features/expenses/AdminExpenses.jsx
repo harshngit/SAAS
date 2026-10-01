@@ -193,7 +193,7 @@ export default function AdminExpenses() {
         )}
         <DataTable
           title="All Expenses"
-          subtitle="Submitted by sales officers, delivery partners, and staff"
+          subtitle="Organization-wide expenses submitted by admin, sales, delivery, and staff teams"
           toolbarActions={<Select options={FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />}
           loading={isLoading}
           columns={[

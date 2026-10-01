@@ -37,7 +37,9 @@ export function ToastProvider({ children }) {
           <div
             key={toast.id}
             role="status"
-            className="flex items-start gap-3 rounded-2xl border border-primary-100 bg-surface p-4 shadow-(--shadow-popover)"
+            // bg-(--modal-bg), not bg-surface: this fixed-position toast must stay solid and
+            // readable regardless of image-background mode - same token Modal.jsx/Tabs.jsx use.
+            className="flex items-start gap-3 rounded-2xl border border-primary-100 bg-(--modal-bg) p-4 shadow-(--shadow-popover)"
           >
             <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
               <CheckCircle className="size-5" aria-hidden="true" />

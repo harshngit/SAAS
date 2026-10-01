@@ -59,9 +59,14 @@ function TabsTrigger({ value, children, className, ...props }) {
     <button
       type="button"
       onClick={() => setActiveTab(value)}
+      // bg-(--modal-bg), not bg-surface: this pill needs to stay a solid, clearly-visible surface
+      // regardless of mode - --color-surface goes near-transparent under image-background mode
+      // (by design, for Card/Sidebar/Layout's actual glass chrome), which left the "selected" tab
+      // barely distinguishable from the unselected ones. --modal-bg is the same "always solid,
+      // mode-aware but never image-transparent" token Modal.jsx uses for the same reason.
       className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:pointer-events-none disabled:opacity-50 ${
         isActive
-          ? 'bg-surface text-primary-700 shadow-(--shadow-xs)'
+          ? 'bg-(--modal-bg) text-primary-700 shadow-(--shadow-xs)'
           : 'text-neutral-500 hover:text-neutral-900'
       } ${className}`}
       {...props}

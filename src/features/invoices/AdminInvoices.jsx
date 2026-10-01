@@ -219,7 +219,11 @@ function SalesInvoicesPanel({ header }) {
                       className="cursor-pointer transition-colors hover:bg-primary-50/30"
                     >
                       <td className="whitespace-nowrap px-6 py-5 font-medium text-primary-700">
-                        {invoice.invoiceNumber}
+                        <div className="flex items-center gap-1.5">
+                          {invoice.invoiceNumber}
+                          {invoice.paymentLinkStatus === 'paid' && <Badge variant="success">Paid online</Badge>}
+                          {invoice.hasActivePaymentLink && invoice.paymentLinkStatus !== 'paid' && <Badge variant="warning">Link sent</Badge>}
+                        </div>
                       </td>
                       <td className="whitespace-nowrap px-6 py-5 text-neutral-500">
                         {invoice.orderId ? (

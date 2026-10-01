@@ -136,17 +136,30 @@ export function buildInvoicePreviewData(invoice, org, invoiceSettings) {
   }
 }
 
-// Mirrors app/core/pdf_docs.py's _TEMPLATE_STYLES exactly. The real PDF's font sizing is driven
-// entirely by these fixed per-template values (every _font() call there passes an explicit
-// custom_size) - typography.headingSize/bodySize/tableSize are accepted and saved by the backend
-// but never actually read by the PDF renderer (see the backend-changes writeup), so the preview
-// intentionally does NOT resize from those sliders either: doing so would make the preview lie
-// about what the real PDF looks like, which is the one thing this redesign must not do.
+// Mirrors app/core/pdf_docs.py's _TEMPLATE_STYLES defaults. The backend-generated "Simple
+// PDF"/"Download PDF" on a real invoice still uses these fixed per-template sizes regardless of
+// the Typography sliders below (every _font() call there passes an explicit custom_size, and
+// typography.headingSize/bodySize/tableSize are saved but never read by that renderer - see the
+// backend-changes writeup). But the client-side Print Preview / Download Sample PDF / a real
+// invoice's own Print Preview button (InvoiceDetail.jsx) are fully frontend-rendered, so THERE is
+// no reason to leave the sliders inert - resolveTemplateStyle below applies them for real, which
+// is what "Heading Size / Body Size / Table Size apply to the generated PDF" (the Typography
+// section's own InfoNote) actually promises for those two paths.
 const TEMPLATE_STYLES = {
   classic: { heading: '1rem', body: '0.75rem', table: '0.68rem', rowPad: 'py-1.5' },
   modern: { heading: '1.2rem', body: '0.75rem', table: '0.68rem', rowPad: 'py-2' },
   compact: { heading: '0.8rem', body: '0.6rem', table: '0.56rem', rowPad: 'py-1' },
   thermal: { heading: '0.8rem', body: '0.6rem', table: '0.56rem', rowPad: 'py-1' },
+}
+
+function resolveTemplateStyle(baseTemplate, typography) {
+  const base = TEMPLATE_STYLES[baseTemplate] || TEMPLATE_STYLES.classic
+  return {
+    ...base,
+    heading: typography?.headingSize ? `${typography.headingSize}pt` : base.heading,
+    body: typography?.bodySize ? `${typography.bodySize}pt` : base.body,
+    table: typography?.tableSize ? `${typography.tableSize}pt` : base.table,
+  }
 }
 
 const FONT_STACKS = {
@@ -474,7 +487,7 @@ function PartyBlock({ primaryColor, partyDetails, billTo, accentHeading }) {
 function RegularInvoiceDocument({ preset, ...props }) {
   const { primaryColor, data = sampleInvoice, businessDetails, invoiceDetails, partyDetails, itemTable, paymentDetails, footer, fields, typography } = withDefaults(props)
   const { company, billTo, items } = data
-  const style = TEMPLATE_STYLES[preset.baseTemplate] || TEMPLATE_STYLES.classic
+  const style = resolveTemplateStyle(preset.baseTemplate, typography)
   const fontFamily = resolveFontFamily(typography)
   const accentHeading = preset.accent === 'bold'
 
@@ -537,39 +550,50 @@ export function RegularThemePreview({ presetId, ...props }) {
 // thermal presets) adds small presentational differences on top of the same structure - not 4
 // more bespoke components, matching Part 6/10's "own layout configuration, not a full rebuild".
 export function ThermalPreview(props) {
-  const { primaryColor, data = sampleInvoice, businessDetails, invoiceDetails, itemTable, footer, thermalLayout = 'standard', thermalVariant } = withDefaults(props)
+  const { primaryColor, data = sampleInvoice, businessDetails, invoiceDetails, itemTable, footer, thermalLayout = 'standard', thermalVariant, showExtras, typography, thermalBoldText, thermalExtraLines } = withDefaults(props)
   const { company, items } = data
-  const style = TEMPLATE_STYLES.thermal
+  const style = resolveTemplateStyle('thermal', typography)
   const activeColumns = resolveActiveColumns(itemTable.columns, { showProductImage: itemTable.showProductImage })
   const showTax = activeColumns.some((col) => col.key === 'tax_rate')
   const dividerClass = thermalLayout === 'simple' || thermalLayout === 'compact' ? 'border-t border-neutral-200' : 'border-t border-dashed border-neutral-300'
   const spacing = thermalLayout === 'compact' ? 'space-y-0.5 pt-1' : 'space-y-1 pt-1.5'
   const centerAll = thermalLayout === 'classic' ? 'text-center' : ''
-  // Variant 1/3 = totals right-aligned like a normal receipt (default); 2/4 = totals emphasised
-  // with the accent color, a small nod to "Theme 1-4" being distinct from the base 4 without a
-  // different structural layout (thermal receipts don't have room for structural variety).
+  // Every one of the 8 Thermal Theme cards (4 base layouts + Theme 1-4) must render visibly
+  // differently from every other - previously "Simple"/"Theme 3" and "Advanced"/"Theme 1" were
+  // pixel-identical (showExtras was silently dropped, and variant 1/3 did nothing at all), which
+  // is why picking between them looked like nothing happened. Each axis now does something real:
+  // showExtras ("Advanced") adds an HSN/tax detail line per item; variant 1/4 bolds item names;
+  // variant 3 boxes the items section; variant 2/4 emphasise the TOTAL row in the accent color.
+  const boldItems = thermalVariant === 1 || thermalVariant === 4
+  const boxedItems = thermalVariant === 3
   const emphasizeTotal = thermalVariant === 2 || thermalVariant === 4
+  const itemsWrapClass = boxedItems ? 'rounded border border-neutral-300 px-1.5' : ''
 
   return (
     // Same never-themed pin as RegularInvoiceDocument above (Part 2.10).
-    <div data-mode="light" data-bg="none" className={`space-y-2 font-mono leading-tight text-neutral-700 ${centerAll}`} style={{ fontSize: style.body }}>
+    <div data-mode="light" data-bg="none" className={`space-y-2 font-mono leading-tight text-neutral-700 ${centerAll} ${thermalBoldText ? 'font-semibold' : ''}`} style={{ fontSize: style.body }}>
       <div className="text-center">
         {businessDetails.showLogo && company.logoUrl && (
           <img src={company.logoUrl} alt="" className="mx-auto mb-1 size-7 object-contain" onError={(event) => { event.currentTarget.style.display = 'none' }} />
         )}
-        {businessDetails.showBusinessName && <p className="font-bold" style={{ color: primaryColor }}>{company.name}</p>}
+        {businessDetails.showBusinessName && <p className="font-bold" style={{ color: primaryColor, fontSize: style.heading }}>{company.name}</p>}
         {businessDetails.showAddress && <p className="text-neutral-500">{company.address}</p>}
         {businessDetails.showAddress && <p className="text-neutral-500">{company.cityLine}</p>}
         {businessDetails.showGstin && company.gstin && <p className="text-neutral-500">GSTIN {company.gstin}</p>}
       </div>
       <div className={`${dividerClass} ${spacing} text-center text-neutral-500`}>
-        {invoiceDetails.showInvoiceNumber && <p>{data.invoiceNo}</p>}
-        {invoiceDetails.showInvoiceDate && <p>{data.invoiceDate}</p>}
+        {invoiceDetails.showInvoiceNumber && <p style={{ fontSize: style.heading }}>{data.invoiceNo}</p>}
+        {invoiceDetails.showInvoiceDate && <p style={{ fontSize: style.heading }}>{data.invoiceDate}</p>}
       </div>
-      <div className={`${dividerClass} ${spacing}`}>
+      <div className={`${dividerClass} ${spacing} ${itemsWrapClass}`} style={{ fontSize: style.table }}>
         {items.map((item, index) => (
           <div key={item.name + index}>
-            <p className="truncate">{item.name}</p>
+            <p className={`truncate ${boldItems ? 'font-bold' : ''}`}>{item.name}</p>
+            {showExtras && (item.hsn || item.taxRate) && (
+              <p className="text-neutral-400" style={{ fontSize: '0.85em' }}>
+                {[item.hsn ? `HSN ${item.hsn}` : '', item.taxRate ? `${item.taxRate}% GST` : ''].filter(Boolean).join(' · ')}
+              </p>
+            )}
             <div className="flex justify-between text-neutral-500">
               <span>{item.qty} x {money(item.rate)}{showTax && item.taxRate ? ` +${item.taxRate}%` : ''}</span>
               <span>{money(item.amount)}</span>
@@ -595,6 +619,7 @@ export function ThermalPreview(props) {
           <span className="text-neutral-500">Authorised Signatory</span>
         </div>
       )}
+      {Array.from({ length: Math.max(0, Number(thermalExtraLines) || 0) }).map((_, index) => <p key={`extra-${index}`} aria-hidden="true">&nbsp;</p>)}
       <p className={`${dividerClass} pt-1.5 text-center text-neutral-500`}>{footer.footerText || 'Thank you!'}</p>
     </div>
   )
@@ -604,7 +629,7 @@ export function ThermalPreview(props) {
 // theme picker in InvoiceSettings.jsx.
 export function ThermalThemePreview({ presetId, ...props }) {
   const preset = findThermalPreset(presetId)
-  return <ThermalPreview {...props} thermalLayout={preset.layout} thermalVariant={preset.variant} />
+  return <ThermalPreview {...props} thermalLayout={preset.layout} thermalVariant={preset.variant} showExtras={preset.showExtras} />
 }
 
 export const templateComponents = {

@@ -17,7 +17,10 @@ import {
   rejectOrganizationUpgrade,
   updateOrganizationStatus,
 } from '../../api/superadmin'
+import { getSuperAdminSubscriptionPayments } from '../../api/billing'
 import { formatCurrency } from '../../utils/format'
+
+const PAYMENT_STATUS_VARIANT = { paid: 'success', failed: 'danger', created: 'warning' }
 
 const statusVariant = {
   trial: 'info',
@@ -74,6 +77,10 @@ export default function OrganizationDetail() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
+  const [payments, setPayments] = useState([])
+  const [isLoadingPayments, setIsLoadingPayments] = useState(true)
+  const [paymentsError, setPaymentsError] = useState('')
+
   useEffect(() => {
     let isMounted = true
 
@@ -97,7 +104,21 @@ export default function OrganizationDetail() {
       setStatusDraft(result.organization.status || '')
     }
 
+    async function loadPayments() {
+      setIsLoadingPayments(true)
+      const result = await getSuperAdminSubscriptionPayments(id)
+      if (!isMounted) return
+      setIsLoadingPayments(false)
+      if (!result.success) {
+        setPaymentsError(result.error)
+        return
+      }
+      setPaymentsError('')
+      setPayments(result.payments)
+    }
+
     load()
+    loadPayments()
 
     return () => {
       isMounted = false
@@ -351,6 +372,47 @@ export default function OrganizationDetail() {
           )}
         </Card>
       </div>
+
+      <Card title="Payments" subtitle="Online subscription payments for this organization">
+        {isLoadingPayments ? (
+          <LoadingSpinner label="Loading payments..." />
+        ) : paymentsError ? (
+          <p className="py-6 text-center text-sm text-red-600">{paymentsError}</p>
+        ) : payments.length === 0 ? (
+          <EmptyState icon={CreditCard} title="No payments yet" description="This organization hasn't made an online plan payment." />
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-neutral-100">
+            <table className="w-full min-w-2xl text-left text-sm">
+              <thead>
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <th className="px-3.5 py-2.5">Date</th>
+                  <th className="px-3.5 py-2.5">Plan</th>
+                  <th className="px-3.5 py-2.5">Cycle</th>
+                  <th className="px-3.5 py-2.5 text-right">Amount</th>
+                  <th className="px-3.5 py-2.5">Status</th>
+                  <th className="px-3.5 py-2.5">Payment ID</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-50">
+                {payments.map((payment) => (
+                  <tr key={payment.id}>
+                    <td className="px-3.5 py-2.5 text-neutral-600">{formatDate(payment.paidAt || payment.createdAt)}</td>
+                    <td className="px-3.5 py-2.5 text-neutral-800">{payment.planName || '—'}</td>
+                    <td className="px-3.5 py-2.5 capitalize text-neutral-500">{payment.billingCycle || '—'}</td>
+                    <td className="px-3.5 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(payment.amountPaise / 100)}</td>
+                    <td className="px-3.5 py-2.5">
+                      <Badge variant={PAYMENT_STATUS_VARIANT[payment.status] || 'neutral'} dot>
+                        {payment.status}
+                      </Badge>
+                    </td>
+                    <td className="px-3.5 py-2.5 text-xs text-neutral-400">{payment.razorpayPaymentId || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       <Modal
         isOpen={isRejectModalOpen}

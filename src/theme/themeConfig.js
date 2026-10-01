@@ -74,6 +74,14 @@ export function generateColorRamp(hex) {
   Object.entries(RAMP_LIGHTNESS).forEach(([shade, lightness]) => {
     ramp[shade] = hslToHex(h, s, lightness)
   })
+  // Shades 400-800 (buttons, active states, focus rings - "the accent color" as anyone actually
+  // sees it) are pinned to the EXACT picked hex, matching this brand's own default ramp
+  // (--color-primary-400..800 are all hand-pinned to the same literal value in index.css, not a
+  // generated progression). Forcing them to a fixed 38%-ish lightness instead made the accent
+  // color on buttons visibly brighter than the color someone actually picked (e.g. a dark
+  // #063b00 rendered as a much lighter green). Only the light tints (50-300, hover/badge
+  // backgrounds) and dark text shades (900/950) still vary in computed lightness.
+  ;['400', '500', '600', '700', '800'].forEach((shade) => { ramp[shade] = hex })
   return ramp
 }
 

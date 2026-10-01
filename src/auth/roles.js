@@ -11,14 +11,12 @@ import {
   Receipt,
   FileText,
   UserCog,
-  Settings,
   MapPin,
   Wallet,
   Store,
   Warehouse,
   Car,
   FileSpreadsheet,
-  Bell,
   History,
   UserPlus,
   ClipboardList,
@@ -50,6 +48,8 @@ import {
   Bus,
   HandCoins,
   Palette,
+  UserCircle,
+  Link2,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -121,10 +121,6 @@ export function resolveHomePath({ fullAccess, role, currentUser } = {}) {
   return roleHomePath[currentUser?.role] || UNIVERSAL_FALLBACK_PATH
 }
 
-export const roleProfileSettingsPath = {
-  [ROLES.ADMIN]: '/admin/settings',
-}
-
 export const roleMenus = {
   [ROLES.SUPER_ADMIN]: [
     {
@@ -192,6 +188,7 @@ export const roleMenus = {
       items: [
         { label: 'Company Settings', path: '/admin/company-settings', icon: Store, module: 'settings' },
         { label: 'Plans', path: '/admin/plans', icon: CreditCard },
+        { label: 'Billing History', path: '/admin/billing-history', icon: Receipt },
         { label: 'Staff', path: '/admin/users', icon: Users, module: 'users' },
         { label: 'Roles & Permissions', path: '/admin/roles', icon: ShieldCheck, module: 'users', action: 'edit' },
         { label: 'Object Field Settings', path: '/admin/object-fields', icon: SlidersHorizontal, module: 'settings' },
@@ -203,9 +200,9 @@ export const roleMenus = {
     {
       section: 'System',
       items: [
-        { label: 'Notifications', path: '/admin/notifications', icon: Bell },
-        { label: 'Sales Workflow', path: '/admin/settings', icon: Settings, module: 'settings' },
-        { label: 'Appearance', path: '/admin/theme-settings', icon: Palette, module: 'settings' },
+        { label: 'My Profile', path: '/profile', icon: UserCircle },
+        { label: 'Appearance & Branding', path: '/admin/theme-settings', icon: Palette, module: 'settings' },
+        { label: 'Online Payments', path: '/admin/online-payments', icon: Link2, module: 'settings' },
       ],
     },
   ],
@@ -225,6 +222,7 @@ export const roleMenus = {
         { label: 'Follow-ups', path: '/sales/followups', icon: ClipboardList, module: 'follow_ups' },
         { label: 'Attendance', path: '/sales/attendance', icon: ClipboardCheck, module: 'attendance' },
         { label: 'Leaves', path: '/sales/leaves', icon: CalendarClock, module: 'leaves' },
+        { label: 'Expenses', path: '/sales/expenses', icon: Receipt, module: 'expenses' },
         { label: 'My Performance', path: '/sales/performance', icon: Target },
       ],
     },

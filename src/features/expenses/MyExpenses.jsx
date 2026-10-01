@@ -430,7 +430,7 @@ export default function MyExpenses() {
             <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Expenses</h1>
             {demo && <Badge variant="warning">Demo data</Badge>}
           </div>
-          <p className="mt-1 text-xs text-neutral-400">Track and submit your work-related expenses.</p>
+          <p className="mt-1 text-xs text-neutral-400">Track and submit your business expenses.</p>
         </div>
         {canCreate && (
           <Button onClick={openForm}>
@@ -487,7 +487,7 @@ export default function MyExpenses() {
             <EmptyState
               icon={FileText}
               title={expenses.length === 0 ? 'No expense claims yet' : 'Nothing in this filter'}
-              description={expenses.length === 0 ? 'Add a work-related expense and track its status here.' : 'Try a different status filter or search.'}
+              description={expenses.length === 0 ? 'Add a business expense and track its status here.' : 'Try a different status filter or search.'}
             />
           </div>
         ) : (

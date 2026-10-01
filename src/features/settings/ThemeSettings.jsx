@@ -131,7 +131,9 @@ function ColorField({ label, value, onChange, disabled, warning }) {
             aria-label={color}
             disabled={disabled}
             onClick={() => onChange(color)}
-            className={`size-8 rounded-full border-2 transition-transform disabled:cursor-not-allowed disabled:opacity-50 ${value === color ? 'scale-110 border-neutral-900' : 'border-transparent'}`}
+            // A ring + white offset (not just a border) stays visible regardless of the swatch's
+            // own color - a dark-neutral border on a dark green swatch barely showed at all.
+            className={`size-8 rounded-full ring-2 ring-offset-2 transition-transform disabled:cursor-not-allowed disabled:opacity-50 ${value === color ? 'scale-110 ring-primary-600' : 'ring-transparent'}`}
             style={{ backgroundColor: color }}
           />
         ))}
@@ -310,13 +312,17 @@ export default function ThemeSettings() {
   const overlayPercent = Math.round((draft.background?.overlayOpacity ?? DEFAULT_OVERLAY_BY_MODE[draft.mode] ?? 0.3) * 100)
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900">Appearance</h1>
           <p className="mt-1 text-sm text-neutral-500">Applies across the whole CRM for everyone in your organization, immediately after Save.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" onClick={() => setIsResetConfirmOpen(true)}>
+            <RotateCcw className="size-4" />
+            Reset to Default
+          </Button>
           <Button type="button" variant="outline" onClick={handleDiscard}>
             <RotateCcw className="size-4" />
             Discard Changes
@@ -328,7 +334,7 @@ export default function ThemeSettings() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_380px]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_520px]">
       <div className="space-y-4">
 
       <Card title="Mode">
@@ -413,13 +419,6 @@ export default function ThemeSettings() {
           warning={!contrast.meetsAA ? 'This color may be hard to read as button text. Consider a darker or more saturated shade.' : ''}
         />
       </Card>
-
-      <div className="flex justify-end">
-        <Button type="button" variant="outline" onClick={() => setIsResetConfirmOpen(true)}>
-          <RotateCcw className="size-4" />
-          Reset to Default
-        </Button>
-      </div>
 
       </div>
 

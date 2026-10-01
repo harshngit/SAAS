@@ -86,6 +86,7 @@ import SubscriptionPlans from '../features/superadmin/SubscriptionPlans'
 import PlatformAnalytics from '../features/superadmin/PlatformAnalytics'
 import SuperAdminsList from '../features/superadmin/SuperAdminsList'
 import AdminPlans from '../features/plans/AdminPlans'
+import BillingHistory from '../features/plans/BillingHistory'
 import AdminDeliveries from '../features/deliveries/AdminDeliveries'
 import AdminExpenses from '../features/expenses/AdminExpenses'
 import AdminInvoices from '../features/invoices/AdminInvoices'
@@ -93,8 +94,8 @@ import CreateSalesInvoice from '../features/invoices/CreateSalesInvoice'
 import InvoiceDetail from '../features/invoices/InvoiceDetail'
 import InvoicePrintView from '../features/invoices/InvoicePrintView'
 import InvoiceSettings from '../features/invoices/InvoiceSettings'
-import AdminSettings from '../features/settings/AdminSettings'
 import ThemeSettings from '../features/settings/ThemeSettings'
+import OnlinePayments from '../features/settings/OnlinePayments'
 import ObjectFieldsSettings from '../features/settings/ObjectFieldsSettings'
 import AdminAttendance from '../features/attendance/AdminAttendance'
 import AttendanceDetail from '../features/attendance/AttendanceDetail'
@@ -199,6 +200,7 @@ export default function AppRoutes() {
             }
           />
           <Route path="/admin/plans" element={<AdminPlans />} />
+          <Route path="/admin/billing-history" element={<BillingHistory />} />
           <Route
             path="/admin/users"
             element={
@@ -707,18 +709,18 @@ export default function AppRoutes() {
             }
           />
           <Route
-            path="/admin/settings"
-            element={
-              <RequirePermissionRoute module="settings" action="view">
-                <AdminSettings />
-              </RequirePermissionRoute>
-            }
-          />
-          <Route
             path="/admin/theme-settings"
             element={
               <RequirePermissionRoute module="settings" action="view">
                 <ThemeSettings />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/online-payments"
+            element={
+              <RequirePermissionRoute module="settings" action="view">
+                <OnlinePayments />
               </RequirePermissionRoute>
             }
           />
@@ -897,6 +899,14 @@ export default function AppRoutes() {
             element={
               <RequirePermissionRoute module="leaves" action="view">
                 <MyLeaves />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
+            path="/sales/expenses"
+            element={
+              <RequirePermissionRoute module="expenses" action="view">
+                <MyExpenses />
               </RequirePermissionRoute>
             }
           />

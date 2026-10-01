@@ -45,7 +45,6 @@ import {
   formatPaymentMode,
   formatStatus as formatCollectionStatus,
 } from '../collections/collectionHelpers'
-import { getSalesWorkflowSettings } from '../../api/settings'
 import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
 import { listProducts } from '../../api/products'
@@ -136,7 +135,6 @@ export default function OrderDetail() {
   const [orderInvoices, setOrderInvoices] = useState([])
   const [orderReturns, setOrderReturns] = useState([])
   const [hasMoreToInvoice, setHasMoreToInvoice] = useState(false)
-  const [invoiceMode, setInvoiceMode] = useState('per_delivery')
   const [isViewDeliveryOpen, setIsViewDeliveryOpen] = useState(false)
   const [isViewInvoiceOpen, setIsViewInvoiceOpen] = useState(false)
   const [creator, setCreator] = useState(null)
@@ -375,13 +373,12 @@ export default function OrderDetail() {
   useEffect(() => {
     let isMounted = true
 
-    Promise.all([listDeliveryPartners(), listVehicles(), listWarehouses(), getSalesWorkflowSettings()]).then(
-      ([partnersResult, vehiclesResult, warehousesResult, settingsResult]) => {
+    Promise.all([listDeliveryPartners(), listVehicles(), listWarehouses()]).then(
+      ([partnersResult, vehiclesResult, warehousesResult]) => {
         if (!isMounted) return
         if (partnersResult.success) setDeliveryPartners(partnersResult.partners)
         if (vehiclesResult.success) setVehicles(vehiclesResult.vehicles)
         if (warehousesResult.success) setWarehouses(warehousesResult.warehouses)
-        if (settingsResult.success) setInvoiceMode(settingsResult.settings.partialDeliveryInvoiceMode)
       },
     )
 
@@ -420,7 +417,6 @@ export default function OrderDetail() {
   const stockReserved = isStockReserved(order)
   const fulfilmentLabel = getFulfilmentLabel(order)
   const stateMismatch = hasOrderStateMismatch(order)
-  const isDelivered = order.fulfilmentStatus === 'delivered'
   const hasDeliveredQuantity = order.items.some((item) => (item.deliveredQuantity || 0) > 0)
 
   // Demo-only: per-line stock shortages (availableStock is null on real orders).
@@ -692,7 +688,9 @@ export default function OrderDetail() {
     navigate(`${basePath}/create?from=${order.id}`)
   }
 
-  const canCreateInvoiceNow = invoiceMode === 'after_full_order' ? isDelivered : hasDeliveredQuantity
+  // Per-delivery invoicing is always available now (fixed ERP behavior, not an org setting) -
+  // any delivered quantity is enough to invoice, not just a fully-delivered order.
+  const canCreateInvoiceNow = hasDeliveredQuantity
   const firstInvoice = orderInvoices[0]
   // The backend auto-creates the sales invoice once the order reaches its invoice-trigger
   // status (delivered / completed) - this only decides which passive state to SHOW, it never

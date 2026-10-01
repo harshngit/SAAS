@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Calendar,
   Download,
+  Eye,
   FileText,
   IndianRupee,
   Maximize2,
@@ -27,6 +28,7 @@ import { templateComponents, RegularThemePreview, money as formatPreviewMoney, b
 import { resolveRegularPresetId } from './invoiceThemePresets'
 import { INVOICE_DEMO_ENABLED } from './invoiceDemoData'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
+import InvoicePaymentLinks from './InvoicePaymentLinks'
 import { FINANCIAL_STATUS_VARIANT, financialStatus } from './invoiceHelpers'
 import { formatCurrency } from '../../utils/format'
 import { exportElementToPdf } from '../../utils/pdfExport'
@@ -79,12 +81,27 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
   const primaryColor = invoiceSettings?.branding?.primaryColor || '#063b00'
   const templateLabel = template.charAt(0).toUpperCase() + template.slice(1)
 
+  const templateProps = {
+    presetId: regularPresetId,
+    primaryColor,
+    data: previewData,
+    businessDetails: invoiceSettings?.businessDetails,
+    invoiceDetails: invoiceSettings?.invoiceDetails,
+    partyDetails: invoiceSettings?.partyDetails,
+    itemTable: invoiceSettings?.itemTable,
+    paymentDetails: invoiceSettings?.paymentDetails,
+    footer: invoiceSettings?.footer,
+    fields: invoiceSettings?.fields,
+    typography: invoiceSettings?.typography,
+    thermalLayout: invoiceSettings?.thermalPrint?.layout,
+  }
+
   const previewDocument = (
     <div>
       {/* Payment-status pill on its own row above the document — an absolute overlay here
           collided with the template header ("TAX INVOICE" in Classic, "Invoice" in Modern).
-          It lives OUTSIDE exportRef below: the printable invoice itself must never show
-          payment status (PAID/UNPAID/Paid Amount/Balance Due), only this admin-facing page may. */}
+          It is never part of the printable invoice itself, which must never show payment
+          status (PAID/UNPAID/Paid Amount/Balance Due) — only this admin-facing page may. */}
       <div className="mb-3 flex justify-end">
         <span
           className={`rounded-full px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-wide ${
@@ -94,22 +111,7 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
           {invoice.paymentStatus}
         </span>
       </div>
-      <div ref={exportRef}>
-        <TemplateComponent
-          presetId={regularPresetId}
-          primaryColor={primaryColor}
-          data={previewData}
-          businessDetails={invoiceSettings?.businessDetails}
-          invoiceDetails={invoiceSettings?.invoiceDetails}
-          partyDetails={invoiceSettings?.partyDetails}
-          itemTable={invoiceSettings?.itemTable}
-          paymentDetails={invoiceSettings?.paymentDetails}
-          footer={invoiceSettings?.footer}
-          fields={invoiceSettings?.fields}
-          typography={invoiceSettings?.typography}
-          thermalLayout={invoiceSettings?.thermalPrint?.layout}
-        />
-      </div>
+      <TemplateComponent {...templateProps} />
       <div className="mt-4 grid grid-cols-2 gap-3 border-t border-neutral-100 pt-3">
         <div className="rounded-lg bg-neutral-50 px-3 py-2">
           <p className="text-[0.62rem] uppercase tracking-wide text-neutral-400">Amount Paid</p>
@@ -125,6 +127,26 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
 
   return (
     <>
+      {/* Scoped to this page only (unmounts with it) - same pattern as Invoice Settings' Live
+          Preview: hides everything else in the app during print so only the invoice document
+          (natural size, not the on-screen zoom) prints or exports. This off-screen copy is what
+          Print Preview (window.print) and Download Themed PDF (html2canvas, via exportRef)
+          actually capture - it always matches Invoice Settings exactly (same TemplateComponent,
+          same props), unlike the backend-generated Simple PDF / Download PDF below. */}
+      <style>{`
+        .invoice-detail-export-root { position: absolute; left: -10000px; top: 0; }
+        @media print {
+          body * { visibility: hidden; }
+          .invoice-detail-export-root, .invoice-detail-export-root * { visibility: visible; }
+          .invoice-detail-export-root {
+            position: fixed; inset: 0; left: 0; margin: 0; width: auto !important; height: auto !important;
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
+      <div ref={exportRef} aria-hidden="true" className="invoice-detail-export-root" style={{ width: isThermalTemplate ? '13rem' : '32rem' }}>
+        <div className="bg-surface p-5 text-xs text-neutral-600">{previewDocument}</div>
+      </div>
       <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -207,6 +229,7 @@ export default function InvoiceDetail() {
   const [paymentsError, setPaymentsError] = useState('')
   const [isPaymentDrawerOpen, setIsPaymentDrawerOpen] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
+  const [isExportingThemed, setIsExportingThemed] = useState(false)
   const [downloadError, setDownloadError] = useState('')
   const [orgSettings, setOrgSettings] = useState(null)
   const [invoiceSettings, setInvoiceSettings] = useState(null)
@@ -286,20 +309,41 @@ export default function InvoiceDetail() {
     )
   }
 
+  const isThermalTemplate = invoiceSettings?.template === 'thermal'
+
+  // Client-side export of the on-screen preview — the one path that always matches whatever
+  // Theme/Layout/Typography the org picked in Invoice Settings exactly, since it renders through
+  // the same TemplateComponent with the same props. Used for demo mode (no backend to call) and
+  // for the real-invoice "Print Preview"/"Download Themed PDF" actions below, which exist
+  // specifically because the backend PDF (handleDownload's non-demo branch) does not vary by
+  // Theme/Layout/Typography — only by the base template and paper settings.
+  const handleDownloadThemedPdf = async () => {
+    setIsExportingThemed(true)
+    setDownloadError('')
+    try {
+      await exportElementToPdf(previewExportRef.current, `${invoice.invoiceNumber || invoice.id}-preview.pdf`, {
+        widthRem: isThermalTemplate ? 13 : 32,
+      })
+    } catch (error) {
+      setDownloadError(error?.message || 'Unable to export the themed PDF. Please try again.')
+    } finally {
+      setIsExportingThemed(false)
+    }
+  }
+
   // The backend PDF endpoint is the canonical, fully-branded invoice PDF (logo, signature,
   // stamp, QR, letterhead, primary color, footer text) — no separate frontend PDF generator
   // for real invoices. Demo mode has no backend to call, so it still renders the on-screen
   // preview to a PDF client-side, matching this project's "demo mode must stay usable" rule.
   const handleDownload = async (format) => {
+    if (INVOICE_DEMO_ENABLED) {
+      await handleDownloadThemedPdf()
+      return
+    }
+
     setIsDownloading(true)
     setDownloadError('')
-
     try {
-      if (INVOICE_DEMO_ENABLED) {
-        await exportElementToPdf(previewExportRef.current, `${invoice.invoiceNumber || invoice.id}.pdf`)
-        return
-      }
-
       const result = await downloadInvoicePdf(invoice.id, invoice.invoiceNumber, format)
       if (!result.success) setDownloadError(result.error)
     } catch (error) {
@@ -343,13 +387,28 @@ export default function InvoiceDetail() {
               Record Payment
             </Button>
           )}
-          <Button type="button" variant="outline" loading={isDownloading} onClick={() => handleDownload('simple')}>
-            <Printer className="size-4" />
-            Simple PDF
+          {!INVOICE_DEMO_ENABLED && (
+            <>
+              <Button type="button" variant="outline" loading={isDownloading} onClick={() => handleDownload('simple')}>
+                <Printer className="size-4" />
+                Simple PDF
+              </Button>
+              <Button type="button" variant="outline" loading={isDownloading} onClick={() => handleDownload('detailed')}>
+                <Download className="size-4" />
+                Download PDF
+              </Button>
+            </>
+          )}
+          {/* Client-side, theme-accurate alternative to the two backend buttons above — guaranteed
+              to match whatever Theme/Layout/Typography is selected in Invoice Settings, including
+              for thermal receipts. In demo mode (no backend PDF) these are the only options. */}
+          <Button type="button" variant="outline" onClick={() => window.print()}>
+            <Eye className="size-4" />
+            Print Preview
           </Button>
-          <Button type="button" variant="outline" loading={isDownloading} onClick={() => handleDownload('detailed')}>
+          <Button type="button" variant="outline" loading={isExportingThemed} onClick={handleDownloadThemedPdf}>
             <Download className="size-4" />
-            Download PDF
+            Download Themed PDF
           </Button>
         </div>
       </div>
@@ -487,6 +546,10 @@ export default function InvoiceDetail() {
               </div>
             )}
           </div>
+
+          {!INVOICE_DEMO_ENABLED && (
+            <InvoicePaymentLinks invoice={invoice} canCollectOnline={canRecordPayment} onLinkChanged={loadInvoice} />
+          )}
 
           <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
             <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">

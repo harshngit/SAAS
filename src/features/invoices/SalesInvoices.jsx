@@ -64,9 +64,13 @@ export default function SalesInvoices() {
               header: 'Invoice #',
               sortable: true,
               render: (row) => (
-                <button type="button" onClick={() => navigate(`/accounts/invoices/sales/${row.id}`)} className="font-medium text-primary-700 hover:underline">
-                  {row.invoiceNumber}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button type="button" onClick={() => navigate(`/accounts/invoices/sales/${row.id}`)} className="font-medium text-primary-700 hover:underline">
+                    {row.invoiceNumber}
+                  </button>
+                  {row.paymentLinkStatus === 'paid' && <Badge variant="success">Paid online</Badge>}
+                  {row.hasActivePaymentLink && row.paymentLinkStatus !== 'paid' && <Badge variant="warning">Link sent</Badge>}
+                </div>
               ),
             },
             { key: 'customerName', header: 'Customer', sortable: true, render: (row) => row.customerName || row.walkInName || '—' },

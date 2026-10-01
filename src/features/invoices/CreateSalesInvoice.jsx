@@ -16,7 +16,6 @@ import { listOrders, getOrder } from '../../api/orders'
 import { ORDER_STATUS_VARIANT, formatOrderStatus, getDeliveryStatus } from '../orders/orderHelpers'
 import { listProducts } from '../../api/products'
 import { listWarehouses } from '../../api/warehouses'
-import { getSalesWorkflowSettings } from '../../api/settings'
 import { formatCurrency } from '../../utils/format'
 import { getPaymentMethodFlags, sanitizePaymentDetails } from '../payments/paymentMethodUtils'
 
@@ -77,7 +76,6 @@ function OrderInvoicePanel({ orderId }) {
   const [allDeliveries, setAllDeliveries] = useState([])
   const [invoices, setInvoices] = useState([])
   const [wholeOrderInvoice, setWholeOrderInvoice] = useState(null)
-  const [invoiceMode, setInvoiceMode] = useState('per_delivery')
   const [selectedDeliveryId, setSelectedDeliveryId] = useState('')
   const [previewDelivery, setPreviewDelivery] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -93,8 +91,7 @@ function OrderInvoicePanel({ orderId }) {
       getOrder(orderId),
       listDeliveries({ order_id: orderId }),
       listInvoices({ order_id: orderId }),
-      getSalesWorkflowSettings(),
-    ]).then(([orderResult, deliveriesResult, invoicesResult, settingsResult]) => {
+    ]).then(([orderResult, deliveriesResult, invoicesResult]) => {
       if (!orderResult.success) {
         setLoadError(orderResult.error)
         setIsLoading(false)
@@ -108,17 +105,16 @@ function OrderInvoicePanel({ orderId }) {
       const wholeOrder = invoiceList.find((invoice) => !invoice.deliveryId) || null
       setWholeOrderInvoice(wholeOrder)
 
-      const mode = settingsResult.success ? settingsResult.settings.partialDeliveryInvoiceMode : 'per_delivery'
-      setInvoiceMode(mode)
-
       const invoicedDeliveryIds = new Set(invoiceList.map((invoice) => invoice.deliveryId).filter(Boolean))
       const deliveries = deliveriesResult.success ? deliveriesResult.deliveries : []
       setAllDeliveries(deliveries)
 
+      // Per-delivery invoicing is always available now (fixed ERP behavior, not an org setting) -
+      // pre-select the one billable delivery when there's exactly one, same as before.
       const billable = deliveries.filter(
         (delivery) => billableDeliveryStatuses.includes(delivery.status) && !invoicedDeliveryIds.has(delivery.id),
       )
-      if (mode === 'per_delivery' && billable.length === 1) setSelectedDeliveryId(billable[0].id)
+      if (billable.length === 1) setSelectedDeliveryId(billable[0].id)
 
       setIsLoading(false)
     })
@@ -130,7 +126,7 @@ function OrderInvoicePanel({ orderId }) {
   }, [orderId])
 
   useEffect(() => {
-    if (invoiceMode !== 'per_delivery' || !selectedDeliveryId) {
+    if (!selectedDeliveryId) {
       setPreviewDelivery(null)
       return
     }
@@ -145,10 +141,10 @@ function OrderInvoicePanel({ orderId }) {
     return () => {
       isMounted = false
     }
-  }, [invoiceMode, selectedDeliveryId])
+  }, [selectedDeliveryId])
 
-  // Preview must reflect what actually gets invoiced - the delivered quantity on the
-  // selected delivery (per_delivery mode) or across the whole order (after_full_order mode) -
+  // Preview must reflect what actually gets invoiced - the delivered quantity on the selected
+  // delivery, or across the whole order when no delivery is selected (whole-order invoicing) -
   // never the ordered quantity. Rate/tax still come from the order line since delivery lines
   // don't carry pricing.
   const previewItems = useMemo(() => {
@@ -203,7 +199,9 @@ function OrderInvoicePanel({ orderId }) {
     setSubmitError('')
     setDuplicateInvoice(null)
 
-    const result = await invoiceOrder(orderId, !isPickupOrder && invoiceMode === 'per_delivery' ? selectedDeliveryId : undefined)
+    // A picked delivery bills that delivery's quantities; no selection bills the whole
+    // remaining order (only reachable once it's fully delivered - see canInvoiceWholeOrder).
+    const result = await invoiceOrder(orderId, !isPickupOrder ? selectedDeliveryId || undefined : undefined)
 
     if (!result.success) {
       if (result.duplicateRef) {
@@ -240,14 +238,17 @@ function OrderInvoicePanel({ orderId }) {
   }
 
   // Pickup orders never go through the delivery pipeline at all - no delivery records ever
-  // exist for them, so the per_delivery/after_full_order delivery-selection logic below must
-  // not apply. They always bill the whole order directly, gated only on whether the pickup has
-  // actually been collected (which is when delivered_quantity gets set on the order items).
+  // exist for them, so the delivery-selection logic below must not apply. They always bill the
+  // whole order directly, gated only on whether the pickup has actually been collected (which is
+  // when delivered_quantity gets set on the order items).
   const hasDeliveredQuantity = order.items.some((item) => (item.deliveredQuantity || 0) > 0)
-  const isAfterFullOrderMode = !isPickupOrder && invoiceMode === 'after_full_order'
   const orderFullyDelivered = order.fulfilmentStatus === 'delivered'
-  const needsDeliveryChoice = !isPickupOrder && invoiceMode === 'per_delivery' && billableUninvoicedDeliveries.length > 1
-  const noBillableDelivery = !isPickupOrder && invoiceMode === 'per_delivery' && billableUninvoicedDeliveries.length === 0 && !wholeOrderInvoice
+  // Both invoicing shapes are always available now (Fixed Backend Behavior: a delivery_id bills
+  // that delivery, no delivery_id bills the whole remaining order once fully delivered) - not a
+  // single org-wide mode, so both can be offered together whenever they're each eligible.
+  const canInvoiceWholeOrder = !isPickupOrder && orderFullyDelivered && !wholeOrderInvoice
+  const needsDeliveryChoice = !isPickupOrder && billableUninvoicedDeliveries.length > 1 && !canInvoiceWholeOrder
+  const noBillableDelivery = !isPickupOrder && billableUninvoicedDeliveries.length === 0 && !canInvoiceWholeOrder && !wholeOrderInvoice
   const pickupNotCollected = isPickupOrder && !hasDeliveredQuantity && !wholeOrderInvoice
 
   // Already-invoiced states short-circuit the whole panel - never let the user attempt a duplicate.
@@ -269,14 +270,6 @@ function OrderInvoicePanel({ orderId }) {
     return (
       <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
         This order has not been collected yet. Complete the pickup before creating an invoice.
-      </div>
-    )
-  }
-
-  if (isAfterFullOrderMode && !orderFullyDelivered) {
-    return (
-      <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-        Complete the pending delivery before creating the final invoice. This organization only invoices an order once it is fully delivered.
       </div>
     )
   }
@@ -324,10 +317,24 @@ function OrderInvoicePanel({ orderId }) {
         </div>
       </div>
 
-      {invoiceMode === 'per_delivery' && allDeliveries.length > 0 && (
+      {canInvoiceWholeOrder && (
+        <div className={`rounded-2xl border p-5 shadow-(--shadow-card) ${!selectedDeliveryId ? 'border-primary-300 bg-primary-50/40' : 'border-neutral-100 bg-surface'}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-neutral-900">Invoice Whole Order</p>
+              <p className="mt-1 text-xs text-neutral-400">This order is fully delivered - bill everything remaining in one invoice instead of per delivery.</p>
+            </div>
+            <Button type="button" size="sm" variant={!selectedDeliveryId ? 'primary' : 'outline'} onClick={() => setSelectedDeliveryId('')}>
+              {!selectedDeliveryId ? 'Selected' : 'Select Whole Order'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {allDeliveries.length > 0 && (
         <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
           <p className="text-sm font-semibold text-neutral-900">Deliveries</p>
-          <p className="mt-1 text-xs text-neutral-400">This organization bills per delivery. Select which delivery this invoice covers.</p>
+          <p className="mt-1 text-xs text-neutral-400">Select a delivery to invoice just that delivery's quantities.</p>
           <div className="mt-3 space-y-2">
             {allDeliveries.map((delivery) => {
               const deliveryInvoice = invoicedByDeliveryId[delivery.id]
@@ -411,7 +418,6 @@ function FromOrderFlow({ onBack }) {
   const navigate = useNavigate()
   const [customers, setCustomers] = useState([])
   const [customerId, setCustomerId] = useState('')
-  const [invoiceMode, setInvoiceMode] = useState('per_delivery')
   const [orders, setOrders] = useState([])
   const [invoicesByOrder, setInvoicesByOrder] = useState({})
   const [moreToInvoiceByOrder, setMoreToInvoiceByOrder] = useState({})
@@ -419,9 +425,8 @@ function FromOrderFlow({ onBack }) {
   const [isLoadingOrders, setIsLoadingOrders] = useState(false)
 
   useEffect(() => {
-    Promise.all([listCustomers(), getSalesWorkflowSettings()]).then(([customersResult, settingsResult]) => {
+    listCustomers().then((customersResult) => {
       if (customersResult.success) setCustomers(customersResult.customers)
-      if (settingsResult.success) setInvoiceMode(settingsResult.settings.partialDeliveryInvoiceMode)
       setIsLoadingCustomers(false)
     })
   }, [])
@@ -453,31 +458,28 @@ function FromOrderFlow({ onBack }) {
       })
       setInvoicesByOrder(invoiceMap)
 
-      // Per-delivery orgs can have more to invoice even after one invoice exists - only
-      // check deliveries for orders that already have an invoice but no whole-order one.
-      if (invoiceMode === 'per_delivery') {
-        const ordersNeedingCheck = customerOrders.filter((order) => {
-          const orderInvoices = invoiceMap[order.id] || []
-          return orderInvoices.length > 0 && !orderInvoices.some((invoice) => !invoice.deliveryId)
+      // Per-delivery invoicing is always available now (fixed ERP behavior) - an order can have
+      // more to invoice even after one invoice exists, so only check deliveries for orders that
+      // already have an invoice but no whole-order one.
+      const ordersNeedingCheck = customerOrders.filter((order) => {
+        const orderInvoices = invoiceMap[order.id] || []
+        return orderInvoices.length > 0 && !orderInvoices.some((invoice) => !invoice.deliveryId)
+      })
+
+      if (ordersNeedingCheck.length > 0) {
+        const deliveryResults = await Promise.all(ordersNeedingCheck.map((order) => listDeliveries({ order_id: order.id })))
+        if (!isMounted) return
+
+        const moreMap = {}
+        ordersNeedingCheck.forEach((order, index) => {
+          const result = deliveryResults[index]
+          const deliveries = result.success ? result.deliveries : []
+          const invoicedDeliveryIds = new Set((invoiceMap[order.id] || []).map((invoice) => invoice.deliveryId).filter(Boolean))
+          moreMap[order.id] = deliveries.some(
+            (delivery) => billableDeliveryStatuses.includes(delivery.status) && !invoicedDeliveryIds.has(delivery.id),
+          )
         })
-
-        if (ordersNeedingCheck.length > 0) {
-          const deliveryResults = await Promise.all(ordersNeedingCheck.map((order) => listDeliveries({ order_id: order.id })))
-          if (!isMounted) return
-
-          const moreMap = {}
-          ordersNeedingCheck.forEach((order, index) => {
-            const result = deliveryResults[index]
-            const deliveries = result.success ? result.deliveries : []
-            const invoicedDeliveryIds = new Set((invoiceMap[order.id] || []).map((invoice) => invoice.deliveryId).filter(Boolean))
-            moreMap[order.id] = deliveries.some(
-              (delivery) => billableDeliveryStatuses.includes(delivery.status) && !invoicedDeliveryIds.has(delivery.id),
-            )
-          })
-          setMoreToInvoiceByOrder(moreMap)
-        } else {
-          setMoreToInvoiceByOrder({})
-        }
+        setMoreToInvoiceByOrder(moreMap)
       } else {
         setMoreToInvoiceByOrder({})
       }
@@ -490,7 +492,7 @@ function FromOrderFlow({ onBack }) {
     return () => {
       isMounted = false
     }
-  }, [customerId, invoiceMode])
+  }, [customerId])
 
   const customerOptions = useMemo(() => customers.map((customer) => ({ value: customer.id, label: customer.name })), [customers])
   const selectedCustomer = customers.find((customer) => customer.id === customerId)
@@ -528,7 +530,7 @@ function FromOrderFlow({ onBack }) {
               const wholeOrderInvoice = orderInvoices.find((invoice) => !invoice.deliveryId)
               const deliveredQty = order.items.reduce((sum, item) => sum + (item.deliveredQuantity || 0), 0)
               const hasDelivered = deliveredQty > 0
-              const canCreateNext = !wholeOrderInvoice && invoiceMode === 'per_delivery' && moreToInvoiceByOrder[order.id]
+              const canCreateNext = !wholeOrderInvoice && moreToInvoiceByOrder[order.id]
 
               return (
                 <div

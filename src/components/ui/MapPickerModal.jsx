@@ -184,7 +184,7 @@ export default function MapPickerModal({ isOpen, onClose, onSelect, initialPosit
     >
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="flex min-w-0 flex-1 rounded-xl border border-neutral-200 bg-neutral-50 focus-within:border-primary-400 focus-within:bg-surface focus-within:ring-4 focus-within:ring-primary-500/12">
+          <div className="flex min-w-0 flex-1 rounded-xl border border-neutral-200 bg-neutral-50 focus-within:border-primary-400 focus-within:bg-(--modal-bg) focus-within:ring-4 focus-within:ring-primary-500/12">
             <input
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bell, CheckCheck, ChevronDown, HelpCircle, LogOut, Search, Settings } from 'lucide-react'
+import { Bell, CheckCheck, ChevronDown, LogOut, Search, UserCircle } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { ROLES, roleLabels, roleMenus } from '../../auth/roles'
@@ -170,13 +170,6 @@ export default function Topbar() {
             className="w-full rounded-xl border border-surface-border bg-(--input-bg) py-2.5 pl-11 pr-4 text-sm text-fg shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/10"
           />
         </div>
-        <button
-          type="button"
-          aria-label="Help"
-          className="hidden rounded-full bg-surface p-2.5 text-fg-muted shadow-(--shadow-xs) ring-1 ring-neutral-100 transition-colors hover:text-fg sm:inline-flex"
-        >
-          <HelpCircle className="size-4.5" />
-        </button>
         <div className="relative" ref={notificationsRef}>
           <button
             type="button"
@@ -275,8 +268,8 @@ export default function Topbar() {
                 onClick={handleProfileSettings}
                 className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
               >
-                <Settings className="size-4" aria-hidden="true" />
-                Profile Settings
+                <UserCircle className="size-4" aria-hidden="true" />
+                My Profile
               </button>
               <button
                 type="button"

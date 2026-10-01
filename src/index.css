@@ -122,6 +122,14 @@
   --row-divider: #e4e6e9;
   --input-bg: #f8f9fa;
   --input-border: #e4e6e9;
+  /* Deliberately NOT --color-surface: Modal.jsx reads this directly, and it must always stay a
+     solid, fully opaque surface ("solid readable surface" per spec) - --color-surface itself
+     goes near-transparent under [data-bg="image"] (by design, for Card/Sidebar/Layout's chrome),
+     which would otherwise make Modal transparent too, but WITHOUT the blur Card/Sidebar also get
+     (Modal was deliberately never given .theme-glass), the worst possible combination. This
+     token is intentionally never redefined under [data-bg="image"], only under [data-mode="dark"]
+     below, so it always stays solid regardless of background-image mode. */
+  --modal-bg: #ffffff;
 
   /* Badge dark-mode tinted borders (Part 2.7) - transparent by default so Light never shows a
      border that wasn't there before; Badge.jsx's variants read these directly. */
@@ -182,6 +190,7 @@
   --color-surface-border: #374151;
   --color-fg: #f1f2f4;
   --color-fg-muted: #9aa1ac;
+  --modal-bg: #111827;
 
   --app-bg: #0a0e14;
   --sidebar-bg: #0f1a12;
@@ -213,19 +222,8 @@
   --app-bg: transparent;
 }
 
-/* Cards are nearly transparent now, so fixed-color text sitting directly over a busy photo has
-   no reliable contrast against it - some patches of the photo are bright, some dark, and a
-   single text color can't win against both. A halo the OPPOSITE brightness of the text
-   (--text-glow, set per-mode below) fixes this everywhere at once via inheritance from body,
-   instead of hunting down every text-color utility class in the app. No-op outside image mode -
-   --text-glow is only ever declared there. */
-body {
-  text-shadow: var(--text-glow, none);
-}
 
 [data-mode="dark"][data-bg="image"] {
-  /* White text needs a DARK halo to stay readable over bright patches of the photo. */
-  --text-glow: 0 1px 3px rgba(0, 0, 0, 0.6), 0 1px 8px rgba(0, 0, 0, 0.4);
   --color-surface: rgba(10, 25, 47, 0.55);
   --color-surface-muted: rgba(255, 255, 255, 0.05);
   --color-surface-border: rgba(255, 255, 255, 0.14);
@@ -261,8 +259,6 @@ body {
   /* Pushed further per explicit request ("more less white"): barely a tint at all now, almost
    * pure glass - the border + blur is what still reads as "a card", not the fill color. Text
    * stays the normal light neutral-900 per spec - only surfaces go translucent. */
-  /* Dark text needs a LIGHT halo to stay readable over dark patches of the photo. */
-  --text-glow: 0 1px 2px rgba(255, 255, 255, 0.85), 0 1px 8px rgba(255, 255, 255, 0.6);
   --color-surface: rgba(255, 255, 255, 0.05);
   --color-surface-muted: rgba(255, 255, 255, 0.03);
   --color-surface-border: rgba(15, 23, 42, 0.16);
@@ -273,8 +269,8 @@ body {
 }
 
 /* Applied by the shared components that should actually blur (Layout's content panel/header,
-   Sidebar, Card, Modal) - only has a visible effect while [data-bg="image"] is set, since
-   --glass-blur is only ever declared there. */
+   Sidebar, Card) - only has a visible effect while [data-bg="image"] is set, since --glass-blur
+   is only ever declared there. */
 .theme-glass {
   backdrop-filter: var(--glass-blur, none);
   -webkit-backdrop-filter: var(--glass-blur, none);

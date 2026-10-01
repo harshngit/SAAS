@@ -72,7 +72,9 @@ export default function ListActionMenu({ items = [], align = 'right', className 
             ref={menuRef}
             role="menu"
             style={{ position: 'fixed', top: position.top, left: position.left, width: MENU_WIDTH }}
-            className="z-50 rounded-xl border border-neutral-100 bg-surface p-1.5 shadow-(--shadow-popover)"
+            // bg-(--modal-bg), not bg-surface: this portaled menu must stay solid and readable
+            // regardless of image-background mode - same token Modal.jsx/Tabs.jsx use.
+            className="z-50 rounded-xl border border-neutral-100 bg-(--modal-bg) p-1.5 shadow-(--shadow-popover)"
           >
             {items.map((item) => (
               <button

@@ -202,6 +202,7 @@ function normalizeInvoice(invoice) {
     customerId: invoice.customer?.id || invoice.customer_id || '',
     customerName: invoice.customer?.name || invoice.customer?.customer_name || invoice.walk_in_name || '',
     customerPhone: invoice.customer?.phone || invoice.customer?.mobile_number || invoice.walk_in_phone || '',
+    customerEmail: invoice.customer?.email || '',
     customerGstin: invoice.customer?.gst_number || invoice.customer?.gstin || '',
     walkInName: invoice.walk_in_name || '',
     walkInPhone: invoice.walk_in_phone || '',
@@ -226,6 +227,10 @@ function normalizeInvoice(invoice) {
     items,
     createdAt: invoice.created_at,
     updatedAt: invoice.updated_at,
+    // Razorpay Part B - invoice payment links (see src/api/invoicePaymentLinks.js).
+    hasActivePaymentLink: Boolean(invoice.has_active_payment_link),
+    paymentLinkUrl: invoice.payment_link_url || '',
+    paymentLinkStatus: invoice.payment_link_status || '',
   }
 }
 

@@ -206,6 +206,9 @@ function buildPreviewProps(settings, printMode, regularPresetId, previewData) {
     fields: settings.fields,
     typography: settings.typography,
     thermalLayout: settings.thermalPrint.layout,
+    thermalPaperWidth: settings.thermalPrint.paperWidth,
+    thermalBoldText: settings.thermalPrint.boldText,
+    thermalExtraLines: settings.thermalPrint.extraLines,
   }
 }
 
@@ -309,7 +312,10 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
   const renderPreview = (props) => (isThermal
     ? <ThermalThemePreview presetId={thermalPresetId} {...props} />
     : <RegularThemePreview presetId={regularPresetId} {...props} />)
-  const baseWidth = isThermal ? BASE_WIDTH_PX.thermal : BASE_WIDTH_PX[settings.regularPrint.paperSize] || BASE_WIDTH_PX.A4
+  const thermalWidth = { '58mm': 220, '80mm': BASE_WIDTH_PX.thermal, '110mm': 380 }
+  const baseWidth = isThermal
+    ? thermalWidth[settings.thermalPrint.paperWidth] || BASE_WIDTH_PX.thermal
+    : BASE_WIDTH_PX[settings.regularPrint.paperSize] || BASE_WIDTH_PX.A4
   const displayedZoom = Math.round((zoomMode === 'fit' ? fitScale : manualZoom / 100) * 100)
 
   const adjustZoom = (delta) => {
@@ -826,7 +832,7 @@ export default function InvoiceSettings() {
                 </label>
               ))}
             </div>
-            <InfoNote>Font Family, Heading Size, Body Size and Table Size all apply to the generated PDF.</InfoNote>
+            <InfoNote>Font Family, Heading Size, Body Size and Table Size apply to Print Preview and Download Sample PDF above, and to an invoice's own Print Preview button — not to the backend-generated Simple PDF / Download PDF on an actual invoice, which always uses a fixed size per template.</InfoNote>
           </SettingsSection>
 
           <SettingsSection title="8. Footer" description="Notes, terms and signature" isOpen={openSection === 'footer'} onToggle={() => toggleSection('footer')}>
@@ -960,7 +966,7 @@ export default function InvoiceSettings() {
                 </div>
               </TabsContent>
             </Tabs>
-            <InfoNote>Paper size, orientation, margins, paper width, extra lines and bold styling apply to the generated PDF today. Layout, auto-cut, cash drawer, copies and printing type are saved for client/POS use but not applied by the PDF engine itself.</InfoNote>
+            <InfoNote>Paper size, orientation, margins, paper width, extra lines and bold styling apply to the backend-generated Simple PDF / Download PDF on an actual invoice. Theme, Layout, auto-cut, cash drawer, copies and printing type are fully reflected in Print Preview and Download Sample PDF above, and in the Print Preview button on an invoice's own page — but not by the backend PDF engine itself, which always renders a fixed per-template look regardless of these choices.</InfoNote>
           </SettingsSection>
         </div>
 

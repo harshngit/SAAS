@@ -173,7 +173,10 @@ const Select = forwardRef(function Select(
             aria-haspopup="listbox"
             aria-expanded={isOpen}
             aria-controls={`${selectId}-listbox`}
-            className={`flex w-full max-w-full items-center gap-2 rounded-xl border bg-(--input-bg) py-2.5 pl-3.5 pr-3 text-sm text-fg transition-all focus-within:bg-surface focus-within:outline-none focus-within:ring-4 ${
+            // focus-within:bg-(--modal-bg), not bg-surface: --color-surface goes near-transparent
+            // under image-background mode, which made focusing this field look washed out instead
+            // of highlighted. Same always-solid token Modal.jsx/Tabs.jsx use.
+            className={`flex w-full max-w-full items-center gap-2 rounded-xl border bg-(--input-bg) py-2.5 pl-3.5 pr-3 text-sm text-fg transition-all focus-within:bg-(--modal-bg) focus-within:outline-none focus-within:ring-4 ${
               error
                 ? 'border-red-300 focus-within:border-red-400 focus-within:ring-red-500/15'
                 : 'border-surface-border focus-within:border-primary-400 focus-within:ring-primary-500/12'
@@ -227,7 +230,7 @@ const Select = forwardRef(function Select(
             onClick={() => !disabled && setIsOpen((current) => !current)}
             onKeyDown={handleKeyDown}
             onBlur={onBlur}
-            className={`flex w-full max-w-full cursor-pointer items-center justify-between rounded-xl border bg-(--input-bg) py-2.5 pl-3.5 pr-3 text-sm text-fg transition-all focus:bg-surface focus:outline-none focus:ring-4 ${
+            className={`flex w-full max-w-full cursor-pointer items-center justify-between rounded-xl border bg-(--input-bg) py-2.5 pl-3.5 pr-3 text-sm text-fg transition-all focus:bg-(--modal-bg) focus:outline-none focus:ring-4 ${
               error
                 ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15'
                 : 'border-surface-border focus:border-primary-400 focus:ring-primary-500/12'
@@ -249,7 +252,10 @@ const Select = forwardRef(function Select(
             role="listbox"
             id={`${selectId}-listbox`}
             style={menuStyle}
-            className="fixed z-50 overflow-x-hidden overflow-y-auto rounded-xl border border-surface-border bg-surface p-1 text-sm text-fg shadow-popover"
+            // bg-(--modal-bg), not bg-surface: this floating options panel is portaled above
+            // everything else on the page, so it must stay solid and readable regardless of
+            // image-background mode - same always-solid token Modal.jsx/Tabs.jsx use.
+            className="fixed z-50 overflow-x-hidden overflow-y-auto rounded-xl border border-surface-border bg-(--modal-bg) p-1 text-sm text-fg shadow-popover"
           >
             {visibleOptions.length === 0 ? (
               <div className="cursor-default rounded-lg px-3 py-2 text-neutral-400">No matches</div>
