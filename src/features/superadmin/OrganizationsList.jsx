@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import DataTable from '../../components/ui/DataTable'
 import Badge from '../../components/ui/Badge'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { listSuperAdminOrganizations } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 
 const statusVariant = {
   Active: 'success',
@@ -70,6 +72,9 @@ export default function OrganizationsList() {
   const [listError, setListError] = useState('')
   const statusFilter = searchParams.get('status') || ''
   const upgradeStatusFilter = searchParams.get('upgrade_status') || ''
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   const setStatusFilter = (value) => {
     setSearchParams((current) => {
@@ -120,6 +125,12 @@ export default function OrganizationsList() {
     }
   }, [statusFilter, upgradeStatusFilter])
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  const dateFilteredOrganizations = useMemo(
+    () => organizations.filter((organization) => isWithinDateRange(organization.createdAt, dateFrom, dateTo)),
+    [organizations, dateFrom, dateTo],
+  )
+
   return (
     <div className="space-y-6">
       <div>
@@ -128,7 +139,7 @@ export default function OrganizationsList() {
       </div>
 
       <Card title="Organizations List">
-        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-lg">
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-2xl lg:grid-cols-3">
           <Select
             label="Status"
             options={statusFilterOptions}
@@ -141,6 +152,10 @@ export default function OrganizationsList() {
             value={upgradeStatusFilter}
             onChange={(event) => setUpgradeStatusFilter(event.target.value)}
           />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-fg">Created</label>
+            <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+          </div>
         </div>
 
         <DataTable
@@ -168,7 +183,7 @@ export default function OrganizationsList() {
                 ),
             },
           ]}
-          data={organizations}
+          data={dateFilteredOrganizations}
           searchKeys={['id', 'name', 'adminName', 'plan', 'status']}
           searchPlaceholder="Search organizations..."
           loading={isLoadingOrganizations}

@@ -136,15 +136,12 @@ export function buildInvoicePreviewData(invoice, org, invoiceSettings) {
   }
 }
 
-// Mirrors app/core/pdf_docs.py's _TEMPLATE_STYLES defaults. The backend-generated "Simple
-// PDF"/"Download PDF" on a real invoice still uses these fixed per-template sizes regardless of
-// the Typography sliders below (every _font() call there passes an explicit custom_size, and
-// typography.headingSize/bodySize/tableSize are saved but never read by that renderer - see the
-// backend-changes writeup). But the client-side Print Preview / Download Sample PDF / a real
-// invoice's own Print Preview button (InvoiceDetail.jsx) are fully frontend-rendered, so THERE is
-// no reason to leave the sliders inert - resolveTemplateStyle below applies them for real, which
-// is what "Heading Size / Body Size / Table Size apply to the generated PDF" (the Typography
-// section's own InfoNote) actually promises for those two paths.
+// Defaults mirror the backend's own per-template sizing. The backend-generated "Simple PDF"/
+// "Download PDF" on a real invoice now applies typography.heading_size/body_size/table_size for
+// real (confirmed backend support - see InvoiceSettings.jsx's Typography InfoNote), so this
+// preview must match that behavior exactly rather than diverge from it: resolveTemplateStyle
+// below is the single place both the client-side preview/export paths AND the real backend PDF
+// derive the same sizing logic from.
 const TEMPLATE_STYLES = {
   classic: { heading: '1rem', body: '0.75rem', table: '0.68rem', rowPad: 'py-1.5' },
   modern: { heading: '1.2rem', body: '0.75rem', table: '0.68rem', rowPad: 'py-2' },

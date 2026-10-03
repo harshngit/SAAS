@@ -10,6 +10,9 @@ import Card from '../../components/ui/Card'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { uniqueOptions } from '../../utils/filterOptions'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
 import { listCollections, reconcileCollection, voidCollection } from '../../api/deliveryCollections'
@@ -45,7 +48,13 @@ export default function CollectionReconciliation() {
   const [loadError, setLoadError] = useState('')
   const [unavailable, setUnavailable] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [partnerFilter, setPartnerFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [searchHost, setSearchHost] = useState(null)
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  const hasExtraFilters = partnerFilter !== 'all' || datePreset !== 'all'
 
   const [detail, setDetail] = useState(null)
   const [reconcileTarget, setReconcileTarget] = useState(null)
@@ -84,15 +93,22 @@ export default function CollectionReconciliation() {
     }
   }, [collections])
 
+  const partnerOptions = useMemo(() => uniqueOptions(collections, 'deliveryPartnerName', 'All partners'), [collections])
+
   const rows = useMemo(() => {
-    const base = statusFilter === 'all' ? collections : collections.filter((c) => c.status === statusFilter)
+    const base = collections.filter((c) => {
+      if (statusFilter !== 'all' && c.status !== statusFilter) return false
+      if (partnerFilter !== 'all' && c.deliveryPartnerName !== partnerFilter) return false
+      if (!isWithinDateRange(c.recordedAt, dateFrom, dateTo)) return false
+      return true
+    })
     return base.map((c) => ({
       ...c,
       _amount: Number(c.amount) || 0,
       _recordedAtLabel: formatDateTime(c.recordedAt),
       _modeLabel: formatPaymentMode(c.paymentMode),
     }))
-  }, [collections, statusFilter])
+  }, [collections, statusFilter, partnerFilter, dateFrom, dateTo])
 
   const runReconcile = async (collection) => {
     if (isActing) return
@@ -157,6 +173,13 @@ export default function CollectionReconciliation() {
                 <div ref={setSearchHost} className={isLoading ? 'hidden' : 'hidden w-60 md:block'} />
                 <ListFilterPanel title="Filter Collections">
                   <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+                  <Select label="Delivery Partner" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date
+                    <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+                  </div>
+                  {hasExtraFilters && (
+                    <button type="button" onClick={() => { setPartnerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                  )}
                 </ListFilterPanel>
               </div>
             )}
@@ -213,6 +236,7 @@ export default function CollectionReconciliation() {
                 {/* Desktop / tablet: compact table */}
                 <div className="hidden md:block">
                   <DataTable
+                    key={`${statusFilter}-${partnerFilter}-${datePreset}-${customFrom}-${customTo}`}
                     renderToolbar={({ search, onSearchChange, resultCount }) => (
                       <>
                         <div className="flex items-center gap-2 px-5 py-3">

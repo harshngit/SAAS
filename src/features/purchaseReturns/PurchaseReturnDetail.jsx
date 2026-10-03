@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Ban, Check, PackageX, RotateCcw, Send, Trash2, Truck } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
@@ -20,6 +20,13 @@ import {
   getDemoPurchaseReturn,
   isDemoPurchaseReturn,
 } from './purchaseReturnDemoData'
+import {
+  cancelPurchaseReturn,
+  completePurchaseReturn,
+  confirmPurchaseReturn,
+  dispatchPurchaseReturn,
+  getPurchaseReturn,
+} from '../../api/purchaseReturns'
 import { buildReturnActivity, prNextActions, prStatusMeta, totalReturnQty } from './purchaseReturnHelpers'
 
 const basePath = '/admin/purchase-returns'
@@ -45,21 +52,43 @@ export default function PurchaseReturnDetail() {
 
   const [purchaseReturn, setPurchaseReturn] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [isActing, setIsActing] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     setIsLoading(true)
+    setLoadError('')
+
     if (PURCHASE_RETURNS_DEMO_ENABLED && isDemoPurchaseReturn(id)) {
       setPurchaseReturn(getDemoPurchaseReturn(id))
-    } else {
-      setPurchaseReturn(null)
+      setIsLoading(false)
+      return
     }
+
+    if (PURCHASE_RETURNS_DEMO_ENABLED) {
+      setPurchaseReturn(null)
+      setIsLoading(false)
+      return
+    }
+
+    const result = await getPurchaseReturn(id)
+    if (!result.success) {
+      setPurchaseReturn(null)
+      setLoadError(result.error)
+      setIsLoading(false)
+      return
+    }
+    setPurchaseReturn(result.purchaseReturn)
     setIsLoading(false)
   }, [id])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   if (isLoading) {
     return (
@@ -74,12 +103,8 @@ export default function PurchaseReturnDetail() {
       <Card>
         <EmptyState
           icon={PackageX}
-          title={PURCHASE_RETURNS_DEMO_ENABLED ? 'Purchase return not found' : "Purchase Returns tracking isn't available yet"}
-          description={
-            PURCHASE_RETURNS_DEMO_ENABLED
-              ? 'This purchase return may have been removed or the link is out of date.'
-              : 'Purchase Return records will be available once the backend is enabled.'
-          }
+          title={loadError ? 'Unable to load this purchase return' : 'Purchase return not found'}
+          description={loadError || 'This purchase return may have been removed or the link is out of date.'}
           action={{ label: 'Back to Purchase Returns', onClick: () => navigate(basePath) }}
         />
       </Card>
@@ -90,7 +115,21 @@ export default function PurchaseReturnDetail() {
   const nextActions = canManage ? prNextActions(purchaseReturn.status) : []
   const activity = buildReturnActivity(purchaseReturn)
 
-  const runAction = (fn, next) => {
+  // Real mode: call the backend, wait for success, then reload from GET /purchase-returns/{id} -
+  // never update local state optimistically. Demo mode keeps its existing local simulation.
+  const runRealAction = async (apiCall) => {
+    setIsActing(true)
+    setActionError('')
+    const result = await apiCall(purchaseReturn.id)
+    setIsActing(false)
+    if (!result.success) {
+      setActionError(result.error)
+      return
+    }
+    await load()
+  }
+
+  const runDemoAction = (fn, next) => {
     setIsActing(true)
     setActionError('')
     const updated = fn(purchaseReturn.id)
@@ -111,7 +150,7 @@ export default function PurchaseReturnDetail() {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold text-neutral-900">{purchaseReturn.returnNumber}</h1>
               <Badge variant={meta.variant}>{meta.label}</Badge>
-              <Badge variant="warning">Demo</Badge>
+              {PURCHASE_RETURNS_DEMO_ENABLED && <Badge variant="warning">Demo</Badge>}
             </div>
             <p className="mt-1.5 text-xs text-neutral-400">
               {purchaseReturn.supplierName || 'Supplier'}
@@ -128,19 +167,34 @@ export default function PurchaseReturnDetail() {
             </Button>
           )}
           {nextActions.includes('confirm') && (
-            <Button variant="primary" size="sm" loading={isActing} onClick={() => runAction(confirmDemoPurchaseReturn)}>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isActing}
+              onClick={() => (PURCHASE_RETURNS_DEMO_ENABLED ? runDemoAction(confirmDemoPurchaseReturn) : runRealAction(confirmPurchaseReturn))}
+            >
               <Check className="size-4" aria-hidden="true" />
               Confirm
             </Button>
           )}
           {nextActions.includes('dispatch') && (
-            <Button variant="primary" size="sm" loading={isActing} onClick={() => runAction(dispatchDemoPurchaseReturn)}>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isActing}
+              onClick={() => (PURCHASE_RETURNS_DEMO_ENABLED ? runDemoAction(dispatchDemoPurchaseReturn) : runRealAction(dispatchPurchaseReturn))}
+            >
               <Send className="size-4" aria-hidden="true" />
               Dispatch Return
             </Button>
           )}
           {nextActions.includes('complete') && (
-            <Button variant="primary" size="sm" loading={isActing} onClick={() => runAction(completeDemoPurchaseReturn)}>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isActing}
+              onClick={() => (PURCHASE_RETURNS_DEMO_ENABLED ? runDemoAction(completeDemoPurchaseReturn) : runRealAction(completePurchaseReturn))}
+            >
               <Truck className="size-4" aria-hidden="true" />
               Complete Return
             </Button>
@@ -151,7 +205,9 @@ export default function PurchaseReturnDetail() {
               Cancel
             </Button>
           )}
-          {canManage && meta.key === 'draft' && (
+          {/* No DELETE /purchase-returns/{id} exists in the canonical backend contract - delete
+              stays a demo-only convenience, never sent to the real API. */}
+          {PURCHASE_RETURNS_DEMO_ENABLED && canManage && meta.key === 'draft' && (
             <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>
               <Trash2 className="size-4" aria-hidden="true" />
               Delete
@@ -165,7 +221,7 @@ export default function PurchaseReturnDetail() {
       )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={RotateCcw} iconVariant="info" label="Return Qty" value={String(totalReturnQty(purchaseReturn))} />
+        <StatCard icon={RotateCcw} iconVariant="info" label="Return Qty" value={String(purchaseReturn.totalReturnQty ?? totalReturnQty(purchaseReturn))} />
         <StatCard icon={PackageX} iconVariant="neutral" label="Line Items" value={String(purchaseReturn.items.length)} />
         <StatCard icon={Send} iconVariant="warning" label="Dispatched" value={formatDate(purchaseReturn.dispatchedAt)} />
         <StatCard icon={Check} iconVariant="success" label="Completed" value={formatDate(purchaseReturn.completedAt)} />
@@ -188,6 +244,11 @@ export default function PurchaseReturnDetail() {
                   <td className="px-5 py-3.5">
                     <p className="font-medium text-neutral-800">{item.productName || 'Item'}</p>
                     {item.sku && <p className="mt-0.5 text-xs text-neutral-400">{item.sku}</p>}
+                    {(item.batchNumber || item.expiryDate) && (
+                      <p className="mt-0.5 text-xs text-neutral-400">
+                        {[item.batchNumber && `Batch ${item.batchNumber}`, item.expiryDate && `Exp ${formatDate(item.expiryDate)}`].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.receivedQty}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.previouslyReturned}</td>
@@ -215,8 +276,8 @@ export default function PurchaseReturnDetail() {
             )}
           </div>
           <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
-            Supplier credit / debit note / payable adjustment is handled separately. Warehouse stock is not changed by
-            this screen.
+            Supplier credit/debit note, payable adjustment and warehouse stock movement are handled by the backend as
+            part of this return's lifecycle - never calculated or applied from this screen.
           </p>
         </Card>
 
@@ -264,7 +325,11 @@ export default function PurchaseReturnDetail() {
                   setActionError('A cancellation reason is required.')
                   return
                 }
-                runAction((rid) => cancelDemoPurchaseReturn(rid, cancelReason.trim()), () => setCancelOpen(false))
+                if (PURCHASE_RETURNS_DEMO_ENABLED) {
+                  runDemoAction((rid) => cancelDemoPurchaseReturn(rid, cancelReason.trim()), () => setCancelOpen(false))
+                } else {
+                  runRealAction((rid) => cancelPurchaseReturn(rid, cancelReason.trim())).then(() => setCancelOpen(false))
+                }
               }}
             >
               Cancel Return
@@ -273,25 +338,27 @@ export default function PurchaseReturnDetail() {
         </div>
       </Modal>
 
-      <Modal isOpen={deleteOpen} onClose={() => !isActing && setDeleteOpen(false)} title="Delete Purchase Return">
-        <div className="space-y-5">
-          <p className="text-sm text-neutral-600">Delete {purchaseReturn.returnNumber}? This cannot be undone.</p>
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-            <Button
-              type="button"
-              variant="danger"
-              loading={isActing}
-              onClick={() => {
-                deleteDemoPurchaseReturn(purchaseReturn.id)
-                navigate(basePath)
-              }}
-            >
-              Delete
-            </Button>
+      {PURCHASE_RETURNS_DEMO_ENABLED && (
+        <Modal isOpen={deleteOpen} onClose={() => !isActing && setDeleteOpen(false)} title="Delete Purchase Return">
+          <div className="space-y-5">
+            <p className="text-sm text-neutral-600">Delete {purchaseReturn.returnNumber}? This cannot be undone.</p>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button type="button" variant="secondary" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+              <Button
+                type="button"
+                variant="danger"
+                loading={isActing}
+                onClick={() => {
+                  deleteDemoPurchaseReturn(purchaseReturn.id)
+                  navigate(basePath)
+                }}
+              >
+                Delete
+              </Button>
+            </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
     </div>
   )
 }

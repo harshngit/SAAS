@@ -6,9 +6,13 @@ import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import ListFilterPanel from '../../components/ui/ListFilterPanel'
 import { listDeliveries } from '../../api/deliveries'
 import { DELIVERY_STAGE_FILTER_OPTIONS, getDeliveryStage } from './deliveryStage'
 import { formatCurrency } from '../../utils/format'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { uniqueOptions } from '../../utils/filterOptions'
 
 export default function AdminDeliveries() {
   const navigate = useNavigate()
@@ -16,6 +20,22 @@ export default function AdminDeliveries() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [partnerFilter, setPartnerFilter] = useState('all')
+  const [vehicleFilter, setVehicleFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
+  const hasActiveFilters = statusFilter !== 'all' || partnerFilter !== 'all' || vehicleFilter !== 'all' || datePreset !== 'all'
+  const clearFilters = () => {
+    setStatusFilter('all')
+    setPartnerFilter('all')
+    setVehicleFilter('all')
+    setDatePreset('all')
+    setCustomFrom('')
+    setCustomTo('')
+  }
 
   const loadDeliveries = useCallback(async () => {
     setIsLoading(true)
@@ -47,10 +67,18 @@ export default function AdminDeliveries() {
     return { total: deliveries.length, delivered, inProgress, failed, awaiting }
   }, [deliveries])
 
+  const partnerOptions = useMemo(() => uniqueOptions(deliveries, 'deliveryPartnerName', 'All partners'), [deliveries])
+  const vehicleOptions = useMemo(() => uniqueOptions(deliveries, 'vehicleNumber', 'All vehicles'), [deliveries])
+
   const filteredDeliveries = useMemo(() => {
-    if (statusFilter === 'all') return deliveries
-    return deliveries.filter((row) => getDeliveryStage(row).key === statusFilter)
-  }, [deliveries, statusFilter])
+    return deliveries.filter((row) => {
+      if (statusFilter !== 'all' && getDeliveryStage(row).key !== statusFilter) return false
+      if (partnerFilter !== 'all' && row.deliveryPartnerName !== partnerFilter) return false
+      if (vehicleFilter !== 'all' && row.vehicleNumber !== vehicleFilter) return false
+      if (!isWithinDateRange(row.scheduledDate, dateFrom, dateTo)) return false
+      return true
+    })
+  }, [deliveries, statusFilter, partnerFilter, vehicleFilter, dateFrom, dateTo])
 
   return (
     <div className="listing-page space-y-4">
@@ -85,18 +113,31 @@ export default function AdminDeliveries() {
         ) : (
           <>
             <DataTable
+              key={`${statusFilter}-${partnerFilter}-${vehicleFilter}-${datePreset}-${customFrom}-${customTo}`}
               title="All Deliveries"
               subtitle="Every delivery across the organization"
               toolbarActions={
-              <Select
-                options={[{ value: 'all', label: 'All status' }, ...DELIVERY_STAGE_FILTER_OPTIONS]}
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="w-full"
-                triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
-              />
+                <ListFilterPanel title="Filter Deliveries">
+                  <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                    <Select options={[{ value: 'all', label: 'All status' }, ...DELIVERY_STAGE_FILTER_OPTIONS]} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Delivery Partner
+                    <Select options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Vehicle
+                    <Select options={vehicleOptions} value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)} />
+                  </label>
+                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Scheduled Date
+                    <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+                  </div>
+                  {hasActiveFilters && (
+                    <button type="button" onClick={clearFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                  )}
+                </ListFilterPanel>
               }
               loading={isLoading}
+              emptyTitle={hasActiveFilters ? 'No deliveries match these filters' : 'No deliveries found'}
+              emptyDescription={hasActiveFilters ? 'Try widening the date range or clearing filters.' : undefined}
               columns={[
                 { key: 'deliveryNumber', header: 'Delivery #', sortable: true },
                 { key: 'orderNumber', header: 'Order #', sortable: true },

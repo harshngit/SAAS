@@ -6,7 +6,9 @@ import Card from '../../components/ui/Card'
 import Modal from '../../components/ui/Modal'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { checkIn, getMyAttendance } from '../../api/attendance'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { attendanceLifecycleLabel, durationLabel, normalizeAttendanceRecord } from './attendanceUtils'
 import { ATTENDANCE_CHECK_IN_TYPE, ATTENDANCE_CHECK_OUT_TYPE, formatTime } from './attendanceConstants'
 import { attendanceDemoResolved, simulateDemoCheckIn, simulateDemoCheckOut } from './attendanceDemo'
@@ -124,6 +126,10 @@ export default function MyAttendance() {
   const [checkOutGap, setCheckOutGap] = useState(false)
   const [detailRecord, setDetailRecord] = useState(null)
   const [now, setNow] = useState(() => new Date().toISOString())
+  const [datePreset, setDatePreset] = useState('last30')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
   // Demo data comes ONLY from the explicit DEMO_MODE switch (src/config/demoMode.js) - never
   // from "the real API returned zero records". A brand-new employee's first real Check In must
@@ -163,6 +169,13 @@ export default function MyAttendance() {
     [rawRecords],
   )
   const todayRecord = records.find((r) => r.date === todayIso()) || null
+  // The Date filter only narrows the History table below - todayRecord (which drives the
+  // Check In/Out widget) always looks at the full set, so a Custom Range that excludes today
+  // never breaks "already checked in today" detection.
+  const filteredRecords = useMemo(
+    () => records.filter((record) => isWithinDateRange(record.date, dateFrom, dateTo)),
+    [records, dateFrom, dateTo],
+  )
 
   // Live "active duration" tick while checked in (once a minute - no need for seconds).
   useEffect(() => {
@@ -226,7 +239,14 @@ export default function MyAttendance() {
         onCheckOut={() => act('out')}
       />
 
-      <Card title="Attendance History" className="p-0" bodyClassName="p-0">
+      <Card
+        title="Attendance History"
+        className="p-0"
+        bodyClassName="p-0"
+        actions={
+          <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
+        }
+      >
         {isLoading ? (
           <div className="p-6"><LoadingSpinner label="Loading attendance history..." /></div>
         ) : loadError ? (
@@ -237,6 +257,10 @@ export default function MyAttendance() {
         ) : records.length === 0 ? (
           <div className="p-6">
             <EmptyState icon={CalendarCheck} title="No attendance recorded yet" description="Check in above to start building your history." />
+          </div>
+        ) : filteredRecords.length === 0 ? (
+          <div className="p-6">
+            <EmptyState icon={CalendarCheck} title="No attendance in this date range" description="Try widening the date range." />
           </div>
         ) : (
           <>
@@ -254,7 +278,7 @@ export default function MyAttendance() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
-                  {records.map((record) => (
+                  {filteredRecords.map((record) => (
                     <tr
                       key={record.date}
                       onClick={() => setDetailRecord(record)}
@@ -277,7 +301,7 @@ export default function MyAttendance() {
             </div>
             {/* Mobile */}
             <div className="divide-y divide-neutral-100 sm:hidden">
-              {records.map((record) => (
+              {filteredRecords.map((record) => (
                 <button
                   key={record.date}
                   type="button"

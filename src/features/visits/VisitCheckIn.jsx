@@ -23,6 +23,8 @@ import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { listAssignableStaff } from '../../api/users'
 import { listCustomers } from '../../api/customers'
 import { listLeads } from '../../api/leads'
@@ -356,6 +358,9 @@ export default function VisitCheckIn() {
   const [historyTab, setHistoryTab] = useState('all')
   const [historySearch, setHistorySearch] = useState('')
   const [historyPage, setHistoryPage] = useState(1)
+  const [historyDatePreset, setHistoryDatePreset] = useState('all')
+  const [historyCustomFrom, setHistoryCustomFrom] = useState('')
+  const [historyCustomTo, setHistoryCustomTo] = useState('')
   const [checkInData, setCheckInData] = useState(emptyCheckInData)
   const [customers, setCustomers] = useState([])
   const [leads, setLeads] = useState([])
@@ -479,6 +484,8 @@ export default function VisitCheckIn() {
     return { total, completed, inProgress, cancelled }
   }, [visits])
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(historyDatePreset, historyCustomFrom, historyCustomTo), [historyDatePreset, historyCustomFrom, historyCustomTo])
+
   const filteredVisits = useMemo(() => {
     const query = historySearch.trim().toLowerCase()
     const now = new Date()
@@ -486,6 +493,7 @@ export default function VisitCheckIn() {
       if (historyTab === 'today' && !isSameDay(visit.visitDate, now)) return false
       if (historyTab === 'leads' && !visit.leadId) return false
       if (historyTab === 'customers' && visit.leadId) return false
+      if (!isWithinDateRange(visit.visitDate, dateFrom, dateTo)) return false
       if (query) {
         const haystack = `${visitContactName(visit)} ${labelize(visit.visitType)} ${visit.outcome || ''}`.toLowerCase()
         if (!haystack.includes(query)) return false
@@ -493,7 +501,7 @@ export default function VisitCheckIn() {
       return true
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visits, historyTab, historySearch, leadIndex])
+  }, [visits, historyTab, historySearch, leadIndex, dateFrom, dateTo])
 
   const totalPages = Math.max(1, Math.ceil(filteredVisits.length / PAGE_SIZE))
   const currentPage = Math.min(historyPage, totalPages)
@@ -501,7 +509,7 @@ export default function VisitCheckIn() {
 
   useEffect(() => {
     setHistoryPage(1)
-  }, [historyTab, historySearch])
+  }, [historyTab, historySearch, dateFrom, dateTo])
 
   const isLeadVisit = checkInData.visitFor === 'lead'
   const detailVisit = visits.find((visit) => visit.id === detailVisitId) || null
@@ -965,15 +973,18 @@ export default function VisitCheckIn() {
                   <Clock className="size-4 text-primary-600" aria-hidden="true" />
                   <h3 className="text-base font-semibold text-neutral-900">Visit Timeline</h3>
                 </div>
-                <div className="relative w-full lg:w-64">
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                  <input
-                    type="search"
-                    value={historySearch}
-                    onChange={(event) => setHistorySearch(event.target.value)}
-                    placeholder="Search visits..."
-                    className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2 pl-10 pr-3 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                  />
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+                  <div className="relative w-full lg:w-64">
+                    <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                    <input
+                      type="search"
+                      value={historySearch}
+                      onChange={(event) => setHistorySearch(event.target.value)}
+                      placeholder="Search visits..."
+                      className="w-full rounded-xl border border-neutral-100 bg-neutral-50 py-2 pl-10 pr-3 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                    />
+                  </div>
+                  <DateRangeFilter preset={historyDatePreset} onPresetChange={setHistoryDatePreset} customFrom={historyCustomFrom} customTo={historyCustomTo} onCustomChange={({ from, to }) => { setHistoryCustomFrom(from); setHistoryCustomTo(to) }} className="w-full lg:w-44" />
                 </div>
               </div>
 

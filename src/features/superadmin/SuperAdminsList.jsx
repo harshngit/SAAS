@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Edit, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -6,8 +6,10 @@ import Card from '../../components/ui/Card'
 import DataTable from '../../components/ui/DataTable'
 import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { createSuperAdmin, deleteSuperAdmin, listSuperAdmins, updateSuperAdmin } from '../../api/superadmin'
 import { useAuthStore } from '../../store/authStore'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 
 function formatDateLabel(value) {
   if (!value) return '—'
@@ -132,6 +134,9 @@ export default function SuperAdminsList() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   const loadAdmins = async () => {
     setIsLoading(true)
@@ -211,6 +216,12 @@ export default function SuperAdminsList() {
     setIsDeleting(false)
   }
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  const dateFilteredAdmins = useMemo(
+    () => admins.filter((admin) => isWithinDateRange(admin.createdAt, dateFrom, dateTo)),
+    [admins, dateFrom, dateTo],
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -218,10 +229,13 @@ export default function SuperAdminsList() {
           <h1 className="text-2xl font-semibold text-neutral-900">Superadmins</h1>
           <p className="mt-1 text-sm text-neutral-500">Manage platform-level Superadmin accounts.</p>
         </div>
-        <Button type="button" onClick={() => openForm()}>
-          <Plus className="size-4" aria-hidden="true" />
-          Add Superadmin
-        </Button>
+        <div className="flex items-center gap-2">
+          <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
+          <Button type="button" onClick={() => openForm()}>
+            <Plus className="size-4" aria-hidden="true" />
+            Add Superadmin
+          </Button>
+        </div>
       </div>
 
       <Card title="Superadmin Accounts">
@@ -249,7 +263,7 @@ export default function SuperAdminsList() {
             },
             { key: 'createdAt', header: 'Created', sortable: true, render: (row) => formatDateLabel(row.createdAt) },
           ]}
-          data={admins}
+          data={dateFilteredAdmins}
           searchKeys={['name', 'email', 'phone']}
           searchPlaceholder="Search superadmins..."
           loading={isLoading}

@@ -12,12 +12,13 @@ import Select from '../../components/ui/Select'
 import { ROLES } from '../../auth/roles'
 import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, deleteLead, listLeads, updateLead } from '../../api/leads'
 import { listUsers } from '../../api/users'
+import { listFollowUps } from '../../api/followups'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import { LeadEditForm } from './LeadForms'
 import ConvertLeadModal from './ConvertLeadModal'
-import { LEAD_STATUS_VARIANT, formatLeadStatus, getLeadActivity } from './leadActivity'
+import { LEAD_STATUS_VARIANT, formatLeadStatus, getLastActivityLabel, getNextFollowUpSummary } from './leadActivity'
 
 const statusVariant = LEAD_STATUS_VARIANT
 
@@ -72,6 +73,12 @@ export default function LeadList() {
 
   const [convertTarget, setConvertTarget] = useState(null)
 
+  // Earliest PENDING follow-up due date per lead id, keyed from one real GET
+  // /follow-ups?status=pending call (never one request per lead) - see loadPendingFollowUps
+  // below. A lead with no entry here genuinely has no pending follow-up; the UI shows "—"
+  // rather than inventing one.
+  const [nextFollowUpByLeadId, setNextFollowUpByLeadId] = useState({})
+
   const loadLeads = useCallback(async () => {
     setIsLoading(true)
     setListError('')
@@ -92,6 +99,50 @@ export default function LeadList() {
   useEffect(() => {
     loadLeads()
   }, [loadLeads])
+
+  useEffect(() => {
+    let isMounted = true
+
+    // Backend caps GET /follow-ups at limit=500 per page (default 100), so one call cannot
+    // assume it got every pending follow-up for the organization. Page with offset until a page
+    // comes back short of the limit - the standard "last page" signal - rather than trusting a
+    // single call to be complete. The 20-page cap (10,000 records) is just a defensive ceiling
+    // against an unexpected backend response shape looping forever, not an expected real count.
+    const PAGE_SIZE = 500
+    const MAX_PAGES = 20
+
+    async function loadPendingFollowUps() {
+      const allFollowUps = []
+      let offset = 0
+
+      for (let page = 0; page < MAX_PAGES; page += 1) {
+        const result = await listFollowUps({ status: 'pending', limit: PAGE_SIZE, offset })
+        if (!isMounted) return
+        if (!result.success) break
+
+        allFollowUps.push(...result.followUps)
+        if (result.followUps.length < PAGE_SIZE) break
+        offset += PAGE_SIZE
+      }
+
+      const earliestByLead = {}
+      allFollowUps.forEach((followUp) => {
+        if (!followUp.leadId || !followUp.dueDate) return
+        const existing = earliestByLead[followUp.leadId]
+        if (!existing || new Date(followUp.dueDate) < new Date(existing)) {
+          earliestByLead[followUp.leadId] = followUp.dueDate
+        }
+      })
+      if (isMounted) setNextFollowUpByLeadId(earliestByLead)
+    }
+
+    loadPendingFollowUps()
+    return () => {
+      isMounted = false
+    }
+    // Pending follow-ups aren't scoped to the current status filter - fetched once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -191,7 +242,8 @@ export default function LeadList() {
     const rows = [
       ['Lead ID', 'Lead', 'Mobile', 'Email', 'Source', 'Assigned', 'Status', 'Last Activity', 'Next Follow-up', 'Created'],
       ...leadsToExport.map((lead) => {
-        const activity = getLeadActivity(lead)
+        const lastActivity = getLastActivityLabel(lead)
+        const nextFollowUp = getNextFollowUpSummary(nextFollowUpByLeadId[lead.id])
         return [
           lead.leadId,
           lead.name || lead.customerName,
@@ -200,8 +252,8 @@ export default function LeadList() {
           lead.leadSource,
           lead.assignedSalespersonName,
           lead.leadStatus,
-          activity.lastActivity.label,
-          activity.nextFollowUp.label,
+          lastActivity.label,
+          nextFollowUp.label,
           lead.createdAt,
         ]
       }),
@@ -398,7 +450,7 @@ export default function LeadList() {
                   </tr>
                 ) : (
                   visibleLeads.map((lead, index) => {
-                    const activity = getLeadActivity(lead)
+                    const nextFollowUp = getNextFollowUpSummary(nextFollowUpByLeadId[lead.id])
                     return (
                     <tr
                       key={lead.id}
@@ -443,8 +495,8 @@ export default function LeadList() {
                       <td className="px-6 py-5">
                         <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLeadStatus(lead.leadStatus)}</Badge>
                       </td>
-                      <td className={`px-6 py-5 ${activity.nextFollowUp.tone === 'danger' ? 'font-medium text-red-600' : activity.nextFollowUp.tone === 'warning' ? 'font-medium text-amber-600' : 'text-fg-muted'}`}>
-                        {activity.nextFollowUp.label}
+                      <td className={`px-6 py-5 ${nextFollowUp.tone === 'danger' ? 'font-medium text-red-600' : nextFollowUp.tone === 'warning' ? 'font-medium text-amber-600' : 'text-fg-muted'}`}>
+                        {nextFollowUp.label}
                       </td>
                       <td className="px-6 py-5 text-fg-muted">{formatDate(lead.createdAt)}</td>
                       <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>

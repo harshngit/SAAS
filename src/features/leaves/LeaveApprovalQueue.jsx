@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, XCircle } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import DataTable from '../../components/ui/DataTable'
 import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
+import Select from '../../components/ui/Select'
 import { LEAVE_TYPE_OPTIONS, approveLeave, listLeaves, rejectLeave } from '../../api/leaves'
 import { useToast } from '../../components/ui/toastContext'
+import { uniqueOptions } from '../../utils/filterOptions'
 
 const statusVariant = {
   pending: 'warning',
@@ -23,6 +25,7 @@ export default function LeaveApprovalQueue() {
   const [rejectTarget, setRejectTarget] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
   const [isActing, setIsActing] = useState(false)
+  const [employeeFilter, setEmployeeFilter] = useState('all')
 
   const loadLeaves = useCallback(async () => {
     setIsLoading(true)
@@ -82,6 +85,12 @@ export default function LeaveApprovalQueue() {
     setRejectReason('')
   }
 
+  const employeeOptions = useMemo(() => uniqueOptions(leaveList, 'userName', 'All employees'), [leaveList])
+  const filteredLeaves = useMemo(() => {
+    if (employeeFilter === 'all') return leaveList
+    return leaveList.filter((leave) => leave.userName === employeeFilter)
+  }, [leaveList, employeeFilter])
+
   return (
     <div className="space-y-6">
       <div>
@@ -94,6 +103,26 @@ export default function LeaveApprovalQueue() {
           <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
         <DataTable
+          key={employeeFilter}
+          renderToolbar={({ search, onSearchChange, resultCount, searchable }) => (
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              {searchable && (
+                <div className="relative w-full max-w-xs">
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={onSearchChange}
+                    placeholder="Search pending leave requests..."
+                    className="w-full rounded-full border border-neutral-100 bg-neutral-50 py-2.5 pl-4 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  />
+                </div>
+              )}
+              <div className="flex items-center gap-3">
+                <Select options={employeeOptions} value={employeeFilter} onChange={(event) => setEmployeeFilter(event.target.value)} className="w-44" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+                <p className="shrink-0 text-xs font-medium text-neutral-400">{resultCount} {resultCount === 1 ? 'result' : 'results'}</p>
+              </div>
+            </div>
+          )}
           loading={isLoading}
           columns={[
             { key: 'userName', header: 'Employee', sortable: true },
@@ -109,7 +138,7 @@ export default function LeaveApprovalQueue() {
               render: (row) => <Badge variant={statusVariant[row.status] || 'neutral'} dot>{row.status}</Badge>,
             },
           ]}
-          data={leaveList}
+          data={filteredLeaves}
           searchKeys={['userName', 'leaveType', 'reason']}
           searchPlaceholder="Search pending leave requests..."
           actions={(row) => [

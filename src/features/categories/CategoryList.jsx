@@ -17,6 +17,8 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { readImageAsDataUrl } from '../../utils/imageFile'
 import { getFileUrl } from '../../api/files'
 
@@ -210,6 +212,9 @@ export default function CategoryList() {
   const [listError, setListError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [categorySort, setCategorySort] = useState('recent')
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false)
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
@@ -227,12 +232,15 @@ export default function CategoryList() {
   const [detailsError, setDetailsError] = useState('')
   const [isDetailsLoading, setIsDetailsLoading] = useState(false)
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const filteredCategories = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
     const filtered = categories.filter((category) => {
       if (categoryFilter === 'with-image' && !category.image) return false
       if (categoryFilter === 'without-image' && category.image) return false
+      if (!isWithinDateRange(category.createdAt, dateFrom, dateTo)) return false
       if (!normalizedSearch) return true
 
       return [category.name, category.description]
@@ -247,7 +255,7 @@ export default function CategoryList() {
       if (categorySort === 'oldest') return leftTime - rightTime
       return rightTime - leftTime
     })
-  }, [categoryFilter, categorySort, categories, searchTerm])
+  }, [categoryFilter, categorySort, categories, searchTerm, dateFrom, dateTo])
 
   const totalPages = Math.max(1, Math.ceil(filteredCategories.length / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
@@ -671,9 +679,12 @@ export default function CategoryList() {
                 value={categoryFilter}
                 onChange={(event) => { setCategoryFilter(event.target.value); setPage(1) }}
               />
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Created
+                <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} />
+              </label>
             </div>
             <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4">
-              <button type="button" onClick={() => { setCategoryFilter('all'); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+              <button type="button" onClick={() => { setCategoryFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
               <Button type="button" onClick={() => setIsFilterMenuOpen(false)}>Apply filters</Button>
             </div>
           </aside>

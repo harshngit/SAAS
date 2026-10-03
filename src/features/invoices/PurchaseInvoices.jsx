@@ -8,8 +8,12 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import { listPurchases, PURCHASE_PAYMENT_STATUS_OPTIONS, updatePurchasePaymentStatus } from '../../api/purchases'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import { listPurchases, PURCHASE_PAYMENT_STATUS_OPTIONS, PURCHASE_STATUS_OPTIONS, updatePurchasePaymentStatus } from '../../api/purchases'
 import { formatCurrency } from '../../utils/format'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { uniqueOptions } from '../../utils/filterOptions'
 
 const statusVariant = { pending: 'warning', approved: 'success', cancelled: 'danger' }
 const paymentStatusVariant = { unpaid: 'danger', partial: 'warning', paid: 'success' }
@@ -24,6 +28,22 @@ export default function PurchaseInvoices() {
   const [paymentAmount, setPaymentAmount] = useState('')
   const [isUpdatingPayment, setIsUpdatingPayment] = useState(false)
   const [paymentError, setPaymentError] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('all')
+  const [supplierFilter, setSupplierFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  const hasActiveFilters = statusFilter !== 'all' || paymentStatusFilter !== 'all' || supplierFilter !== 'all' || datePreset !== 'all'
+  const clearFilters = () => {
+    setStatusFilter('all')
+    setPaymentStatusFilter('all')
+    setSupplierFilter('all')
+    setDatePreset('all')
+    setCustomFrom('')
+    setCustomTo('')
+  }
 
   const loadInvoices = useCallback(async () => {
     setIsLoading(true)
@@ -74,6 +94,17 @@ export default function PurchaseInvoices() {
     setPaymentTarget(null)
     loadInvoices()
   }
+
+  const supplierOptions = useMemo(() => uniqueOptions(invoices, 'supplierName', 'All suppliers'), [invoices])
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((row) => {
+      if (statusFilter !== 'all' && row.status !== statusFilter) return false
+      if (paymentStatusFilter !== 'all' && row.paymentStatus !== paymentStatusFilter) return false
+      if (supplierFilter !== 'all' && row.supplierName !== supplierFilter) return false
+      if (!isWithinDateRange(row.invoiceDate, dateFrom, dateTo)) return false
+      return true
+    })
+  }, [invoices, statusFilter, paymentStatusFilter, supplierFilter, dateFrom, dateTo])
 
   const columns = useMemo(
     () => [
@@ -130,8 +161,46 @@ export default function PurchaseInvoices() {
       ) : (
         <Card title="Purchase Invoices" className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:mx-5 [&>p]:mx-5 [&>p]:mb-5">
           <DataTable
+            key={`${statusFilter}-${paymentStatusFilter}-${supplierFilter}-${datePreset}-${customFrom}-${customTo}`}
+            renderToolbar={({ search, onSearchChange, resultCount, searchable }) => (
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                {searchable && (
+                  <div className="relative w-full max-w-xs">
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={onSearchChange}
+                      placeholder="Search purchase invoices..."
+                      className="w-full rounded-full border border-neutral-100 bg-neutral-50 py-2.5 pl-4 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                    />
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <ListFilterPanel title="Filter Purchase Invoices">
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                      <Select options={[{ value: 'all', label: 'All status' }, ...PURCHASE_STATUS_OPTIONS]} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Status
+                      <Select options={[{ value: 'all', label: 'All payment status' }, ...PURCHASE_PAYMENT_STATUS_OPTIONS]} value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Supplier
+                      <Select options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} />
+                    </label>
+                    <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
+                      <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+                    </div>
+                    {hasActiveFilters && (
+                      <button type="button" onClick={clearFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                    )}
+                  </ListFilterPanel>
+                  <p className="shrink-0 text-xs font-medium text-neutral-400">{resultCount} {resultCount === 1 ? 'result' : 'results'}</p>
+                </div>
+              </div>
+            )}
+            emptyTitle={hasActiveFilters ? 'No purchase invoices match these filters' : 'No purchase invoices found'}
+            emptyDescription={hasActiveFilters ? 'Try widening the date range or clearing filters.' : undefined}
             columns={columns}
-            data={invoices}
+            data={filteredInvoices}
             searchKeys={['invoiceNumber', 'supplierName', 'status', 'paymentStatus']}
             searchPlaceholder="Search purchase invoices..."
             actions={(row) => [

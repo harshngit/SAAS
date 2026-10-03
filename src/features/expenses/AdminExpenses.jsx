@@ -6,7 +6,11 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import ListFilterPanel from '../../components/ui/ListFilterPanel'
 import { usePermission } from '../../auth/usePermission'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { uniqueOptions } from '../../utils/filterOptions'
 import { approveExpense, listExpenses, rejectExpense, requestExpenseClarification } from '../../api/expenses'
 import {
   DEMO_EXPENSES_ENABLED,
@@ -51,6 +55,21 @@ export default function AdminExpenses() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [submittedByFilter, setSubmittedByFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  const hasActiveFilters = statusFilter !== 'all' || categoryFilter !== 'all' || submittedByFilter !== 'all' || datePreset !== 'all'
+  const clearFilters = () => {
+    setStatusFilter('all')
+    setCategoryFilter('all')
+    setSubmittedByFilter('all')
+    setDatePreset('all')
+    setCustomFrom('')
+    setCustomTo('')
+  }
 
   const [reviewTarget, setReviewTarget] = useState(null) // { row, mode: 'reject' | 'clarify' }
   const [reviewReason, setReviewReason] = useState('')
@@ -164,10 +183,18 @@ export default function AdminExpenses() {
     return { pending, approved: approvedRows, totalAmount, reimbursedAmount }
   }, [expenseList])
 
+  const categoryOptions = useMemo(() => uniqueOptions(expenseList, 'category', 'All categories'), [expenseList])
+  const submittedByOptions = useMemo(() => uniqueOptions(expenseList, 'submittedByName', 'All submitters'), [expenseList])
+
   const rows = useMemo(() => {
-    if (statusFilter === 'all') return expenseList
-    return expenseList.filter((e) => effectiveStatus(e) === statusFilter)
-  }, [expenseList, statusFilter])
+    return expenseList.filter((e) => {
+      if (statusFilter !== 'all' && effectiveStatus(e) !== statusFilter) return false
+      if (categoryFilter !== 'all' && e.category !== categoryFilter) return false
+      if (submittedByFilter !== 'all' && e.submittedByName !== submittedByFilter) return false
+      if (!isWithinDateRange(e.expenseDate, dateFrom, dateTo)) return false
+      return true
+    })
+  }, [expenseList, statusFilter, categoryFilter, submittedByFilter, dateFrom, dateTo])
 
   return (
     <div className="listing-page space-y-4">
@@ -192,9 +219,30 @@ export default function AdminExpenses() {
           <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
         <DataTable
+          key={`${statusFilter}-${categoryFilter}-${submittedByFilter}-${datePreset}-${customFrom}-${customTo}`}
           title="All Expenses"
           subtitle="Organization-wide expenses submitted by admin, sales, delivery, and staff teams"
-          toolbarActions={<Select options={FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />}
+          toolbarActions={
+            <ListFilterPanel title="Filter Expenses">
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                <Select options={FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category
+                <Select options={categoryOptions} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Submitted By
+                <Select options={submittedByOptions} value={submittedByFilter} onChange={(event) => setSubmittedByFilter(event.target.value)} />
+              </label>
+              <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Expense Date
+                <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+              </div>
+              {hasActiveFilters && (
+                <button type="button" onClick={clearFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+              )}
+            </ListFilterPanel>
+          }
+          emptyTitle={hasActiveFilters ? 'No expenses match these filters' : 'No expenses found'}
+          emptyDescription={hasActiveFilters ? 'Try widening the date range or clearing filters.' : undefined}
           loading={isLoading}
           columns={[
             { key: 'expenseNumber', header: 'Expense #', sortable: true, render: (row) => row.expenseNumber || row.expenseId || '—' },

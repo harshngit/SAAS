@@ -7,10 +7,12 @@ import EmptyState from '../../components/ui/EmptyState'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { useToast } from '../../components/ui/toastContext'
 import { getPaymentHistory } from '../../api/billing'
 import { getCurrentOrganizationState } from '../../api/organizations'
 import { formatCurrency } from '../../utils/format'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 
 const PAYMENT_STATUS_VARIANT = { paid: 'success', failed: 'danger', created: 'warning' }
 
@@ -40,6 +42,9 @@ export default function BillingHistory() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [billingCycle, setBillingCycle] = useState('')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -83,6 +88,8 @@ export default function BillingHistory() {
     })),
   ], [payments])
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const filteredPayments = useMemo(() => {
     const query = search.trim().toLowerCase()
     return payments.filter((payment) => {
@@ -95,8 +102,9 @@ export default function BillingHistory() {
       return matchesSearch
         && (!status || payment.status === status)
         && (!billingCycle || payment.billingCycle === billingCycle)
+        && isWithinDateRange(payment.paidAt || payment.createdAt, dateFrom, dateTo)
     })
-  }, [billingCycle, payments, search, status])
+  }, [billingCycle, payments, search, status, dateFrom, dateTo])
 
   const copyPaymentId = async (paymentId) => {
     try {
@@ -141,7 +149,7 @@ export default function BillingHistory() {
       </div>
 
       <Card title="Subscription Payments" subtitle="Online payments made for this organization&apos;s CRM subscription.">
-        <div className="mb-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_12rem]">
+        <div className="mb-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_12rem_auto]">
           <Input
             aria-label="Search billing payments"
             placeholder="Search plan or payment ID..."
@@ -151,6 +159,7 @@ export default function BillingHistory() {
           />
           <Select label="" options={statusOptions} value={status} onChange={(event) => setStatus(event.target.value)} />
           <Select label="" options={cycleOptions} value={billingCycle} onChange={(event) => setBillingCycle(event.target.value)} />
+          <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
         </div>
 
         {isLoading ? (

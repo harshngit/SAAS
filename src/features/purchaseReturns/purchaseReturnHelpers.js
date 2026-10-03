@@ -1,9 +1,9 @@
 // Single source of truth for how a Purchase Return reads in the UI.
 //
-// The backend has NO Purchase Return entity - only a thin fire-and-forget
-// `POST /purchases/{id}/returns` (items + reason -> PurchaseOut, nothing tracked). So the
-// lifecycle below is a FRONTEND model, fully exercised only in explicit demo mode. Real mode
-// shows a truthful "not available yet" state - see PURCHASE_RETURN_BACKEND_LATER.
+// Backed by the real PurchaseReturn entity (GET/POST/PATCH /purchase-returns, plus
+// confirm/dispatch/complete/cancel - see api/purchaseReturns.js). The older
+// `POST /purchases/{id}/returns` (items + reason -> PurchaseOut, nothing tracked) is a separate,
+// unrelated legacy call this module does not use.
 //
 // Lifecycle:  draft -> confirmed -> dispatched -> completed   (+ cancelled)
 
@@ -85,21 +85,3 @@ export function buildReturnActivity(purchaseReturn) {
   }
   return events.filter((event) => event.at)
 }
-
-// Everything a real Purchase Return module needs that the current backend does not provide.
-// Surfaced verbatim in real mode so the UI never implies these already work.
-export const PURCHASE_RETURN_BACKEND_LATER = [
-  'PurchaseReturn / PurchaseReturnItem entity + table',
-  'GET /purchase-returns list + GET /purchase-returns/{id} detail',
-  'Return number generation',
-  'Draft → Confirmed → Dispatched → Completed lifecycle endpoints (+ Cancel)',
-  'Purchase → Return and Goods Receipt → Return relationships',
-  'Per-item received quantity from a real Goods Receipt / GRN',
-  'Per-item previously-returned quantity (multiple returns against one receipt)',
-  'Source warehouse persisted on the return',
-  'Stock movement out of the warehouse on dispatch / completion',
-  'Batch / lot / serial / expiry references carried onto the return',
-  'Supplier credit note / debit note / payable adjustment on completion',
-  'Return audit trail',
-  'purchase_returns permission module (currently reuses `purchases`)',
-]

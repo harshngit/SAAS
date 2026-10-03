@@ -45,12 +45,6 @@ export const PAYMENT_STATUS_FILTER_OPTIONS = [
   { value: 'voided', label: 'Voided' },
 ]
 
-export const PAYMENT_DATE_FILTER_OPTIONS = [
-  { value: 'all', label: 'Any Date' },
-  { value: 'this_month', label: 'This Month' },
-  { value: 'recent', label: 'Last 30 Days' },
-]
-
 export const PAYMENT_SORT_OPTIONS = [
   { value: 'recent', label: 'Recent' },
   { value: 'oldest', label: 'Oldest' },

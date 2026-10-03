@@ -7,11 +7,12 @@
 //
 // PERSISTENCE: the exact regular preset id (e.g. "gst-3") round-trips via the real
 // `template_variant` field (`settings.templateVariant` / api/invoices.js). The exact thermal
-// preset id (e.g. "thermal-theme-2") round-trips via `thermal_print.layout` - the backend is
-// adding validation for these preset-id strings there (replacing the older 4 plain layout names
-// compact/standard/simple/classic). findThermalPreset below accepts either: a real preset id, or
-// one of those 4 legacy layout names (what an org saved before this change), which maps to that
-// layout's plain/no-variant card - so an older saved value is never fatal.
+// preset id (e.g. "thermal-theme-2") round-trips via `thermal_print.layout` - confirmed backend
+// support for these 8 exact preset-id strings as valid `layout` values (replacing the older 4
+// plain layout names compact/standard/simple/classic). findThermalPreset below still accepts
+// either: a real preset id, or one of those 4 legacy layout names (what an org saved before this
+// change), which maps to that layout's plain/no-variant card - so an older saved value is never
+// fatal.
 
 export const REGULAR_THEME_PRESETS = [
   { id: 'classic', name: 'Classic', baseTemplate: 'classic', header: 'plain', table: 'bordered', totals: 'plain', accent: 'standard', density: 'normal' },

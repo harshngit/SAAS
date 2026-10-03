@@ -35,7 +35,31 @@ function removeAuthProfile() {
   }
 }
 
+const AUTH_TOKENS_STORAGE_KEY = 'aquapure-auth-storage'
+
+// zustand's `persist` middleware (below) rehydrates authTokens from this same key, but only
+// ASYNCHRONOUSLY, after the first render has already committed. currentUser/authProfile are
+// seeded synchronously above specifically so ProtectedRoute can let the authenticated app render
+// immediately on reload with no flash of the login page - but every one of those pages fires its
+// own data-loading useEffect on mount, which races ahead of persist's async rehydration and goes
+// out with no Authorization header at all, 401-ing even /auth/me. Reading the same storage key
+// synchronously here (zustand persist's own on-disk shape: {state: {...}, version}) closes that
+// race - persist's later async pass re-applies the identical value, which is a harmless no-op.
+function readStoredAuthTokens() {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.localStorage.getItem(AUTH_TOKENS_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed?.state?.authTokens || null
+  } catch {
+    return null
+  }
+}
+
 const storedAuthProfile = readStoredAuthProfile()
+const storedAuthTokens = readStoredAuthTokens()
 
 export const useAuthStore = create(
   persist(
@@ -50,7 +74,7 @@ export const useAuthStore = create(
       fullAccess: storedAuthProfile?.fullAccess ?? false,
       dataScope: storedAuthProfile?.dataScope || 'own',
       authProfile: storedAuthProfile,
-      authTokens: null,
+      authTokens: storedAuthTokens,
       // Cached from the last /auth/me response (Part 2.8: no flash on load) - ThemeProvider
       // applies this synchronously on first render, before its own GET /organization/theme
       // refresh resolves. Org-scoped implicitly: it's part of the same persisted authProfile

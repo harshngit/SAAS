@@ -16,6 +16,8 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 
 const emptyForm = {
   name: '',
@@ -121,7 +123,11 @@ export default function BrandList() {
   const [listError, setListError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false)
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const [selectedIds, setSelectedIds] = useState([])
   const [pageSize, setPageSize] = useState('10')
   const [page, setPage] = useState(1)
@@ -176,13 +182,14 @@ export default function BrandList() {
     return brands.filter((brand) => {
       if (statusFilter === 'active' && !brand.isActive) return false
       if (statusFilter === 'inactive' && brand.isActive) return false
+      if (!isWithinDateRange(brand.createdAt, dateFrom, dateTo)) return false
       if (!normalizedSearch) return true
 
       return [brand.name, brand.code, brand.description]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(normalizedSearch))
     })
-  }, [brands, searchTerm, statusFilter])
+  }, [brands, searchTerm, statusFilter, dateFrom, dateTo])
 
   const totalPages = Math.max(1, Math.ceil(filteredBrands.length / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
@@ -317,7 +324,7 @@ export default function BrandList() {
                 <div
                   role="menu"
                   aria-label="Brand filters"
-                  className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-48 rounded-2xl border border-neutral-100 bg-surface p-2 shadow-(--shadow-popover)"
+                  className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-72 rounded-2xl border border-neutral-100 bg-surface p-2 shadow-(--shadow-popover)"
                 >
                   <p className="px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Status</p>
                   {[
@@ -346,6 +353,15 @@ export default function BrandList() {
                       </button>
                     )
                   })}
+                  <p className="mt-2 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Created</p>
+                  <div className="px-3 py-1.5">
+                    <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+                  </div>
+                  {(statusFilter !== 'all' || datePreset !== 'all') && (
+                    <button type="button" onClick={() => { setStatusFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo('') }} className="mt-1 w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900">
+                      Clear filters
+                    </button>
+                  )}
                 </div>
               )}
             </div>

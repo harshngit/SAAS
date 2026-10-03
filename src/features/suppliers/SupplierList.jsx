@@ -10,6 +10,8 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import {
   createSupplier,
   deleteSupplier,
@@ -49,6 +51,9 @@ export default function SupplierList() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [sortFilter, setSortFilter] = useState('recent')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [pageSize, setPageSize] = useState('10')
   const [page, setPage] = useState(1)
@@ -155,6 +160,8 @@ export default function SupplierList() {
     return '—'
   }
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const filteredSuppliers = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
@@ -166,8 +173,9 @@ export default function SupplierList() {
           .some((value) => String(value).toLowerCase().includes(normalizedSearch))
       const matchesCategory = categoryFilter === 'all' || supplier.category === categoryFilter
       const matchesStatus = statusFilter === 'all' || supplier.status === statusFilter
+      const matchesDate = isWithinDateRange(supplier.createdAt, dateFrom, dateTo)
 
-      return matchesSearch && matchesCategory && matchesStatus
+      return matchesSearch && matchesCategory && matchesStatus && matchesDate
     })
 
     return filtered.sort((left, right) => {
@@ -179,7 +187,7 @@ export default function SupplierList() {
 
       return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
     })
-  }, [categoryFilter, searchTerm, sortFilter, statusFilter, suppliers])
+  }, [categoryFilter, searchTerm, sortFilter, statusFilter, suppliers, dateFrom, dateTo])
 
   const supplierSummary = useMemo(() => ({
     total: filteredSuppliers.length,
@@ -599,8 +607,9 @@ export default function SupplierList() {
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={supplierStatusTabs.map((tab) => ({ value: tab.value, label: tab.label }))} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label>
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category<Select options={[{ value: 'all', label: 'All supplier types' }, ...supplierCategoryOptions.map((category) => ({ value: category, label: category }))]} value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1) }} /></label>
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort<Select options={[{ value: 'recent', label: 'Recent' }, { value: 'oldest', label: 'Oldest' }]} value={sortFilter} onChange={(event) => { setSortFilter(event.target.value); setPage(1) }} /></label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Created<DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} /></label>
             </div>
-            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSortFilter('recent'); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
+            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSortFilter('recent'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
           </aside>
         </div>,
         document.body,

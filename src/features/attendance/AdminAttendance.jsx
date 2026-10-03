@@ -18,6 +18,8 @@ import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { resolveDateRange } from '../../utils/dateRange'
 import { getAttendance } from '../../api/attendance'
 import { listUsers } from '../../api/users'
 import { getFileUrl } from '../../api/files'
@@ -41,13 +43,6 @@ const statusOptions = [
   { value: 'Half Day', label: 'Half Day' },
   { value: 'Week Off', label: 'Week Off' },
   { value: 'On Leave', label: 'On Leave' },
-]
-
-const dateRangeOptions = [
-  { value: 'today', label: 'Today' },
-  { value: '7', label: 'Last 7 days' },
-  { value: '30', label: 'Last 30 days' },
-  { value: 'all', label: 'All time' },
 ]
 
 const pageSizeOptions = [10, 25, 50].map((value) => ({ value: String(value), label: `${value} / page` }))
@@ -79,7 +74,9 @@ export default function AdminAttendance() {
   const [isLoading, setIsLoading] = useState(true)
   const [roleFilter, setRoleFilter] = useState('all')
   const [userFilter, setUserFilter] = useState('all')
-  const [dateRangeFilter, setDateRangeFilter] = useState('today')
+  const [datePreset, setDatePreset] = useState('today')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [showMoreFilters, setShowMoreFilters] = useState(false)
@@ -87,10 +84,18 @@ export default function AdminAttendance() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const loadAttendance = async () => {
     setIsLoading(true)
 
-    const [attendanceResult, usersResult] = await Promise.all([getAttendance({}), listUsers()])
+    // date_from/date_to are backend-confirmed params (api/attendance.js#getAttendance) - this
+    // scopes the fetch to the selected range instead of pulling the organization's entire
+    // attendance history on every load.
+    const [attendanceResult, usersResult] = await Promise.all([
+      getAttendance({ date_from: dateFrom || undefined, date_to: dateTo || undefined }),
+      listUsers(),
+    ])
 
     const nextUsersById = new Map(
       usersResult.success ? usersResult.users.map((user) => [user.id, normalizeUser(user)]) : [],
@@ -104,7 +109,7 @@ export default function AdminAttendance() {
   useEffect(() => {
     loadAttendance()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [dateFrom, dateTo])
 
   const rowsWithUser = useMemo(
     () =>
@@ -145,8 +150,6 @@ export default function AdminAttendance() {
 
   const filteredRows = useMemo(() => {
     const search = searchTerm.trim().toLowerCase()
-    const cutoffDays = dateRangeFilter === 'today' ? 0 : dateRangeFilter === 'all' ? null : Number(dateRangeFilter)
-    const latestTime = latestDate ? new Date(latestDate).getTime() : null
 
     return rowsWithUser.filter((row) => {
       const matchesRole = roleFilter === 'all' || row.role === roleFilter
@@ -156,19 +159,13 @@ export default function AdminAttendance() {
         !search ||
         [row.name, row.employeeId].filter(Boolean).some((value) => String(value).toLowerCase().includes(search))
 
-      let matchesDate = true
-      if (cutoffDays != null && latestTime != null) {
-        const rowTime = new Date(row.date).getTime()
-        matchesDate = !Number.isNaN(rowTime) && latestTime - rowTime <= cutoffDays * 86400000 && rowTime <= latestTime
-      }
-
-      return matchesRole && matchesUser && matchesStatus && matchesSearch && matchesDate
+      return matchesRole && matchesUser && matchesStatus && matchesSearch
     })
-  }, [rowsWithUser, roleFilter, userFilter, statusFilter, searchTerm, dateRangeFilter, latestDate])
+  }, [rowsWithUser, roleFilter, userFilter, statusFilter, searchTerm])
 
   useEffect(() => {
     setPage(1)
-  }, [roleFilter, userFilter, statusFilter, searchTerm, dateRangeFilter, pageSize])
+  }, [roleFilter, userFilter, statusFilter, searchTerm, dateFrom, dateTo, pageSize])
 
   const todaysRows = useMemo(() => rowsWithUser.filter((row) => row.date === latestDate), [rowsWithUser, latestDate])
   const totalStaff = useMemo(() => new Set(rowsWithUser.map((row) => row.userId)).size, [rowsWithUser])
@@ -300,7 +297,7 @@ export default function AdminAttendance() {
           <div className="flex flex-wrap items-center gap-2">
             <Select options={roleOptions} value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="w-44" triggerClassName="h-9 bg-neutral-50 py-1.5" />
             <Select options={staffOptions} value={userFilter} onChange={(event) => setUserFilter(event.target.value)} className="w-44" triggerClassName="h-9 bg-neutral-50 py-1.5" />
-            <Select options={dateRangeOptions} value={dateRangeFilter} onChange={(event) => setDateRangeFilter(event.target.value)} className="w-36" triggerClassName="h-9 bg-neutral-50 py-1.5" />
+            <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
             <Select options={statusOptions} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-36" triggerClassName="h-9 bg-neutral-50 py-1.5" />
 
             <div className="relative w-full sm:w-56">
@@ -328,6 +325,24 @@ export default function AdminAttendance() {
               More Filters
             </Button>
 
+            {(roleFilter !== 'all' || userFilter !== 'all' || statusFilter !== 'all' || datePreset !== 'today' || searchTerm) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRoleFilter('all')
+                  setUserFilter('all')
+                  setStatusFilter('all')
+                  setSearchTerm('')
+                  setDatePreset('today')
+                  setCustomFrom('')
+                  setCustomTo('')
+                }}
+                className="text-xs font-medium text-primary-600 hover:underline"
+              >
+                Clear Filters
+              </button>
+            )}
+
             <Button type="button" variant="outline" size="sm" className="ml-auto h-9 rounded-xl" onClick={handleDownload}>
               <Download className="size-4" aria-hidden="true" />
               Download{selectedKeys.length > 0 ? ` (${selectedKeys.length})` : ''}
@@ -345,7 +360,11 @@ export default function AdminAttendance() {
           {isLoading ? (
             <LoadingSpinner label="Loading attendance..." />
           ) : filteredRows.length === 0 ? (
-            <EmptyState icon={CalendarCheck} title="No attendance records found" description="Try adjusting your filters." />
+            <EmptyState
+              icon={CalendarCheck}
+              title={rows.length === 0 ? 'No attendance records for this date range' : 'No attendance records match these filters'}
+              description={rows.length === 0 ? 'Try a wider date range.' : 'Try adjusting your role, employee, status, or search filters.'}
+            />
           ) : (
             <>
               <table className="w-full text-left text-sm">

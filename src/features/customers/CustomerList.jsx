@@ -28,6 +28,8 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { ROLES } from '../../auth/roles'
 import { RequirePermission } from '../../auth/RequirePermission'
 import { createCustomer, deleteCustomer as deleteCustomerApi, getCustomer, listCustomers, updateCustomer } from '../../api/customers'
@@ -109,6 +111,9 @@ export default function CustomerList() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [salesOfficerFilter, setSalesOfficerFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false)
   const [pageSize, setPageSize] = useState('10')
@@ -205,6 +210,8 @@ export default function CustomerList() {
     [salesOfficers],
   )
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const filteredCustomers = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
@@ -219,10 +226,11 @@ export default function CustomerList() {
         !isAdmin || salesOfficerFilter === 'all' || customer.assignedSalesOfficerId === salesOfficerFilter
       const matchesStatus = statusFilter === 'all' || customer.status === statusFilter
       const matchesSalesScope = !isSalesOfficer || !currentUser?.id || customer.assignedSalesOfficerId === currentUser.id
+      const matchesDate = isWithinDateRange(customer.joinedAt, dateFrom, dateTo)
 
-      return matchesSearch && matchesType && matchesSalesOfficer && matchesStatus && matchesSalesScope
+      return matchesSearch && matchesType && matchesSalesOfficer && matchesStatus && matchesSalesScope && matchesDate
     })
-  }, [currentUser?.id, customers, isAdmin, isSalesOfficer, salesOfficerFilter, searchTerm, statusFilter, typeFilter])
+  }, [currentUser?.id, customers, isAdmin, isSalesOfficer, salesOfficerFilter, searchTerm, statusFilter, typeFilter, dateFrom, dateTo])
 
   const customerSummary = useMemo(() => ({
     total: filteredCustomers.length,
@@ -669,8 +677,9 @@ export default function CustomerList() {
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={[{ value: 'all', label: 'All Statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label>
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category<Select options={[{ value: 'all', label: 'All categories' }, ...customerCategoryOptions]} value={typeFilter} onChange={(event) => { setTypeFilter(event.target.value); setPage(1) }} /></label>
               {isAdmin && <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sales officer<Select options={salesOfficerFilterOptions} value={salesOfficerFilter} onChange={(event) => { setSalesOfficerFilter(event.target.value); setPage(1) }} /></label>}
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Joined<DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} /></label>
             </div>
-            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setTypeFilter('all'); setSalesOfficerFilter('all'); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
+            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setTypeFilter('all'); setSalesOfficerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
           </aside>
         </div>,
         document.body,

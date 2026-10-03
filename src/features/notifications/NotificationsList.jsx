@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, CheckCircle, CheckCheck, Info, RotateCw } from 'lucide-react'
 import Card from '../../components/ui/Card'
@@ -6,6 +6,8 @@ import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { Bell } from 'lucide-react'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notifications'
 
 function getIcon(type) {
@@ -33,6 +35,9 @@ export default function NotificationsList() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isMarkingAll, setIsMarkingAll] = useState(false)
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   const loadNotifications = useCallback(async () => {
     setIsLoading(true)
@@ -79,6 +84,11 @@ export default function NotificationsList() {
   }
 
   const unreadCount = notifications.filter((n) => !n.isRead).length
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  const filteredNotifications = useMemo(
+    () => notifications.filter((n) => isWithinDateRange(n.createdAt, dateFrom, dateTo)),
+    [notifications, dateFrom, dateTo],
+  )
 
   return (
     <div className="space-y-6">
@@ -87,12 +97,15 @@ export default function NotificationsList() {
           <h1 className="text-2xl font-bold text-neutral-900">Notifications</h1>
           <p className="text-sm text-neutral-500">You have {unreadCount} unread notification(s)</p>
         </div>
-        {unreadCount > 0 && (
-          <Button type="button" variant="outline" size="sm" loading={isMarkingAll} onClick={handleMarkAllRead}>
-            <CheckCheck className="size-4" aria-hidden="true" />
-            Mark all as read
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
+          {unreadCount > 0 && (
+            <Button type="button" variant="outline" size="sm" loading={isMarkingAll} onClick={handleMarkAllRead}>
+              <CheckCheck className="size-4" aria-hidden="true" />
+              Mark all as read
+            </Button>
+          )}
+        </div>
       </div>
 
       {error ? (
@@ -111,9 +124,13 @@ export default function NotificationsList() {
         <Card>
           <EmptyState icon={Bell} title="No notifications" description="You're all caught up." />
         </Card>
+      ) : filteredNotifications.length === 0 ? (
+        <Card>
+          <EmptyState icon={Bell} title="No notifications in this date range" description="Try widening the date range." />
+        </Card>
       ) : (
         <div className="space-y-4">
-          {notifications.map((notification) => {
+          {filteredNotifications.map((notification) => {
             const Icon = getIcon(notification.type)
             return (
               <button

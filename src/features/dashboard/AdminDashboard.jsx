@@ -572,27 +572,6 @@ export default function AdminDashboard() {
     })
   }, [])
 
-  useEffect(() => {
-    const handleSidebarStateChange = (event) => {
-      if (typeof event?.detail === 'boolean') {
-        setIsSidebarExpanded(event.detail)
-        return
-      }
-
-      if (typeof window !== 'undefined') {
-        setIsSidebarExpanded(window.localStorage.getItem('saas-sidebar-expanded') !== 'false')
-      }
-    }
-
-    window.addEventListener('saas-sidebar-expanded-change', handleSidebarStateChange)
-    window.addEventListener('storage', handleSidebarStateChange)
-
-    return () => {
-      window.removeEventListener('saas-sidebar-expanded-change', handleSidebarStateChange)
-      window.removeEventListener('storage', handleSidebarStateChange)
-    }
-  }, [])
-
   if (isLoading && !dashboard) {
     return <LoadingSpinner label="Loading dashboard..." />
   }

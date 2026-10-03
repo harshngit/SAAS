@@ -6,7 +6,9 @@ import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { usePermission } from '../../auth/usePermission'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { approveExpense, listExpenses, rejectExpense, requestExpenseClarification } from '../../api/expenses'
 import {
   DEMO_EXPENSES_ENABLED,
@@ -31,6 +33,9 @@ export default function ExpenseApprovalQueue() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState('review')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   const [reviewTarget, setReviewTarget] = useState(null) // { row, mode }
   const [reviewReason, setReviewReason] = useState('')
@@ -133,13 +138,19 @@ export default function ExpenseApprovalQueue() {
     setReimburseTarget(null)
   }
 
-  // Each tab is exactly one backend status - waiting on us vs waiting on the submitter.
-  const awaitingReview = useMemo(() => expenseList.filter((e) => e.statusKey === 'pending'), [expenseList])
-  const clarification = useMemo(
-    () => expenseList.filter((e) => e.statusKey === 'clarification_requested'),
-    [expenseList],
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  const dateFiltered = useMemo(
+    () => expenseList.filter((e) => isWithinDateRange(e.expenseDate, dateFrom, dateTo)),
+    [expenseList, dateFrom, dateTo],
   )
-  const approved = useMemo(() => expenseList.filter((e) => e.statusKey === 'approved'), [expenseList])
+
+  // Each tab is exactly one backend status - waiting on us vs waiting on the submitter.
+  const awaitingReview = useMemo(() => dateFiltered.filter((e) => e.statusKey === 'pending'), [dateFiltered])
+  const clarification = useMemo(
+    () => dateFiltered.filter((e) => e.statusKey === 'clarification_requested'),
+    [dateFiltered],
+  )
+  const approved = useMemo(() => dateFiltered.filter((e) => e.statusKey === 'approved'), [dateFiltered])
   const rows = tab === 'review' ? awaitingReview : tab === 'clarification' ? clarification : approved
 
   const cardTitle =
@@ -154,23 +165,26 @@ export default function ExpenseApprovalQueue() {
         </div>
       </ListHeader>
 
-      <div className="flex flex-wrap gap-2">
-        {[
-          { value: 'review', label: 'Awaiting Review', count: awaitingReview.length },
-          { value: 'clarification', label: 'Clarification Required', count: clarification.length },
-          { value: 'approved', label: 'Approved', count: approved.length },
-        ].map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => setTab(t.value)}
-            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-              tab === t.value ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'
-            }`}
-          >
-            {t.label} ({t.count})
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { value: 'review', label: 'Awaiting Review', count: awaitingReview.length },
+            { value: 'clarification', label: 'Clarification Required', count: clarification.length },
+            { value: 'approved', label: 'Approved', count: approved.length },
+          ].map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setTab(t.value)}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                tab === t.value ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'
+              }`}
+            >
+              {t.label} ({t.count})
+            </button>
+          ))}
+        </div>
+        <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
       </div>
 
       <Card title={cardTitle} className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:mx-5 [&>p]:mx-5 [&>p]:mb-5">

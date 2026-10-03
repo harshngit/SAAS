@@ -12,10 +12,13 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { RequirePermission } from '../../auth/RequirePermission'
 import { deleteOrder, listOrders } from '../../api/orders'
 import { listDeliveryPartners } from '../../api/deliveries'
 import { formatCurrency } from '../../utils/format'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { uniqueOptions } from '../../utils/filterOptions'
 import {
   ORDER_SOURCE_OPTIONS,
   ORDER_STATUS_VARIANT,
@@ -66,6 +69,10 @@ export default function OrderList() {
   const [statusTab, setStatusTab] = useState('all')
   const [deliveryPartnerFilter, setDeliveryPartnerFilter] = useState('all')
   const [sourceFilter, setSourceFilter] = useState('all')
+  const [customerFilter, setCustomerFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [pageSize, setPageSize] = useState('10')
   const [page, setPage] = useState(1)
@@ -112,6 +119,9 @@ export default function OrderList() {
     [deliveryPartners],
   )
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  const customerOptions = useMemo(() => uniqueOptions(orders, 'customerName', 'All customers'), [orders])
+
   const filteredOrders = useMemo(() => {
     const search = searchTerm.trim().toLowerCase()
     const tab = ORDER_TABS.find((t) => t.value === statusTab)
@@ -120,10 +130,12 @@ export default function OrderList() {
       if (deliveryPartnerFilter !== 'all' && order.assignedDeliveryPartnerId !== deliveryPartnerFilter) return false
       if (sourceFilter === 'direct' && order.quotationId) return false
       if (sourceFilter === 'quotation' && !order.quotationId) return false
+      if (customerFilter !== 'all' && order.customerName !== customerFilter) return false
+      if (!isWithinDateRange(order.orderDate, dateFrom, dateTo)) return false
       if (search && ![order.orderNumber, order.customerName].filter(Boolean).some((v) => String(v).toLowerCase().includes(search))) return false
       return true
     })
-  }, [orders, statusTab, deliveryPartnerFilter, sourceFilter, searchTerm])
+  }, [orders, statusTab, deliveryPartnerFilter, sourceFilter, customerFilter, dateFrom, dateTo, searchTerm])
 
   const stats = useMemo(
     () => ({
@@ -411,8 +423,12 @@ export default function OrderList() {
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
                 <Select options={ORDER_TABS.map((tab) => ({ value: tab.value, label: tab.label }))} value={statusTab} onChange={(event) => { setStatusTab(event.target.value); setPage(1) }} />
               </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Customer<Select options={customerOptions} value={customerFilter} onChange={(event) => { setCustomerFilter(event.target.value); setPage(1) }} /></label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Order Date
+                <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} />
+              </label>
             </div>
-            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setDeliveryPartnerFilter('all'); setSourceFilter('all'); setStatusTab('all'); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
+            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setDeliveryPartnerFilter('all'); setSourceFilter('all'); setStatusTab('all'); setCustomerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
           </aside>
         </div>,
         document.body,

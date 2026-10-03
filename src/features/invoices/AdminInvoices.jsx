@@ -28,6 +28,9 @@ import { usePermission } from '../../auth/usePermission'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
 import { INVOICE_DEMO_ENABLED } from './invoiceDemoData'
 import { formatCurrency } from '../../utils/format'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { uniqueOptions } from '../../utils/filterOptions'
 import {
   FINANCIAL_STATUS_VARIANT,
   INVOICE_STATUS_FILTERS,
@@ -58,6 +61,11 @@ function SalesInvoicesPanel({ header }) {
   const [paymentStatus, setPaymentStatus] = useState('all')
   const [page, setPage] = useState(1)
   const [paymentInvoice, setPaymentInvoice] = useState(null)
+  const [customerFilter, setCustomerFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const pageSize = 10
 
   const loadInvoices = useCallback(async () => {
@@ -108,11 +116,15 @@ function SalesInvoicesPanel({ header }) {
     return { totalReceivable, paidThisMonth, overdueAmount, dueSoonAmount }
   }, [invoices])
 
+  const customerOptions = useMemo(() => uniqueOptions(invoices, 'customerName', 'All customers'), [invoices])
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
 
     return invoices.filter((invoice) => {
       if (paymentStatus !== 'all' && financialStatus(invoice) !== paymentStatus) return false
+      if (customerFilter !== 'all' && invoice.customerName !== customerFilter) return false
+      if (!isWithinDateRange(invoice.invoiceDate, dateFrom, dateTo)) return false
       if (!term) return true
       const orderNumber = orderNumbersById[invoice.orderId] || ''
       return (
@@ -121,7 +133,7 @@ function SalesInvoicesPanel({ header }) {
         orderNumber.toLowerCase().includes(term)
       )
     })
-  }, [invoices, search, paymentStatus, orderNumbersById])
+  }, [invoices, search, paymentStatus, customerFilter, dateFrom, dateTo, orderNumbersById])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -154,9 +166,13 @@ function SalesInvoicesPanel({ header }) {
           </div>
           <ListFilterPanel title="Filter Sales Invoices">
           <Select label="Payment status" options={INVOICE_STATUS_FILTERS} value={paymentStatus} onChange={updateFilter(setPaymentStatus)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <Select label="Customer" options={customerOptions} value={customerFilter} onChange={updateFilter(setCustomerFilter)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
+            <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} />
+          </div>
           <button
             type="button"
-            onClick={() => { setSearch(''); setPaymentStatus('all'); setPage(1) }}
+            onClick={() => { setSearch(''); setPaymentStatus('all'); setCustomerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setPage(1) }}
             aria-label="Reset filters"
             className="flex size-9 shrink-0 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 hover:bg-neutral-50"
           >
@@ -263,7 +279,7 @@ function SalesInvoicesPanel({ header }) {
                   ))}
                   {paginated.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="px-6 py-10 text-center text-sm text-neutral-400">No invoices match your filters.</td>
+                      <td colSpan={10} className="px-6 py-10 text-center text-sm text-neutral-400">{invoices.length === 0 ? 'No sales invoices found.' : 'No invoices match your filters.'}</td>
                     </tr>
                   )}
                 </tbody>

@@ -9,7 +9,9 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { formatCurrency } from '../../utils/format'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { DEMO_MODE } from '../../config/demoMode'
 import { safeNumber } from '../purchases/purchaseHelpers'
 import { paymentStatusMeta, PAYMENT_STATUS_OPTIONS, verificationMeta } from '../supplierInvoices/supplierInvoiceHelpers'
@@ -51,6 +53,9 @@ export default function PayablesList() {
   const [dueFilter, setDueFilter] = useState('all')
   const [ageingFilter, setAgeingFilter] = useState('all')
   const [sortFilter, setSortFilter] = useState('recent')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [quickViewId, setQuickViewId] = useState(null)
   const [recordPreset, setRecordPreset] = useState(null)
   const [refresh, setRefresh] = useState(0)
@@ -126,6 +131,8 @@ export default function PayablesList() {
     return [{ value: 'all', label: 'All Suppliers' }, ...names.map((name) => ({ value: name, label: name }))]
   }, [rows])
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
     const out = rows.filter((row) => {
@@ -138,7 +145,8 @@ export default function PayablesList() {
       const matchesAgeing =
         ageingFilter === 'all' ||
         (DEMO_MODE ? ageingBucket(row.dueDate, row.outstanding)?.key === ageingFilter : row.ageingLabel === apAgeingLabel(ageingFilter))
-      return matchesSearch && matchesSupplier && matchesPayment && matchesDue && matchesAgeing
+      const matchesDate = isWithinDateRange(row.invoiceDate, dateFrom, dateTo)
+      return matchesSearch && matchesSupplier && matchesPayment && matchesDue && matchesAgeing && matchesDate
     })
 
     return out.sort((left, right) => {
@@ -148,7 +156,7 @@ export default function PayablesList() {
       const rightTime = new Date(right.invoiceDate || 0).getTime()
       return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
     })
-  }, [rows, search, supplierFilter, paymentStatusFilter, dueFilter, ageingFilter, sortFilter])
+  }, [rows, search, supplierFilter, paymentStatusFilter, dueFilter, ageingFilter, sortFilter, dateFrom, dateTo])
 
   // Header metrics: real -> ALWAYS the backend summary (reflects all matching payables, not the
   // visible page). Demo -> derived from the demo store.
@@ -213,6 +221,9 @@ export default function PayablesList() {
           {DEMO_MODE && <Select label="Due date" options={DUE_FILTER_OPTIONS} value={dueFilter} onChange={(event) => setDueFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />}
           <Select label="Ageing" options={ageingFilterOptions} value={ageingFilter} onChange={(event) => setAgeingFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <Select label="Sort by" options={PAYABLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
+            <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+          </div>
           </ListFilterPanel>
 
         </div>

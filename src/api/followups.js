@@ -104,14 +104,18 @@ export async function listFollowUps(params = {}) {
     if (params.assignedToId || params.assigned_to_id) queryParams.assigned_to_id = params.assignedToId || params.assigned_to_id
     if (params.status) queryParams.status = params.status
     if (params.priority) queryParams.priority = params.priority
+    if (params.dueBefore || params.due_before) queryParams.due_before = params.dueBefore || params.due_before
+    if (params.dueAfter || params.due_after) queryParams.due_after = params.dueAfter || params.due_after
+    if (params.limit !== undefined) queryParams.limit = params.limit
+    if (params.offset !== undefined) queryParams.offset = params.offset
 
     const { data } = await apiClient.get('/follow-ups', {
       headers: authHeader(),
       params: queryParams,
     })
 
-    const followUps = Array.isArray(data) ? data : data?.follow_ups || []
-    return { success: true, followUps: followUps.map(normalizeFollowUp) }
+    const followUps = Array.isArray(data) ? data : data?.follow_ups || data?.items || []
+    return { success: true, followUps: followUps.map(normalizeFollowUp), total: data?.total }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

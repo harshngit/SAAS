@@ -7,11 +7,14 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { usePermission } from '../../auth/usePermission'
 import { listSalesReturns } from '../../api/salesReturns'
 import { SALES_RETURNS_DEMO_ENABLED, getDemoSalesReturns } from './salesReturnDemoData'
 import { SR_STATUS_FILTERS, rawStatusForFilter, srStatusMeta, totalReturnQty } from './salesReturnHelpers'
 import { formatCurrency } from '../../utils/format'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { uniqueOptions } from '../../utils/filterOptions'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -32,7 +35,12 @@ export default function SalesReturnList() {
   const [listError, setListError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [customerFilter, setCustomerFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const filterTriggerRef = useRef(null)
   const filterCloseRef = useRef(null)
 
@@ -88,19 +96,23 @@ export default function SalesReturnList() {
     return { total: salesReturns.length, pending: by('pending'), received: by('received'), completed: by('completed') }
   }, [salesReturns])
 
+  const customerOptions = useMemo(() => uniqueOptions(salesReturns, 'customerName', 'All customers'), [salesReturns])
+
   const filteredSalesReturns = useMemo(() => {
     const search = searchTerm.trim().toLowerCase()
     return salesReturns.filter((salesReturn) => {
       const matchesStatus =
         statusFilter === 'all' || srStatusMeta(salesReturn.status).key === statusFilter
+      const matchesCustomer = customerFilter === 'all' || salesReturn.customerName === customerFilter
+      const matchesDate = isWithinDateRange(salesReturn.createdAt || salesReturn.returnDate, dateFrom, dateTo)
       const matchesSearch =
         !search ||
         [salesReturn.returnNumber, salesReturn.customerName, salesReturn.invoiceNumber, salesReturn.orderNumber]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(search))
-      return matchesStatus && matchesSearch
+      return matchesStatus && matchesCustomer && matchesDate && matchesSearch
     })
-  }, [salesReturns, searchTerm, statusFilter])
+  }, [salesReturns, searchTerm, statusFilter, customerFilter, dateFrom, dateTo])
 
   return (
     <div className="listing-page space-y-4">
@@ -255,9 +267,13 @@ export default function SalesReturnList() {
             </div>
             <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
               <Select label="Status" options={SR_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
+              <Select label="Customer" options={customerOptions} value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)} />
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Return Date
+                <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+              </label>
             </div>
             <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4">
-              <button type="button" onClick={() => { setStatusFilter('all'); setSearchTerm('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+              <button type="button" onClick={() => { setStatusFilter('all'); setCustomerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSearchTerm('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
               <Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button>
             </div>
           </aside>

@@ -13,6 +13,8 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import {
   AVAILABILITY_FILTER_OPTIONS,
   assignedPartnerName,
@@ -52,6 +54,9 @@ export default function VehicleList() {
   const [availabilityFilter, setAvailabilityFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [sortFilter, setSortFilter] = useState('recent')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingVehicle, setEditingVehicle] = useState(null)
@@ -113,6 +118,8 @@ export default function VehicleList() {
     )
   }, [vehicles])
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
     const filtered = vehicles.filter((vehicle) => {
@@ -124,7 +131,8 @@ export default function VehicleList() {
       const matchesStatus = statusFilter === 'all' || vehicleStatus(vehicle) === statusFilter
       const matchesAvailability = availabilityFilter === 'all' || deriveAvailability(vehicle).key === availabilityFilter
       const matchesType = typeFilter === 'all' || vehicle.vehicleType === typeFilter
-      return matchesSearch && matchesStatus && matchesAvailability && matchesType
+      const matchesDate = isWithinDateRange(vehicle.createdAt, dateFrom, dateTo)
+      return matchesSearch && matchesStatus && matchesAvailability && matchesType && matchesDate
     })
 
     return filtered.sort((left, right) => {
@@ -132,7 +140,7 @@ export default function VehicleList() {
       if (sortFilter === 'name') return vehicleDisplayName(left).localeCompare(vehicleDisplayName(right))
       return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()
     })
-  }, [vehicles, search, statusFilter, availabilityFilter, typeFilter, sortFilter])
+  }, [vehicles, search, statusFilter, availabilityFilter, typeFilter, sortFilter, dateFrom, dateTo])
 
   const openForm = (vehicle = null) => {
     setEditingVehicle(vehicle)
@@ -213,6 +221,9 @@ export default function VehicleList() {
           <Select label="Availability" options={AVAILABILITY_FILTER_OPTIONS} value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <Select label="Vehicle type" options={VEHICLE_TYPE_FILTER_OPTIONS} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <Select label="Sort by" options={VEHICLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Created
+            <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+          </div>
           </ListFilterPanel>
           <Button type="button" onClick={() => openForm()}>
           <Plus className="size-4" aria-hidden="true" />

@@ -842,7 +842,7 @@ export default function InvoiceSettings() {
                 </label>
               ))}
             </div>
-            <InfoNote>Font Family, Heading Size, Body Size and Table Size apply to Print Preview and Download Sample PDF above, and to an invoice's own Print Preview button — not to the backend-generated Simple PDF / Download PDF on an actual invoice, which always uses a fixed size per template.</InfoNote>
+            <InfoNote>Font Family, Heading Size, Body Size and Table Size are saved to typography.font_family/heading_size/body_size/table_size and applied by the backend to the generated Simple PDF / Download PDF on an actual invoice, as well as to Print Preview and Download Sample PDF above.</InfoNote>
           </SettingsSection>
 
           <SettingsSection title="8. Footer" description="Notes, terms and signature" isOpen={openSection === 'footer'} onToggle={() => toggleSection('footer')}>
@@ -986,7 +986,7 @@ export default function InvoiceSettings() {
                 <p className="-mt-2 text-xs text-neutral-400">Copies is not supported for browser printing - use your printer dialog's own copy count instead.</p>
               </TabsContent>
             </Tabs>
-            <InfoNote>Paper size, orientation and margins apply to the backend-generated Simple PDF / Download PDF for a regular (A4) invoice. Thermal Theme, Layout, Paper Width, Bold and Extra Lines are fully reflected everywhere a thermal receipt is actually produced: Print Preview and Download Sample PDF above, and the Print Receipt (Thermal) button on an invoice's own page — printed via the browser, sized to the selected paper width. Auto-cut, cash drawer and copies are raw printer commands a browser print dialog cannot issue, so they are saved but have no effect on browser printing.</InfoNote>
+            <InfoNote>Paper size, orientation and margins apply to the backend-generated Simple PDF / Download PDF for a regular (A4) invoice. Thermal Theme, Layout and Paper Width (thermal_print.layout / paper_width) and Bold / Extra Lines (bold_text / extra_lines) are applied by the backend to the generated thermal PDF, as well as to Print Preview, Download Sample PDF above, and the Print Receipt (Thermal) button on an invoice's own page. Auto-cut, cash drawer, copies and printing type are raw printer-driver commands — no PDF can carry them, so they're saved for a connected thermal printer's own settings but have no effect on any generated PDF or browser print.</InfoNote>
           </SettingsSection>
         </div>
 

@@ -144,61 +144,48 @@ export function describeDueDate(value, from = new Date()) {
 }
 
 // ---------------------------------------------------------------------------
-// MOCK activity summary for the Leads list "Last Activity" / "Next Follow-up"
-// columns. GET /leads exposes none of this yet, so we derive a stable, plausible
-// value per lead. Deterministic (seeded by lead id) so it doesn't jump on every
-// render.
+// Real-data-only activity summary for the Leads list "Last Activity" (CSV export)
+// and "Next Follow-up" (table column) fields.
 //
-// TODO: replace the whole body with the real activity/follow-up feed once the
-// backend returns last_activity_at / next_follow_up_at (or a small activities
-// endpoint). The shape returned here is the contract the UI depends on.
+// Previously this whole module was a deterministic MOCK (a hash of the lead id spread
+// pseudo-randomly across a few fixed outcomes, plus invented action verbs like "Called"/
+// "Note added" with no real activity data behind them) - removed entirely. Next Follow-up now
+// comes from the real GET /follow-ups endpoint (see LeadList.jsx, which fetches pending
+// follow-ups once for the whole page and passes the earliest due date in here per lead via
+// `nextFollowUpDueDate`). Last Activity only ever states what the lead record itself actually
+// proves happened - it never guesses a specific action.
 // ---------------------------------------------------------------------------
 
-function seedFromId(id = '') {
-  let hash = 0
-  for (let i = 0; i < id.length; i += 1) {
-    hash = (hash * 31 + id.charCodeAt(i)) >>> 0
+export function getLastActivityLabel(lead) {
+  if (!lead) return { label: 'No activity', tone: 'muted' }
+
+  if (lead.convertedAt) {
+    return { label: `Converted ${relativeDay(lead.convertedAt).toLowerCase()}`, tone: 'success' }
   }
-  return hash
+
+  const updatedMs = lead.updatedAt ? new Date(lead.updatedAt).getTime() : 0
+  const createdMs = lead.createdAt ? new Date(lead.createdAt).getTime() : 0
+  if (updatedMs && updatedMs - createdMs > 60_000) {
+    // The record changed after creation, but the lead itself carries no field saying what
+    // changed (no "call logged" / "note added" distinction exists on it) - say only what's
+    // actually known: it was updated, and when.
+    return { label: `Updated ${relativeDay(lead.updatedAt).toLowerCase()}`, tone: 'default' }
+  }
+
+  if (createdMs) {
+    return { label: `Created ${relativeDay(lead.createdAt).toLowerCase()}`, tone: 'muted' }
+  }
+
+  return { label: 'No activity', tone: 'muted' }
 }
 
-export function getLeadActivity(lead) {
-  const seed = seedFromId(lead?.id || lead?.leadId || '')
-  const now = Date.now()
-
-  // --- Last activity (derived from real fields where we can) ---
-  let lastActivity = { label: 'No activity', tone: 'muted' }
-  const updatedMs = lead?.updatedAt ? new Date(lead.updatedAt).getTime() : 0
-  const createdMs = lead?.createdAt ? new Date(lead.createdAt).getTime() : 0
-  if (lead?.convertedAt) {
-    lastActivity = { label: `Converted ${relativeDay(lead.convertedAt).toLowerCase()}`, tone: 'success' }
-  } else if (updatedMs && updatedMs - createdMs > 60_000) {
-    const verbs = ['Called', 'Note added', 'Status updated', 'Emailed']
-    lastActivity = { label: `${verbs[seed % verbs.length]} ${relativeDay(lead.updatedAt).toLowerCase()}`, tone: 'default' }
-  } else if (createdMs) {
-    lastActivity = { label: `Created ${relativeDay(lead.createdAt).toLowerCase()}`, tone: 'muted' }
-  }
-
-  // --- Next follow-up (pure mock spread until backend exists) ---
-  let nextFollowUp = { label: '—', tone: 'muted', overdueDays: 0 }
-  if (lead && lead.leadStatus !== 'won' && lead.leadStatus !== 'lost') {
-    const bucket = seed % 5
-    if (bucket === 0) {
-      nextFollowUp = { label: '—', tone: 'muted', overdueDays: 0 }
-    } else if (bucket === 1) {
-      const at = new Date(now)
-      at.setHours(16, 0, 0, 0)
-      nextFollowUp = describeDueDate(at.toISOString())
-    } else if (bucket === 2) {
-      nextFollowUp = describeDueDate(new Date(now + DAY_MS).toISOString())
-    } else if (bucket === 3) {
-      nextFollowUp = describeDueDate(new Date(now + DAY_MS * (2 + (seed % 6))).toISOString())
-    } else {
-      nextFollowUp = describeDueDate(new Date(now - DAY_MS * (1 + (seed % 3))).toISOString())
-    }
-  }
-
-  return { lastActivity, nextFollowUp }
+// `dueDate` is the earliest PENDING follow-up due date already resolved for this lead by the
+// caller (grouped from one real GET /follow-ups?status=pending call - see LeadList.jsx). `null`/
+// undefined means no pending follow-up was found for this lead, which is the honest "—" case,
+// not an error.
+export function getNextFollowUpSummary(dueDate) {
+  if (!dueDate) return { label: '—', tone: 'muted', overdueDays: 0 }
+  return describeDueDate(dueDate)
 }
 
 // ---------------------------------------------------------------------------

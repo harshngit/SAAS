@@ -8,6 +8,8 @@ import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { LEAVE_TYPE_OPTIONS, calculateDaysCount, createLeave, deleteLeave, getMyLeaves } from '../../api/leaves'
 import { useToast } from '../../components/ui/toastContext'
 import { formatDate, formatDateTime } from '../../utils/format'
@@ -80,6 +82,9 @@ export default function MyLeaves() {
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [filter, setFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState(emptyForm)
@@ -129,9 +134,15 @@ export default function MyLeaves() {
     [leaves],
   )
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const filtered = useMemo(
-    () => (filter === 'all' ? leaves : leaves.filter((l) => l.status === filter)),
-    [leaves, filter],
+    () =>
+      leaves.filter((l) => {
+        if (filter !== 'all' && l.status !== filter) return false
+        return isWithinDateRange(l.startDate, dateFrom, dateTo)
+      }),
+    [leaves, filter, dateFrom, dateTo],
   )
 
   const previewDays = calculateDaysCount(formData.startDate, formData.endDate)
@@ -230,19 +241,22 @@ export default function MyLeaves() {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilter(f.key)}
-            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-              filter === f.key ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFilter(f.key)}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                filter === f.key ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
       </div>
 
       <Card className="p-0" bodyClassName="p-0">

@@ -9,6 +9,8 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { formatCurrency } from '../../utils/format'
 import { usePermission } from '../../auth/usePermission'
 import { DEMO_MODE } from '../../config/demoMode'
@@ -94,6 +96,9 @@ export default function SupplierInvoiceList() {
   const [verificationFilter, setVerificationFilter] = useState('all')
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all')
   const [sortFilter, setSortFilter] = useState('recent')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   const [realInvoices, setRealInvoices] = useState([])
   const [isLoading, setIsLoading] = useState(!DEMO_MODE)
@@ -131,6 +136,8 @@ export default function SupplierInvoiceList() {
     return [{ value: 'all', label: 'All Suppliers' }, ...names.map((name) => ({ value: name, label: name }))]
   }, [rows])
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
     const out = rows.filter((row) => {
@@ -144,7 +151,8 @@ export default function SupplierInvoiceList() {
       const matchesVerification =
         verificationFilter === 'all' || (row.verification?.key || 'pending') === verificationFilter
       const matchesPayment = paymentStatusFilter === 'all' || row.payment?.key === paymentStatusFilter
-      return matchesSearch && matchesSupplier && matchesLifecycle && matchesVerification && matchesPayment
+      const matchesDate = isWithinDateRange(row.invoiceDate, dateFrom, dateTo)
+      return matchesSearch && matchesSupplier && matchesLifecycle && matchesVerification && matchesPayment && matchesDate
     })
 
     return out.sort((left, right) => {
@@ -155,7 +163,7 @@ export default function SupplierInvoiceList() {
       const rightTime = new Date(right.invoiceDate || 0).getTime()
       return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
     })
-  }, [rows, search, supplierFilter, lifecycleFilter, verificationFilter, paymentStatusFilter, sortFilter])
+  }, [rows, search, supplierFilter, lifecycleFilter, verificationFilter, paymentStatusFilter, sortFilter, dateFrom, dateTo])
 
   const stats = useMemo(() => {
     const totalValue = rows.reduce((sum, row) => sum + safeNumber(row.grandTotal), 0)
@@ -216,6 +224,9 @@ export default function SupplierInvoiceList() {
             triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
           />
           <Select label="Sort by" options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
+            <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+          </div>
           </ListFilterPanel>
           {canCreate && (
           <Button type="button" onClick={() => navigate(`${basePath}/new`)}>

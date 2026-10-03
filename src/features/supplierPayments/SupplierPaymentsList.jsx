@@ -15,13 +15,14 @@ import { safeNumber } from '../purchases/purchaseHelpers'
 import {
   isSameMonth,
   isWithinDays,
-  PAYMENT_DATE_FILTER_OPTIONS,
   PAYMENT_MODE_OPTIONS,
   paymentModeLabel,
   PAYMENT_SORT_OPTIONS,
   PAYMENT_STATUS_FILTER_OPTIONS,
   paymentStatusMeta,
 } from './supplierPaymentHelpers'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import {
   getSupplierPayments,
   paidThisMonth,
@@ -87,7 +88,9 @@ export default function SupplierPaymentsList() {
   const [supplierFilter, setSupplierFilter] = useState('all')
   const [modeFilter, setModeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [dateFilter, setDateFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [sortFilter, setSortFilter] = useState('recent')
   const [recordOpen, setRecordOpen] = useState(false)
   const [quickViewId, setQuickViewId] = useState(null)
@@ -99,6 +102,8 @@ export default function SupplierPaymentsList() {
   const [isLoading, setIsLoading] = useState(!DEMO_MODE)
   const [loadError, setLoadError] = useState('')
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const loadReal = useCallback(async () => {
     if (DEMO_MODE) return
     setIsLoading(true)
@@ -108,6 +113,8 @@ export default function SupplierPaymentsList() {
       page_size: PAGE_SIZE,
       status: statusFilter,
       payment_method: modeFilter,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
       search: search.trim() || undefined,
     })
     setIsLoading(false)
@@ -119,7 +126,7 @@ export default function SupplierPaymentsList() {
     }
     setRealPayments(result.payments)
     setRealTotal(result.total)
-  }, [page, statusFilter, modeFilter, search])
+  }, [page, statusFilter, modeFilter, dateFrom, dateTo, search])
 
   useEffect(() => {
     loadReal()
@@ -150,7 +157,6 @@ export default function SupplierPaymentsList() {
   // over the current page. Demo mode: everything client-side.
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    const now = Date.now()
     const out = rows.filter((payment) => {
       const matchesSearch =
         !DEMO_MODE ||
@@ -161,10 +167,10 @@ export default function SupplierPaymentsList() {
       const matchesSupplier = supplierFilter === 'all' || payment.supplierName === supplierFilter
       const matchesMode = !DEMO_MODE || modeFilter === 'all' || payment.paymentMode === modeFilter
       const matchesStatus = !DEMO_MODE || statusFilter === 'all' || payment.status === statusFilter
-      const matchesDate =
-        dateFilter === 'all' ||
-        (dateFilter === 'this_month' && isSameMonth(payment.paymentDate)) ||
-        (dateFilter === 'recent' && isWithinDays(payment.paymentDate, 30, now))
+      // Real mode: date_from/date_to already bounded this fetch server-side - re-checking here
+      // would only re-filter the current page and risk hiding correctly-fetched rows. Demo mode
+      // has no server call, so the range is applied here instead.
+      const matchesDate = !DEMO_MODE || isWithinDateRange(payment.paymentDate, dateFrom, dateTo)
       return matchesSearch && matchesSupplier && matchesMode && matchesStatus && matchesDate
     })
 
@@ -174,7 +180,7 @@ export default function SupplierPaymentsList() {
       const rightTime = new Date(right.paymentDate || 0).getTime()
       return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
     })
-  }, [rows, search, supplierFilter, modeFilter, statusFilter, dateFilter, sortFilter])
+  }, [rows, search, supplierFilter, modeFilter, statusFilter, dateFrom, dateTo, sortFilter])
 
   // Header stats: demo -> demo ledger; real -> aggregate of the RECORDED payments on this page
   // (the backend has no supplier-payment summary endpoint, so this is page-scoped and labelled).
@@ -218,7 +224,9 @@ export default function SupplierPaymentsList() {
             <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <Select label="Payment mode" options={[{ value: 'all', label: 'All Modes' }, ...PAYMENT_MODE_OPTIONS]} value={modeFilter} onChange={(event) => { setModeFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <Select label="Status" options={PAYMENT_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Date" options={PAYMENT_DATE_FILTER_OPTIONS} value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Date
+            <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
+          </div>
           <Select label="Sort by" options={PAYMENT_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           </ListFilterPanel>
           {canCreate && (

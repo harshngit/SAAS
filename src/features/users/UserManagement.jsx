@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Banknote,
   BriefcaseBusiness,
-  CalendarDays,
   Edit,
   FileText,
   KeyRound,
@@ -23,6 +22,8 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
@@ -466,6 +467,9 @@ export default function UserManagement() {
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
   const [activeRoleFilter, setActiveRoleFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [pageSize, setPageSize] = useState('10')
   const [currentPage, setCurrentPage] = useState(1)
@@ -861,6 +865,8 @@ export default function UserManagement() {
     setStatusUser(null)
   }
 
+  const { dateFrom, dateTo } = resolveDateRange(datePreset, customFrom, customTo)
+
   const filteredUsers = users.filter((user) => {
     const matchesRole = activeRoleFilter === 'all' || user.role === activeRoleFilter
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -869,8 +875,9 @@ export default function UserManagement() {
       [user.name, user.email, user.phone, roleLabels[user.role], user.isActive ? 'active' : 'inactive']
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedSearch))
+    const matchesDate = isWithinDateRange(user.createdAt, dateFrom, dateTo)
 
-    return matchesRole && matchesSearch
+    return matchesRole && matchesSearch && matchesDate
   })
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / Number(pageSize)))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -893,7 +900,7 @@ export default function UserManagement() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [activeRoleFilter, searchTerm, pageSize])
+  }, [activeRoleFilter, searchTerm, pageSize, datePreset, customFrom, customTo])
 
   useEffect(() => {
     setCurrentPage((current) => Math.min(current, totalPages))
@@ -1367,10 +1374,7 @@ export default function UserManagement() {
                   Add Staff
                 </Button>
               </RequirePermission>
-              <Button type="button" variant="outline" size="sm">
-                <CalendarDays className="size-4" aria-hidden="true" />
-                This Month
-              </Button>
+              <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
             </div>
           </div>
         </div>

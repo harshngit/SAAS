@@ -9,6 +9,8 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import {
   completeFollowUp,
   createFollowUp,
@@ -200,6 +202,9 @@ export default function FollowUpsList() {
   const [isSaving, setIsSaving] = useState(false)
   const [actingId, setActingId] = useState('')
   const [activeTab, setActiveTab] = useState('today')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [completingFollowUp, setCompletingFollowUp] = useState(null)
   const [completeOutcome, setCompleteOutcome] = useState('')
   const [completeNotes, setCompleteNotes] = useState('')
@@ -306,13 +311,17 @@ export default function FollowUpsList() {
     [leads],
   )
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const buckets = useMemo(() => {
     const grouped = { today: [], upcoming: [], overdue: [], completed: [] }
-    followUps.forEach((followUp) => {
-      grouped[bucketForFollowUp(followUp)].push(followUp)
-    })
+    followUps
+      .filter((followUp) => isWithinDateRange(followUp.dueDate, dateFrom, dateTo))
+      .forEach((followUp) => {
+        grouped[bucketForFollowUp(followUp)].push(followUp)
+      })
     return grouped
-  }, [followUps])
+  }, [followUps, dateFrom, dateTo])
 
   const handleAddFollowUp = () => {
     setEditingFollowUp(null)
@@ -530,10 +539,13 @@ export default function FollowUpsList() {
           <h1 className="text-2xl font-bold text-neutral-900">Follow-ups</h1>
           <p className="text-sm text-neutral-500">Track and manage your customer follow-ups</p>
         </div>
-        <Button onClick={handleAddFollowUp}>
-          <Plus className="size-4 mr-2" />
-          Add Follow-up
-        </Button>
+        <div className="flex items-center gap-2">
+          <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
+          <Button onClick={handleAddFollowUp}>
+            <Plus className="size-4 mr-2" />
+            Add Follow-up
+          </Button>
+        </div>
       </div>
 
       {listError ? (

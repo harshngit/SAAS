@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, Eye, TrendingUp, X } from 'lucide-react'
 import Card from '../../components/ui/Card'
@@ -10,11 +10,13 @@ import Modal from '../../components/ui/Modal'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/Tabs'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import {
   approveOrganizationUpgrade,
   listSuperAdminOrganizations,
   rejectOrganizationUpgrade,
 } from '../../api/superadmin'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 
 const tabOptions = [
   { value: 'pending', label: 'Pending' },
@@ -48,6 +50,9 @@ export default function UpgradeRequests() {
   const [rejectReason, setRejectReason] = useState('')
   const [rejectError, setRejectError] = useState('')
   const [isRejecting, setIsRejecting] = useState(false)
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   const loadRequests = async () => {
     setIsLoading(true)
@@ -120,6 +125,12 @@ export default function UpgradeRequests() {
     await loadRequests()
   }
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  const filteredRequests = useMemo(
+    () => requests.filter((organization) => isWithinDateRange(organization.upgrade_requested_at, dateFrom, dateTo)),
+    [requests, dateFrom, dateTo],
+  )
+
   return (
     <div className="space-y-6">
       <div>
@@ -127,15 +138,18 @@ export default function UpgradeRequests() {
         <p className="mt-1 text-sm text-neutral-500">Review and action plan upgrade requests from organizations.</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          {tabOptions.map((tab) => (
-            <TabsTrigger key={tab.value || 'all'} value={tab.value}>
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            {tabOptions.map((tab) => (
+              <TabsTrigger key={tab.value || 'all'} value={tab.value}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
+      </div>
 
       {actionError && (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
@@ -145,17 +159,17 @@ export default function UpgradeRequests() {
         <Card>
           <LoadingSpinner label="Loading upgrade requests…" />
         </Card>
-      ) : requests.length === 0 ? (
+      ) : filteredRequests.length === 0 ? (
         <Card>
           <EmptyState
             icon={TrendingUp}
-            title={listError ? 'Unable to load upgrade requests' : 'No upgrade requests here'}
-            description={listError || 'Nothing to review in this view right now.'}
+            title={listError ? 'Unable to load upgrade requests' : requests.length === 0 ? 'No upgrade requests here' : 'No requests in this date range'}
+            description={listError || (requests.length === 0 ? 'Nothing to review in this view right now.' : 'Try widening the date range.')}
           />
         </Card>
       ) : activeTab === 'pending' ? (
         <div className="space-y-3">
-          {requests.map((organization) => (
+          {filteredRequests.map((organization) => (
             <Card key={organization.id} bodyClassName="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -208,7 +222,7 @@ export default function UpgradeRequests() {
               },
               { key: 'requestedAt', header: 'Requested', sortable: true },
             ]}
-            data={requests.map((organization) => ({
+            data={filteredRequests.map((organization) => ({
               id: organization.id,
               name: organization.name,
               currentPlan: organization.plan?.name || 'No plan',

@@ -10,6 +10,8 @@ import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import {
   createExpense,
   deleteExpense,
@@ -169,6 +171,9 @@ export default function MyExpenses() {
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [filter, setFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [search, setSearch] = useState('')
 
   const [showForm, setShowForm] = useState(false)
@@ -249,14 +254,17 @@ export default function MyExpenses() {
     [expenses],
   )
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
     return expenses.filter((e) => {
       if (filter !== 'all' && claimStatus(e) !== filter) return false
+      if (!isWithinDateRange(e.expenseDate, dateFrom, dateTo)) return false
       if (!q) return true
       return `${e.category} ${e.description}`.toLowerCase().includes(q)
     })
-  }, [expenses, filter, search])
+  }, [expenses, filter, search, dateFrom, dateTo])
 
   const duplicate = useMemo(() => {
     const amount = Math.round(Number(formData.amount)) || 0
@@ -465,6 +473,7 @@ export default function MyExpenses() {
             {f.label}
           </button>
         ))}
+        <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
         <input
           type="search"
           value={search}

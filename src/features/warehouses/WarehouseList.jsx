@@ -19,6 +19,8 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import StatCard from '../../components/ui/StatCard'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { safeNumber } from '../purchases/purchaseHelpers'
@@ -96,6 +98,9 @@ export default function WarehouseList() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortFilter, setSortFilter] = useState('recent')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [pageSize, setPageSize] = useState('10')
   const [page, setPage] = useState(1)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -174,6 +179,8 @@ export default function WarehouseList() {
     )
   }, [warehouses])
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
     const filtered = warehouses.filter((warehouse) => {
@@ -182,7 +189,8 @@ export default function WarehouseList() {
         [warehouse.name, warehouse.code, warehouse.city].filter(Boolean).some((value) => String(value).toLowerCase().includes(query))
       const matchesStatus =
         statusFilter === 'all' || (statusFilter === 'active' ? warehouse.isActive : !warehouse.isActive)
-      return matchesSearch && matchesStatus
+      const matchesDate = isWithinDateRange(warehouse.createdAt, dateFrom, dateTo)
+      return matchesSearch && matchesStatus && matchesDate
     })
 
     return filtered.sort((left, right) => {
@@ -190,7 +198,7 @@ export default function WarehouseList() {
       if (sortFilter === 'stock') return safeNumber(right.stockUnits) - safeNumber(left.stockUnits)
       return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()
     })
-  }, [warehouses, search, statusFilter, sortFilter])
+  }, [warehouses, search, statusFilter, sortFilter, dateFrom, dateTo])
 
   const totalPages = Math.max(1, Math.ceil(rows.length / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
@@ -399,7 +407,7 @@ export default function WarehouseList() {
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-surface px-5 py-4 text-xs text-fg-muted"><div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-fg">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-fg">{rows.length}</span></span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" /></label></div><div className="flex items-center gap-1.5"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Previous page"><ChevronLeft className="size-4" /></button><span className="min-w-14 text-center font-medium text-fg">{currentPage} / {totalPages}</span><button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Next page"><ChevronRight className="size-4" /></button></div></div>
-      {isFilterOpen && createPortal(<div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Warehouse filters"><button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" /><aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl"><div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4"><div><h2 className="text-lg font-semibold text-neutral-900">Filter Warehouses</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the warehouses shown in the table.</p></div><button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button></div><div className="flex-1 space-y-5 overflow-y-auto px-5 py-6"><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={WAREHOUSE_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort<Select options={WAREHOUSE_SORT_OPTIONS} value={sortFilter} onChange={(event) => { setSortFilter(event.target.value); setPage(1) }} /></label></div><div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setSortFilter('recent'); setSearch(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div></aside></div>, document.body)}
+      {isFilterOpen && createPortal(<div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Warehouse filters"><button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" /><aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl"><div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4"><div><h2 className="text-lg font-semibold text-neutral-900">Filter Warehouses</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the warehouses shown in the table.</p></div><button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button></div><div className="flex-1 space-y-5 overflow-y-auto px-5 py-6"><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={WAREHOUSE_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort<Select options={WAREHOUSE_SORT_OPTIONS} value={sortFilter} onChange={(event) => { setSortFilter(event.target.value); setPage(1) }} /></label><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Created<DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} /></label></div><div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setSortFilter('recent'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSearch(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div></aside></div>, document.body)}
       <Modal isOpen={isFormOpen} onClose={() => !isSaving && (setIsFormOpen(false), setEditingWarehouse(null))} title={editingWarehouse ? 'Edit Warehouse' : 'Add Warehouse'} size="2xl">
         <WarehouseForm
           warehouse={editingWarehouse}

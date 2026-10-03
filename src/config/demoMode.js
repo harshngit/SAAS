@@ -16,9 +16,17 @@
 // checking the truthful empty state without touching real data.
 //
 // This is intentionally NOT a runtime UI toggle - it must never ship enabled to production.
+//
+// Vite env vars are always strings (or undefined) - never real booleans - so this is a strict,
+// explicit allow-list, not a loose truthiness check. Only an exact match on one of the "enabled"
+// strings below turns demo mode on; EVERY other value - "false", "0", "no", "", undefined, or
+// any typo - is treated as OFF. This is deliberately asymmetric: the production-safe default is
+// OFF, so an unrecognized/misspelled value must fail safe, not fail open.
 const raw = import.meta.env.VITE_DEMO_DATA
-export const DEMO_EMPTY = raw === 'empty'
-export const DEMO_MODE = DEMO_EMPTY || raw === 'true' || raw === '1' || raw === true
+const normalized = typeof raw === 'string' ? raw.trim().toLowerCase() : raw
+const ENABLED_VALUES = ['true', '1', 'yes']
+export const DEMO_EMPTY = normalized === 'empty'
+export const DEMO_MODE = DEMO_EMPTY || ENABLED_VALUES.includes(normalized) || raw === true
 
 // Hard fail-safe: demo mode must never reach a production build, by accident or by a
 // misconfigured deploy env. This module is imported for its side effect at app startup
