@@ -1,6 +1,7 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
 import { getFileUrl } from './files'
+import { resolveCustomerGst } from '../utils/customer'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -295,7 +296,7 @@ function normalizeSectionedCustomer(data) {
     mapsLatitude: mapsLocation.latitude,
     mapsLongitude: mapsLocation.longitude,
 
-    gstNumber: businessTax.gstin_tax_id || '',
+    gstNumber: resolveCustomerGst(businessTax.gstin_tax_id),
     panBusinessRegistrationNo: businessTax.pan_business_registration_no || '',
     taxExempt: Boolean(businessTax.tax_exempt),
     taxCategory: businessTax.tax_category || '',

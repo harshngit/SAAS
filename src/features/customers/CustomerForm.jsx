@@ -318,6 +318,7 @@ function hydrateCustomer(formCustomer, isSalesOfficer, currentUser, salesOfficer
   const customerType = formCustomer?.customerType || formCustomer?.type || formCustomer?.category || ''
   const mapsLatitude = formCustomer?.mapsLatitude ?? formCustomer?.maps_latitude
   const mapsLongitude = formCustomer?.mapsLongitude ?? formCustomer?.maps_longitude
+  const gstNumber = formCustomer?.gstNumber || formCustomer?.gst_number || ''
 
   return {
     ...baseFields,
@@ -330,7 +331,7 @@ function hydrateCustomer(formCustomer, isSalesOfficer, currentUser, salesOfficer
     displayName: formCustomer?.displayName || customerName,
     primaryContactPerson: formCustomer?.primaryContactPerson || formCustomer?.primary_contact_person || customerName,
     mobileNumber: formCustomer?.mobileNumber || formCustomer?.phone || '',
-    gstNumber: formCustomer?.gstNumber || formCustomer?.gst_number || '',
+    gstNumber: gstNumber === 'NA' ? '' : gstNumber,
     billingAddress,
     shippingAddress,
     sameAsBilling: Boolean(formCustomer?.sameAsBilling),

@@ -37,6 +37,7 @@ import { getFileUrl } from '../../api/files'
 import { listUsers } from '../../api/users'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
+import { resolveCustomerGst } from '../../utils/customer'
 import CustomerForm from './CustomerForm'
 import { customerCategoryOptions } from './customerConstants'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
@@ -58,7 +59,9 @@ const normalizeCustomer = (customer) => ({
   assignedSalesOfficer: customer.assigned_sales_officer || customer.assignedSalesOfficer,
   outstandingBalance: customer.outstanding_balance || customer.outstandingBalance || 0,
   creditLimit: customer.credit_limit ?? customer.creditLimit ?? 0,
-  gstNumber: customer.gst_number || customer.gstNumber || '',
+  gstNumber: resolveCustomerGst(
+    customer.gst_number || customer.gstNumber || customer.business_tax_information?.gstin_tax_id,
+  ),
   contactPerson: customer.primary_contact_person || customer.contactPerson || '',
   city: customer.city || '',
   lastOrderDate: customer.last_order_date || customer.lastOrderDate || null,

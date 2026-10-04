@@ -5,6 +5,7 @@ import {
   demoInvoicesResolved,
   getDemoInvoiceById,
 } from '../features/invoices/invoiceDemoData'
+import { resolveCustomerGst } from '../utils/customer'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -203,7 +204,7 @@ function normalizeInvoice(invoice) {
     customerName: invoice.customer?.name || invoice.customer?.customer_name || invoice.walk_in_name || '',
     customerPhone: invoice.customer?.phone || invoice.customer?.mobile_number || invoice.walk_in_phone || '',
     customerEmail: invoice.customer?.email || '',
-    customerGstin: invoice.customer?.gst_number || invoice.customer?.gstin || '',
+    customerGstin: resolveCustomerGst(invoice.customer?.gst_number || invoice.customer?.gstin),
     walkInName: invoice.walk_in_name || '',
     walkInPhone: invoice.walk_in_phone || '',
     invoiceDate: invoice.invoice_date,

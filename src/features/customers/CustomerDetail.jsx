@@ -64,6 +64,7 @@ import { getFileUrl } from '../../api/files'
 import { useAuthStore } from '../../store/authStore'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
 import { formatCurrency } from '../../utils/format'
+import { resolveCustomerGst } from '../../utils/customer'
 import CustomerForm from './CustomerForm'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
 import { customerBasePathByRole } from './customerConstants'
@@ -125,7 +126,9 @@ const normalizeCustomer = (customer) => ({
   totalBilled: customer.total_billed || customer.totalBilled || 0,
   totalReceived: customer.total_received || customer.totalReceived || 0,
   creditLimit: customer.credit_limit ?? customer.creditLimit ?? 0,
-  gstNumber: customer.gst_number || customer.gstNumber || '',
+  gstNumber: resolveCustomerGst(
+    customer.gst_number || customer.gstNumber || customer.business_tax_information?.gstin_tax_id,
+  ),
   joinedAt: customer.created_at || customer.joinedAt,
   updatedAt: customer.updated_at || customer.updatedAt,
   notes: customer.notes || '',
