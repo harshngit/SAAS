@@ -33,6 +33,7 @@ import {
 import RecordSupplierPaymentDrawer from './RecordSupplierPaymentDrawer'
 import SupplierPaymentQuickView from './SupplierPaymentQuickView'
 import { listSupplierPayments } from '../../api/supplierPayments'
+import { listSuppliers } from '../../api/suppliers'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -48,6 +49,7 @@ function toRow(payment, isDemo) {
   if (!isDemo) {
     return {
       id: payment.id,
+      supplierId: payment.supplierId,
       paymentNumber: payment.paymentNumber,
       supplierName: payment.supplierName,
       paymentDate: payment.paymentDate,
@@ -64,6 +66,7 @@ function toRow(payment, isDemo) {
   const allocated = (payment.allocations || []).reduce((sum, line) => sum + safeNumber(line.amount), 0)
   return {
     id: payment.id,
+    supplierId: payment.supplierId,
     paymentNumber: payment.paymentNumber,
     supplierName: payment.supplierName,
     paymentDate: payment.paymentDate,
@@ -98,6 +101,7 @@ export default function SupplierPaymentsList() {
   const [page, setPage] = useState(1)
 
   const [realPayments, setRealPayments] = useState([])
+  const [realSupplierOptions, setRealSupplierOptions] = useState([{ value: 'all', label: 'All Suppliers' }])
   const [realTotal, setRealTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(!DEMO_MODE)
   const [loadError, setLoadError] = useState('')
@@ -111,6 +115,7 @@ export default function SupplierPaymentsList() {
     const result = await listSupplierPayments({
       page,
       page_size: PAGE_SIZE,
+      supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined,
       status: statusFilter,
       payment_method: modeFilter,
       date_from: dateFrom || undefined,
@@ -126,11 +131,28 @@ export default function SupplierPaymentsList() {
     }
     setRealPayments(result.payments)
     setRealTotal(result.total)
-  }, [page, statusFilter, modeFilter, dateFrom, dateTo, search])
+  }, [page, statusFilter, modeFilter, dateFrom, dateTo, search, supplierFilter])
 
   useEffect(() => {
     loadReal()
   }, [loadReal, refresh])
+
+  useEffect(() => {
+    if (DEMO_MODE) return undefined
+    let active = true
+    listSuppliers().then((result) => {
+      if (!active || !result.success) return
+      setRealSupplierOptions([
+        { value: 'all', label: 'All Suppliers' },
+        ...result.suppliers
+          .filter((supplier) => supplier?.id && (supplier.name || supplier.supplier_name))
+          .map((supplier) => ({ value: String(supplier.id), label: supplier.name || supplier.supplier_name })),
+      ])
+    })
+    return () => {
+      active = false
+    }
+  }, [])
 
   /* eslint-disable react-hooks/exhaustive-deps */
   const demoPayments = useMemo(() => (DEMO_MODE ? getSupplierPayments() : []), [refresh])
@@ -149,30 +171,32 @@ export default function SupplierPaymentsList() {
   }, [demoPayments, realPayments])
 
   const supplierOptions = useMemo(() => {
-    const names = [...new Set(rows.map((row) => row.supplierName).filter(Boolean))]
-    return [{ value: 'all', label: 'All Suppliers' }, ...names.map((name) => ({ value: name, label: name }))]
-  }, [rows])
+    if (!DEMO_MODE) return realSupplierOptions
+    const suppliers = new Map()
+    rows.forEach((row) => {
+      const value = row.supplierId || row.supplierName
+      if (value && !suppliers.has(value)) suppliers.set(value, row.supplierName || value)
+    })
+    return [{ value: 'all', label: 'All Suppliers' }, ...Array.from(suppliers, ([value, label]) => ({ value, label }))]
+  }, [realSupplierOptions, rows])
 
-  // Real mode: status / method / search are server-side; supplier / date / sort are client-side
-  // over the current page. Demo mode: everything client-side.
+  // Real mode filters are server-side; sorting remains presentation-only over the current page.
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    const out = rows.filter((payment) => {
-      const matchesSearch =
-        !DEMO_MODE ||
-        !query ||
-        [payment.paymentNumber, payment.supplierName, payment.reference]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(query))
-      const matchesSupplier = supplierFilter === 'all' || payment.supplierName === supplierFilter
-      const matchesMode = !DEMO_MODE || modeFilter === 'all' || payment.paymentMode === modeFilter
-      const matchesStatus = !DEMO_MODE || statusFilter === 'all' || payment.status === statusFilter
-      // Real mode: date_from/date_to already bounded this fetch server-side - re-checking here
-      // would only re-filter the current page and risk hiding correctly-fetched rows. Demo mode
-      // has no server call, so the range is applied here instead.
-      const matchesDate = !DEMO_MODE || isWithinDateRange(payment.paymentDate, dateFrom, dateTo)
-      return matchesSearch && matchesSupplier && matchesMode && matchesStatus && matchesDate
-    })
+    const out = DEMO_MODE
+      ? rows.filter((payment) => {
+          const matchesSearch =
+            !query ||
+            [payment.paymentNumber, payment.supplierName, payment.reference]
+              .filter(Boolean)
+              .some((value) => String(value).toLowerCase().includes(query))
+          const matchesSupplier = supplierFilter === 'all' || payment.supplierId === supplierFilter
+          const matchesMode = modeFilter === 'all' || payment.paymentMode === modeFilter
+          const matchesStatus = statusFilter === 'all' || payment.status === statusFilter
+          const matchesDate = isWithinDateRange(payment.paymentDate, dateFrom, dateTo)
+          return matchesSearch && matchesSupplier && matchesMode && matchesStatus && matchesDate
+        })
+      : rows
 
     return out.sort((left, right) => {
       if (sortFilter === 'amount') return safeNumber(right.amount) - safeNumber(left.amount)
@@ -221,13 +245,14 @@ export default function SupplierPaymentsList() {
             />
           </div>
           <ListFilterPanel title="Filter Supplier Payments">
-            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <Select label="Payment mode" options={[{ value: 'all', label: 'All Modes' }, ...PAYMENT_MODE_OPTIONS]} value={modeFilter} onChange={(event) => { setModeFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <Select label="Status" options={PAYMENT_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Date
             <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
           </div>
           <Select label="Sort by" options={PAYMENT_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setModeFilter('all'); setStatusFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSortFilter('recent'); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
           </ListFilterPanel>
           {canCreate && (
           <Button type="button" onClick={() => setRecordOpen(true)}>
@@ -240,9 +265,9 @@ export default function SupplierPaymentsList() {
 
       <ListSummary className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={IndianRupee} iconVariant="primary" label={DEMO_MODE ? 'Total Paid' : 'Paid (this page)'} value={formatCurrency(stats.total)} />
-        <StatCard icon={Wallet} iconVariant="success" label="Payments This Month" value={formatCurrency(stats.month)} />
-        <StatCard icon={Users} iconVariant="info" label="Suppliers Paid" value={stats.suppliers} />
-        <StatCard icon={CalendarClock} iconVariant="warning" label="Recent Payments" value={stats.recent} />
+        <StatCard icon={Wallet} iconVariant="success" label={DEMO_MODE ? 'Payments This Month' : 'Payments This Month (this page)'} value={formatCurrency(stats.month)} />
+        <StatCard icon={Users} iconVariant="info" label={DEMO_MODE ? 'Suppliers Paid' : 'Suppliers Paid (this page)'} value={stats.suppliers} />
+        <StatCard icon={CalendarClock} iconVariant="warning" label={DEMO_MODE ? 'Recent Payments' : 'Recent Payments (this page)'} value={stats.recent} />
       </ListSummary>
       </ListOverview>
 

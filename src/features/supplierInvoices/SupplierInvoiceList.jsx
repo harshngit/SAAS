@@ -28,6 +28,7 @@ import {
 } from './supplierInvoiceHelpers'
 import { SUPPLIER_INVOICES_DEMO_ENABLED, demoSupplierInvoicesResolved } from './supplierInvoiceDemoData'
 import { listSupplierInvoices } from '../../api/supplierInvoices'
+import { listSuppliers } from '../../api/suppliers'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -35,6 +36,8 @@ function formatDate(value) {
   if (Number.isNaN(date.getTime())) return '—'
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
+
+const PAGE_SIZE = 25
 
 const sortOptions = [
   { value: 'recent', label: 'Recent' },
@@ -47,6 +50,7 @@ function toRow(invoice, isDemo) {
   if (!isDemo) {
     return {
       id: invoice.id,
+      supplierId: invoice.supplierId,
       supplierInvoiceNumber: invoice.supplierInvoiceNumber,
       supplierName: invoice.supplierName,
       purchaseNumber: invoice.purchaseNumber,
@@ -65,6 +69,7 @@ function toRow(invoice, isDemo) {
   const resolved = resolveSupplierInvoice(invoice)
   return {
     id: resolved.id,
+    supplierId: resolved.supplierId,
     supplierInvoiceNumber: resolved.supplierInvoiceNumber,
     supplierName: resolved.supplierName,
     purchaseNumber: resolved.purchaseNumber,
@@ -99,8 +104,11 @@ export default function SupplierInvoiceList() {
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const [page, setPage] = useState(1)
 
   const [realInvoices, setRealInvoices] = useState([])
+  const [realSupplierOptions, setRealSupplierOptions] = useState([{ value: 'all', label: 'All Suppliers' }])
+  const [realTotal, setRealTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(!DEMO_MODE)
   const [loadError, setLoadError] = useState('')
 
@@ -108,19 +116,46 @@ export default function SupplierInvoiceList() {
     if (DEMO_MODE) return
     setIsLoading(true)
     setLoadError('')
-    const result = await listSupplierInvoices({})
+    const result = await listSupplierInvoices({
+      supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined,
+      status: lifecycleFilter,
+      verification_status: verificationFilter,
+      payment_status: paymentStatusFilter,
+      search: search.trim() || undefined,
+      page,
+      page_size: PAGE_SIZE,
+    })
     setIsLoading(false)
     if (!result.success) {
       setRealInvoices([])
+      setRealTotal(0)
       setLoadError(result.error)
       return
     }
     setRealInvoices(result.invoices)
-  }, [])
+    setRealTotal(result.total)
+  }, [lifecycleFilter, page, paymentStatusFilter, search, supplierFilter, verificationFilter])
 
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    if (DEMO_MODE) return undefined
+    let active = true
+    listSuppliers().then((result) => {
+      if (!active || !result.success) return
+      setRealSupplierOptions([
+        { value: 'all', label: 'All Suppliers' },
+        ...result.suppliers
+          .filter((supplier) => supplier?.id && (supplier.name || supplier.supplier_name))
+          .map((supplier) => ({ value: String(supplier.id), label: supplier.name || supplier.supplier_name })),
+      ])
+    })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const rows = useMemo(() => {
     const source = DEMO_MODE
@@ -132,13 +167,26 @@ export default function SupplierInvoiceList() {
   }, [realInvoices])
 
   const supplierOptions = useMemo(() => {
-    const names = [...new Set(rows.map((row) => row.supplierName).filter(Boolean))]
-    return [{ value: 'all', label: 'All Suppliers' }, ...names.map((name) => ({ value: name, label: name }))]
-  }, [rows])
+    if (!DEMO_MODE) return realSupplierOptions
+    const suppliers = new Map()
+    rows.forEach((row) => {
+      const value = row.supplierId || row.supplierName
+      if (value && !suppliers.has(value)) suppliers.set(value, row.supplierName || value)
+    })
+    return [{ value: 'all', label: 'All Suppliers' }, ...Array.from(suppliers, ([value, label]) => ({ value, label }))]
+  }, [realSupplierOptions, rows])
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
   const filtered = useMemo(() => {
+    if (!DEMO_MODE) {
+      return [...rows].sort((left, right) => {
+        if (sortFilter === 'dueDate') return new Date(left.dueDate || 0).getTime() - new Date(right.dueDate || 0).getTime()
+        const leftTime = new Date(left.invoiceDate || 0).getTime()
+        const rightTime = new Date(right.invoiceDate || 0).getTime()
+        return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
+      })
+    }
     const query = search.trim().toLowerCase()
     const out = rows.filter((row) => {
       const matchesSearch =
@@ -146,7 +194,7 @@ export default function SupplierInvoiceList() {
         [row.supplierInvoiceNumber, row.supplierName, row.purchaseNumber]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(query))
-      const matchesSupplier = supplierFilter === 'all' || row.supplierName === supplierFilter
+      const matchesSupplier = supplierFilter === 'all' || row.supplierId === supplierFilter
       const matchesLifecycle = lifecycleFilter === 'all' || row.lifecycle?.key === lifecycleFilter
       const matchesVerification =
         verificationFilter === 'all' || (row.verification?.key || 'pending') === verificationFilter
@@ -195,38 +243,40 @@ export default function SupplierInvoiceList() {
             <input
               type="text"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => { setSearch(event.target.value); if (!DEMO_MODE) setPage(1) }}
               placeholder="Search Invoice # / Supplier / Purchase #"
               className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
           <ListFilterPanel title="Filter Supplier Invoices">
-            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <Select label="Invoice status"
             options={[{ value: 'all', label: 'All Statuses' }, ...lifecycleFilterOptions]}
             value={lifecycleFilter}
-            onChange={(event) => setLifecycleFilter(event.target.value)}
+            onChange={(event) => { setLifecycleFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
             className="w-full"
             triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
           />
           <Select label="Verification"
             options={[{ value: 'all', label: 'All Verification' }, ...VERIFICATION_FILTER_OPTIONS]}
             value={verificationFilter}
-            onChange={(event) => setVerificationFilter(event.target.value)}
+            onChange={(event) => { setVerificationFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
             className="w-full"
             triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
           />
           <Select label="Payment status"
             options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]}
             value={paymentStatusFilter}
-            onChange={(event) => setPaymentStatusFilter(event.target.value)}
+            onChange={(event) => { setPaymentStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
             className="w-full"
             triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
           />
           <Select label="Sort by" options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
-            <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+            <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
+            {!DEMO_MODE && <span className="text-xs font-normal text-neutral-400">Date filtering is unavailable in live mode because the backend does not support date parameters.</span>}
           </div>
+          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setLifecycleFilter('all'); setVerificationFilter('all'); setPaymentStatusFilter('all'); setSortFilter('recent'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
           </ListFilterPanel>
           {canCreate && (
           <Button type="button" onClick={() => navigate(`${basePath}/new`)}>
@@ -238,10 +288,10 @@ export default function SupplierInvoiceList() {
       </ListHeader>
 
       <ListSummary className="grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={ClipboardList} iconVariant="primary" label="Total Supplier Invoices" value={stats.total} />
-        <StatCard icon={IndianRupee} iconVariant="info" label="Total Invoice Value" value={formatCurrency(stats.totalValue)} />
-        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={formatCurrency(stats.outstanding)} />
-        <StatCard icon={CalendarClock} iconVariant="danger" label="Overdue Invoices" value={stats.overdue} />
+        <StatCard icon={ClipboardList} iconVariant="primary" label="Total Supplier Invoices" value={DEMO_MODE ? stats.total : realTotal} />
+        <StatCard icon={IndianRupee} iconVariant="info" label={DEMO_MODE ? 'Total Invoice Value' : 'Total Invoice Value (this page)'} value={formatCurrency(stats.totalValue)} />
+        <StatCard icon={IndianRupee} iconVariant="warning" label={DEMO_MODE ? 'Outstanding Payable' : 'Outstanding Payable (this page)'} value={formatCurrency(stats.outstanding)} />
+        <StatCard icon={CalendarClock} iconVariant="danger" label={DEMO_MODE ? 'Overdue Invoices' : 'Overdue Invoices (this page)'} value={stats.overdue} />
       </ListSummary>
       </ListOverview>
 
@@ -315,6 +365,15 @@ export default function SupplierInvoiceList() {
             </table>
           )}
         </div>
+        {!DEMO_MODE && !isLoading && !loadError && (
+          <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-sm text-neutral-500">
+            <span>Page {page} of {Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} · {realTotal} invoices</span>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
+              <Button type="button" variant="outline" size="sm" disabled={page >= Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} onClick={() => setPage((value) => value + 1)}>Next</Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   )

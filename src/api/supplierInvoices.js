@@ -242,7 +242,7 @@ export async function listSupplierInvoices(params = {}) {
 
     const { data } = await apiClient.get('/supplier-invoices', { params: query })
     const { rows, total } = unwrapList(data)
-    return { success: true, invoices: rows.map(normalizeSupplierInvoice), total }
+    return { success: true, invoices: rows.map(normalizeSupplierInvoice), total, page: query.page, pageSize: query.page_size }
   } catch (error) {
     return { success: false, error: apiError(error, 'Unable to load supplier invoices. Please try again.') }
   }

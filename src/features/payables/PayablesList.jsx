@@ -32,6 +32,7 @@ import {
   getAccountsPayableSummary,
   listAccountsPayable,
 } from '../../api/accountsPayable'
+import { listSuppliers } from '../../api/suppliers'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -39,6 +40,8 @@ function formatDate(value) {
   if (Number.isNaN(date.getTime())) return '—'
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
+
+const PAGE_SIZE = 25
 
 export default function PayablesList() {
   const navigate = useNavigate()
@@ -59,9 +62,12 @@ export default function PayablesList() {
   const [quickViewId, setQuickViewId] = useState(null)
   const [recordPreset, setRecordPreset] = useState(null)
   const [refresh, setRefresh] = useState(0)
+  const [page, setPage] = useState(1)
 
   // ---- real data ------------------------------------------------------
   const [realPayables, setRealPayables] = useState([])
+  const [realSupplierOptions, setRealSupplierOptions] = useState([{ value: 'all', label: 'All Suppliers' }])
+  const [realTotal, setRealTotal] = useState(0)
   const [realSummary, setRealSummary] = useState(null)
   const [isLoading, setIsLoading] = useState(!DEMO_MODE)
   const [loadError, setLoadError] = useState('')
@@ -71,23 +77,49 @@ export default function PayablesList() {
     setIsLoading(true)
     setLoadError('')
     const [listResult, summaryResult] = await Promise.all([
-      listAccountsPayable({ page: 1, page_size: 100 }),
-      getAccountsPayableSummary(),
+      listAccountsPayable({
+        supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined,
+        payment_status: paymentStatusFilter,
+        ageing_bucket: ageingFilter,
+        search: search.trim() || undefined,
+        page,
+        page_size: PAGE_SIZE,
+      }),
+      getAccountsPayableSummary({ supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined }),
     ])
     setIsLoading(false)
     if (!listResult.success) {
       setRealPayables([])
+      setRealTotal(0)
       setRealSummary(null)
       setLoadError(listResult.error)
       return
     }
     setRealPayables(listResult.payables)
+    setRealTotal(listResult.total)
     setRealSummary(summaryResult.success ? summaryResult.summary : null)
-  }, [])
+  }, [ageingFilter, page, paymentStatusFilter, search, supplierFilter])
 
   useEffect(() => {
     loadReal()
   }, [loadReal])
+
+  useEffect(() => {
+    if (DEMO_MODE) return undefined
+    let active = true
+    listSuppliers().then((result) => {
+      if (!active || !result.success) return
+      setRealSupplierOptions([
+        { value: 'all', label: 'All Suppliers' },
+        ...result.suppliers
+          .filter((supplier) => supplier?.id && (supplier.name || supplier.supplier_name))
+          .map((supplier) => ({ value: String(supplier.id), label: supplier.name || supplier.supplier_name })),
+      ])
+    })
+    return () => {
+      active = false
+    }
+  }, [])
 
   // refresh is bumped after a demo payment so the demo store is re-read.
   /* eslint-disable react-hooks/exhaustive-deps */
@@ -127,13 +159,27 @@ export default function PayablesList() {
   }, [demoRows, realPayables])
 
   const supplierOptions = useMemo(() => {
-    const names = [...new Set(rows.map((row) => row.supplierName).filter(Boolean))]
-    return [{ value: 'all', label: 'All Suppliers' }, ...names.map((name) => ({ value: name, label: name }))]
-  }, [rows])
+    if (!DEMO_MODE) return realSupplierOptions
+    const suppliers = new Map()
+    rows.forEach((row) => {
+      const value = row.supplierId || row.supplierName
+      if (value && !suppliers.has(value)) suppliers.set(value, row.supplierName || value)
+    })
+    return [{ value: 'all', label: 'All Suppliers' }, ...Array.from(suppliers, ([value, label]) => ({ value, label }))]
+  }, [realSupplierOptions, rows])
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
   const filtered = useMemo(() => {
+    if (!DEMO_MODE) {
+      return [...rows].sort((left, right) => {
+        if (sortFilter === 'outstanding') return safeNumber(right.outstanding) - safeNumber(left.outstanding)
+        if (sortFilter === 'dueDate') return new Date(left.dueDate || 0).getTime() - new Date(right.dueDate || 0).getTime()
+        const leftTime = new Date(left.invoiceDate || 0).getTime()
+        const rightTime = new Date(right.invoiceDate || 0).getTime()
+        return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
+      })
+    }
     const query = search.trim().toLowerCase()
     const out = rows.filter((row) => {
       const matchesSearch =
@@ -210,20 +256,22 @@ export default function PayablesList() {
             <input
               type="text"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => { setSearch(event.target.value); if (!DEMO_MODE) setPage(1) }}
               placeholder="Search Supplier / Supplier Invoice #"
               className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
             />
           </div>
           <ListFilterPanel title="Filter Accounts Payable">
-            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Payment status" options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]} value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <Select label="Payment status" options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]} value={paymentStatusFilter} onChange={(event) => { setPaymentStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           {DEMO_MODE && <Select label="Due date" options={DUE_FILTER_OPTIONS} value={dueFilter} onChange={(event) => setDueFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />}
-          <Select label="Ageing" options={ageingFilterOptions} value={ageingFilter} onChange={(event) => setAgeingFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+          <Select label="Ageing" options={ageingFilterOptions} value={ageingFilter} onChange={(event) => { setAgeingFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <Select label="Sort by" options={PAYABLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
           <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
-            <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+            <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
+            {!DEMO_MODE && <span className="text-xs font-normal text-neutral-400">Date filtering is unavailable in live mode because the backend does not support date parameters.</span>}
           </div>
+          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setPaymentStatusFilter('all'); setDueFilter('all'); setAgeingFilter('all'); setSortFilter('recent'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
           </ListFilterPanel>
 
         </div>
@@ -330,6 +378,15 @@ export default function PayablesList() {
             </table>
           )}
         </div>
+        {!DEMO_MODE && !isLoading && !loadError && (
+          <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-sm text-neutral-500">
+            <span>Page {page} of {Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} · {realTotal} payables</span>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
+              <Button type="button" variant="outline" size="sm" disabled={page >= Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} onClick={() => setPage((value) => value + 1)}>Next</Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {DEMO_MODE && (
