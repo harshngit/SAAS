@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore'
 import { ROLES, roleLabels, roleMenus } from '../../auth/roles'
 import { logout } from '../../api/auth'
 import { listNotifications, markAllNotificationsRead, markNotificationRead, getUnreadNotificationCount } from '../../api/notifications'
+import { resolveNotificationDestination } from '../../utils/notificationNavigation'
 
 const NOTIFICATIONS_PANEL_WIDTH = 320
 const MENU_PANEL_WIDTH = 240
@@ -161,7 +162,8 @@ export default function Topbar() {
     }
 
     setIsNotificationsOpen(false)
-    if (notification.link) navigate(notification.link)
+    const destination = resolveNotificationDestination(notification, currentUser)
+    if (destination) navigate(destination)
   }
 
   const handleMarkAllRead = async () => {

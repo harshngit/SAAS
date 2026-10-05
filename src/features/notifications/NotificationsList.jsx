@@ -9,6 +9,8 @@ import { Bell } from 'lucide-react'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notifications'
+import { useAuthStore } from '../../store/authStore'
+import { resolveNotificationDestination } from '../../utils/notificationNavigation'
 
 function getIcon(type) {
   if (type === 'success') return CheckCircle
@@ -31,6 +33,7 @@ function formatTime(value) {
 
 export default function NotificationsList() {
   const navigate = useNavigate()
+  const currentUser = useAuthStore((state) => state.currentUser)
   const [notifications, setNotifications] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -80,7 +83,8 @@ export default function NotificationsList() {
 
   const handleClick = (notification) => {
     markAsRead(notification)
-    if (notification.link) navigate(notification.link)
+    const destination = resolveNotificationDestination(notification, currentUser)
+    if (destination) navigate(destination)
   }
 
   const unreadCount = notifications.filter((n) => !n.isRead).length
