@@ -970,7 +970,7 @@ export default function UserManagement() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="border-[#063B00] text-[#063B00] hover:border-[#063B00] hover:bg-primary-50 hover:text-[#063B00]"
+                    className="border-[#00092A] text-[#00092A] hover:border-[#00092A] hover:bg-primary-50 hover:text-[#00092A]"
                     onClick={handleCloseModal}
                   >
                     Back to Staff

@@ -1,5 +1,5 @@
 export const CATEGORICAL_COLORS = [
-  '#063b00',
+  '#00092A',
   '#111827',
   '#4b5563',
   '#9aa1ac',
@@ -7,7 +7,7 @@ export const CATEGORICAL_COLORS = [
   '#0a0e14',
 ]
 
-export const CHART_PRIMARY = '#063b00'
+export const CHART_PRIMARY = '#00092A'
 export const CHART_PRIMARY_SOFT = '#4b5563'
 
 export const CHART_INK = {

@@ -45,7 +45,7 @@ import { SettingsSection, ToggleRow, ColumnRow } from './InvoiceSettingsSection'
 
 // #063b00 first - the app's own brand color (src/index.css --color-primary-600), the single
 // source of truth for "the existing product default accent color" (Part 3 of the theme redesign).
-const COLOR_PRESETS = ['#063b00', '#16A34A', '#2563EB', '#DC2626', '#7C3AED', '#EA580C']
+const COLOR_PRESETS = ['#00092A', '#16A34A', '#2563EB', '#DC2626', '#7C3AED', '#EA580C']
 const FONT_FAMILY_OPTIONS = [
   { value: 'Helvetica', label: 'Helvetica' },
   { value: 'Times', label: 'Times' },

@@ -44,7 +44,7 @@ export const DEFAULT_THEME = {
   customEnabled: false,
   mode: 'light',
   primaryColor: '',
-  background: { url: '', overlayOpacity: null }, // null = "not set yet" -> ThemeSettings picks the mode-appropriate default (0.45 dark / 0.20 light), never a fixed 0.5/0.4 guess.
+  background: { url: '', overlayOpacity: null }, // null = "not set yet" -> ThemeSettings uses the shared 5% default.
   updatedAt: null,
 }
 

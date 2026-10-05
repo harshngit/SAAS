@@ -353,7 +353,7 @@ function InvoiceFooter({ company, data, payment, footer, style }) {
 // InvoiceSettings schema defines (see app/schemas/workflow_settings.py), never a flat guessed set.
 function withDefaults(props) {
   return {
-    primaryColor: props.primaryColor || '#063b00',
+    primaryColor: props.primaryColor || '#00092A',
     data: props.data,
     businessDetails: { showBusinessName: true, showLogo: true, showAddress: true, showPhone: true, showEmail: true, showGstin: true, showPan: false, ...props.businessDetails },
     invoiceDetails: { showInvoiceNumber: true, showInvoiceDate: true, showDueDate: true, showOrderReference: true, showPoNumber: false, showEwayBillNumber: false, showVehicleNumber: false, ...props.invoiceDetails },

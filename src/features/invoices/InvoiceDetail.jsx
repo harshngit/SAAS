@@ -78,7 +78,7 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
   // if `templateVariant` is unset or names a preset no longer in the catalog.
   const TemplateComponent = isThermalTemplate ? templateComponents.thermal : RegularThemePreview
   const regularPresetId = resolveRegularPresetId(template, invoiceSettings?.templateVariant)
-  const primaryColor = invoiceSettings?.branding?.primaryColor || '#063b00'
+  const primaryColor = invoiceSettings?.branding?.primaryColor || '#00092A'
   const templateLabel = template.charAt(0).toUpperCase() + template.slice(1)
 
   const templateProps = {
@@ -302,7 +302,7 @@ export default function InvoiceDetail() {
   )
   const thermalPaperWidth = invoiceSettings?.thermalPrint?.paperWidth || '80mm'
   const sharedTemplateProps = {
-    primaryColor: invoiceSettings?.branding?.primaryColor || '#063b00',
+    primaryColor: invoiceSettings?.branding?.primaryColor || '#00092A',
     data: previewData,
     businessDetails: invoiceSettings?.businessDetails,
     invoiceDetails: invoiceSettings?.invoiceDetails,

@@ -129,7 +129,7 @@ export default function InvoicePrintView() {
   const paperSize = invoiceSettings?.paperSize || 'A4'
   const previewData = buildInvoicePreviewData(invoice, orgSettings, invoiceSettings)
   const fields = format === 'simple' ? SIMPLE_FIELDS_PRESET : invoiceSettings?.fields || {}
-  const primaryColor = (colorOverride && `#${colorOverride.replace(/^#/, '')}`) || invoiceSettings?.branding?.primaryColor || '#063b00'
+  const primaryColor = (colorOverride && `#${colorOverride.replace(/^#/, '')}`) || invoiceSettings?.branding?.primaryColor || '#00092A'
   const isSimple = format === 'simple'
 
   return (

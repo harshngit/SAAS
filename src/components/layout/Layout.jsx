@@ -96,7 +96,7 @@ export default function Layout() {
             className="pointer-events-none fixed inset-0 z-0"
             style={{
               backgroundColor: theme.mode === 'dark' ? '#000000' : '#ffffff',
-              opacity: theme.background.overlayOpacity ?? (theme.mode === 'dark' ? 0.45 : 0.2),
+              opacity: theme.background.overlayOpacity ?? 0.05,
             }}
           />
         </>

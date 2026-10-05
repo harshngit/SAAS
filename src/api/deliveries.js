@@ -32,6 +32,23 @@ function formatApiError(errorData, fallbackMessage = 'Something went wrong. Plea
   return String(errorData)
 }
 
+function formatVehicleLoadError(error) {
+  if (!error.response) {
+    return { message: 'Server did not respond. Please retry or contact support.', status: null }
+  }
+
+  const status = error.response.status
+  const detail = error.response.data?.detail
+  const message = typeof detail === 'string'
+    ? detail
+    : formatApiError(detail || error.response.data?.message || error.response.data?.error, '')
+
+  return {
+    message: message || `Vehicle loading failed (HTTP ${status}). Please try again.`,
+    status,
+  }
+}
+
 function authHeader() {
   const accessToken = useAuthStore.getState().authTokens?.access_token
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
@@ -76,6 +93,15 @@ function normalizeDeliveryItem(item) {
     deliveredQuantity: item.delivered_quantity ?? 0,
     pendingQuantity: item.pending_quantity ?? Math.max((item.planned_quantity ?? item.quantity ?? 0) - (item.delivered_quantity ?? 0), 0),
     remainingQuantity: item.remaining_quantity ?? Math.max((item.planned_quantity ?? item.quantity ?? 0) - (item.delivered_quantity ?? 0), 0),
+    remainingLoadQuantity:
+      item.remaining_load_quantity
+      ?? item.remaining_to_load
+      ?? (item.picked_quantity !== undefined || item.pickedQuantity !== undefined
+        ? Math.max((item.picked_quantity ?? item.pickedQuantity ?? 0) - (item.loaded_quantity ?? 0), 0)
+        : Math.max((item.planned_quantity ?? item.quantity ?? 0) - (item.loaded_quantity ?? 0), 0)),
+    uom: item.uom || '',
+    warehouseAvailable: item.warehouse_available ?? item.warehouseAvailable ?? null,
+    weightKg: item.weight_kg ?? item.weightKg ?? null,
     batchNumber: item.batch_number || '',
     expiryDate: item.expiry_date || null,
     serialNumbers: Array.isArray(item.serial_numbers) ? item.serial_numbers : [],
@@ -127,7 +153,8 @@ function normalizeDelivery(delivery) {
     vehicleNumber: delivery.vehicle?.vehicle_number || '',
     vehicleType: delivery.vehicle?.vehicle_type || '',
     vehicleCapacityKg: delivery.vehicle?.capacity_kg ?? null,
-    warehouseId: delivery.warehouse_id || '',
+    warehouseId: delivery.warehouse_id || delivery.warehouse?.id || '',
+    warehouse: delivery.warehouse ? { id: delivery.warehouse.id, name: delivery.warehouse.name || '' } : null,
     warehouseName: delivery.warehouse?.name || '',
     scheduledDate: delivery.scheduled_date,
     deliveryAddress: delivery.delivery_address || '',
@@ -290,13 +317,22 @@ export async function loadDeliveryOntoVehicle(deliveryId) {
 
     return { success: true, delivery: normalizeDelivery(data) }
   } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to load delivery onto the vehicle. Please try again.',
-    )
+    const { message, status } = formatVehicleLoadError(error)
 
-    return { success: false, error: message }
+    return { success: false, error: message, status, deliveryId }
+  }
+}
+
+export async function loadDeliveriesBatch(deliveryIds) {
+  try {
+    const { data } = await apiClient.post('/deliveries/load-batch', { delivery_ids: deliveryIds }, {
+      headers: authHeader(),
+    })
+
+    return { success: true, data }
+  } catch (error) {
+    const { message, status } = formatVehicleLoadError(error)
+    return { success: false, error: message, status, deliveryIds }
   }
 }
 
@@ -372,13 +408,9 @@ export async function markDeliveryReady(deliveryId) {
 
     return { success: true, delivery: normalizeDelivery(data) }
   } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to mark this delivery ready. Please try again.',
-    )
+    const { message, status } = formatVehicleLoadError(error)
 
-    return { success: false, error: message }
+    return { success: false, error: message, status, deliveryId }
   }
 }
 

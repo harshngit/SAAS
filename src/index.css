@@ -6,11 +6,11 @@
   --color-primary-100: #eeeeee;
   --color-primary-200: #dddddd;
   --color-primary-300: #bdbdbd;
-  --color-primary-400: #063b00;
-  --color-primary-500: #063b00;
-  --color-primary-600: #063b00;
-  --color-primary-700: #063b00;
-  --color-primary-800: #063b00;
+  --color-primary-400: #00092A;
+  --color-primary-500: #00092A;
+  --color-primary-600: #00092A;
+  --color-primary-700: #00092A;
+  --color-primary-800: #00092A;
   --color-primary-900: #052f00;
   --color-primary-950: #021a00;
 
@@ -88,9 +88,9 @@
   /* Elevation: soft, layered shadows for a premium, quiet-depth feel */
   --shadow-xs: 0 1px 2px 0 rgb(17 24 39 / 0.04);
   --shadow-card: 0 1px 1px 0 rgb(17 24 39 / 0.03), 0 18px 44px -28px rgb(17 24 39 / 0.22);
-  --shadow-card-hover: 0 2px 4px 0 rgb(17 24 39 / 0.05), 0 22px 48px -28px rgb(6 59 0 / 0.2);
+  --shadow-card-hover: 0 2px 4px 0 rgb(17 24 39 / 0.05), 0 22px 48px -28px rgb(0 9 42 / 0.2);
   --shadow-popover: 0 10px 24px -12px rgb(17 24 39 / 0.18), 0 28px 56px -24px rgb(17 24 39 / 0.22);
-  --shadow-glow-primary: 0 8px 20px -6px rgb(6 59 0 / 0.35);
+  --shadow-glow-primary: 0 8px 20px -6px rgb(0 9 42 / 0.35);
 
   /* ---- Org theme (src/theme/) semantic surface/text tokens ----------------------------------
      Registered under --color-* so Tailwind v4 generates real utilities (bg-surface,
@@ -199,7 +199,7 @@
   --input-border: #374151;
 
   --badge-neutral-border: rgba(148, 163, 184, 0.35);
-  --badge-primary-border: rgba(6, 59, 0, 0.45);
+  --badge-primary-border: rgba(0, 9, 42, 0.45);
   --badge-success-border: rgba(34, 197, 94, 0.45);
   --badge-warning-border: rgba(245, 158, 11, 0.45);
   --badge-danger-border: rgba(239, 68, 68, 0.45);

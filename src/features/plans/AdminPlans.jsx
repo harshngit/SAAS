@@ -386,7 +386,7 @@ export default function AdminPlans() {
                   key={plan.id}
                   className={`group flex min-h-[39rem] rounded-2xl border shadow-(--shadow-card) transition-all duration-300 hover:-translate-y-2 hover:shadow-(--shadow-card-hover) ${
                     isFeatured
-                      ? 'xl:min-h-[43rem] border-primary-700 bg-[#063B00] ring-1 ring-primary-700 xl:shadow-[0_10px_22px_-12px_rgb(6_59_0/0.22),0_34px_70px_-40px_rgb(6_59_0/0.42)]'
+                      ? 'xl:min-h-[43rem] border-primary-700 bg-[#00092A] ring-1 ring-primary-700 xl:shadow-[0_10px_22px_-12px_rgb(0_9_42/0.22),0_34px_70px_-40px_rgb(0_9_42/0.42)]'
                     : isCurrent
                         ? 'border-primary-300 bg-surface ring-2 ring-primary-100'
                         : 'border-neutral-100 bg-surface'

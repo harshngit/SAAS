@@ -17,8 +17,14 @@ import {
 import { resolveAccentContrast, resolveThemeTokens } from '../../theme/themeConfig'
 import { getFileUrl } from '../../api/files'
 
-const COLOR_PRESETS = ['#063b00', '#16A34A', '#2563EB', '#DC2626', '#7C3AED', '#EA580C']
-const DEFAULT_OVERLAY_BY_MODE = { dark: 0.45, light: 0.2 }
+const COLOR_PRESETS = ['#00092A', '#16A34A', '#2563EB', '#DC2626', '#7C3AED', '#EA580C']
+const DEFAULT_OVERLAY_BY_MODE = { dark: 0.05, light: 0.05 }
+const BACKGROUND_PRESETS = [
+  { id: 'theme1', label: 'Soft Mint', src: '/theme1.png' },
+  { id: 'theme2', label: 'Aqua Flow', src: '/theme2.png' },
+  { id: 'theme3', label: 'Grid Paper', src: '/theme3.png' },
+  { id: 'theme4', label: 'Lime Collage', src: '/theme4.png' },
+]
 
 // Not a fake mockup: `resolveThemeTokens(draft)` is the EXACT same function ThemeProvider calls to
 // theme the real app - here it's applied as inline style + data-mode/data-bg attributes on this
@@ -30,7 +36,7 @@ const DEFAULT_OVERLAY_BY_MODE = { dark: 0.45, light: 0.2 }
 function ThemePreview({ draft }) {
   const tokens = resolveThemeTokens(draft)
   const hasBackground = Boolean(draft.customEnabled && draft.background?.url)
-  const overlayOpacity = draft.background?.overlayOpacity ?? DEFAULT_OVERLAY_BY_MODE[draft.mode] ?? 0.3
+  const overlayOpacity = draft.background?.overlayOpacity ?? DEFAULT_OVERLAY_BY_MODE[draft.mode] ?? 0.05
 
   return (
     <div
@@ -139,10 +145,10 @@ function ColorField({ label, value, onChange, disabled, warning }) {
           />
         ))}
         <label className={`flex size-8 items-center justify-center rounded-full border border-dashed border-neutral-300 text-neutral-400 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-primary-300'}`}>
-          <input type="color" value={value || '#063b00'} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="size-0 opacity-0" />
+          <input type="color" value={value || '#00092A'} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="size-0 opacity-0" />
           <Palette className="pointer-events-none size-3.5" aria-hidden="true" />
         </label>
-        <Input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} placeholder="#063b00" className="w-28" />
+        <Input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} placeholder="#00092A" className="w-28" />
       </div>
       {warning && (
         <p className="mt-2 flex items-center gap-1.5 text-xs text-amber-600">
@@ -166,6 +172,7 @@ export default function ThemeSettings() {
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false)
   const [assetError, setAssetError] = useState('')
   const [thumbnailFailedUrl, setThumbnailFailedUrl] = useState('')
+  const [selectedPresetId, setSelectedPresetId] = useState('')
   const backgroundInputRef = useRef(null)
 
   // Re-seed the draft whenever the provider's real theme changes (initial load, or a refresh
@@ -199,7 +206,7 @@ export default function ThemeSettings() {
   const updateBackground = (patch) => setDraft((current) => ({ ...current, background: { ...current.background, ...patch } }))
 
   const hasBackgroundImage = Boolean(draft.customEnabled && draft.background?.url)
-  const contrast = resolveAccentContrast(draft.primaryColor || '#063b00')
+  const contrast = resolveAccentContrast(draft.primaryColor || '#00092A')
 
   const selectMode = (mode) => updateDraft({ mode })
   // "Plain" / "Image" is the background toggle - selecting Image without an uploaded file yet
@@ -237,6 +244,22 @@ export default function ThemeSettings() {
     updateDraft({ customEnabled: true })
     updateBackground({ url: result.url })
     showToast({ title: 'Background uploaded', message: 'Applied across the CRM immediately.' })
+  }
+
+  const handleSelectPreset = async (preset) => {
+    if (isUploadingBackground) return
+    setSelectedPresetId(preset.id)
+    setAssetError('')
+    try {
+      const response = await fetch(preset.src)
+      if (!response.ok) throw new Error('Unable to load preset')
+      const blob = await response.blob()
+      await handleUploadBackground(new File([blob], `${preset.id}.png`, { type: blob.type || 'image/png' }))
+    } catch {
+      setAssetError('Unable to load this preset. Please try another image or upload your own.')
+    } finally {
+      setSelectedPresetId('')
+    }
   }
 
   const handleRemoveBackground = async () => {
@@ -310,7 +333,7 @@ export default function ThemeSettings() {
     refreshTheme()
   }
 
-  const overlayPercent = Math.round((draft.background?.overlayOpacity ?? DEFAULT_OVERLAY_BY_MODE[draft.mode] ?? 0.3) * 100)
+  const overlayPercent = Math.round((draft.background?.overlayOpacity ?? DEFAULT_OVERLAY_BY_MODE[draft.mode] ?? 0.05) * 100)
 
   return (
     <div className="space-y-4">
@@ -359,6 +382,25 @@ export default function ThemeSettings() {
           </ToggleChip>
         </div>
 
+        <div className="mt-5">
+          <p className="text-sm font-medium text-neutral-700">Predefined themes</p>
+          <p className="mt-1 text-xs text-neutral-500">Choose one of the included backgrounds, or upload your own below.</p>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {BACKGROUND_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                disabled={isUploadingBackground}
+                onClick={() => handleSelectPreset(preset)}
+                className={`group overflow-hidden rounded-xl border-2 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${selectedPresetId === preset.id ? 'border-primary-600 ring-2 ring-primary-200' : 'border-neutral-200 hover:border-primary-300'}`}
+              >
+                <img src={preset.src} alt="" className="h-20 w-full object-cover transition-transform group-hover:scale-105" />
+                <span className="block truncate px-2.5 py-2 text-xs font-medium text-neutral-700">{preset.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className={`mt-4 flex items-center gap-3 ${!draft.customEnabled ? 'opacity-50' : ''}`}>
           <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
             {draft.background?.url && draft.background.url !== thumbnailFailedUrl ? (
@@ -373,6 +415,7 @@ export default function ThemeSettings() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-neutral-500">Upload your own</span>
             <Button type="button" variant="outline" size="sm" disabled={!draft.customEnabled} loading={isUploadingBackground} onClick={() => backgroundInputRef.current?.click()}>
               <Upload className="size-3.5" aria-hidden="true" />
               {draft.background?.url ? 'Replace' : 'Upload'}
@@ -401,7 +444,7 @@ export default function ThemeSettings() {
             max="0.9"
             step="0.05"
             disabled={!hasBackgroundImage}
-            value={draft.background?.overlayOpacity ?? DEFAULT_OVERLAY_BY_MODE[draft.mode] ?? 0.3}
+            value={draft.background?.overlayOpacity ?? DEFAULT_OVERLAY_BY_MODE[draft.mode] ?? 0.05}
             onChange={(event) => updateBackground({ overlayOpacity: Number(event.target.value) })}
             className="mt-1.5 w-full accent-primary-600"
           />
@@ -436,7 +479,7 @@ export default function ThemeSettings() {
               {hasBackgroundImage ? 'Image background' : 'Plain background'}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
-              <span className="size-2.5 rounded-full" style={{ backgroundColor: draft.primaryColor || '#063b00' }} aria-hidden="true" />
+              <span className="size-2.5 rounded-full" style={{ backgroundColor: draft.primaryColor || '#00092A' }} aria-hidden="true" />
               {draft.primaryColor || 'Default accent'}
             </span>
           </div>

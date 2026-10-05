@@ -1,7 +1,7 @@
 import { ArrowUp, ArrowDown } from 'lucide-react'
 
 const iconVariantClasses = {
-  primary: 'bg-linear-to-br from-primary-500 to-primary-700 text-white shadow-[0_4px_10px_-3px_rgb(6_59_0/0.45)]',
+  primary: 'bg-linear-to-br from-primary-500 to-primary-700 text-white shadow-[0_4px_10px_-3px_rgb(0_9_42/0.45)]',
   success: 'bg-linear-to-br from-green-400 to-green-600 text-white shadow-[0_4px_10px_-3px_rgb(22_163_74/0.4)]',
   warning: 'bg-linear-to-br from-amber-400 to-amber-600 text-white shadow-[0_4px_10px_-3px_rgb(217_119_6/0.4)]',
   danger: 'bg-linear-to-br from-red-400 to-red-600 text-white shadow-[0_4px_10px_-3px_rgb(220_38_38/0.4)]',

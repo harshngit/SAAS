@@ -518,7 +518,7 @@ function normalizeInvoiceSettings(settings) {
       // invoice-override -> Company Settings fallback precedence as logo/signature.
       stampFileId: settings.branding?.stamp_file_id || '',
       paymentQrFileId: settings.branding?.payment_qr_file_id || '',
-      primaryColor: settings.branding?.primary_color || '#063b00',
+      primaryColor: settings.branding?.primary_color || '#00092A',
     },
     fields: { ...DEFAULT_INVOICE_FIELDS, ...(settings.fields || {}) },
     typography: {

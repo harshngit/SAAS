@@ -30,7 +30,7 @@ export async function payForPlan({ plan, billingCycle, accentColor, onFailed, on
       name: 'Beas Suite',
       description: `${orderResult.planName || plan.name} - ${orderResult.billingCycle || billingCycle}`,
       prefill: orderResult.prefill,
-      theme: { color: accentColor || '#063b00' },
+      theme: { color: accentColor || '#00092A' },
       handler: async (response) => {
         const verifyResult = await verifyRazorpayPayment({
           razorpayOrderId: response.razorpay_order_id,
