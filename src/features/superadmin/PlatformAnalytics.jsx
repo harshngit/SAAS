@@ -15,7 +15,7 @@ import {
   Clock,
   IndianRupee,
   Layers,
-  MoreHorizontal,
+  Eye,
   RotateCw,
   UserPlus,
   Users,
@@ -25,6 +25,7 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import ActionMenu from '../../components/ui/ActionMenu'
 import { listSuperAdminOrganizations } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
 
@@ -36,10 +37,10 @@ const statusVariant = {
 }
 
 const planColors = {
-  'No Plan': '#065f1a',
-  Basic: 'var(--color-primary-700)',
-  Pro: 'var(--color-primary-500)',
-  Enterprise: 'var(--color-amber-500)',
+  'No Plan': '#166534',
+  Basic: '#2563eb',
+  Pro: '#22c55e',
+  Enterprise: '#7c3aed',
 }
 
 const planFilterOptions = ['All Plans', 'No Plan', 'Basic', 'Pro', 'Enterprise']
@@ -595,7 +596,16 @@ export default function PlatformAnalytics() {
                   <span><Badge variant={org.plan?.name ? 'neutral' : 'info'}>{normalizePlanName(org.plan?.name)}</Badge></span>
                   <span><Badge variant={statusVariant[org.status] || 'neutral'} dot>{titleCase(org.status)}</Badge></span>
                   <span className="text-[12px] font-medium text-fg-muted">{formatDateLabel(org.created_at, true)}</span>
-                  <button type="button" className="text-fg-muted hover:text-primary-700"><MoreHorizontal className="size-4" aria-hidden="true" /></button>
+                  <ActionMenu
+                    triggerClassName="size-7 text-fg-muted hover:bg-surface-muted hover:text-primary-700"
+                    items={[
+                      {
+                        label: 'View details',
+                        icon: Eye,
+                        onClick: () => navigate(`/superadmin/organizations/${org.id}`),
+                      },
+                    ]}
+                  />
                 </div>
               ))}
               {stats.recent.length === 0 && <p className="py-8 text-center text-sm text-fg-muted">No organizations yet.</p>}

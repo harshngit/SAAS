@@ -10,8 +10,9 @@ import {
   ChevronDown,
   ChevronRight,
   Clock3,
-  MoreHorizontal,
+  Eye,
   PieChart as PieChartIcon,
+  Trash2,
   TrendingUp,
   UserRoundCog,
   WalletCards,
@@ -31,6 +32,7 @@ import {
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
+import ActionMenu from '../../components/ui/ActionMenu'
 import { deleteOrganization, listSuperAdminOrganizations, updateOrganizationStatus } from '../../api/superadmin'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
@@ -52,8 +54,8 @@ const planVariant = {
 }
 
 const planColors = {
-  'No plan': '#065f1a',
-  Basic: '#0f172a',
+  'No plan': '#166534',
+  Basic: '#2563eb',
   Pro: '#22c55e',
   Business: '#f59e0b',
   Enterprise: '#7c3aed',
@@ -106,7 +108,7 @@ function DashboardCard({ children, className = '' }) {
   )
 }
 
-function PanelHeader({ icon: Icon, title, subtitle, actions, iconClassName = 'bg-green-50 text-green-700' }) {
+function PanelHeader({ icon: Icon, title, subtitle, actions, iconClassName = 'bg-primary-50 text-primary-700' }) {
   return (
     <div className="mb-4 flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-start gap-3">
@@ -465,11 +467,11 @@ export default function SuperAdminDashboard() {
                       setIsDateRangeOpen(false)
                     }}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors ${
-                      growthRange === range.value ? 'bg-green-50 text-green-800' : 'text-slate-600 hover:bg-neutral-50'
+                      growthRange === range.value ? 'bg-primary-50 text-primary-800' : 'text-slate-600 hover:bg-neutral-50'
                     }`}
                   >
                     {range.value}
-                    {growthRange === range.value && <span className="size-1.5 rounded-full bg-green-700" aria-hidden="true" />}
+                    {growthRange === range.value && <span className="size-1.5 rounded-full bg-primary-700" aria-hidden="true" />}
                   </button>
                 ))}
               </div>
@@ -478,7 +480,7 @@ export default function SuperAdminDashboard() {
           <button
             type="button"
             onClick={() => exportDashboardReportCsv({ stats, dateWindow, organizations: organizationsInDateWindow })}
-            className="inline-flex h-11 items-center justify-center gap-3 rounded-xl border border-green-100 bg-green-50 px-5 text-sm font-bold text-green-800 shadow-[0_12px_26px_-24px_rgb(21_128_61/0.65)]"
+            className="inline-flex h-11 items-center justify-center gap-3 rounded-xl border border-primary-100 bg-primary-50 px-5 text-sm font-bold text-primary-800 shadow-[0_12px_26px_-24px_rgb(0_9_42/0.65)]"
           >
             <ArrowDownToLine className="size-4" aria-hidden="true" />
             Export Report
@@ -498,7 +500,7 @@ export default function SuperAdminDashboard() {
           icon={Building2}
           label="Total Organizations"
           value={stats.total}
-          tint={{ border: 'border-green-100', iconBg: 'bg-green-50', icon: 'text-green-800', arrowBg: 'bg-green-50', arrow: 'text-green-700' }}
+          tint={{ border: 'border-primary-100', iconBg: 'bg-primary-50', icon: 'text-primary-800', arrowBg: 'bg-primary-50', arrow: 'text-primary-700' }}
           onClick={() => navigate('/superadmin/organizations')}
         />
         <KpiTile
@@ -545,13 +547,18 @@ export default function SuperAdminDashboard() {
             title="Organizations Growth"
             subtitle="Cumulative organizations on the platform"
             actions={
-              <div className="grid h-10 grid-cols-5 overflow-hidden rounded-full border border-neutral-200 bg-neutral-50 text-[0.72rem] font-bold text-slate-700">
+              <div className="grid h-10 grid-cols-5 overflow-hidden rounded-xl border border-neutral-200 bg-white text-[0.72rem] font-bold text-slate-700 shadow-[0_8px_22px_-20px_rgb(15_23_42/0.45)]">
                 {growthRangeOptions.map((range) => (
                   <button
                     key={range.value}
                     type="button"
                     onClick={() => setGrowthRange(range.value)}
-                    className={`min-w-16 px-4 transition-colors ${growthRange === range.value ? 'bg-green-900 text-white shadow-sm' : 'hover:bg-white'}`}
+                    aria-pressed={growthRange === range.value}
+                    className={`min-w-16 border-r border-neutral-200 px-4 transition-all duration-200 last:border-r-0 ${
+                      growthRange === range.value
+                        ? 'bg-primary-700 text-white'
+                        : 'text-slate-600 hover:bg-primary-50 hover:text-primary-800'
+                    }`}
                   >
                     {range.value}
                   </button>
@@ -564,8 +571,8 @@ export default function SuperAdminDashboard() {
               <AreaChart data={growthChartData} margin={{ left: -18, right: 16, top: 10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="organizationGrowthFill" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="#16a34a" stopOpacity={0.22} />
-                    <stop offset="100%" stopColor="#16a34a" stopOpacity={0.02} />
+                    <stop offset="0%" stopColor="var(--color-primary-600)" stopOpacity={0.22} />
+                    <stop offset="100%" stopColor="var(--color-primary-600)" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="#dfe7e2" vertical />
@@ -579,10 +586,10 @@ export default function SuperAdminDashboard() {
                   key={`organization-growth-area-${growthRange}`}
                   type="monotone"
                   dataKey="total"
-                  stroke="#14532d"
+                  stroke="var(--color-primary-800)"
                   strokeWidth={3}
                   fill="url(#organizationGrowthFill)"
-                  dot={{ r: 3, fill: '#14532d', stroke: '#ffffff', strokeWidth: 2 }}
+                  dot={{ r: 3, fill: 'var(--color-primary-800)', stroke: '#ffffff', strokeWidth: 2 }}
                   activeDot={{ r: 5 }}
                   isAnimationActive
                   animationBegin={120}
@@ -626,11 +633,11 @@ export default function SuperAdminDashboard() {
                           setIsPlanFilterOpen(false)
                         }}
                         className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors ${
-                          planFilter === option ? 'bg-green-50 text-green-800' : 'text-slate-600 hover:bg-neutral-50'
+                          planFilter === option ? 'bg-primary-50 text-primary-800' : 'text-slate-600 hover:bg-neutral-50'
                         }`}
                       >
                         {option}
-                        {planFilter === option && <span className="size-1.5 rounded-full bg-green-700" aria-hidden="true" />}
+                        {planFilter === option && <span className="size-1.5 rounded-full bg-primary-700" aria-hidden="true" />}
                       </button>
                     ))}
                   </div>
@@ -677,7 +684,7 @@ export default function SuperAdminDashboard() {
             icon={UserRoundCog}
             title="Recent Organizations"
             actions={
-              <button type="button" onClick={() => navigate('/superadmin/organizations')} className="inline-flex h-8 items-center gap-2 rounded-lg border border-green-100 bg-green-50 px-3 text-[0.68rem] font-bold text-green-800">
+              <button type="button" onClick={() => navigate('/superadmin/organizations')} className="inline-flex h-8 items-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 text-[0.68rem] font-bold text-primary-800">
                 View All
                 <ChevronRight className="size-3" aria-hidden="true" />
               </button>
@@ -713,9 +720,38 @@ export default function SuperAdminDashboard() {
                 label: 'Actions',
                 width: 'minmax(3rem,0.5fr)',
                 render: (row) => (
-                  <button type="button" onClick={() => handleToggleSuspend(row)} disabled={updatingStatusId === row.id} className="text-slate-500 hover:text-slate-900">
-                    <MoreHorizontal className="size-4" aria-hidden="true" />
-                  </button>
+                  <ActionMenu
+                    triggerClassName="size-7 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                    items={[
+                      {
+                        label: 'View details',
+                        icon: Eye,
+                        onClick: () => navigate(`/superadmin/organizations/${row.id}`),
+                      },
+                      {
+                        label:
+                          updatingStatusId === row.id
+                            ? 'Updating...'
+                            : row.status === 'suspended'
+                              ? 'Activate'
+                              : 'Suspend',
+                        icon: row.status === 'suspended' ? CheckCircle2 : Ban,
+                        onClick: () => {
+                          if (updatingStatusId === row.id) return
+                          handleToggleSuspend(row)
+                        },
+                      },
+                      {
+                        label: 'Delete',
+                        icon: Trash2,
+                        danger: true,
+                        onClick: () => {
+                          setDeleteError('')
+                          setDeleteTarget(row)
+                        },
+                      },
+                    ]}
+                  />
                 ),
               },
             ]}
@@ -729,7 +765,7 @@ export default function SuperAdminDashboard() {
             icon={TrendingUp}
             title="Upgrade Requests"
             actions={
-              <button type="button" onClick={() => navigate('/superadmin/upgrade-requests')} className="inline-flex h-8 items-center gap-2 rounded-lg border border-green-100 bg-green-50 px-3 text-[0.68rem] font-bold text-green-800">
+              <button type="button" onClick={() => navigate('/superadmin/upgrade-requests')} className="inline-flex h-8 items-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 text-[0.68rem] font-bold text-primary-800">
                 View All
                 <ChevronRight className="size-3" aria-hidden="true" />
               </button>

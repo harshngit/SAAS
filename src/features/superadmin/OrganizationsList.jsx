@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Download,
   Eye,
@@ -9,6 +13,7 @@ import {
   Search,
   SlidersHorizontal,
   Timer,
+  X,
 } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -135,6 +140,8 @@ export default function OrganizationsList() {
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+  const [currentPage, setCurrentPage] = useState(1)
 
   const setStatusFilter = (value) => {
     setSearchParams((current) => {
@@ -199,6 +206,19 @@ export default function OrganizationsList() {
         .some((value) => String(value).toLowerCase().includes(query)),
     )
   }, [dateFilteredOrganizations, searchTerm])
+
+  const totalPages = Math.max(1, Math.ceil(visibleOrganizations.length / rowsPerPage))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const pageStartIndex = visibleOrganizations.length === 0 ? 0 : (safeCurrentPage - 1) * rowsPerPage + 1
+  const pageEndIndex = Math.min(safeCurrentPage * rowsPerPage, visibleOrganizations.length)
+  const paginatedOrganizations = useMemo(
+    () => visibleOrganizations.slice((safeCurrentPage - 1) * rowsPerPage, safeCurrentPage * rowsPerPage),
+    [visibleOrganizations, rowsPerPage, safeCurrentPage],
+  )
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter, upgradeStatusFilter, datePreset, customFrom, customTo, rowsPerPage])
 
   const stats = useMemo(
     () => ({
@@ -286,31 +306,6 @@ export default function OrganizationsList() {
             </div>
           </div>
 
-        {showFilters && (
-            <div className="mt-5 grid grid-cols-1 gap-3 border-t border-neutral-100 pt-4 sm:grid-cols-2 xl:grid-cols-3">
-            <Select label="Status" options={statusFilterOptions} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
-            <Select
-              label="Upgrade request"
-              options={upgradeStatusFilterOptions}
-              value={upgradeStatusFilter}
-              onChange={(event) => setUpgradeStatusFilter(event.target.value)}
-            />
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-fg">Created</label>
-              <DateRangeFilter
-                preset={datePreset}
-                onPresetChange={setDatePreset}
-                customFrom={customFrom}
-                customTo={customTo}
-                onCustomChange={({ from, to }) => {
-                  setCustomFrom(from)
-                  setCustomTo(to)
-                }}
-              />
-            </div>
-          </div>
-        )}
-
           <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
             {[
               { label: 'Total Organizations', value: stats.total, hint: 'all organizations', icon: Copy },
@@ -328,6 +323,61 @@ export default function OrganizationsList() {
           </div>
         </div>
       </Card>
+
+      {showFilters && createPortal(
+        <div className="fixed inset-0 z-[100] flex justify-end bg-slate-950/35 backdrop-blur-[2px]" onClick={() => setShowFilters(false)}>
+          <aside
+            className="h-full w-full max-w-sm border-l border-surface-border bg-surface p-6 shadow-[0_24px_70px_-32px_rgb(15_23_42/0.6)]"
+            onClick={(event) => event.stopPropagation()}
+            aria-label="Organization filters"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-(--font-display) text-lg font-semibold tracking-tight text-fg">Filters</h2>
+                <p className="mt-1 text-sm text-fg-muted">Refine organizations by status, upgrade request, and created date.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFilters(false)}
+                className="flex size-9 shrink-0 items-center justify-center rounded-full border border-surface-border text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg"
+                aria-label="Close filters"
+              >
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              <Select label="Status" options={statusFilterOptions} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
+              <Select
+                label="Upgrade request"
+                options={upgradeStatusFilterOptions}
+                value={upgradeStatusFilter}
+                onChange={(event) => setUpgradeStatusFilter(event.target.value)}
+              />
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-fg">Created</label>
+                <DateRangeFilter
+                  preset={datePreset}
+                  onPresetChange={setDatePreset}
+                  customFrom={customFrom}
+                  customTo={customTo}
+                  onCustomChange={({ from, to }) => {
+                    setCustomFrom(from)
+                    setCustomTo(to)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-8 flex justify-end">
+              <Button type="button" onClick={() => setShowFilters(false)}>
+                Apply Filters
+              </Button>
+            </div>
+          </aside>
+        </div>,
+        document.body,
+      )}
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto bg-surface px-0 py-0">
@@ -366,7 +416,7 @@ export default function OrganizationsList() {
               </tr>
             </thead>
             <tbody>
-              {visibleOrganizations.map((organization) => (
+              {paginatedOrganizations.map((organization) => (
                   <tr
                     key={organization.id}
                     onClick={() => navigate(`/superadmin/organizations/${organization.id}`)}
@@ -444,6 +494,57 @@ export default function OrganizationsList() {
           </table>
           )}
         </div>
+        {!isLoadingOrganizations && !listError && visibleOrganizations.length > 0 && (
+          <div className="flex flex-col gap-4 border-t border-surface-border px-6 py-4 text-sm text-fg-muted sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-4">
+              <span>
+                Showing <span className="font-semibold text-fg">{pageStartIndex}-{pageEndIndex}</span> of{' '}
+                <span className="font-semibold text-fg">{visibleOrganizations.length}</span>
+              </span>
+              <span className="hidden h-4 w-px bg-surface-border sm:block" aria-hidden="true" />
+              <label className="flex items-center gap-3">
+                <span>Rows per page</span>
+                <span className="relative">
+                  <select
+                    value={rowsPerPage}
+                    onChange={(event) => setRowsPerPage(Number(event.target.value))}
+                    className="h-10 appearance-none rounded-full border border-surface-border bg-surface py-0 pl-5 pr-10 text-sm font-medium text-fg shadow-(--shadow-xs) outline-none transition-all focus:border-primary-400 focus:ring-4 focus:ring-primary-500/12"
+                  >
+                    {[10, 25, 50].map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" aria-hidden="true" />
+                </span>
+              </label>
+            </div>
+            <div className="flex items-center gap-4 sm:justify-end">
+              <button
+                type="button"
+                disabled={safeCurrentPage === 1}
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                className="flex size-10 items-center justify-center rounded-full border border-surface-border text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="size-5" aria-hidden="true" />
+              </button>
+              <span className="font-semibold text-fg">
+                {safeCurrentPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={safeCurrentPage === totalPages}
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                className="flex size-10 items-center justify-center rounded-full border border-surface-border text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                aria-label="Next page"
+              >
+                <ChevronRight className="size-5" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   )

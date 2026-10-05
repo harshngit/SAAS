@@ -401,7 +401,7 @@ function ProductUploadField({ field, value, isUploading, onFileSelected, onRemov
           </span>
         )}
         <div className="flex shrink-0 flex-col items-start gap-2">
-          <label className="inline-flex h-8 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+          <label className="inline-flex h-8 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(0_9_42/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
             <Upload className="size-3.5" aria-hidden="true" />
             {isUploading ? 'Uploading' : 'Upload'}
             <input
@@ -1252,7 +1252,7 @@ export default function ProductForm({
               </div>
               <p className="mt-1 text-sm text-neutral-500">Add every sellable variant with its stock, MRP, and selling price.</p>
             </div>
-            <Button type="button" size="sm" className="h-10 px-4 shadow-[0_12px_26px_-14px_rgb(6_59_0/0.9)]" onClick={addVariant}>
+            <Button type="button" size="sm" className="h-10 px-4 shadow-[0_12px_26px_-14px_rgb(0_9_42/0.9)]" onClick={addVariant}>
               <Plus className="size-4" aria-hidden="true" />
               New Variant
             </Button>
@@ -1426,7 +1426,7 @@ export default function ProductForm({
               </span>
             )}
             <div className="flex shrink-0 items-center gap-2">
-              <label className="inline-flex h-8 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+              <label className="inline-flex h-8 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(0_9_42/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
                 <Upload className="size-3.5" aria-hidden="true" />
                 {isUploading ? 'Uploading' : 'Upload'}
                 <input
@@ -1473,7 +1473,7 @@ export default function ProductForm({
               error={errors.videoUrl}
             />
             <div className="flex flex-wrap items-center gap-2">
-              <label className="inline-flex h-10 w-28 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-sm font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+              <label className="inline-flex h-10 w-28 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-sm font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(0_9_42/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
                 <Upload className="size-4" aria-hidden="true" />
                 {isUploading ? 'Uploading' : 'Upload'}
                 <input
@@ -1537,7 +1537,7 @@ export default function ProductForm({
               )}
             </button>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <label className="inline-flex h-8 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+              <label className="inline-flex h-8 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(0_9_42/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
                 <Upload className="size-3.5" aria-hidden="true" />
                 Upload
                 <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={handleCoverImageChange} />
@@ -1598,7 +1598,7 @@ export default function ProductForm({
               </button>
             )}
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <label className="inline-flex h-8 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+              <label className="inline-flex h-8 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(0_9_42/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
                 <ImagePlus className="size-3.5" aria-hidden="true" />
                 Add
                 <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple className="sr-only" onChange={handleAdditionalImagesChange} />

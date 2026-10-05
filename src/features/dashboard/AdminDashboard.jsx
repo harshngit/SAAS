@@ -191,7 +191,7 @@ function FilterField({ label, children }) {
 
 function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
   const toneClasses = {
-    green: 'bg-[linear-gradient(135deg,#0f3d10,#14532d)] text-white',
+    green: 'bg-linear-to-br from-primary-700 to-primary-900 text-white',
     mint: 'bg-[linear-gradient(135deg,#047857,#10b981)] text-white',
     amber: 'bg-[linear-gradient(135deg,#f59e0b,#fbbf24)] text-white',
     violet: 'bg-[linear-gradient(135deg,#7c3aed,#8b5cf6)] text-white',
@@ -828,7 +828,7 @@ export default function AdminDashboard() {
             type="button"
             onClick={applyFilters}
             disabled={isLoading}
-            className="inline-flex h-10 min-w-0 items-center justify-center rounded-xl bg-primary-600 px-3 py-1.5 text-[0.73rem] font-semibold text-white shadow-[0_12px_24px_-14px_rgb(6_59_0/0.45)] transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 min-w-0 items-center justify-center rounded-xl bg-primary-600 px-3 py-1.5 text-[0.73rem] font-semibold text-white shadow-[0_12px_24px_-14px_rgb(0_9_42/0.45)] transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isLoading ? 'Applying…' : 'Apply'}
           </button>

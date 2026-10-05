@@ -79,7 +79,7 @@ export function generateColorRamp(hex) {
   // (--color-primary-400..800 are all hand-pinned to the same literal value in index.css, not a
   // generated progression). Forcing them to a fixed 38%-ish lightness instead made the accent
   // color on buttons visibly brighter than the color someone actually picked (e.g. a dark
-  // #063b00 rendered as a much lighter green). Only the light tints (50-300, hover/badge
+  // a dark brand color rendered as a much lighter tint). Only the light tints (50-300, hover/badge
   // backgrounds) and dark text shades (900/950) still vary in computed lightness.
   ;['400', '500', '600', '700', '800'].forEach((shade) => { ramp[shade] = hex })
   return ramp
@@ -149,7 +149,7 @@ export function resolveThemeTokens(theme) {
     tokens['--color-accent'] = primaryRamp['600']
     tokens['--color-accent-contrast'] = resolveAccentContrast(primaryRamp['600']).color
     // Sidebar active-nav background: a light TINT of the accent color (ramp shade 200), never
-    // the raw accent as a solid block - keeps the same visual weight as the default #c4eba9
+    // the raw accent as a solid block - keeps the same visual weight as the default #adbfff
     // regardless of mode.
     tokens['--sidebar-active-bg'] = primaryRamp['200']
   }
@@ -222,7 +222,7 @@ export function resolveGlassSurfaceStyle(theme, hasLoadedBackground) {
     '--row-divider': 'rgba(15, 23, 42, 0.14)',
     '--input-bg': 'rgba(255, 255, 255, 0.05)',
     '--input-border': 'rgba(15, 23, 42, 0.2)',
-    '--sidebar-bg': 'rgba(238, 246, 235, 0.05)',
+    '--sidebar-bg': 'rgba(243, 246, 255, 0.05)',
     '--glass-blur': 'blur(6px) saturate(140%)',
   }
 }

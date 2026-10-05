@@ -1,18 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  /* Primary: brand green, with black/white supporting states */
-  --color-primary-50: #f7f7f7;
-  --color-primary-100: #eeeeee;
-  --color-primary-200: #dddddd;
-  --color-primary-300: #bdbdbd;
+  /* Primary: default brand accent (#00092A), with generated tints for subtle states */
+  --color-primary-50: #ebefff;
+  --color-primary-100: #d6dfff;
+  --color-primary-200: #adbfff;
+  --color-primary-300: #708fff;
   --color-primary-400: #00092A;
   --color-primary-500: #00092A;
   --color-primary-600: #00092A;
   --color-primary-700: #00092A;
   --color-primary-800: #00092A;
-  --color-primary-900: #052f00;
-  --color-primary-950: #021a00;
+  --color-primary-900: #00145c;
+  --color-primary-950: #000b33;
 
   /* Status palettes pinned to hex (close approximations of Tailwind's default oklch
      shades). Tailwind v4 leaves any non-overridden colour as an oklch()/color-mix()
@@ -117,8 +117,8 @@
    not through a generated utility family. */
 :root {
   --app-bg: #ffffff;
-  --sidebar-bg: #eef6eb;
-  --sidebar-active-bg: #c4eba9;
+  --sidebar-bg: #f3f6ff;
+  --sidebar-active-bg: #adbfff;
   --row-divider: #e4e6e9;
   --input-bg: #f8f9fa;
   --input-border: #e4e6e9;
@@ -193,7 +193,7 @@
   --modal-bg: #111827;
 
   --app-bg: #0a0e14;
-  --sidebar-bg: #0f1a12;
+  --sidebar-bg: #050b1f;
   --row-divider: #374151;
   --input-bg: #1f2937;
   --input-border: #374151;
@@ -243,8 +243,8 @@
      these per variant. */
   --badge-neutral-bg: rgba(148, 163, 184, 0.18);
   --badge-neutral-text: #e2e8f0;
-  --badge-primary-bg: rgba(134, 239, 172, 0.18);
-  --badge-primary-text: #bbf7d0;
+  --badge-primary-bg: rgba(173, 191, 255, 0.18);
+  --badge-primary-text: #d6dfff;
   --badge-success-bg: rgba(34, 197, 94, 0.18);
   --badge-success-text: #86efac;
   --badge-warning-bg: rgba(245, 158, 11, 0.18);
@@ -265,7 +265,7 @@
   --row-divider: rgba(15, 23, 42, 0.14);
   --input-bg: rgba(255, 255, 255, 0.05);
   --input-border: rgba(15, 23, 42, 0.2);
-  --sidebar-bg: rgba(238, 246, 235, 0.05);
+  --sidebar-bg: rgba(243, 246, 255, 0.05);
 }
 
 /* Applied by the shared components that should actually blur (Layout's content panel/header,

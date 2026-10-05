@@ -178,7 +178,7 @@ function DocumentUploadRow({ label, description, accept, multiple = false, exist
           {!stagedNames && !hasExisting && <p className="mt-1 text-xs text-neutral-400">No file uploaded</p>}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+          <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(0_9_42/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
             <Upload className="size-3.5" aria-hidden="true" />
             Upload
             <input
@@ -649,7 +649,7 @@ export default function UserEdit() {
               type="button"
               variant="outline"
               size="sm"
-              className="border-[#00092A] text-[#00092A] hover:border-[#00092A] hover:bg-primary-50 hover:text-[#00092A]"
+              className="border-primary-700 text-primary-700 hover:border-primary-700 hover:bg-primary-50 hover:text-primary-700"
               onClick={() => navigate('/admin/users')}
             >
               Back to Staff

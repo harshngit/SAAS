@@ -114,7 +114,7 @@ export default function Register() {
 
               <Button
                 type="submit"
-                className="w-full rounded-xl bg-linear-to-r from-primary-500 to-primary-600 py-3 text-base shadow-[0_14px_30px_-14px_rgb(6_59_0/0.8)] hover:from-primary-500 hover:to-primary-700"
+                className="w-full rounded-xl bg-linear-to-r from-primary-500 to-primary-600 py-3 text-base shadow-[0_14px_30px_-14px_rgb(0_9_42/0.8)] hover:from-primary-500 hover:to-primary-700"
                 loading={isSubmitting}
               >
                 Register

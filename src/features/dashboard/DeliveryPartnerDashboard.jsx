@@ -448,7 +448,7 @@ export default function DeliveryPartnerDashboard() {
 
   return (
     <div className="space-y-5 lg:space-y-6">
-      <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-[#0d5d12] via-[#0f4f10] to-[#0c3f0d] px-5 py-5 shadow-[0_16px_36px_-16px_rgb(6_59_0/0.55)] sm:px-6 sm:py-6">
+      <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-primary-700 via-primary-800 to-primary-900 px-5 py-5 shadow-[0_16px_36px_-16px_rgb(0_9_42/0.55)] sm:px-6 sm:py-6">
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-4">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-white/15 text-lg font-semibold text-white ring-1 ring-white/25">

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Edit, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { Edit, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -240,7 +240,7 @@ export default function SuperAdminsList() {
         )}
       />
 
-      <Card title="Superadmin Accounts">
+      <Card>
         <DataTable
           columns={[
             {
@@ -268,6 +268,28 @@ export default function SuperAdminsList() {
           data={dateFilteredAdmins}
           searchKeys={['name', 'email', 'phone']}
           searchPlaceholder="Search superadmins..."
+          renderToolbar={({ search, onSearchChange, resultCount }) => (
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="font-(--font-display) text-base font-semibold tracking-tight text-fg">Superadmin Accounts</h3>
+                <p className="mt-2 text-xs font-medium text-neutral-400">
+                  {resultCount} {resultCount === 1 ? 'result' : 'results'}
+                </p>
+              </div>
+              <div className="w-full sm:max-w-sm">
+                <div className="relative w-full">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={onSearchChange}
+                    placeholder="Search superadmins..."
+                    className="w-full rounded-full border border-neutral-100 bg-neutral-50 py-2.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
           loading={isLoading}
           emptyTitle={listError ? 'Unable to load superadmins' : 'No superadmins found'}
           emptyDescription={listError || undefined}

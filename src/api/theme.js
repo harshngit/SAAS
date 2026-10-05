@@ -40,10 +40,12 @@ function authHeader() {
 
 // customEnabled:false here is what keeps the current CRM design active whenever the org has
 // never customized its theme, the theme API fails, or the app hasn't fetched it yet.
+export const DEFAULT_PRIMARY_COLOR = '#00092A'
+
 export const DEFAULT_THEME = {
   customEnabled: false,
   mode: 'light',
-  primaryColor: '',
+  primaryColor: DEFAULT_PRIMARY_COLOR,
   background: { url: '', overlayOpacity: null }, // null = "not set yet" -> ThemeSettings uses the shared 5% default.
   updatedAt: null,
 }
@@ -51,15 +53,16 @@ export const DEFAULT_THEME = {
 // snake_case wire shape -> camelCase, one flat object - the one place this mapping happens.
 export function normalizeOrganizationTheme(payload) {
   if (!payload) return DEFAULT_THEME
+  const background = payload.background || {}
   return {
-    customEnabled: Boolean(payload.custom_enabled),
+    customEnabled: Boolean(payload.custom_enabled ?? payload.customEnabled),
     mode: payload.mode === 'dark' ? 'dark' : 'light',
-    primaryColor: payload.primary_color || '',
+    primaryColor: payload.primary_color || payload.primaryColor || DEFAULT_PRIMARY_COLOR,
     background: {
-      url: getFileUrl(payload.background?.url || ''),
-      overlayOpacity: payload.background?.overlay_opacity ?? null,
+      url: getFileUrl(background.url || ''),
+      overlayOpacity: background.overlay_opacity ?? background.overlayOpacity ?? null,
     },
-    updatedAt: payload.updated_at || null,
+    updatedAt: payload.updated_at || payload.updatedAt || null,
   }
 }
 

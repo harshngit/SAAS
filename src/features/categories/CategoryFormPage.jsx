@@ -216,7 +216,7 @@ export default function CategoryFormPage() {
                 className="flex-1"
                 compact
               />
-              <label className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-linear-to-b from-primary-500 to-primary-600 px-3.5 text-sm font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+              <label className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-linear-to-b from-primary-500 to-primary-600 px-3.5 text-sm font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(0_9_42/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
                 <Upload className="size-4" aria-hidden="true" />
                 Upload
                 <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={handleImageUpload} />

@@ -1604,7 +1604,7 @@ function FileUploadField({
               className={`inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium tracking-tight transition-all ${
                 disabled || uploading
                   ? "cursor-not-allowed opacity-50 bg-linear-to-b from-primary-500 to-primary-600 text-white"
-                  : "cursor-pointer bg-linear-to-b from-primary-500 to-primary-600 text-white shadow-[0_8px_20px_-6px_rgb(6_59_0/0.4)] hover:from-primary-500 hover:to-primary-700"
+                  : "cursor-pointer bg-linear-to-b from-primary-500 to-primary-600 text-white shadow-[0_8px_20px_-6px_rgb(0_9_42/0.4)] hover:from-primary-500 hover:to-primary-700"
               }`}
             >
               <Upload className="size-4" />
@@ -3471,7 +3471,7 @@ export default function CompanySettings() {
                     onClick={() => handleTabChange(item.id)}
                     className={`relative flex shrink-0 items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-sm font-medium transition-colors lg:w-full ${
                       isActive
-                        ? "bg-[#c4eba9] text-neutral-900 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]"
+                        ? "bg-primary-200 text-primary-950 shadow-[inset_0_0_0_1px_rgb(0_9_42/0.14)]"
                         : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-800"
                     }`}
                   >

@@ -223,7 +223,7 @@ export default function Sidebar({
 
         <div className={`relative flex items-center px-4 pb-4 pt-5 ${isExpanded ? 'justify-between' : 'md:justify-center'}`}>
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#0f5116] text-white shadow-[0_10px_24px_-16px_rgb(15_81_22/0.55)]">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-700 text-white shadow-[0_10px_24px_-16px_rgb(0_9_42/0.55)]">
               <Droplet className="size-5" aria-hidden="true" />
             </div>
             <div className={`hidden min-w-0 flex-col overflow-hidden transition-all duration-150 md:flex ${labelVisibilityClass}`}>
@@ -273,7 +273,7 @@ export default function Sidebar({
                     title={group.section}
                     className={`group relative hidden items-center justify-center rounded-2xl py-2.5 text-sm font-medium transition-all duration-150 md:flex ${
                       isSectionActive
-                        ? 'bg-(--sidebar-active-bg) text-primary-700 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.14)]'
+                        ? 'bg-(--sidebar-active-bg) text-primary-700 shadow-[inset_0_0_0_1px_rgb(0_9_42/0.14)]'
                         : 'text-fg-muted hover:bg-neutral-50 hover:text-fg'
                     }`}
                   >
@@ -365,7 +365,7 @@ export default function Sidebar({
                               // --color-neutral-900 INVERTS to a light value there (Part 2.3) -
                               // that pairing went light-on-light. --color-primary-900 is a fixed
                               // dark shade of the accent ramp and isn't part of that inversion.
-                              ? 'bg-(--sidebar-active-bg) text-primary-900 shadow-[inset_0_0_0_1px_rgb(6_59_0/0.12)]'
+                              ? 'bg-(--sidebar-active-bg) text-primary-900 shadow-[inset_0_0_0_1px_rgb(0_9_42/0.12)]'
                               : 'text-fg-muted hover:bg-neutral-50 hover:text-fg'
                           }`
                         }

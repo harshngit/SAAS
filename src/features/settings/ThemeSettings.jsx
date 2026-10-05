@@ -10,6 +10,7 @@ import { usePermission } from '../../auth/usePermission'
 import { useTheme } from '../../theme/useTheme'
 import {
   deleteThemeBackground,
+  DEFAULT_PRIMARY_COLOR,
   resetOrganizationTheme,
   updateOrganizationTheme,
   uploadThemeBackground,
@@ -17,7 +18,7 @@ import {
 import { resolveAccentContrast, resolveThemeTokens } from '../../theme/themeConfig'
 import { getFileUrl } from '../../api/files'
 
-const COLOR_PRESETS = ['#00092A', '#16A34A', '#2563EB', '#DC2626', '#7C3AED', '#EA580C']
+const COLOR_PRESETS = [DEFAULT_PRIMARY_COLOR, '#16A34A', '#2563EB', '#DC2626', '#7C3AED', '#EA580C']
 const DEFAULT_OVERLAY_BY_MODE = { dark: 0.05, light: 0.05 }
 const BACKGROUND_PRESETS = [
   { id: 'theme1', label: 'Soft Mint', src: '/theme1.png' },
@@ -145,10 +146,10 @@ function ColorField({ label, value, onChange, disabled, warning }) {
           />
         ))}
         <label className={`flex size-8 items-center justify-center rounded-full border border-dashed border-neutral-300 text-neutral-400 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-primary-300'}`}>
-          <input type="color" value={value || '#00092A'} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="size-0 opacity-0" />
+          <input type="color" value={value || DEFAULT_PRIMARY_COLOR} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="size-0 opacity-0" />
           <Palette className="pointer-events-none size-3.5" aria-hidden="true" />
         </label>
-        <Input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} placeholder="#00092A" className="w-28" />
+        <Input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} placeholder={DEFAULT_PRIMARY_COLOR} className="w-28" />
       </div>
       {warning && (
         <p className="mt-2 flex items-center gap-1.5 text-xs text-amber-600">
@@ -206,7 +207,7 @@ export default function ThemeSettings() {
   const updateBackground = (patch) => setDraft((current) => ({ ...current, background: { ...current.background, ...patch } }))
 
   const hasBackgroundImage = Boolean(draft.customEnabled && draft.background?.url)
-  const contrast = resolveAccentContrast(draft.primaryColor || '#00092A')
+  const contrast = resolveAccentContrast(draft.primaryColor || DEFAULT_PRIMARY_COLOR)
 
   const selectMode = (mode) => updateDraft({ mode })
   // "Plain" / "Image" is the background toggle - selecting Image without an uploaded file yet
@@ -479,7 +480,7 @@ export default function ThemeSettings() {
               {hasBackgroundImage ? 'Image background' : 'Plain background'}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
-              <span className="size-2.5 rounded-full" style={{ backgroundColor: draft.primaryColor || '#00092A' }} aria-hidden="true" />
+              <span className="size-2.5 rounded-full" style={{ backgroundColor: draft.primaryColor || DEFAULT_PRIMARY_COLOR }} aria-hidden="true" />
               {draft.primaryColor || 'Default accent'}
             </span>
           </div>

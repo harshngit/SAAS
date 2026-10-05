@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Check, CheckCircle2, Clock, Copy, Download, Eye, Search, SlidersHorizontal, X, XCircle } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
@@ -214,31 +215,6 @@ export default function UpgradeRequests() {
             </div>
           </div>
 
-          {isFilterOpen && (
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-4">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList>
-                  {tabOptions.map((tab) => (
-                    <TabsTrigger key={tab.value || 'all'} value={tab.value}>
-                      {tab.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-              <DateRangeFilter
-                preset={datePreset}
-                onPresetChange={setDatePreset}
-                customFrom={customFrom}
-                customTo={customTo}
-                onCustomChange={({ from, to }) => {
-                  setCustomFrom(from)
-                  setCustomTo(to)
-                }}
-                className="w-44"
-              />
-            </div>
-          )}
-
           <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
             {[
               { label: 'Total Requests', value: requestSummary.total, detail: 'all requests', icon: Copy },
@@ -256,6 +232,66 @@ export default function UpgradeRequests() {
           </div>
         </div>
       </Card>
+
+      {isFilterOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex justify-end bg-slate-950/35 backdrop-blur-[2px]" onClick={() => setIsFilterOpen(false)}>
+          <aside
+            className="h-full w-full max-w-sm border-l border-surface-border bg-surface p-6 shadow-[0_24px_70px_-32px_rgb(15_23_42/0.6)]"
+            onClick={(event) => event.stopPropagation()}
+            aria-label="Upgrade request filters"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-(--font-display) text-lg font-semibold tracking-tight text-fg">Filters</h2>
+                <p className="mt-1 text-sm text-fg-muted">Refine upgrade requests by decision status and requested date.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFilterOpen(false)}
+                className="flex size-9 shrink-0 items-center justify-center rounded-full border border-surface-border text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg"
+                aria-label="Close filters"
+              >
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-fg">Status</label>
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList className="w-full">
+                    {tabOptions.map((tab) => (
+                      <TabsTrigger key={tab.value || 'all'} value={tab.value}>
+                        {tab.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-fg">Requested</label>
+                <DateRangeFilter
+                  preset={datePreset}
+                  onPresetChange={setDatePreset}
+                  customFrom={customFrom}
+                  customTo={customTo}
+                  onCustomChange={({ from, to }) => {
+                    setCustomFrom(from)
+                    setCustomTo(to)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-8 flex justify-end">
+              <Button type="button" onClick={() => setIsFilterOpen(false)}>
+                Apply Filters
+              </Button>
+            </div>
+          </aside>
+        </div>,
+        document.body,
+      )}
 
       {actionError && (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>

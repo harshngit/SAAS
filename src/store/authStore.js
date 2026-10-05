@@ -79,7 +79,7 @@ export const useAuthStore = create(
       // applies this synchronously on first render, before its own GET /organization/theme
       // refresh resolves. Org-scoped implicitly: it's part of the same persisted authProfile
       // blob as `user`/`organization`, so a different login/org always overwrites it.
-      orgTheme: storedAuthProfile?.theme || DEFAULT_THEME,
+      orgTheme: storedAuthProfile?.theme ? normalizeOrganizationTheme(storedAuthProfile.theme) : DEFAULT_THEME,
 
       setAuthenticatedSession: ({
         user,

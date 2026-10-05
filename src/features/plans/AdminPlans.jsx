@@ -289,7 +289,7 @@ export default function AdminPlans() {
         )}
       </Modal>
 
-      <section className="rounded-2xl border border-neutral-100 bg-linear-to-br from-white via-white to-[#eef6eb] p-5 shadow-(--shadow-card)">
+      <section className="rounded-2xl border border-neutral-100 bg-linear-to-br from-white via-white to-primary-50 p-5 shadow-(--shadow-card)">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
@@ -386,7 +386,7 @@ export default function AdminPlans() {
                   key={plan.id}
                   className={`group flex min-h-[39rem] rounded-2xl border shadow-(--shadow-card) transition-all duration-300 hover:-translate-y-2 hover:shadow-(--shadow-card-hover) ${
                     isFeatured
-                      ? 'xl:min-h-[43rem] border-primary-700 bg-[#00092A] ring-1 ring-primary-700 xl:shadow-[0_10px_22px_-12px_rgb(0_9_42/0.22),0_34px_70px_-40px_rgb(0_9_42/0.42)]'
+                      ? 'xl:min-h-[43rem] border-primary-700 bg-primary-700 ring-1 ring-primary-700 xl:shadow-[0_10px_22px_-12px_rgb(0_9_42/0.22),0_34px_70px_-40px_rgb(0_9_42/0.42)]'
                     : isCurrent
                         ? 'border-primary-300 bg-surface ring-2 ring-primary-100'
                         : 'border-neutral-100 bg-surface'
@@ -469,7 +469,7 @@ export default function AdminPlans() {
                           variant={isFeatured ? 'outline' : 'primary'}
                           className={`mt-5 w-full transition-transform duration-200 group-hover:scale-[1.01] ${
                             isFeatured
-                              ? 'border-primary-200 bg-[#bdeaa5] text-primary-700 shadow-[0_10px_24px_-12px_rgb(6_59_0/0.35)] hover:border-primary-300 hover:bg-[#aee391] hover:text-primary-900'
+                              ? 'border-primary-200 bg-primary-100 text-primary-700 shadow-[0_10px_24px_-12px_rgb(0_9_42/0.35)] hover:border-primary-300 hover:bg-primary-200 hover:text-primary-900'
                               : ''
                           }`}
                           disabled={Boolean(payingPlanId) && !isPaying}
@@ -486,7 +486,7 @@ export default function AdminPlans() {
                           variant={isFeatured ? 'outline' : 'primary'}
                           className={`mt-5 w-full disabled:opacity-100 ${
                             isFeatured
-                              ? 'border-primary-200 bg-[#bdeaa5] text-primary-700 hover:border-primary-200 hover:bg-[#bdeaa5]'
+                              ? 'border-primary-200 bg-primary-100 text-primary-700 hover:border-primary-200 hover:bg-primary-100'
                               : ''
                           }`}
                           disabled

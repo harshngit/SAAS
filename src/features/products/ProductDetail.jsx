@@ -633,7 +633,7 @@ export default function ProductDetail() {
         title="Attachments"
         subtitle="Extra files attached to this product (up to 10)"
         action={
-          <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3.5 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(6_59_0/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
+          <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-3.5 text-xs font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(0_9_42/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
             {isUploadingAttachment ? 'Uploading...' : <><Upload className="size-3.5" aria-hidden="true" />Upload</>}
             <input type="file" multiple className="sr-only" disabled={isUploadingAttachment || attachments.length >= 10} onChange={handleUploadAttachments} />
           </label>
