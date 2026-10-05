@@ -1,9 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Building2, Calendar, Check, Clock, CreditCard, Trash2, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  Building2,
+  Calendar,
+  Check,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  Edit3,
+  Info,
+  IndianRupee,
+  Mail,
+  MapPin,
+  Phone,
+  Settings,
+  Trash2,
+  X,
+} from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
-import StatCard from '../../components/ui/StatCard'
 import Badge from '../../components/ui/Badge'
 import Select from '../../components/ui/Select'
 import Input from '../../components/ui/Input'
@@ -44,15 +60,85 @@ const upgradeStatusVariant = {
   rejected: 'danger',
 }
 
+const metricCardClasses = {
+  plan: 'border-surface-border bg-surface',
+  price: 'border-surface-border bg-surface',
+  trial: 'border-surface-border bg-surface',
+  member: 'border-surface-border bg-surface',
+}
+
+const metricIconClasses = {
+  plan: 'bg-blue-100 text-blue-600',
+  price: 'bg-emerald-100 text-emerald-700',
+  trial: 'bg-violet-100 text-violet-700',
+  member: 'bg-orange-100 text-orange-600',
+}
+
 function formatDate(value) {
-  if (!value) return '—'
+  if (!value) return '-'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString()
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function titleCase(value) {
   if (!value) return 'Unknown'
   return `${value.charAt(0).toUpperCase()}${value.slice(1)}`
+}
+
+function MetricTile({ icon: Icon, label, value, hint, tone = 'plan', info = false }) {
+  return (
+    <div className={`min-h-[126px] rounded-2xl border px-6 py-5 shadow-(--shadow-card) ${metricCardClasses[tone]}`}>
+      <div className="flex items-start gap-4">
+        <span className={`flex size-12 items-center justify-center rounded-xl ${metricIconClasses[tone]}`}>
+          <Icon className="size-6" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-medium text-fg-muted">{label}</p>
+            {info && <Info className="size-3.5 text-fg-muted" aria-hidden="true" />}
+          </div>
+          <p className="mt-2 font-(--font-display) text-2xl font-bold leading-none tracking-tight text-fg">
+            {value}
+          </p>
+          {hint && <p className="mt-3 max-w-52 text-xs leading-5 text-fg-muted">{hint}</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DetailRow({ label, value, icon: Icon }) {
+  return (
+    <div className="grid grid-cols-[1.35fr_2fr] items-center gap-4 border-b border-surface-border py-3 last:border-b-0">
+      <div className="flex min-w-0 items-center gap-3">
+        {Icon && (
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-fg-muted">
+            <Icon className="size-3.5" aria-hidden="true" />
+          </span>
+        )}
+        <p className="truncate text-xs font-medium text-fg-muted">{label}</p>
+      </div>
+      <p className="min-w-0 break-words text-sm font-medium text-fg">{value || '-'}</p>
+    </div>
+  )
+}
+
+function SectionTitle({ icon: Icon, title, actions }) {
+  return (
+    <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="flex items-center gap-3">
+        {Icon && (
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-fg-muted">
+            <Icon className="size-4" aria-hidden="true" />
+          </span>
+        )}
+        <h3 className="font-(--font-display) text-base font-semibold tracking-tight text-fg">{title}</h3>
+      </div>
+      {actions}
+    </div>
+  )
 }
 
 export default function OrganizationDetail() {
@@ -209,7 +295,7 @@ export default function OrganizationDetail() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading organization…" />
+    return <LoadingSpinner label="Loading organization..." />
   }
 
   if (!organization) {
@@ -226,71 +312,107 @@ export default function OrganizationDetail() {
   }
 
   const hasUpgradeRequest = organization.upgrade_status && organization.upgrade_status !== 'none'
+  const currentPlanName = organization.plan?.name || 'No plan'
+  const currentPrice = formatCurrency(
+    organization.billing_cycle === 'yearly'
+      ? organization.plan?.price_yearly || 0
+      : organization.plan?.price_monthly || 0,
+  )
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="secondary" onClick={() => navigate('/superadmin/organizations')}>
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Back
-          </Button>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold text-neutral-900">{organization.name}</h1>
-              <Badge variant={statusVariant[organization.status] || 'neutral'} dot>
-                {titleCase(organization.status)}
-              </Badge>
-            </div>
-            <p className="mt-1 text-sm text-neutral-500">Organization Details</p>
-          </div>
-        </div>
+    <div className="listing-page space-y-4">
+      <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-fg-muted">
         <Button
-          variant="danger"
-          onClick={() => {
-            setDeleteError('')
-            setIsDeleteModalOpen(true)
-          }}
+          variant="outline"
+          size="sm"
+          className="h-9 rounded-full px-4 text-xs"
+          onClick={() => navigate('/superadmin/organizations')}
         >
-          <Trash2 className="size-4" aria-hidden="true" />
-          Delete Organization
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Back
         </Button>
+        <span>Organizations</span>
+        <ChevronRight className="size-3.5" aria-hidden="true" />
+        <span className="max-w-64 truncate">{organization.name}</span>
+      </div>
+
+      <div className="relative min-h-[112px] overflow-hidden rounded-2xl border border-surface-border bg-surface p-4 shadow-(--shadow-card)">
+        <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 items-center gap-5">
+            <div className="flex size-[76px] shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-primary-600">
+              <Building2 className="size-9" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate font-(--font-display) text-2xl font-semibold tracking-tight text-fg">
+                  {organization.name}
+                </h1>
+                <Badge variant={statusVariant[organization.status] || 'neutral'} dot>
+                  {titleCase(organization.status)}
+                </Badge>
+              </div>
+              <p className="mt-1 text-sm text-fg-muted">Organization details and subscription controls</p>
+            </div>
+          </div>
+          <Button
+            variant="danger"
+            className="h-11 px-5 shadow-[0_12px_24px_-10px_rgb(220_38_38/0.8)]"
+            onClick={() => {
+              setDeleteError('')
+              setIsDeleteModalOpen(true)
+            }}
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+            Delete Organization
+          </Button>
+        </div>
       </div>
 
       {actionError && (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <StatCard icon={CreditCard} iconVariant="primary" label="Current Plan" value={organization.plan?.name || 'No plan'} />
-        <StatCard
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MetricTile
           icon={CreditCard}
-          iconVariant="success"
+          label="Current Plan"
+          value={currentPlanName}
+          hint={organization.plan ? 'Current active subscription plan.' : "This organization doesn't have an active plan."}
+          tone="plan"
+          info
+        />
+        <MetricTile
+          icon={IndianRupee}
           label={`Price / ${organization.billing_cycle === 'yearly' ? 'year' : 'month'}`}
-          value={formatCurrency(
-            organization.billing_cycle === 'yearly'
-              ? organization.plan?.price_yearly || 0
-              : organization.plan?.price_monthly || 0,
-          )}
+          value={currentPrice}
+          hint="Billed amount per month."
+          tone="price"
         />
-        <StatCard
+        <MetricTile
           icon={Clock}
-          iconVariant="info"
           label="Trial Days Left"
-          value={organization.trial_days_left ?? '—'}
+          value={organization.trial_days_left ?? '-'}
+          hint="Number of days remaining in trial."
+          tone="trial"
         />
-        <StatCard icon={Calendar} iconVariant="neutral" label="Member Since" value={formatDate(organization.created_at)} />
+        <MetricTile
+          icon={Calendar}
+          label="Member Since"
+          value={formatDate(organization.created_at)}
+          hint="Organization registered date."
+          tone="member"
+        />
       </div>
 
       {hasUpgradeRequest && (
-        <Card title="Plan Upgrade Request">
+        <Card title="Plan Upgrade Request" subtitle="Review the organization's latest plan change request.">
           <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge variant={upgradeStatusVariant[organization.upgrade_status] || 'neutral'}>
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-surface-border bg-surface-muted/60 px-4 py-3">
+              <Badge variant={upgradeStatusVariant[organization.upgrade_status] || 'neutral'} dot>
                 {titleCase(organization.upgrade_status)}
               </Badge>
-              <p className="text-sm text-neutral-600">
-                Requested <span className="font-semibold text-neutral-900">{organization.requested_plan?.name || 'a new plan'}</span>
+              <p className="text-sm text-fg-muted">
+                Requested <span className="font-semibold text-fg">{organization.requested_plan?.name || 'a new plan'}</span>
                 {organization.upgrade_requested_at && ` on ${formatDate(organization.upgrade_requested_at)}`}
               </p>
             </div>
@@ -317,50 +439,71 @@ export default function OrganizationDetail() {
         </Card>
       )}
 
-      <Card title="Status Override" subtitle="Manually set the organization's account status.">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <Select
-            label="Status"
-            options={statusOptions}
-            value={statusDraft}
-            onChange={(event) => setStatusDraft(event.target.value)}
-            className="w-full sm:w-56"
-          />
-          <Button
-            type="button"
-            onClick={handleUpdateStatus}
-            loading={isUpdatingStatus}
-            disabled={!statusDraft || statusDraft === organization.status}
-          >
-            Update Status
-          </Button>
+      <Card className="p-4">
+        <div className="flex min-h-[58px] flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-primary-600">
+              <Settings className="size-5" aria-hidden="true" />
+            </span>
+            <div>
+              <h3 className="font-(--font-display) text-base font-semibold tracking-tight text-fg">Status Override</h3>
+              <p className="mt-1 text-xs text-fg-muted">Manually set the organization's account status.</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-3 md:w-[34rem] sm:flex-row sm:items-end">
+            <Select
+              label="Status"
+              options={statusOptions}
+              value={statusDraft}
+              onChange={(event) => setStatusDraft(event.target.value)}
+              className="w-full flex-1"
+              triggerClassName="h-9 rounded-xl py-2"
+            />
+            <Button
+              type="button"
+              onClick={handleUpdateStatus}
+              loading={isUpdatingStatus}
+              disabled={!statusDraft || statusDraft === organization.status}
+              className="h-9 px-6"
+            >
+              Update Status
+            </Button>
+          </div>
         </div>
       </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Organization Details">
-          <div className="space-y-2 text-sm">
-            <p><span className="font-medium text-neutral-700">Business Type:</span> {organization.business_type || '—'}</p>
-            <p><span className="font-medium text-neutral-700">Email:</span> {organization.email || '—'}</p>
-            <p><span className="font-medium text-neutral-700">Phone:</span> {organization.phone || '—'}</p>
-            <p><span className="font-medium text-neutral-700">GST Number:</span> {organization.gst_number || '—'}</p>
-            <p><span className="font-medium text-neutral-700">PAN Number:</span> {organization.pan_number || '—'}</p>
-            <p><span className="font-medium text-neutral-700">Address:</span> {organization.address || '—'}</p>
-            <p><span className="font-medium text-neutral-700">Financial Year:</span> {organization.financial_year || '—'}</p>
+        <Card className="min-h-[220px]">
+          <SectionTitle
+            icon={Building2}
+            title="Organization Details"
+            actions={
+              <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3 text-xs">
+                <Edit3 className="size-3.5" aria-hidden="true" />
+                Edit Details
+              </Button>
+            }
+          />
+          <div>
+            <DetailRow icon={Building2} label="Business Type" value={organization.business_type} />
+            <DetailRow icon={Mail} label="Email" value={organization.email} />
+            <DetailRow icon={Phone} label="Phone" value={organization.phone} />
+            <DetailRow icon={MapPin} label="Address" value={organization.address} />
           </div>
         </Card>
 
-        <Card title="Plan Details">
+        <Card className="min-h-[220px]">
+          <SectionTitle icon={CreditCard} title="Plan Details" />
           {organization.plan ? (
-            <div className="space-y-3 text-sm">
-              <p><span className="font-medium text-neutral-700">Users:</span> {organization.plan.max_users || 'Unlimited'}</p>
-              <p><span className="font-medium text-neutral-700">Orders / month:</span> {organization.plan.max_orders || 'Unlimited'}</p>
-              <p><span className="font-medium text-neutral-700">Billing cycle:</span> {titleCase(organization.billing_cycle) || '—'}</p>
+            <div>
+              <DetailRow icon={Building2} label="Users" value={organization.plan.max_users || 'Unlimited'} />
+              <DetailRow icon={CreditCard} label="Orders / month" value={organization.plan.max_orders || 'Unlimited'} />
+              <DetailRow icon={Calendar} label="Billing Cycle" value={titleCase(organization.billing_cycle) || '-'} />
               {organization.plan.features?.length > 0 && (
-                <ul className="space-y-1.5 pt-1">
+                <ul className="mt-4 space-y-2">
                   {organization.plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-neutral-600">
-                      <Check className="mt-0.5 size-4 shrink-0 text-green-600" aria-hidden="true" />
+                    <li key={feature} className="flex items-start gap-2 text-sm text-fg-muted">
+                      <Check className="mt-0.5 size-4 shrink-0 text-primary-600" aria-hidden="true" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -368,7 +511,15 @@ export default function OrganizationDetail() {
               )}
             </div>
           ) : (
-            <p className="text-sm text-neutral-500">This organization has no active plan.</p>
+            <div className="flex min-h-[150px] flex-col items-center justify-center rounded-2xl border border-dashed border-surface-border bg-surface-muted/25 px-6 py-7 text-center">
+              <CreditCard className="size-8 text-fg-muted" aria-hidden="true" />
+              <p className="mt-3 text-sm font-semibold text-fg">No active plan</p>
+              <p className="mt-1 text-xs text-fg-muted">This organization has no active plan.</p>
+              <Button type="button" className="mt-4 h-10 px-5" onClick={() => navigate('/superadmin/plans')}>
+                <CreditCard className="size-4" aria-hidden="true" />
+                View Plans
+              </Button>
+            </div>
           )}
         </Card>
       </div>
@@ -381,10 +532,10 @@ export default function OrganizationDetail() {
         ) : payments.length === 0 ? (
           <EmptyState icon={CreditCard} title="No payments yet" description="This organization hasn't made an online plan payment." />
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-neutral-100">
+          <div className="overflow-x-auto rounded-2xl border border-surface-border">
             <table className="w-full min-w-2xl text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-surface-border bg-surface-muted/80 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-fg-muted">
                   <th className="px-3.5 py-2.5">Date</th>
                   <th className="px-3.5 py-2.5">Plan</th>
                   <th className="px-3.5 py-2.5">Cycle</th>
@@ -393,19 +544,19 @@ export default function OrganizationDetail() {
                   <th className="px-3.5 py-2.5">Payment ID</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-50">
+              <tbody className="divide-y divide-surface-border">
                 {payments.map((payment) => (
-                  <tr key={payment.id}>
-                    <td className="px-3.5 py-2.5 text-neutral-600">{formatDate(payment.paidAt || payment.createdAt)}</td>
-                    <td className="px-3.5 py-2.5 text-neutral-800">{payment.planName || '—'}</td>
-                    <td className="px-3.5 py-2.5 capitalize text-neutral-500">{payment.billingCycle || '—'}</td>
-                    <td className="px-3.5 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(payment.amountPaise / 100)}</td>
+                  <tr key={payment.id} className="transition-colors hover:bg-surface-muted/50">
+                    <td className="px-3.5 py-3 text-fg-muted">{formatDate(payment.paidAt || payment.createdAt)}</td>
+                    <td className="px-3.5 py-3 font-medium text-fg">{payment.planName || '-'}</td>
+                    <td className="px-3.5 py-3 capitalize text-fg-muted">{payment.billingCycle || '-'}</td>
+                    <td className="px-3.5 py-3 text-right font-semibold text-fg">{formatCurrency(payment.amountPaise / 100)}</td>
                     <td className="px-3.5 py-2.5">
                       <Badge variant={PAYMENT_STATUS_VARIANT[payment.status] || 'neutral'} dot>
                         {payment.status}
                       </Badge>
                     </td>
-                    <td className="px-3.5 py-2.5 text-xs text-neutral-400">{payment.razorpayPaymentId || '—'}</td>
+                    <td className="px-3.5 py-3 text-xs text-fg-muted">{payment.razorpayPaymentId || '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -426,7 +577,7 @@ export default function OrganizationDetail() {
           <Input
             label="Reason"
             as="textarea"
-            placeholder="Explain why this upgrade request is being rejected…"
+            placeholder="Explain why this upgrade request is being rejected..."
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
             error={rejectError}

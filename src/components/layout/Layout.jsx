@@ -73,6 +73,10 @@ export default function Layout() {
   }, [location.pathname])
 
   const glassSurfaceStyle = resolveGlassSurfaceStyle(theme, hasBackground)
+  const isSuperAdminDashboard = location.pathname === '/superadmin/dashboard'
+  const isSuperAdminAnalytics = location.pathname === '/superadmin/analytics'
+  const isSuperAdminOrganizationDetail = /^\/superadmin\/organizations\/[^/]+$/.test(location.pathname)
+  const shouldHideTopbar = isSuperAdminAnalytics || isSuperAdminOrganizationDetail
 
   return (
     <div className="relative h-svh overflow-hidden bg-(--app-bg)" style={glassSurfaceStyle || undefined}>
@@ -109,20 +113,22 @@ export default function Layout() {
         <div
           className={`flex min-w-0 flex-1 flex-col bg-surface md:rounded-l-2xl md:shadow-(--shadow-card) ${hasBackground ? 'theme-glass' : ''}`}
         >
-          <header className={`flex h-20 shrink-0 items-center gap-3 border-b border-surface-border bg-surface pr-7 lg:h-[5.75rem] ${hasBackground ? 'theme-glass' : ''}`}>
-          <button
-            type="button"
-            onClick={() => setIsMobileSidebarOpen(true)}
-            className="rounded-xl p-2 text-fg-muted transition-colors hover:bg-neutral-100 md:hidden"
-            aria-label="Open sidebar"
-            aria-controls="dashboard-sidebar"
-            aria-expanded={isMobileSidebarOpen}
-          >
-            <Menu className="size-5" />
-          </button>
-          <Topbar />
-          </header>
-          <main className="flex-1 overflow-y-auto rounded-b-2xl bg-surface">
+          {!shouldHideTopbar && (
+            <header className={`flex shrink-0 items-center gap-3 border-b border-surface-border bg-surface pr-7 ${isSuperAdminDashboard ? 'h-16' : 'h-20 lg:h-[5.75rem]'} ${hasBackground ? 'theme-glass' : ''}`}>
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="rounded-xl p-2 text-fg-muted transition-colors hover:bg-neutral-100 md:hidden"
+                aria-label="Open sidebar"
+                aria-controls="dashboard-sidebar"
+                aria-expanded={isMobileSidebarOpen}
+              >
+                <Menu className="size-5" />
+              </button>
+              <Topbar />
+            </header>
+          )}
+          <main className={`flex-1 overflow-y-auto rounded-b-2xl ${shouldHideTopbar ? 'bg-(--app-bg)' : 'bg-surface'}`}>
             <PageWrapper>
               <Outlet />
             </PageWrapper>

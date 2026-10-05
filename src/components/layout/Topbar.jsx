@@ -182,6 +182,7 @@ export default function Topbar() {
     .sort((a, b) => b.path.length - a.path.length)[0]
   const pageTitle = activeMenuItem?.label || formatPathTitle(location.pathname)
   const pageSubtitle = pageTitle === 'Leads' ? 'Unified feed from WhatsApp, website form & calls' : ''
+  const isSuperAdminDashboard = location.pathname === '/superadmin/dashboard'
 
   const initials = currentUser.name
     .split(' ')
@@ -227,21 +228,24 @@ export default function Topbar() {
   }
 
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-3">
-      <div className="ml-4 min-w-0">
-        <h1 className="truncate text-xl font-semibold tracking-tight text-fg">{pageTitle}</h1>
-        {pageSubtitle && <p className="mt-0.5 hidden truncate text-sm text-fg-muted sm:block">{pageSubtitle}</p>}
-      </div>
+    <div className={`flex min-w-0 flex-1 items-center gap-3 ${isSuperAdminDashboard ? 'pl-5' : ''}`}>
+      {!isSuperAdminDashboard && (
+        <div className="ml-4 min-w-0">
+          <h1 className="truncate text-xl font-semibold tracking-tight text-fg">{pageTitle}</h1>
+          {pageSubtitle && <p className="mt-0.5 hidden truncate text-sm text-fg-muted sm:block">{pageSubtitle}</p>}
+        </div>
+      )}
 
-      <div className="ml-auto flex min-w-0 items-center gap-3 sm:gap-5">
+      <div className={`${isSuperAdminDashboard ? 'w-full justify-end' : 'ml-auto'} flex min-w-0 items-center gap-3 sm:gap-5`}>
         {logoutError && <p className="hidden text-sm text-red-600 md:block">{logoutError}</p>}
-        <div className="relative hidden min-w-0 w-[min(34rem,42vw)] md:block">
+        <div className={`relative hidden min-w-0 md:block ${isSuperAdminDashboard ? 'mr-auto w-[min(34rem,44vw)]' : 'w-[min(34rem,42vw)]'}`}>
           <Search className="pointer-events-none absolute left-4 top-1/2 size-4.5 -translate-y-1/2 text-fg-muted" />
           <input
             type="search"
-            placeholder="Search customers, jobs, quotes..."
-            className="w-full rounded-xl border border-surface-border bg-(--input-bg) py-2.5 pl-11 pr-4 text-sm text-fg shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 focus:ring-primary-500/10"
+            placeholder={isSuperAdminDashboard ? 'Search customers, jobs, quotes, organizations...' : 'Search customers, jobs, quotes...'}
+            className={`w-full rounded-xl border border-surface-border bg-(--input-bg) py-2.5 pl-11 text-sm text-fg shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 focus:ring-primary-500/10 ${isSuperAdminDashboard ? 'pr-20' : 'pr-4'}`}
           />
+        
         </div>
         <div className="relative">
           <button
