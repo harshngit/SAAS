@@ -192,11 +192,6 @@ export default function SuperAdminDashboard() {
 
   return (
     <div className="space-y-5 lg:space-y-6">
-      <div className="rounded-2xl border border-neutral-100 bg-surface/95 p-5 shadow-(--shadow-card)">
-        <h1 className="font-(--font-display) text-3xl font-semibold tracking-tight text-neutral-900">Platform Overview</h1>
-        <p className="mt-1.5 text-sm text-neutral-500">Super Admin · as of {format(new Date(), 'yyyy-MM-dd')}</p>
-      </div>
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <StatCard icon={Building2} iconVariant="primary" label="Total Organizations" value={stats.total} />
         <StatCard icon={CircleCheck} iconVariant="success" label="Active" value={stats.active} />

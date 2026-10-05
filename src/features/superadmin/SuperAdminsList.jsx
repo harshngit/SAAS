@@ -10,6 +10,7 @@ import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { createSuperAdmin, deleteSuperAdmin, listSuperAdmins, updateSuperAdmin } from '../../api/superadmin'
 import { useAuthStore } from '../../store/authStore'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import SuperAdminPageHeader from './SuperAdminPageHeader'
 
 function formatDateLabel(value) {
   if (!value) return '—'
@@ -224,19 +225,20 @@ export default function SuperAdminsList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Superadmins</h1>
-          <p className="mt-1 text-sm text-neutral-500">Manage platform-level Superadmin accounts.</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <SuperAdminPageHeader
+        icon={ShieldCheck}
+        title="Superadmins"
+        subtitle="Manage platform-level administrator accounts and access."
+        actions={(
+          <>
           <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
           <Button type="button" onClick={() => openForm()}>
             <Plus className="size-4" aria-hidden="true" />
             Add Superadmin
           </Button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       <Card title="Superadmin Accounts">
         <DataTable

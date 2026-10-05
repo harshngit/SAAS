@@ -17,6 +17,7 @@ import {
   rejectOrganizationUpgrade,
 } from '../../api/superadmin'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import SuperAdminPageHeader from './SuperAdminPageHeader'
 
 const tabOptions = [
   { value: 'pending', label: 'Pending' },
@@ -133,10 +134,11 @@ export default function UpgradeRequests() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Upgrade Requests</h1>
-        <p className="mt-1 text-sm text-neutral-500">Review and action plan upgrade requests from organizations.</p>
-      </div>
+      <SuperAdminPageHeader
+        icon={TrendingUp}
+        title="Upgrade Requests"
+        subtitle="Review plan changes requested by organizations and keep decisions moving."
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs value={activeTab} onValueChange={setActiveTab}>

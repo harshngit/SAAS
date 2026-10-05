@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Building2, Clock, IndianRupee, RotateCw } from 'lucide-react'
+import { Activity, Building2, Clock, IndianRupee, RotateCw } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import StatCard from '../../components/ui/StatCard'
@@ -7,6 +7,7 @@ import Badge from '../../components/ui/Badge'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { listSuperAdminOrganizations } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
+import SuperAdminPageHeader from './SuperAdminPageHeader'
 
 const statusVariant = {
   active: 'success',
@@ -97,10 +98,11 @@ export default function PlatformAnalytics() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Platform Analytics</h1>
-        <p className="mt-1 text-sm text-neutral-500">View platform-wide analytics across every organization</p>
-      </div>
+      <SuperAdminPageHeader
+        icon={Activity}
+        title="Platform Analytics"
+        subtitle="Monitor organization growth, plan mix, account status, and estimated recurring revenue."
+      />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <StatCard icon={Building2} label="Total Organizations" value={stats.total} />

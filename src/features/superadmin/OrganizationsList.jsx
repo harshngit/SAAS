@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Eye } from 'lucide-react'
+import { Building2, Eye } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import DataTable from '../../components/ui/DataTable'
 import Badge from '../../components/ui/Badge'
@@ -9,6 +9,7 @@ import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { listSuperAdminOrganizations } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import SuperAdminPageHeader from './SuperAdminPageHeader'
 
 const statusVariant = {
   Active: 'success',
@@ -133,10 +134,11 @@ export default function OrganizationsList() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Organizations</h1>
-        <p className="mt-1 text-sm text-neutral-500">Manage all organizations on the platform</p>
-      </div>
+      <SuperAdminPageHeader
+        icon={Building2}
+        title="Organizations"
+        subtitle="Manage every organization, plan, status, and upgrade request on the platform."
+      />
 
       <Card title="Organizations List">
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-2xl lg:grid-cols-3">

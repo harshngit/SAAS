@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Pencil, Plus, Power, Trash2 } from 'lucide-react'
+import { Check, CreditCard, Pencil, Plus, Power, Trash2 } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '../../components/ui/Tabs'
 import { listPlans, createPlan, updatePlan, updatePlanStatus, deletePlan } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
 import PlanForm from './PlanForm'
+import SuperAdminPageHeader from './SuperAdminPageHeader'
 
 export default function SubscriptionPlans() {
   const [billingCycle, setBillingCycle] = useState('monthly')
@@ -120,16 +121,12 @@ export default function SubscriptionPlans() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Subscription Plans</h1>
-          <p className="mt-1 text-sm text-neutral-500">Manage subscription plans available to organizations</p>
-        </div>
-        <Button onClick={openCreateForm}>
-          <Plus className="size-4" aria-hidden="true" />
-          Create Plan
-        </Button>
-      </div>
+      <SuperAdminPageHeader
+        icon={CreditCard}
+        title="Subscription Plans"
+        subtitle="Manage pricing, limits, features, and the default plan for organizations."
+        actions={<Button onClick={openCreateForm}><Plus className="size-4" aria-hidden="true" />Create Plan</Button>}
+      />
 
       {actionError && (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
