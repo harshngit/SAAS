@@ -58,6 +58,9 @@ export function normalizeApiSupplier(supplier, fallback = {}) {
     organizationId: supplier.organization_id || fallback.organizationId,
     name: supplier.name || fallback.name || '',
     code: supplier.code ?? fallback.code ?? '',
+    // Server-generated business ID (e.g. SUP-0001) - read-only, never sent back in an edit
+    // payload, never generated here.
+    supplierCode: supplier.supplier_code ?? supplier.code ?? fallback.supplierCode ?? '',
     companyName: supplier.company_name ?? fallback.companyName ?? '',
     contactPerson: supplier.contact_person ?? fallback.contactPerson ?? '',
     phone: supplier.phone ?? fallback.phone ?? '',

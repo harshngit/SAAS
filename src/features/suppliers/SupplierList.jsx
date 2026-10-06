@@ -496,7 +496,12 @@ export default function SupplierList() {
                   <div className="flex items-start justify-between gap-3">
                     <button type="button" className="flex min-w-0 items-center gap-3 text-left" onClick={() => navigate(`/admin/suppliers/${supplier.id}`)}>
                       <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-50 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">{getInitials(supplier.name)}</div>
-                      <div className="min-w-0"><p className="truncate font-medium text-neutral-900">{supplier.name}</p><p className="truncate text-xs text-neutral-500">{supplier.contactPerson || '—'}</p></div>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-neutral-900">{supplier.name}</p>
+                        <p className="truncate text-xs text-neutral-500">
+                          {[supplier.supplierCode, supplier.contactPerson].filter(Boolean).join(' · ') || '—'}
+                        </p>
+                      </div>
                     </button>
                     <Badge variant={supplier.status === 'active' ? 'success' : 'neutral'}>{formatSupplierStatus(supplier.status)}</Badge>
                   </div>
@@ -540,7 +545,9 @@ export default function SupplierList() {
                         </div>
                         <div>
                           <span className="font-medium text-neutral-900">{supplier.name}</span>
-                          <p className="mt-0.5 text-xs text-neutral-400">{supplier.category}</p>
+                          <p className="mt-0.5 text-xs text-neutral-400">
+                            {[supplier.supplierCode, supplier.category].filter(Boolean).join(' · ')}
+                          </p>
                         </div>
                       </div>
                     </td>

@@ -210,8 +210,9 @@ function flattenSectionedUser(data) {
 
 // Flat camelCase payload (from UserEdit/UserManagement formData) -> the sectioned PATCH body.
 function buildSectionedUserBody(payload) {
+  // employee_id is backend-generated (e.g. EMP-10001-2027-0001) - read and displayed, but never
+  // sent back on create/update. It's deliberately left out of this body.
   const body = cleanPayload({
-    employee_id: payload.employeeId?.trim(),
     name: payload.name?.trim(),
   })
 

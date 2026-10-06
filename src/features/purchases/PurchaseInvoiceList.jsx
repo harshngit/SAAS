@@ -242,12 +242,15 @@ export default function PurchaseInvoiceList() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate font-medium text-primary-700">
-                            {purchase.invoiceNumber}
+                            {purchase.purchaseNumber || purchase.invoiceNumber || '—'}
                             {isDemoPurchase(purchase.id) && (
                               <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
                             )}
                           </p>
-                          <p className="truncate text-xs text-neutral-500">{purchase.supplierName || '—'}</p>
+                          <p className="truncate text-xs text-neutral-500">
+                            {purchase.supplierName || '—'}
+                            {purchase.purchaseNumber && purchase.invoiceNumber ? ` · Ref: ${purchase.invoiceNumber}` : ''}
+                          </p>
                         </div>
                         <Badge variant={purchaseStatus.variant}>{purchaseStatus.label}</Badge>
                       </div>
@@ -287,10 +290,15 @@ export default function PurchaseInvoiceList() {
                     const actions = getPurchaseActions(purchase)
                     return (
                       <tr key={purchase.id} className="cursor-pointer transition-colors hover:bg-primary-50/30" onClick={() => navigate(`${basePath}/${purchase.id}`)}>
-                        <td className="whitespace-nowrap px-6 py-5 font-medium text-primary-700">
-                          {purchase.invoiceNumber}
-                          {isDemoPurchase(purchase.id) && (
-                            <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
+                        <td className="whitespace-nowrap px-6 py-5">
+                          <span className="font-medium text-primary-700">
+                            {purchase.purchaseNumber || purchase.invoiceNumber || '—'}
+                            {isDemoPurchase(purchase.id) && (
+                              <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
+                            )}
+                          </span>
+                          {purchase.purchaseNumber && purchase.invoiceNumber && (
+                            <p className="mt-0.5 text-xs text-neutral-400">Ref: {purchase.invoiceNumber}</p>
                           )}
                         </td>
                         <td className="whitespace-nowrap px-6 py-5 text-neutral-800">{purchase.supplierName || '—'}</td>
@@ -330,7 +338,7 @@ export default function PurchaseInvoiceList() {
       >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-neutral-600">
-            Delete purchase {deleteTarget?.invoiceNumber || 'this purchase'}? This cannot be undone.
+            Delete purchase {deleteTarget?.purchaseNumber || deleteTarget?.invoiceNumber || 'this purchase'}? This cannot be undone.
           </p>
           {deleteError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</div>

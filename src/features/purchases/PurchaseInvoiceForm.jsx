@@ -187,7 +187,10 @@ export default function PurchaseInvoiceForm() {
     () =>
       suppliers
         .filter((supplier) => supplier.is_active !== false || supplier.id === formState.supplierId)
-        .map((supplier) => ({ value: supplier.id, label: supplier.name })),
+        .map((supplier) => ({
+          value: supplier.id,
+          label: supplier.supplier_code ? `${supplier.name} · ${supplier.supplier_code}` : supplier.name,
+        })),
     [suppliers, formState.supplierId],
   )
   // Only active warehouses are selectable for a new purchase (backend also enforces this); an

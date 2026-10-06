@@ -205,7 +205,10 @@ function normalizePurchase(purchase) {
   return {
     id: purchase.id,
     organizationId: purchase.organization_id,
-    invoiceNumber: purchase.invoice_number || purchase.purchase_number || purchase.id,
+    // Two distinct concepts, never merged: invoiceNumber is the supplier's own reference/invoice
+    // number (user-entered, may be blank); purchaseNumber is the system-generated Purchase Order
+    // business ID (e.g. PO-10001-2027-0001). Neither falls back to the other or to the UUID.
+    invoiceNumber: purchase.invoice_number || '',
     purchaseId: purchase.purchase_id || '',
     purchaseNumber: purchase.purchase_number || '',
     supplierId: purchase.supplier_id || purchase.supplier?.id || '',

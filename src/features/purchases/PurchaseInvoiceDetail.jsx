@@ -490,7 +490,7 @@ export default function PurchaseInvoiceDetail() {
           </Button>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold text-neutral-900">{purchase.invoiceNumber}</h1>
+              <h1 className="text-2xl font-semibold text-neutral-900">{purchase.purchaseNumber || purchase.invoiceNumber || '—'}</h1>
               <Badge variant={purchaseStatus.variant}>{purchaseStatus.label}</Badge>
               {isDemo && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>}
             </div>
@@ -889,7 +889,7 @@ export default function PurchaseInvoiceDetail() {
 
       <Modal isOpen={deleteOpen} onClose={() => !isActing && setDeleteOpen(false)} title="Delete Purchase">
         <div className="space-y-5">
-          <p className="text-sm leading-6 text-neutral-600">Delete {purchase.invoiceNumber}? This cannot be undone.</p>
+          <p className="text-sm leading-6 text-neutral-600">Delete {purchase.purchaseNumber || purchase.invoiceNumber}? This cannot be undone.</p>
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" disabled={isActing} onClick={() => setDeleteOpen(false)}>Cancel</Button>
             <Button type="button" variant="danger" loading={isActing} onClick={handleDelete}>Delete</Button>

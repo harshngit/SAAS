@@ -116,10 +116,6 @@ const systemStatusOptions = [
 
 const pageSizeOptions = [10, 25, 50].map((value) => ({ value: String(value), label: `${value} / page` }))
 
-// Purely a UI preview so the field never looks blank/confusing while filling the form - the
-// backend is free to assign its own employee_id if the admin leaves this untouched.
-const makeEmployeeId = () => `EMP-${new Date().getFullYear()}-AUTO`
-
 const initialStaffFormData = {
   employeeId: '',
   firstName: '',
@@ -568,7 +564,6 @@ export default function UserManagement() {
     setFormData(
       {
         ...initialStaffFormData,
-        employeeId: makeEmployeeId(),
         role: ROLES.SALES_OFFICER,
         role_id: effectiveRoleSelectOptions.find((role) => role.value === ROLES.SALES_OFFICER)?.roleId || '',
       },
@@ -788,8 +783,7 @@ export default function UserManagement() {
           value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0)
         )),
       ),
-      // The auto-generated "EMP-YYYY-AUTO" is only a UI placeholder - never submit it as a real id.
-      employeeId: formData.employeeId === makeEmployeeId() ? '' : formData.employeeId,
+      employeeId: formData.employeeId,
       name: displayName,
       email: formData.email,
       phone: formData.mobileNumber,

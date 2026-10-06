@@ -1785,8 +1785,10 @@ function CompanyOverviewDashboard({
   const statusValue = company.company_status || companyData.status;
   const statusLabel = titleCase(statusValue, "Active");
   const statusIsActive = String(statusValue || "active").toLowerCase() === "active";
-  const companyCode =
-    company.company_code || (organization?.id ? `CMP-${String(organization.id).padStart(5, "0")}` : "Not set");
+  // Server-generated business ID (e.g. CMP-10001) only - never fabricated from the internal
+  // organization UUID, which would just produce a nonsense string that merely looks like a real
+  // business ID.
+  const companyCode = company.company_code || "Not set";
   const employeeCount = counts.employees ?? companyData.numberOfEmployees ?? 0;
   const activeUsers = counts.active_users ?? 0;
   const registrationDate = company.registration_date || companyData.dateOfIncorporation || "";

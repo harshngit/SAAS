@@ -157,6 +157,7 @@ export default function ProductList() {
           product.name,
           product.brand,
           product.sku,
+          product.productId,
           product.categoryLabel || product.category,
           ...product.variants.map((variant) => variant.sku),
         ]
@@ -411,7 +412,12 @@ export default function ProductList() {
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <ProductThumbnail src={getFileUrl(product.coverImage)} alt={product.name} />
-                        <span className="font-medium text-neutral-900">{product.name}</span>
+                        <div>
+                          <span className="block font-medium text-neutral-900">{product.name}</span>
+                          <span className="block text-xs text-neutral-400">
+                            {[product.productId, product.sku].filter(Boolean).join(' · ')}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-5 text-neutral-600">{product.brand || '-'}</td>

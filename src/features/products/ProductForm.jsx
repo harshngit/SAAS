@@ -208,6 +208,7 @@ function findSectionForErrorField(sections, fieldName) {
 
 const productSections = [
   section('Basic Information', [
+    { name: 'productId', label: 'Product ID', description: 'Server-generated business ID.', input: 'readonly' },
     { name: 'productCode', label: 'Product Code / SKU', required: true, maxLength: 50 },
     { name: 'barcode', label: 'Barcode' },
     { name: 'name', label: 'Product Name', required: true, maxLength: 150 },
@@ -303,10 +304,6 @@ const productSections = [
   ]),
 ]
 
-function makeProductId() {
-  return `PROD-${new Date().getFullYear()}-AUTO`
-}
-
 function normalizeVariantInventory(variant = {}, fallbackOpeningStock = '') {
   const inventory = variant.inventory && typeof variant.inventory === 'object' ? variant.inventory : {}
 
@@ -338,7 +335,9 @@ function hydrateProduct(product) {
   return {
     ...emptyForm,
     ...product,
-    productId: product?.productId || product?.id || makeProductId(),
+    // Real, backend-assigned business ID when the backend sends one - left blank otherwise
+    // (shows "System calculated" below). Never a frontend placeholder, never the internal UUID.
+    productId: product?.productId || '',
     productCode,
     category: String(product?.category_id || product?.categoryId || product?.category || ''),
     categoryId: String(product?.category_id || product?.categoryId || ''),
@@ -533,7 +532,13 @@ export default function ProductForm({
       if (suppliersResult.success) {
         setSupplierOptions(
           suppliersResult.suppliers
-            .map((supplier) => ({ value: String(supplier.id), label: supplier.name || supplier.supplier_name || '' }))
+            .map((supplier) => {
+              const name = supplier.name || supplier.supplier_name || ''
+              return {
+                value: String(supplier.id),
+                label: supplier.supplier_code ? `${name} · ${supplier.supplier_code}` : name,
+              }
+            })
             .filter((option) => option.value && option.label),
         )
       }
@@ -1394,7 +1399,7 @@ export default function ProductForm({
     }
 
     if (field.input === 'readonly') {
-      return <Input label={field.label} value={formData[field.name] || makeProductId()} readOnly disabled error={errors[field.name]} required={field.required} />
+      return <Input label={field.label} value={formData[field.name] || 'System calculated'} readOnly disabled error={errors[field.name]} />
     }
 
     if (field.input === 'file') {

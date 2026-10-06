@@ -105,8 +105,6 @@ const baseFields = {
   notes: '',
 }
 
-const makeCustomerId = () => `CUS-${new Date().getFullYear()}-AUTO`
-
 function toDateInputValue(value) {
   if (!value) return ''
 
@@ -323,7 +321,10 @@ function hydrateCustomer(formCustomer, isSalesOfficer, currentUser, salesOfficer
   return {
     ...baseFields,
     ...formCustomer,
-    customerId: formCustomer?.customerId || formCustomer?.id || makeCustomerId(),
+    // Real, backend-assigned business ID (e.g. CS-10001-2027-0001) when editing - left blank on
+    // a brand-new customer; the readonly field below shows "System calculated" until then. Never
+    // a frontend-fabricated placeholder, and never the internal UUID (`formCustomer.id`) either.
+    customerId: formCustomer?.customerId || '',
     profileImage: formCustomer?.profileImage || formCustomer?.profile_image || '',
     customerType,
     customerName,

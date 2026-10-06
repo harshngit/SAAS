@@ -337,7 +337,7 @@ export default function SalesReturnFormPage() {
                 label="Invoice Number or ID"
                 value={invoiceQuery}
                 onChange={(event) => setInvoiceQuery(event.target.value)}
-                placeholder="e.g. INV-2026-000123"
+                placeholder="e.g. IN-10001-2027-0001"
                 className="sm:flex-1"
               />
               <Button type="button" variant="outline" loading={isFetchingInvoice} onClick={handleFetchInvoice}>

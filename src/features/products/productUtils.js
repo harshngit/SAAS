@@ -32,6 +32,9 @@ export function normalizeApiProduct(product, fallback = {}) {
   return {
     ...fallback,
     id: product.id || fallback.id,
+    // Server-generated business ID (e.g. PRD-0001) - distinct from both the internal UUID
+    // above and the user-settable SKU/productCode below. Read-only, never generated here.
+    productId: product.product_id || fallback.productId || '',
     name: product.name || fallback.name,
     brand: product.brand_ref?.name || product.brand || fallback.brand || '',
     manufacturer: product.manufacturer || fallback.manufacturer || '',

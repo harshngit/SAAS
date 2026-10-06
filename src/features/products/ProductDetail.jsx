@@ -318,7 +318,11 @@ export default function ProductDetail() {
                 {product.status === 'active' ? 'Active' : 'Inactive'}
               </Badge>
             </div>
-            {product.sku && <p className="mt-0.5 text-xs text-neutral-400">SKU: {product.sku}</p>}
+            {(product.productId || product.sku) && (
+              <p className="mt-0.5 text-xs text-neutral-400">
+                {[product.productId ? `Product ID: ${product.productId}` : '', product.sku ? `SKU: ${product.sku}` : ''].filter(Boolean).join(' · ')}
+              </p>
+            )}
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {product.brand && <Badge variant="neutral">{product.brand}</Badge>}
               {(product.categoryLabel || product.category) && <Badge variant="primary">{product.categoryLabel || product.category}</Badge>}

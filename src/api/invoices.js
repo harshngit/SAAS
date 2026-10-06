@@ -311,12 +311,18 @@ export async function createInvoice(payload) {
   }
 }
 
+// A backend duplicate-invoice error message may quote the invoice number in either the new
+// canonical format (IN-<company>-<year>-<sequence>, e.g. IN-10001-2027-0001) or a historical one
+// (INV-<year>-<sequence>, e.g. INV-2026-1021) - old records are never migrated, so both must keep
+// matching. A UUID, when present, is still preferred over either.
 function extractDuplicateInvoiceRef(message) {
   if (typeof message !== 'string') return null
   const uuidMatch = message.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/)
   if (uuidMatch) return { id: uuidMatch[0] }
-  const numberMatch = message.match(/INV-\d{4}-\d+/)
-  if (numberMatch) return { invoiceNumber: numberMatch[0] }
+  const newFormatMatch = message.match(/IN-\d+-\d{4}-\d+/)
+  if (newFormatMatch) return { invoiceNumber: newFormatMatch[0] }
+  const legacyFormatMatch = message.match(/INV-\d{4}-\d+/)
+  if (legacyFormatMatch) return { invoiceNumber: legacyFormatMatch[0] }
   return null
 }
 
