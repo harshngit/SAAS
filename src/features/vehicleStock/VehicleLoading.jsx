@@ -158,7 +158,7 @@ export default function VehicleLoading() {
     if (productsResult.success) {
       const meta = {}
       productsResult.products.forEach((product) => {
-        meta[product.id] = { sku: product.sku || '', weight: Number(product.weight) || null }
+        meta[product.id] = { sku: product.sku || '' }
       })
       setProductMeta(meta)
     }

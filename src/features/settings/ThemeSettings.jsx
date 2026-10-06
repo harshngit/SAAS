@@ -20,12 +20,19 @@ import { getFileUrl } from '../../api/files'
 
 const COLOR_PRESETS = [DEFAULT_PRIMARY_COLOR, '#16A34A', '#2563EB', '#DC2626', '#7C3AED', '#EA580C']
 const DEFAULT_OVERLAY_BY_MODE = { dark: 0.05, light: 0.05 }
-const BACKGROUND_PRESETS = [
-  { id: 'theme1', label: 'Soft Mint', src: '/theme1.png' },
-  { id: 'theme2', label: 'Aqua Flow', src: '/theme2.png' },
-  { id: 'theme3', label: 'Grid Paper', src: '/theme3.png' },
-  { id: 'theme4', label: 'Lime Collage', src: '/theme4.png' },
+
+// Single canonical list of the bundled predefined backgrounds - frontend/public assets only, the
+// backend has no "predefined theme id" field (see api/theme.js's contract comment). Referenced by
+// id everywhere below instead of scattering `/themes/theme1.png`-style literals through JSX.
+const PREDEFINED_BACKGROUNDS = [
+  { id: 'theme1', name: 'Soft Mint', src: '/themes/theme1.png' },
+  { id: 'theme2', name: 'Aqua Flow', src: '/themes/theme2.png' },
+  { id: 'theme3', name: 'Grid Paper', src: '/themes/theme3.png' },
+  { id: 'theme4', name: 'Lime Collage', src: '/themes/theme4.png' },
 ]
+
+const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 // Not a fake mockup: `resolveThemeTokens(draft)` is the EXACT same function ThemeProvider calls to
 // theme the real app - here it's applied as inline style + data-mode/data-bg attributes on this
@@ -34,9 +41,14 @@ const BACKGROUND_PRESETS = [
 // below then uses the real Tailwind classes (bg-surface, bg-(--sidebar-bg), text-fg, ...) the
 // actual Layout/Sidebar/Card use - if the real app's theming is broken, this preview shows it
 // broken too, rather than silently looking fine on its own.
-function ThemePreview({ draft }) {
+//
+// `displayBackgroundUrl` is pre-resolved by the caller (resolvePreviewBackgroundUrl below) - it
+// may be a saved backend file URL, a bundled public asset path, or a local blob: object URL from
+// a staged upload. This component never calls getFileUrl() itself, since doing so would mangle a
+// public asset path or a blob: URL (getFileUrl's job is resolving backend file references only).
+function ThemePreview({ draft, displayBackgroundUrl }) {
   const tokens = resolveThemeTokens(draft)
-  const hasBackground = Boolean(draft.customEnabled && draft.background?.url)
+  const hasBackground = Boolean(draft.customEnabled && displayBackgroundUrl)
   const overlayOpacity = draft.background?.overlayOpacity ?? DEFAULT_OVERLAY_BY_MODE[draft.mode] ?? 0.05
 
   return (
@@ -49,7 +61,7 @@ function ThemePreview({ draft }) {
       <div className="relative bg-(--app-bg)">
         {hasBackground && (
           <>
-            <div aria-hidden="true" className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${getFileUrl(draft.background.url)})` }} />
+            <div aria-hidden="true" className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${displayBackgroundUrl})` }} />
             <div
               aria-hidden="true"
               className="absolute inset-0"
@@ -91,7 +103,7 @@ function ThemePreview({ draft }) {
   )
 }
 
-// Shared selected/unselected chip style for the Mode and Background toggles - solid fill + a
+// Shared selected/unselected chip style for the Mode and Background-type toggles - solid fill + a
 // check icon when selected (not just a faint border) so the active choice is unambiguous at a
 // glance, matching how the color presets below already show selection.
 function ToggleChip({ selected, onClick, icon: Icon, children }) {
@@ -161,19 +173,39 @@ function ColorField({ label, value, onChange, disabled, warning }) {
   )
 }
 
+// Fetches a bundled public asset and converts it to a File, only ever called from the Save flow
+// (section 6 of the spec) - never at selection time. The backend only accepts an uploaded image
+// through POST /organization/theme/background; there is no "predefined id" field to persist.
+async function presetToFile(preset) {
+  const response = await fetch(preset.src)
+  if (!response.ok) throw new Error('Unable to load this preset image.')
+  const blob = await response.blob()
+  return new File([blob], `${preset.id}.png`, { type: blob.type || 'image/png' })
+}
+
+// Where the Live Preview (and the small thumbnails) should draw their image from, given the
+// current draft + whatever is staged this session. A staged pick always wins over the saved
+// background - that's the whole point of staging. Returns '' when Background Type is Plain.
+function resolvePreviewBackgroundUrl(draft, stagedBackground) {
+  if (!draft.customEnabled) return ''
+  if (stagedBackground?.kind === 'custom') return stagedBackground.previewUrl
+  if (stagedBackground?.kind === 'preset') return stagedBackground.src
+  return draft.background?.url ? getFileUrl(draft.background.url) : ''
+}
+
 export default function ThemeSettings() {
   const { showToast } = useToast()
   const { can } = usePermission()
   const { theme, refreshTheme, setOptimisticTheme } = useTheme()
   const [draft, setDraft] = useState(theme)
+  // Exactly one of: null (nothing staged this session - Live Preview falls back to the saved
+  // background, if any) | { kind: 'preset', id, name, src } | { kind: 'custom', file, previewUrl }.
+  // Never written to the backend until Save Changes - see handleSave.
+  const [stagedBackground, setStagedBackground] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [isUploadingBackground, setIsUploadingBackground] = useState(false)
-  const [isRemovingBackground, setIsRemovingBackground] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false)
   const [assetError, setAssetError] = useState('')
-  const [thumbnailFailedUrl, setThumbnailFailedUrl] = useState('')
-  const [selectedPresetId, setSelectedPresetId] = useState('')
   const backgroundInputRef = useRef(null)
 
   // Re-seed the draft whenever the provider's real theme changes (initial load, or a refresh
@@ -186,6 +218,18 @@ export default function ThemeSettings() {
       hasLoadedRef.current = true
     }
   }, [theme])
+
+  // Revokes the PREVIOUS staged custom file's object URL whenever stagedBackground changes to a
+  // new value (including null) or this page unmounts - the one place any blob: URL this page
+  // creates ever gets released, so nothing leaks regardless of how staging ends (replaced,
+  // removed, discarded, saved, or navigating away mid-edit).
+  useEffect(() => {
+    return () => {
+      if (stagedBackground?.kind === 'custom' && stagedBackground.previewUrl) {
+        URL.revokeObjectURL(stagedBackground.previewUrl)
+      }
+    }
+  }, [stagedBackground])
 
   if (!can('settings')) {
     return (
@@ -206,115 +250,151 @@ export default function ThemeSettings() {
   const updateDraft = (patch) => setDraft((current) => ({ ...current, ...patch }))
   const updateBackground = (patch) => setDraft((current) => ({ ...current, background: { ...current.background, ...patch } }))
 
-  const hasBackgroundImage = Boolean(draft.customEnabled && draft.background?.url)
+  const previewBackgroundUrl = resolvePreviewBackgroundUrl(draft, stagedBackground)
+  const hasBackgroundImage = Boolean(draft.customEnabled && previewBackgroundUrl)
+  // Image mode is on but there is nothing to show yet - no staged pick, and no previously-saved
+  // background either. Must be resolved (pick a preset or upload one) before Save is allowed.
+  const needsImageSelection = Boolean(draft.customEnabled) && !previewBackgroundUrl
   const contrast = resolveAccentContrast(draft.primaryColor || DEFAULT_PRIMARY_COLOR)
 
   const selectMode = (mode) => updateDraft({ mode })
-  // "Plain" / "Image" is the background toggle - selecting Image without an uploaded file yet
-  // just arms it (nothing visually changes until an upload succeeds, since Layout/Sidebar/Card
-  // all also require background.url to be non-empty before rendering the glass treatment).
-  const selectBackgroundKind = (wantsImage) => updateDraft({ customEnabled: wantsImage })
 
-  const handleUploadBackground = async (file) => {
+  // "Plain" / "Image" is the Background Type toggle. Switching to Plain drops whatever was
+  // staged this session (there's nothing left to preview an image for) but - per the spec - never
+  // calls DELETE here; that only happens in handleSave if the final choice is still Plain.
+  const selectBackgroundKind = (wantsImage) => {
+    setAssetError('')
+    updateDraft({ customEnabled: wantsImage })
+    if (!wantsImage) setStagedBackground(null)
+  }
+
+  // Selecting a predefined card only updates the local draft/preview - no fetch, no upload. The
+  // bundled asset is only ever turned into a File at Save time (presetToFile, in handleSave).
+  const handleSelectPreset = (preset) => {
+    setAssetError('')
+    setStagedBackground({ kind: 'preset', id: preset.id, name: preset.name, src: preset.src })
+    updateDraft({ customEnabled: true })
+  }
+
+  const handleChooseCustomFile = (file) => {
     if (!file) return
-    const isValidType = ['image/png', 'image/jpeg', 'image/webp'].includes(file.type)
-    if (!isValidType) {
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
       setAssetError('Only PNG, JPG/JPEG, or WebP images are supported.')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAX_IMAGE_BYTES) {
       setAssetError('Image must be 5 MB or smaller.')
       return
     }
     setAssetError('')
-    setIsUploadingBackground(true)
-    const result = await uploadThemeBackground(file)
-    setIsUploadingBackground(false)
-    if (!result.success) {
-      setAssetError(result.error)
-      return
-    }
-    // The upload endpoint already persists this to the backend on its own (it returns the full
-    // updated theme, not just a bare url) - PATCH /organization/theme never carries
-    // background.url, so waiting for a later "Save Changes" click to sync the rest of the app
-    // would leave every other page on the old image (and "Save" would say "Nothing to save",
-    // since nothing IT tracks changed). Sync the real app-wide theme immediately here, matching
-    // what the backend already has.
-    const nextTheme = { ...theme, customEnabled: true, background: { ...theme.background, url: result.url } }
-    setOptimisticTheme(nextTheme)
+    setStagedBackground({ kind: 'custom', file, previewUrl: URL.createObjectURL(file) })
     updateDraft({ customEnabled: true })
-    updateBackground({ url: result.url })
-    showToast({ title: 'Background uploaded', message: 'Applied across the CRM immediately.' })
   }
 
-  const handleSelectPreset = async (preset) => {
-    if (isUploadingBackground) return
-    setSelectedPresetId(preset.id)
+  // "Remove selection" next to the Custom Background thumbnail - clears whatever is currently
+  // selected (a fresh staged pick, or a previously-saved background) and stages Plain. This is
+  // the one case section 9 describes as clearing the draft selection; going all the way to Plain
+  // (rather than leaving Image mode on with nothing chosen) is what keeps the result unambiguous.
+  // No DELETE call happens here - that's handleSave's job, only if Plain is still the choice then.
+  const handleRemoveSelection = () => {
     setAssetError('')
-    try {
-      const response = await fetch(preset.src)
-      if (!response.ok) throw new Error('Unable to load preset')
-      const blob = await response.blob()
-      await handleUploadBackground(new File([blob], `${preset.id}.png`, { type: blob.type || 'image/png' }))
-    } catch {
-      setAssetError('Unable to load this preset. Please try another image or upload your own.')
-    } finally {
-      setSelectedPresetId('')
-    }
-  }
-
-  const handleRemoveBackground = async () => {
-    if (!draft.background?.url) return
-    if (!window.confirm('Remove the background image? This clears it for the whole organization.')) return
-    setIsRemovingBackground(true)
-    const result = await deleteThemeBackground()
-    setIsRemovingBackground(false)
-    if (!result.success) {
-      setAssetError(result.error)
-      return
-    }
-    // Same immediate app-wide sync as upload above - DELETE also persists on its own.
-    const nextTheme = result.theme || { ...theme, customEnabled: false, background: { ...theme.background, url: '' } }
-    setOptimisticTheme(nextTheme)
-    updateBackground({ url: '' })
+    setStagedBackground(null)
     updateDraft({ customEnabled: false })
-    showToast({ title: 'Background removed', message: 'Applied across the CRM immediately.' })
   }
 
   const handleSave = async () => {
+    if (isSaving) return
+    // Belt-and-suspenders: the Save button is already disabled while this is true, but guard
+    // here too in case that ever gets bypassed.
+    if (needsImageSelection) {
+      setAssetError('Please select a predefined background or upload an image.')
+      return
+    }
     setIsSaving(true)
-    // Only send what actually changed - the backend's own partial-update contract.
-    // background.url is never sent here - it's set exclusively by the upload/delete endpoints,
-    // which aren't part of the PATCH field list.
-    const payload = {}
-    if (draft.customEnabled !== theme.customEnabled) payload.customEnabled = draft.customEnabled
-    if (draft.mode !== theme.mode) payload.mode = draft.mode
-    if (draft.primaryColor !== theme.primaryColor) payload.primaryColor = draft.primaryColor
-    if (draft.background?.overlayOpacity !== theme.background?.overlayOpacity) payload.overlayOpacity = draft.background.overlayOpacity
+    setAssetError('')
 
-    if (Object.keys(payload).length === 0) {
-      showToast({ title: 'Nothing to save', message: 'No appearance changes were made.' })
+    const hasStagedNewBackground = Boolean(stagedBackground)
+    const isSwitchingToPlain = !draft.customEnabled && theme.customEnabled && Boolean(theme.background?.url)
+
+    try {
+      let nextBackgroundUrl = theme.background?.url || ''
+      let backgroundTouched = false
+
+      if (hasStagedNewBackground) {
+        let file = stagedBackground.file
+        if (stagedBackground.kind === 'preset') {
+          try {
+            file = await presetToFile(stagedBackground)
+          } catch {
+            setAssetError('Unable to load this preset. Please try another image or upload your own.')
+            return
+          }
+        }
+        const uploadResult = await uploadThemeBackground(file)
+        if (!uploadResult.success) {
+          setAssetError(uploadResult.error)
+          return
+        }
+        nextBackgroundUrl = uploadResult.url
+        backgroundTouched = true
+      } else if (isSwitchingToPlain) {
+        const deleteResult = await deleteThemeBackground()
+        if (!deleteResult.success) {
+          setAssetError(deleteResult.error)
+          return
+        }
+        nextBackgroundUrl = ''
+        backgroundTouched = true
+      }
+
+      // Only send what actually changed - the backend's own partial-update contract.
+      // background.url is never part of this payload - it's set exclusively by the
+      // upload/delete endpoints above, which aren't in PATCH's field list.
+      const patchPayload = {}
+      if (draft.mode !== theme.mode) patchPayload.mode = draft.mode
+      if (draft.primaryColor !== theme.primaryColor) patchPayload.primaryColor = draft.primaryColor
+      if (draft.background?.overlayOpacity !== theme.background?.overlayOpacity) patchPayload.overlayOpacity = draft.background.overlayOpacity
+      if (draft.customEnabled !== theme.customEnabled) patchPayload.customEnabled = draft.customEnabled
+
+      let patchedTheme = null
+      if (Object.keys(patchPayload).length > 0) {
+        const patchResult = await updateOrganizationTheme(patchPayload)
+        if (!patchResult.success) {
+          setAssetError(patchResult.error)
+          return
+        }
+        patchedTheme = patchResult.theme
+      }
+
+      if (!backgroundTouched && !patchedTheme) {
+        showToast({ title: 'Nothing to save', message: 'No appearance changes were made.' })
+        return
+      }
+
+      // PATCH's response doesn't carry the background url, so merge rather than fully replace -
+      // `nextBackgroundUrl` is known directly from the upload/delete call above, never guessed.
+      const base = patchedTheme || theme
+      const finalTheme = {
+        ...base,
+        background: {
+          ...base.background,
+          url: nextBackgroundUrl,
+          overlayOpacity: draft.background?.overlayOpacity ?? base.background?.overlayOpacity,
+        },
+      }
+
+      setStagedBackground(null)
+      setOptimisticTheme(finalTheme)
+      setDraft(finalTheme)
+      showToast({ title: 'Appearance saved', message: 'Applied across the CRM immediately.' })
+    } finally {
       setIsSaving(false)
-      return
     }
-
-    const result = await updateOrganizationTheme(payload)
-    setIsSaving(false)
-    if (!result.success) {
-      showToast({ title: 'Save failed', message: result.error, variant: 'error' })
-      return
-    }
-    // Apply instantly across the whole app - no reload required. The uploaded/removed background
-    // URL already lives in `draft`, PATCH's response doesn't carry it, so merge rather than fully
-    // replace.
-    const merged = { ...result.theme, background: { ...result.theme.background, url: draft.background.url } }
-    setOptimisticTheme(merged)
-    setDraft(merged)
-    showToast({ title: 'Appearance saved', message: 'Applied across the CRM immediately.' })
   }
 
   const handleDiscard = () => {
     setDraft(theme)
+    setStagedBackground(null)
     setAssetError('')
   }
 
@@ -327,6 +407,7 @@ export default function ThemeSettings() {
       showToast({ title: 'Reset failed', message: result.error, variant: 'error' })
       return
     }
+    setStagedBackground(null)
     setOptimisticTheme(result.theme)
     setDraft(result.theme)
     setAssetError('')
@@ -335,6 +416,11 @@ export default function ThemeSettings() {
   }
 
   const overlayPercent = Math.round((draft.background?.overlayOpacity ?? DEFAULT_OVERLAY_BY_MODE[draft.mode] ?? 0.05) * 100)
+  const selectedPresetId = stagedBackground?.kind === 'preset' ? stagedBackground.id : ''
+  // The Custom Background thumbnail only ever shows a FRESH staged pick for this session - never
+  // an attempt to guess whether the already-saved background happens to have come from an upload,
+  // since the backend stores just a file URL with no record of which path it came from.
+  const stagedCustomPreviewUrl = stagedBackground?.kind === 'custom' ? stagedBackground.previewUrl : ''
 
   return (
     <div className="space-y-4">
@@ -352,7 +438,7 @@ export default function ThemeSettings() {
             <RotateCcw className="size-4" />
             Discard Changes
           </Button>
-          <Button type="button" loading={isSaving} onClick={handleSave}>
+          <Button type="button" loading={isSaving} disabled={needsImageSelection} onClick={handleSave}>
             <Save className="size-4" />
             Save Changes
           </Button>
@@ -373,8 +459,9 @@ export default function ThemeSettings() {
         </div>
       </Card>
 
-      <Card title="Background" subtitle="Image mode shows an uploaded photo behind the CRM, with a blurred glass effect on cards, sidebar and header">
-        <div className="flex flex-wrap gap-2">
+      <Card title="Background" subtitle="Image mode shows a photo behind the CRM, with a blurred glass effect on cards, sidebar and header">
+        <p className="text-sm font-medium text-neutral-700">Background Type</p>
+        <div className="mt-2 flex flex-wrap gap-2">
           <ToggleChip selected={!draft.customEnabled} onClick={() => selectBackgroundKind(false)}>
             Plain
           </ToggleChip>
@@ -382,78 +469,86 @@ export default function ThemeSettings() {
             Image
           </ToggleChip>
         </div>
+        {needsImageSelection && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-amber-600">
+            <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
+            Select a predefined background or upload an image below to continue.
+          </p>
+        )}
 
-        <div className="mt-5">
-          <p className="text-sm font-medium text-neutral-700">Predefined themes</p>
-          <p className="mt-1 text-xs text-neutral-500">Choose one of the included backgrounds, or upload your own below.</p>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {BACKGROUND_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                disabled={isUploadingBackground}
-                onClick={() => handleSelectPreset(preset)}
-                className={`group overflow-hidden rounded-xl border-2 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${selectedPresetId === preset.id ? 'border-primary-600 ring-2 ring-primary-200' : 'border-neutral-200 hover:border-primary-300'}`}
-              >
-                <img src={preset.src} alt="" className="h-20 w-full object-cover transition-transform group-hover:scale-105" />
-                <span className="block truncate px-2.5 py-2 text-xs font-medium text-neutral-700">{preset.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        {draft.customEnabled && (
+          <>
+            <div className="mt-5 border-t border-neutral-100 pt-5">
+              <p className="text-sm font-medium text-neutral-700">Predefined Backgrounds</p>
+              <p className="mt-1 text-xs text-neutral-500">Picking one only updates the preview - nothing uploads until Save Changes.</p>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {PREDEFINED_BACKGROUNDS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleSelectPreset(preset)}
+                    className={`group overflow-hidden rounded-xl border-2 text-left transition-all ${selectedPresetId === preset.id ? 'border-primary-600 ring-2 ring-primary-200' : 'border-neutral-200 hover:border-primary-300'}`}
+                  >
+                    <img src={preset.src} alt="" className="h-20 w-full object-cover transition-transform group-hover:scale-105" />
+                    <span className="block truncate px-2.5 py-2 text-xs font-medium text-neutral-700">{preset.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div className={`mt-4 flex items-center gap-3 ${!draft.customEnabled ? 'opacity-50' : ''}`}>
-          <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
-            {draft.background?.url && draft.background.url !== thumbnailFailedUrl ? (
-              <img
-                src={getFileUrl(draft.background.url)}
-                alt=""
-                className="size-full object-cover"
-                onError={() => setThumbnailFailedUrl(draft.background.url)}
+            <div className="mt-5 border-t border-neutral-100 pt-5">
+              <p className="text-sm font-medium text-neutral-700">Custom Background</p>
+              <p className="mt-1 text-xs text-neutral-500">Upload your own image - staged here too, uploaded only on Save Changes.</p>
+              <div className="mt-3 flex items-center gap-3">
+                <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
+                  {stagedCustomPreviewUrl ? (
+                    <img src={stagedCustomPreviewUrl} alt="" className="size-full object-cover" />
+                  ) : (
+                    <ImageIcon className="size-5 text-neutral-300" aria-hidden="true" />
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => backgroundInputRef.current?.click()}>
+                    <Upload className="size-3.5" aria-hidden="true" />
+                    {stagedCustomPreviewUrl ? 'Replace' : 'Upload'}
+                  </Button>
+                  {(stagedCustomPreviewUrl || previewBackgroundUrl) && (
+                    <Button type="button" variant="outline" size="sm" onClick={handleRemoveSelection}>
+                      <Trash2 className="size-3.5" aria-hidden="true" />
+                      Remove selection
+                    </Button>
+                  )}
+                  <input
+                    ref={backgroundInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(event) => { handleChooseCustomFile(event.target.files?.[0]); event.target.value = '' }}
+                  />
+                </div>
+              </div>
+              {assetError && <p className="mt-2 text-sm text-red-600">{assetError}</p>}
+            </div>
+
+            <div className="mt-5 border-t border-neutral-100 pt-5">
+              <p className="text-sm font-medium text-neutral-700">Dimming <span className="font-normal text-neutral-400">({overlayPercent}%)</span></p>
+              <input
+                type="range"
+                min="0"
+                max="0.9"
+                step="0.05"
+                disabled={!hasBackgroundImage}
+                value={draft.background?.overlayOpacity ?? DEFAULT_OVERLAY_BY_MODE[draft.mode] ?? 0.05}
+                onChange={(event) => updateBackground({ overlayOpacity: Number(event.target.value) })}
+                className="mt-1.5 w-full accent-primary-600"
               />
-            ) : (
-              <ImageIcon className="size-5 text-neutral-300" aria-hidden="true" />
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-neutral-500">Upload your own</span>
-            <Button type="button" variant="outline" size="sm" disabled={!draft.customEnabled} loading={isUploadingBackground} onClick={() => backgroundInputRef.current?.click()}>
-              <Upload className="size-3.5" aria-hidden="true" />
-              {draft.background?.url ? 'Replace' : 'Upload'}
-            </Button>
-            {draft.background?.url && (
-              <Button type="button" variant="outline" size="sm" disabled={!draft.customEnabled} loading={isRemovingBackground} onClick={handleRemoveBackground}>
-                <Trash2 className="size-3.5" aria-hidden="true" />
-                Remove
-              </Button>
-            )}
-            <input
-              ref={backgroundInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="hidden"
-              onChange={(event) => { handleUploadBackground(event.target.files?.[0]); event.target.value = '' }}
-            />
-          </div>
-        </div>
-        {assetError && <p className="mt-2 text-sm text-red-600">{assetError}</p>}
-        <div className={`mt-4 ${!hasBackgroundImage ? 'opacity-50' : ''}`}>
-          <p className="text-sm font-medium text-neutral-700">Dimming <span className="font-normal text-neutral-400">({overlayPercent}%)</span></p>
-          <input
-            type="range"
-            min="0"
-            max="0.9"
-            step="0.05"
-            disabled={!hasBackgroundImage}
-            value={draft.background?.overlayOpacity ?? DEFAULT_OVERLAY_BY_MODE[draft.mode] ?? 0.05}
-            onChange={(event) => updateBackground({ overlayOpacity: Number(event.target.value) })}
-            className="mt-1.5 w-full accent-primary-600"
-          />
-          <div className="mt-1 flex justify-between text-[0.65rem] text-neutral-400">
-            <span>0% - image fully visible</span>
-            <span>90% - very dark</span>
-          </div>
-        </div>
+              <div className="mt-1 flex justify-between text-[0.65rem] text-neutral-400">
+                <span>0% - image fully visible</span>
+                <span>90% - very dark</span>
+              </div>
+            </div>
+          </>
+        )}
       </Card>
 
       <Card title="Accent Color" subtitle="Buttons, active states, focus rings and links only - surfaces stay controlled by Mode.">
@@ -469,15 +564,16 @@ export default function ThemeSettings() {
 
       <div className="xl:sticky xl:top-4">
         <Card title="Live Preview" subtitle="Uses the real theme tokens - updates instantly, not persisted until Save">
-          <ThemePreview draft={draft} />
+          <ThemePreview draft={draft} displayBackgroundUrl={previewBackgroundUrl} />
           <div className="mt-4 flex flex-wrap gap-1.5">
             <span className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
               {draft.mode === 'dark' ? <Moon className="size-3" aria-hidden="true" /> : <Sun className="size-3" aria-hidden="true" />}
               {draft.mode === 'dark' ? 'Dark' : 'Light'}
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
-              {hasBackgroundImage ? <ImageIcon className="size-3" aria-hidden="true" /> : null}
-              {hasBackgroundImage ? 'Image background' : 'Plain background'}
+            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${needsImageSelection ? 'bg-amber-50 text-amber-700' : 'bg-primary-50 text-primary-700'}`}>
+              {hasBackgroundImage && <ImageIcon className="size-3" aria-hidden="true" />}
+              {needsImageSelection ? <AlertTriangle className="size-3" aria-hidden="true" /> : null}
+              {hasBackgroundImage ? 'Image background' : needsImageSelection ? 'No image selected' : 'Plain background'}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
               <span className="size-2.5 rounded-full" style={{ backgroundColor: draft.primaryColor || DEFAULT_PRIMARY_COLOR }} aria-hidden="true" />
