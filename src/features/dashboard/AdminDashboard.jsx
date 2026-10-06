@@ -437,7 +437,7 @@ function SignalRow({ label, value, positive }) {
 function CashflowTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl bg-surface px-3 py-2 text-xs shadow-(--shadow-popover) ring-1 ring-black/5">
+    <div className="app-cashflow-tooltip rounded-xl bg-surface px-3 py-2 text-xs shadow-(--shadow-popover) ring-1 ring-black/5">
       <p className="font-semibold text-neutral-900">{label}</p>
       {payload.map((item) => (
         <p key={item.dataKey} className="mt-1 text-neutral-500">
@@ -1159,29 +1159,39 @@ export default function AdminDashboard() {
               className="flex h-full min-h-[280px] flex-col"
               bodyClassName="flex flex-1 flex-col"
             >
-              <div className="-mr-2 min-h-50 flex-1">
+              <div className="app-cashflow-chart -mr-2 min-h-50 flex-1">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={cashflowData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid vertical={false} stroke="#edf1f5" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9aa1ac' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
+                    <defs>
+                      <linearGradient id="cashflowInflowGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--cashflow-inflow-start)" />
+                        <stop offset="100%" stopColor="var(--cashflow-inflow-end)" />
+                      </linearGradient>
+                      <linearGradient id="cashflowOutflowGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--cashflow-outflow-start)" />
+                        <stop offset="100%" stopColor="var(--cashflow-outflow-end)" />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} stroke="var(--cashflow-grid)" strokeDasharray="4 6" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--cashflow-axis)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
                     <YAxis
-                      tick={{ fontSize: 11, fill: '#9aa1ac' }}
+                      tick={{ fontSize: 11, fill: 'var(--cashflow-axis)' }}
                       tickLine={false}
                       axisLine={false}
                       tickFormatter={formatCompactCurrency}
                       width={40}
                     />
-                    <Tooltip content={<CashflowTooltip />} cursor={{ fill: '#f8f9fa' }} />
+                    <Tooltip content={<CashflowTooltip />} cursor={{ fill: 'var(--cashflow-cursor)' }} />
                     <Legend
                       verticalAlign="top"
                       align="right"
                       height={28}
                       iconType="circle"
                       iconSize={8}
-                      formatter={(value) => <span className="text-[0.7rem] text-neutral-500">{value}</span>}
+                      formatter={(value) => <span className="text-[0.7rem] text-fg-muted">{value}</span>}
                     />
-                    <Bar name="Inflow" dataKey="value" fill="#14532d" radius={[4, 4, 0, 0]} maxBarSize={14} />
-                    <Bar name="Outflow" dataKey="outflow" fill="#c9ced6" radius={[4, 4, 0, 0]} maxBarSize={14} />
+                    <Bar name="Inflow" dataKey="value" fill="url(#cashflowInflowGradient)" radius={[5, 5, 0, 0]} maxBarSize={18} activeBar={{ fill: 'var(--cashflow-inflow-active)' }} />
+                    <Bar name="Outflow" dataKey="outflow" fill="url(#cashflowOutflowGradient)" radius={[5, 5, 0, 0]} maxBarSize={18} activeBar={{ fill: 'var(--cashflow-outflow-active)' }} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

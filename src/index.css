@@ -210,6 +210,150 @@
   color: #ffffff;
 }
 
+[data-mode="dark"] .plans-page .plans-billing-tab {
+  color: var(--color-fg-muted);
+}
+
+[data-mode="dark"] .plans-page .plans-billing-tab:hover,
+[data-mode="dark"] .plans-page .plans-billing-tab[class*="bg-"] {
+  color: var(--color-fg);
+}
+
+[data-mode="dark"] .company-completion-progress {
+  background: linear-gradient(90deg, #dbe4ff 0%, #9fb4ff 55%, #6f8cff 100%);
+}
+
+[data-mode="dark"] .app-primary-action,
+[data-mode="dark"] :is(button, a, label)[class*="bg-primary-"][class*="text-white"],
+[data-mode="dark"] :is(button, a, label)[class*="from-primary-"][class*="text-white"] {
+  background: linear-gradient(180deg, var(--color-primary-50) 0%, var(--color-primary-100) 100%);
+  color: var(--color-primary-950);
+  border-color: var(--color-primary-200);
+  box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.22) inset, 0 14px 28px -18px rgb(0 9 42 / 0.65);
+}
+
+[data-mode="dark"] .app-primary-action:hover,
+[data-mode="dark"] :is(button, a, label)[class*="hover\:bg-primary-"]:hover,
+[data-mode="dark"] :is(button, a, label)[class*="hover\:from-primary-"]:hover {
+  background: linear-gradient(180deg, var(--color-primary-100) 0%, var(--color-primary-200) 100%);
+  color: var(--color-primary-950);
+  box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.24) inset, 0 18px 34px -20px rgb(0 9 42 / 0.72);
+}
+
+[data-mode="dark"] .app-outline-action {
+  background: color-mix(in srgb, var(--color-primary-50) 5%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary-200) 28%, var(--color-surface-border));
+  color: var(--color-fg);
+}
+
+[data-mode="dark"] .app-outline-action:hover {
+  background: var(--color-primary-50);
+  border-color: var(--color-primary-200);
+  color: var(--color-primary-950);
+}
+
+[data-mode="dark"] .app-sidebar-toggle {
+  background: var(--color-primary-50);
+  color: var(--color-primary-950);
+  box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.22) inset, 0 12px 24px -16px rgb(0 9 42 / 0.7);
+  --tw-ring-color: var(--color-primary-200);
+}
+
+[data-mode="dark"] .app-sidebar-toggle:hover {
+  background: var(--color-primary-100);
+  color: var(--color-primary-950);
+}
+
+[data-mode="dark"] .app-company-section-toggle {
+  background: var(--color-surface-muted);
+  border-color: var(--color-surface-border);
+}
+
+[data-mode="dark"] .app-company-section-toggle:hover {
+  background: color-mix(in srgb, var(--color-primary-50) 8%, var(--color-surface-muted));
+}
+
+[data-mode="dark"] .app-company-section-toggle h3 {
+  color: var(--color-fg);
+}
+
+[data-mode="dark"] .app-company-section-toggle p,
+[data-mode="dark"] .app-company-section-toggle svg {
+  color: var(--color-fg-muted);
+}
+
+.app-cashflow-chart {
+  --cashflow-grid: var(--color-neutral-200);
+  --cashflow-axis: var(--color-fg-muted);
+  --cashflow-cursor: rgb(248 249 250 / 0.72);
+  --cashflow-inflow-start: #16a34a;
+  --cashflow-inflow-end: #14532d;
+  --cashflow-inflow-active: #22c55e;
+  --cashflow-outflow-start: #d1d5db;
+  --cashflow-outflow-end: #9aa1ac;
+  --cashflow-outflow-active: #e4e6e9;
+}
+
+[data-mode="dark"] .app-cashflow-chart {
+  --cashflow-grid: rgb(148 163 184 / 0.2);
+  --cashflow-axis: var(--color-fg-muted);
+  --cashflow-cursor: rgb(159 180 255 / 0.08);
+  --cashflow-inflow-start: var(--color-primary-100);
+  --cashflow-inflow-end: var(--color-primary-300);
+  --cashflow-inflow-active: var(--color-primary-50);
+  --cashflow-outflow-start: #e4e6e9;
+  --cashflow-outflow-end: #9aa1ac;
+  --cashflow-outflow-active: #f8f9fa;
+}
+
+[data-mode="dark"] .app-cashflow-tooltip {
+  box-shadow: 0 18px 36px -20px rgb(0 0 0 / 0.65);
+  --tw-ring-color: var(--color-surface-border);
+}
+
+[data-mode="dark"] .app-topbar-icon-button {
+  background: color-mix(in srgb, var(--color-primary-50) 6%, var(--color-surface-muted));
+  color: var(--color-fg-muted);
+  box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.08) inset, 0 10px 22px -18px rgb(0 9 42 / 0.8);
+  --tw-ring-color: color-mix(in srgb, var(--color-primary-200) 30%, var(--color-surface-border));
+}
+
+[data-mode="dark"] .app-topbar-icon-button:hover {
+  background: color-mix(in srgb, var(--color-primary-50) 12%, var(--color-surface-muted));
+  color: var(--color-fg);
+  --tw-ring-color: var(--color-primary-200);
+}
+
+[data-mode="dark"] .app-topbar-unread-dot {
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 5px rgb(239 68 68 / 0.16);
+  --tw-ring-color: var(--color-surface);
+}
+
+[data-mode="dark"] .app-topbar-user-button {
+  background: color-mix(in srgb, var(--color-primary-50) 3%, transparent);
+  box-shadow: 0 0 0 1px transparent;
+}
+
+[data-mode="dark"] .app-topbar-user-button:hover {
+  background: color-mix(in srgb, var(--color-primary-50) 9%, var(--color-surface-muted));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-200) 28%, var(--color-surface-border));
+}
+
+[data-mode="dark"] .app-topbar-avatar {
+  background: linear-gradient(180deg, var(--color-primary-50) 0%, var(--color-primary-100) 100%);
+  color: var(--color-primary-950);
+  box-shadow: 0 10px 24px -18px rgb(0 9 42 / 0.75);
+  --tw-ring-color: var(--color-primary-200);
+}
+
+[data-mode="dark"] .app-topbar-chevron {
+  color: var(--color-fg-muted);
+}
+
+[data-mode="dark"] .app-topbar-user-button:hover .app-topbar-chevron {
+  color: var(--color-fg);
+}
+
 /* ---- Background-image ("glass") mode ---------------------------------------------------------
    Only engages when a background image is actually set (data-bg="image" - never on data-bg="none"
    or when the attribute is absent, i.e. custom_enabled=false). Sidebar/Topbar/Card/Modal/table

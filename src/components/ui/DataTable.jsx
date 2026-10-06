@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Search, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import ActionMenu from './ActionMenu'
 import EmptyState from './EmptyState'
-import LoadingSpinner from './LoadingSpinner'
+import { TableSkeleton } from './Skeleton'
 
 function compareValues(a, b) {
   if (a == null && b == null) return 0
@@ -128,11 +128,7 @@ export default function DataTable({
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {loading ? (
-              <tr>
-                <td colSpan={colSpan}>
-                  <LoadingSpinner label="Loading…" />
-                </td>
-              </tr>
+              <TableSkeleton columns={colSpan} rows={Math.min(pageSize, 8)} />
             ) : paginated.length === 0 ? (
               <tr>
                 <td colSpan={colSpan}>

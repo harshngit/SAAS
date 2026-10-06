@@ -3,11 +3,11 @@ import { Loader2 } from 'lucide-react'
 
 const variantClasses = {
   primary:
-    'bg-linear-to-b from-primary-500 to-primary-600 text-white shadow-[0_1px_0_0_rgb(255_255_255/0.15)_inset,0_8px_20px_-6px_rgb(0_9_42/0.4)] hover:from-primary-500 hover:to-primary-700 hover:shadow-[0_1px_0_0_rgb(255_255_255/0.15)_inset,0_10px_24px_-6px_rgb(0_9_42/0.5)] active:scale-[0.98] focus-visible:outline-primary-600',
+    'app-primary-action bg-linear-to-b from-primary-500 to-primary-600 text-white shadow-[0_1px_0_0_rgb(255_255_255/0.15)_inset,0_8px_20px_-6px_rgb(0_9_42/0.4)] hover:from-primary-500 hover:to-primary-700 hover:shadow-[0_1px_0_0_rgb(255_255_255/0.15)_inset,0_10px_24px_-6px_rgb(0_9_42/0.5)] active:scale-[0.98] focus-visible:outline-primary-600',
   secondary:
     'bg-neutral-100 text-neutral-800 hover:bg-neutral-200 active:scale-[0.98] focus-visible:outline-neutral-400',
   outline:
-    'border border-(--btn-outline-border) bg-(--btn-outline-bg) text-(--btn-outline-text) hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700 active:scale-[0.98] focus-visible:outline-primary-600',
+    'app-outline-action border border-(--btn-outline-border) bg-(--btn-outline-bg) text-(--btn-outline-text) hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700 active:scale-[0.98] focus-visible:outline-primary-600',
   ghost:
     'text-neutral-600 hover:bg-neutral-100 active:scale-[0.98] focus-visible:outline-neutral-400',
   danger:

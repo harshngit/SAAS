@@ -1658,7 +1658,7 @@ function CompanySection({
           type="button"
           aria-expanded={isOpen}
           onClick={onToggle}
-          className={`${isOpen ? "mb-4 border-primary-100 bg-primary-50/40" : "mb-0 border-neutral-100 bg-neutral-50"} flex w-full items-center justify-between rounded-xl border px-3.5 py-2.5 text-left transition-colors hover:bg-neutral-100`}
+          className={`app-company-section-toggle ${isOpen ? "mb-4 border-primary-100 bg-primary-50/40" : "mb-0 border-neutral-100 bg-neutral-50"} flex w-full items-center justify-between rounded-xl border px-3.5 py-2.5 text-left transition-colors hover:bg-neutral-100`}
         >
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">
@@ -1922,7 +1922,7 @@ function CompanyOverviewDashboard({
         <div className="w-full min-w-0 overflow-x-auto pb-1">
         <div className="grid min-w-[46rem] grid-cols-[minmax(0,1.7fr)_minmax(0,5fr)] items-center gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-16 shrink-0 place-items-center rounded-full border border-neutral-100 bg-surface text-2xl font-bold text-primary-700 shadow-sm 2xl:size-20">
+            <div className="grid size-16 shrink-0 place-items-center rounded-full border border-neutral-100 bg-surface text-2xl font-bold text-fg shadow-sm 2xl:size-20">
               {logoUrl ? (
                 <img
                   src={getFileUrl(logoUrl)}
@@ -2017,25 +2017,25 @@ function CompanyOverviewDashboard({
               <Building2 className="size-4" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-bold tracking-tight text-slate-900">
+              <h3 className="text-sm font-bold tracking-tight text-fg">
                 Profile Completion
               </h3>
-              <p className="mt-1 max-w-xl text-xs leading-4 text-slate-500">
+              <p className="mt-1 max-w-xl text-xs leading-4 text-fg-muted">
                 Complete the missing information to finish your company profile.
               </p>
             </div>
           </div>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200/70">
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-neutral-200/70">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary-950 via-primary-700 to-primary-600 transition-all duration-300"
+              className="company-completion-progress h-full rounded-full bg-gradient-to-r from-primary-950 via-primary-700 to-primary-600 transition-all duration-300"
               style={{ width: `${completion.percent}%` }}
             />
           </div>
           <div className="mt-3">
-            <p className="text-lg font-bold tracking-tight text-slate-950">
+            <p className="text-lg font-bold tracking-tight text-fg">
               {completion.percent}% Complete
             </p>
-            <p className="mt-1 text-xs text-slate-600">
+            <p className="mt-1 text-xs text-fg-muted">
               {completion.completedRequiredFields} of {completion.totalRequiredFields} required fields completed
             </p>
           </div>
@@ -2045,7 +2045,7 @@ function CompanyOverviewDashboard({
                 Profile Complete
               </span>
             ) : (
-              <span className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-2.5 py-1 text-[0.7rem] font-semibold text-slate-800">
+              <span className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-2.5 py-1 text-[0.7rem] font-semibold text-amber-900">
                 <span className="size-1.5 rounded-full bg-amber-500" />
                 {Math.max(completion.totalRequiredFields - completion.completedRequiredFields, 0)} fields remaining
               </span>
@@ -2149,7 +2149,7 @@ function CompanyOverviewDashboard({
           <button
             type="button"
             onClick={() => onNavigate("documents")}
-            className="mt-5 w-full border-t border-neutral-100 pt-4 text-sm font-semibold text-primary-700 transition-all duration-200 hover:translate-x-0.5 hover:text-primary-900"
+            className="mt-5 w-full border-t border-neutral-100 pt-4 text-sm font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:text-fg"
           >
             View All Documents
           </button>
@@ -2169,7 +2169,7 @@ function CompanyOverviewDashboard({
               <div className="space-y-4 text-sm">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-primary-700">
+                    <p className="font-semibold text-fg">
                       Registered Office
                     </p>
                     <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
@@ -2196,12 +2196,12 @@ function CompanyOverviewDashboard({
                   referrerPolicy="no-referrer-when-downgrade"
                   className="absolute inset-0 h-full w-full border-0"
                 />
-                <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-white/35 via-transparent to-transparent" />
+                <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/10 via-transparent to-transparent" />
                 <a
                   href={mapUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="absolute bottom-3 right-3 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-primary-700 shadow-sm ring-1 ring-neutral-100"
+                  className="absolute bottom-3 right-3 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-fg shadow-sm ring-1 ring-neutral-100"
                 >
                   View on Map
                 </a>
@@ -2217,7 +2217,7 @@ function CompanyOverviewDashboard({
               <button
                 type="button"
                 onClick={() => onNavigate("additional-info")}
-                className="rounded-full px-2 py-1 text-xs font-semibold text-primary-700 transition-all duration-200 hover:translate-x-0.5 hover:bg-primary-50 hover:text-primary-900"
+                className="rounded-full px-2 py-1 text-xs font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-neutral-50 hover:text-fg"
               >
                 View All
               </button>
@@ -2262,7 +2262,7 @@ function CompanyOverviewDashboard({
                   key={`${action.label}-${index}`}
                   type="button"
                   onClick={() => onNavigate(action.tab)}
-                  className="flex min-h-14 flex-col items-center justify-center gap-1.5 rounded-xl border border-neutral-100 bg-surface px-1.5 py-2 text-center text-[10px] font-semibold leading-tight text-neutral-700 transition-colors hover:border-primary-100 hover:bg-primary-50/40"
+                  className="flex min-h-14 flex-col items-center justify-center gap-1.5 rounded-xl border border-neutral-100 bg-surface px-1.5 py-2 text-center text-[10px] font-semibold leading-tight text-fg transition-colors hover:border-primary-100 hover:bg-neutral-50"
                 >
                   <span className={`flex size-7 items-center justify-center rounded-lg ${toneClasses[action.tone]}`}>
                     <Icon className="size-3.5" />

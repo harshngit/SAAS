@@ -251,7 +251,7 @@ export default function AdminPlans() {
   }
 
   return (
-    <div className="space-y-8 pb-6">
+    <div className="plans-page space-y-8 pb-6">
       <Modal
         isOpen={Boolean(selectedPlan)}
         onClose={handleCloseConfirmUpgrade}
@@ -289,7 +289,7 @@ export default function AdminPlans() {
         )}
       </Modal>
 
-      <section className="rounded-2xl border border-neutral-100 bg-linear-to-br from-white via-white to-primary-50 p-5 shadow-(--shadow-card)">
+      <section className="rounded-2xl border border-surface-border bg-surface p-5 shadow-(--shadow-card)">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
@@ -353,8 +353,8 @@ export default function AdminPlans() {
 
       <Tabs value={billingCycle} onValueChange={setBillingCycle} className="flex justify-center">
         <TabsList>
-          <TabsTrigger value="monthly">Monthly</TabsTrigger>
-          <TabsTrigger value="yearly">Yearly</TabsTrigger>
+          <TabsTrigger className="plans-billing-tab" value="monthly">Monthly</TabsTrigger>
+          <TabsTrigger className="plans-billing-tab" value="yearly">Yearly</TabsTrigger>
         </TabsList>
       </Tabs>
 

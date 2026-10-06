@@ -7,6 +7,7 @@ import { ROLES, roleLabels, roleMenus } from '../../auth/roles'
 import { logout } from '../../api/auth'
 import { listNotifications, markAllNotificationsRead, markNotificationRead, getUnreadNotificationCount } from '../../api/notifications'
 import { resolveNotificationDestination } from '../../utils/notificationNavigation'
+import { Skeleton } from '../ui/Skeleton'
 
 const NOTIFICATIONS_PANEL_WIDTH = 320
 const MENU_PANEL_WIDTH = 240
@@ -255,11 +256,11 @@ export default function Topbar() {
             aria-haspopup="menu"
             aria-expanded={isNotificationsOpen}
             onClick={toggleNotifications}
-            className="relative rounded-full bg-surface p-2.5 text-fg-muted shadow-(--shadow-xs) ring-1 ring-neutral-100 transition-colors hover:text-fg"
+            className="app-topbar-icon-button relative rounded-full bg-surface p-2.5 text-fg-muted shadow-(--shadow-xs) ring-1 ring-neutral-100 transition-colors hover:text-fg"
           >
             <Bell className="size-4.5" />
             {unreadCount > 0 && (
-              <span className="absolute right-0 top-0 size-2.5 -translate-y-1/2 translate-x-1/2 rounded-full bg-red-500 ring-2 ring-white" />
+              <span className="app-topbar-unread-dot absolute right-0 top-0 size-2.5 -translate-y-1/2 translate-x-1/2 rounded-full bg-red-500 ring-2 ring-white" />
             )}
           </button>
 
@@ -283,7 +284,14 @@ export default function Topbar() {
                 </div>
                 <div className="max-h-80 overflow-y-auto">
                   {isLoadingNotifications ? (
-                    <p className="px-4 py-6 text-center text-sm text-neutral-400">Loading...</p>
+                    <div className="space-y-3 px-4 py-4" role="status" aria-label="Loading notifications">
+                      {Array.from({ length: 3 }).map((_, index) => (
+                        <div key={index} className="space-y-2">
+                          <Skeleton className="h-3.5 w-2/3 rounded-lg" />
+                          <Skeleton className="h-2.5 w-full" />
+                        </div>
+                      ))}
+                    </div>
                   ) : notifications.length === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-neutral-400">No notifications yet.</p>
                   ) : (
@@ -322,9 +330,9 @@ export default function Topbar() {
             onClick={() => setIsMenuOpen((prev) => !prev)}
             aria-haspopup="menu"
             aria-expanded={isMenuOpen}
-            className="flex items-center gap-2 rounded-full bg-transparent py-1 pl-1 pr-1.5 transition-colors hover:bg-(--input-bg)"
+            className="app-topbar-user-button flex items-center gap-2 rounded-full bg-transparent py-1 pl-1 pr-1.5 transition-colors hover:bg-(--input-bg)"
           >
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary-500 to-primary-700 text-xs font-semibold text-white ring-2 ring-white">
+            <div className="app-topbar-avatar flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary-500 to-primary-700 text-xs font-semibold text-white ring-2 ring-white">
               {initials}
             </div>
             <div className="hidden pr-3 text-left sm:block">
@@ -332,7 +340,7 @@ export default function Topbar() {
               <span className="app-role-label text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
             </div>
             <ChevronDown
-              className={`size-4 shrink-0 text-neutral-400 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`}
+              className={`app-topbar-chevron size-4 shrink-0 text-neutral-400 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`}
               aria-hidden="true"
             />
           </button>
