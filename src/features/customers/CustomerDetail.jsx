@@ -1073,7 +1073,7 @@ export default function CustomerDetail() {
               <button
                 type="button"
                 onClick={() => setActiveTab('activities')}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:underline"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-primary-700 transition-all duration-200 hover:translate-x-0.5 hover:bg-primary-50 hover:text-primary-900"
               >
                 View All →
               </button>
@@ -1123,7 +1123,7 @@ export default function CustomerDetail() {
               <button
                 type="button"
                 onClick={() => setActiveTab('orders')}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:underline"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-primary-700 transition-all duration-200 hover:translate-x-0.5 hover:bg-primary-50 hover:text-primary-900"
               >
                 View All →
               </button>

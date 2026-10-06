@@ -1821,6 +1821,9 @@ function CompanyOverviewDashboard({
   const branchAddress = branchAddressEntry
     ? addressText(branchAddressEntry) || "Branch or warehouse address not added."
     : companyData.branchOfficeAddresses || companyData.billingAddress || "Branch or warehouse address not added.";
+  const mapQuery = [addressLine, locationLine].filter(Boolean).join(", ") || displayName;
+  const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
+  const mapEmbedUrl = `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`;
 
   const authorizedDesignation = getOptionLabel(
     designationOptions,
@@ -2146,7 +2149,7 @@ function CompanyOverviewDashboard({
           <button
             type="button"
             onClick={() => onNavigate("documents")}
-            className="mt-5 w-full border-t border-neutral-100 pt-4 text-sm font-semibold text-primary-700 hover:text-primary-800"
+            className="mt-5 w-full border-t border-neutral-100 pt-4 text-sm font-semibold text-primary-700 transition-all duration-200 hover:translate-x-0.5 hover:text-primary-900"
           >
             View All Documents
           </button>
@@ -2185,17 +2188,23 @@ function CompanyOverviewDashboard({
                   <p className="mt-2 text-neutral-700">{branchAddress}</p>
                 </div>
               </div>
-              <div className="relative min-h-36 overflow-hidden rounded-xl border border-neutral-100 bg-[linear-gradient(135deg,#e8f3ff_25%,transparent_25%),linear-gradient(225deg,#e8f3ff_25%,transparent_25%),linear-gradient(45deg,#edf7ef_25%,transparent_25%),linear-gradient(315deg,#edf7ef_25%,#f8fafc_25%)] bg-[length:36px_36px]">
-                <div className="absolute left-1/2 top-1/2 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-red-500 text-white shadow-lg">
-                  <MapPin className="size-5" />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigate("general")}
+              <div className="relative min-h-36 overflow-hidden rounded-xl border border-neutral-100 bg-neutral-50">
+                <iframe
+                  title={`Map location for ${displayName}`}
+                  src={mapEmbedUrl}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  className="absolute inset-0 h-full w-full border-0"
+                />
+                <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-white/35 via-transparent to-transparent" />
+                <a
+                  href={mapUrl}
+                  target="_blank"
+                  rel="noreferrer"
                   className="absolute bottom-3 right-3 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-primary-700 shadow-sm ring-1 ring-neutral-100"
                 >
                   View on Map
-                </button>
+                </a>
               </div>
             </div>
           </div>
@@ -2208,7 +2217,7 @@ function CompanyOverviewDashboard({
               <button
                 type="button"
                 onClick={() => onNavigate("additional-info")}
-                className="text-xs font-semibold text-primary-700"
+                className="rounded-full px-2 py-1 text-xs font-semibold text-primary-700 transition-all duration-200 hover:translate-x-0.5 hover:bg-primary-50 hover:text-primary-900"
               >
                 View All
               </button>
@@ -3491,7 +3500,7 @@ export default function CompanySettings() {
 
           <div className="p-5 sm:p-7">
             {activeTab !== "account" && activeTab !== "online-payments" && (
-              <div className="border-b border-neutral-100 pb-5">
+              <div className="sticky top-0 z-20 -mx-5 border-b border-neutral-100 bg-surface px-5 pb-4 pt-1 shadow-[0_12px_28px_-28px_rgb(15_23_42/0.45)] sm:-mx-7 sm:px-7">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h2 className="font-(--font-display) text-xl font-semibold tracking-tight text-neutral-900">

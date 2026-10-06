@@ -1287,7 +1287,7 @@ export default function LeadDetail() {
               <button
                 type="button"
                 onClick={() => setActivitiesTab('followups')}
-                className="text-xs font-medium text-primary-700 hover:underline"
+                className="rounded-full px-2 py-1 text-xs font-medium text-primary-700 transition-all duration-200 hover:translate-x-0.5 hover:bg-primary-50 hover:text-primary-900"
               >
                 View All
               </button>
@@ -1338,7 +1338,7 @@ export default function LeadDetail() {
                 <button
                   type="button"
                   onClick={() => setActivitiesTab('notes')}
-                  className="text-xs font-medium text-primary-700 hover:underline"
+                  className="rounded-full px-2 py-1 text-xs font-medium text-primary-700 transition-all duration-200 hover:translate-x-0.5 hover:bg-primary-50 hover:text-primary-900"
                 >
                   View All
                 </button>

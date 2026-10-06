@@ -230,13 +230,13 @@ export default function Sidebar({
               <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-fg">
                 Beas Suite
               </span>
-              <span className="truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
+              <span className="app-role-label truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
             </div>
             <div className="flex min-w-0 flex-col md:hidden">
               <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-fg">
                 Beas Suite
               </span>
-              <span className="truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
+              <span className="app-role-label truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
             </div>
           </div>
 

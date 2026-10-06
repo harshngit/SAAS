@@ -684,7 +684,7 @@ export default function SuperAdminDashboard() {
             icon={UserRoundCog}
             title="Recent Organizations"
             actions={
-              <button type="button" onClick={() => navigate('/superadmin/organizations')} className="inline-flex h-8 items-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 text-[0.68rem] font-bold text-primary-800">
+              <button type="button" onClick={() => navigate('/superadmin/organizations')} className="inline-flex h-8 items-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 text-[0.68rem] font-bold text-primary-800 transition-all duration-200 hover:translate-x-0.5 hover:border-primary-200 hover:bg-primary-100 hover:text-primary-900">
                 View All
                 <ChevronRight className="size-3" aria-hidden="true" />
               </button>
@@ -765,7 +765,7 @@ export default function SuperAdminDashboard() {
             icon={TrendingUp}
             title="Upgrade Requests"
             actions={
-              <button type="button" onClick={() => navigate('/superadmin/upgrade-requests')} className="inline-flex h-8 items-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 text-[0.68rem] font-bold text-primary-800">
+              <button type="button" onClick={() => navigate('/superadmin/upgrade-requests')} className="inline-flex h-8 items-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 text-[0.68rem] font-bold text-primary-800 transition-all duration-200 hover:translate-x-0.5 hover:border-primary-200 hover:bg-primary-100 hover:text-primary-900">
                 View All
                 <ChevronRight className="size-3" aria-hidden="true" />
               </button>

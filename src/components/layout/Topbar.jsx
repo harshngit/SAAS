@@ -329,7 +329,7 @@ export default function Topbar() {
             </div>
             <div className="hidden pr-3 text-left sm:block">
               <p className="text-sm font-medium leading-tight text-fg">{currentUser.name}</p>
-              <span className="text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
+              <span className="app-role-label text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
             </div>
             <ChevronDown
               className={`size-4 shrink-0 text-neutral-400 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`}
@@ -348,7 +348,7 @@ export default function Topbar() {
               >
                 <div className="px-3 py-2.5 sm:hidden">
                   <p className="text-sm font-medium leading-tight text-fg">{currentUser.name}</p>
-                  <span className="text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
+                  <span className="app-role-label text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
                 </div>
                 <button
                   type="button"

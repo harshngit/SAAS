@@ -206,6 +206,10 @@
   --badge-info-border: rgba(59, 130, 246, 0.45);
 }
 
+[data-mode="dark"] .app-role-label {
+  color: #ffffff;
+}
+
 /* ---- Background-image ("glass") mode ---------------------------------------------------------
    Only engages when a background image is actually set (data-bg="image" - never on data-bg="none"
    or when the attribute is absent, i.e. custom_enabled=false). Sidebar/Topbar/Card/Modal/table

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Download, FileSpreadsheet } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -14,7 +15,12 @@ export default function FinancialReports({
   title = 'Financial Reports',
   description = 'Generate, review and export every accounting report for your firm',
 }) {
-  const [reportType, setReportType] = useState(REPORT_TYPES[0].value)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedReportType = searchParams.get('type')
+  const initialReportType = REPORT_TYPES.some((item) => item.value === requestedReportType)
+    ? requestedReportType
+    : REPORT_TYPES[0].value
+  const [reportType, setReportType] = useState(initialReportType)
   const [period, setPeriod] = useState('monthly')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -28,6 +34,20 @@ export default function FinancialReports({
     () => getDateRangeForPeriod(period, customFrom, customTo),
     [period, customFrom, customTo],
   )
+
+  useEffect(() => {
+    if (!requestedReportType) return
+    if (!REPORT_TYPES.some((item) => item.value === requestedReportType)) return
+    setReportType(requestedReportType)
+  }, [requestedReportType])
+
+  const handleReportTypeChange = (event) => {
+    const nextReportType = event.target.value
+    setReportType(nextReportType)
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('type', nextReportType)
+    setSearchParams(nextParams, { replace: true })
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -95,7 +115,7 @@ export default function FinancialReports({
             <Select
               options={REPORT_TYPES}
               value={reportType}
-              onChange={(event) => setReportType(event.target.value)}
+              onChange={handleReportTypeChange}
               className="lg:w-72"
             />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

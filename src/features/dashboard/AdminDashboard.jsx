@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { formatCompactCurrency, formatCurrency } from '../../utils/format'
 import { getAdminDashboard } from '../../api/dashboard'
 import { getExpenseCategories } from '../../api/expenses'
-import { listOrders } from '../../api/orders'
+import { cancelOrder, listOrders } from '../../api/orders'
 import { listWarehouses } from '../../api/warehouses'
 import { listCustomers } from '../../api/customers'
 import { listSuppliers } from '../../api/suppliers'
@@ -14,12 +14,11 @@ import { DEMO_EXPENSE_CATEGORIES } from '../expenses/expenseDemo'
 import { ORDER_STATUS_VARIANT, formatOrderStatus } from '../orders/orderHelpers'
 import {
   Ban,
-  BarChart3,
   ChevronRight,
   Clock,
   CreditCard,
+  Eye,
   IndianRupee,
-  MoreHorizontal,
   PackagePlus,
   Search,
   ShoppingCart,
@@ -189,7 +188,7 @@ function FilterField({ label, children }) {
   )
 }
 
-function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
+function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green', onClick }) {
   const toneClasses = {
     green: 'bg-linear-to-br from-primary-700 to-primary-900 text-white',
     mint: 'bg-[linear-gradient(135deg,#047857,#10b981)] text-white',
@@ -206,8 +205,10 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
   const footerSecondLine = footerParts.length === 3 ? footerParts.slice(2).join(' ') : footerParts.slice(1).join(' ')
 
   return (
-    <div
-      className={`group relative flex h-full min-h-[220px] min-w-0 flex-col overflow-hidden rounded-2xl p-4 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] ${toneClasses[tone]}`}
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative flex h-full min-h-[220px] min-w-0 flex-col overflow-hidden rounded-2xl p-4 text-left shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:ring-offset-2 ${toneClasses[tone]}`}
     >
       <div className="min-w-0">
         <p className="flex h-10 items-start justify-center text-center text-[0.68rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-current/72 sm:text-[0.72rem]">
@@ -225,7 +226,7 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
       </div>
       {footer && (
         <div
-          className="mt-auto flex w-full items-end justify-between gap-2 border-t border-white/40 pt-3 text-[0.72rem] font-semibold leading-4 text-current/86 transition-transform duration-300 group-hover:translate-x-0.5"
+          className="mt-auto flex w-full items-end justify-between gap-2 border-t border-white/40 pt-3 text-[0.72rem] font-semibold leading-4 text-current/86 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-white"
         >
           <span className="min-w-0 flex-1 leading-[1.05]">
             <span className="block whitespace-nowrap">{footerFirstLine}</span>
@@ -234,18 +235,22 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green' }) {
           <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
         </div>
       )}
-    </div>
+    </button>
   )
 }
 
-function ProfitSummaryCard({ grossProfit, netProfit }) {
+function ProfitSummaryCard({ grossProfit, netProfit, onClick }) {
   const footer = 'View Profit & Loss'
   const footerParts = footer.split(' ')
   const footerFirstLine = footerParts.length === 3 ? footerParts.slice(0, 2).join(' ') : footerParts.slice(0, 1).join(' ')
   const footerSecondLine = footerParts.length === 3 ? footerParts.slice(2).join(' ') : footerParts.slice(1).join(' ')
  
   return (
-    <div className="group relative flex h-full min-h-[220px] min-w-0 flex-col overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#1687a8_0%,#2670db_100%)] p-4 text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)]">
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative flex h-full min-h-[220px] min-w-0 flex-col overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#1687a8_0%,#2670db_100%)] p-4 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:ring-offset-2"
+    >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_36%)] opacity-90" />
       <div className="relative min-w-0">
         <p className="flex h-10 items-start justify-center text-center text-[0.70rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-white/82 sm:text-[0.72rem]">
@@ -266,14 +271,14 @@ function ProfitSummaryCard({ grossProfit, netProfit }) {
           </div>
         </div>
       </div>
-      <div className="relative z-10 mt-auto flex items-end justify-between gap-2 border-t border-white/40 pt-3 text-[0.72rem] font-semibold leading-4 text-white/92 transition-transform duration-300 group-hover:translate-x-0.5">
+      <div className="relative z-10 mt-auto flex items-end justify-between gap-2 border-t border-white/40 pt-3 text-[0.72rem] font-semibold leading-4 text-white/92 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-white">
         <span className="min-w-0 leading-[1.02]">
           <span className="block whitespace-nowrap">{footerFirstLine}</span>
           {footerSecondLine && <span className="block whitespace-nowrap">{footerSecondLine}</span>}
         </span>
         <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -760,6 +765,42 @@ export default function AdminDashboard() {
         ),
       )
 
+  const openOrder = (order) => {
+    if (!order?.id) return
+    navigate(`/admin/orders/${order.id}`)
+  }
+
+  const handleCancelRecentOrder = async (order) => {
+    if (!order?.id) return
+    const confirmed = window.confirm(`Cancel order ${order.orderNumber || ''}?`)
+    if (!confirmed) return
+
+    if (DEMO_MODE) {
+      setOrders((current) => current.map((item) => (item.id === order.id ? { ...item, status: 'cancelled' } : item)))
+      setDashboard((current) => ({
+        ...current,
+        recent_orders: (current?.recent_orders || []).map((item) =>
+          item.id === order.id ? { ...item, status: 'cancelled' } : item,
+        ),
+      }))
+      return
+    }
+
+    const result = await cancelOrder(order.id, 'Cancelled from dashboard')
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
+
+    setOrders((current) => current.map((item) => (item.id === order.id ? { ...item, status: 'cancelled' } : item)))
+    setDashboard((current) => ({
+      ...current,
+      recent_orders: (current?.recent_orders || []).map((item) =>
+        item.id === order.id ? { ...item, status: 'cancelled' } : item,
+      ),
+    }))
+  }
+
   return (
     <div className="space-y-4 rounded-2xl bg-transparent">
       <div className="overflow-hidden rounded-2xl border border-white/70 bg-surface p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
@@ -828,7 +869,7 @@ export default function AdminDashboard() {
             type="button"
             onClick={applyFilters}
             disabled={isLoading}
-            className="inline-flex h-10 min-w-0 items-center justify-center rounded-xl bg-primary-600 px-3 py-1.5 text-[0.73rem] font-semibold text-white shadow-[0_12px_24px_-14px_rgb(0_9_42/0.45)] transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 min-w-0 items-center justify-center rounded-xl bg-primary-600 px-3 py-1.5 text-[0.73rem] font-semibold text-white shadow-[0_12px_24px_-14px_rgb(0_9_42/0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-[0_16px_30px_-16px_rgb(0_9_42/0.6)] active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-primary-200 focus:ring-offset-2 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60 disabled:hover:shadow-[0_12px_24px_-14px_rgb(0_9_42/0.45)]"
           >
             {isLoading ? 'Applying…' : 'Apply'}
           </button>
@@ -890,6 +931,7 @@ export default function AdminDashboard() {
             footer="View Sales Report"
             icon={Wallet}
             tone="mint"
+            onClick={() => navigate('/admin/reports?type=sales')}
           />
           <KpiCard
             title="Purchases"
@@ -897,6 +939,7 @@ export default function AdminDashboard() {
             footer="View Purchase Report"
             icon={ShoppingCart}
             tone="amber"
+            onClick={() => navigate('/admin/reports?type=purchase')}
           />
           <KpiCard
             title="Expenses"
@@ -904,14 +947,20 @@ export default function AdminDashboard() {
             footer="View Expense Report"
             icon={CreditCard}
             tone="violet"
+            onClick={() => navigate('/admin/reports?type=expense')}
           />
-          <ProfitSummaryCard grossProfit={grossProfit} netProfit={netProfit} />
+          <ProfitSummaryCard
+            grossProfit={grossProfit}
+            netProfit={netProfit}
+            onClick={() => navigate('/admin/reports?type=profit-loss')}
+          />
           <KpiCard
             title="New Customers"
             value={summary.new_customers ?? 0}
             footer="View Customers"
             icon={Users}
             tone="sky"
+            onClick={() => navigate('/admin/customers')}
           />
           <KpiCard
             title="Sales Growth"
@@ -920,6 +969,7 @@ export default function AdminDashboard() {
             footer="View Growth Report"
             icon={Sparkles}
             tone="pink"
+            onClick={() => navigate('/admin/reports?type=sales')}
           />
         </div>
       </div>
@@ -927,40 +977,49 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="space-y-4">
           <div className="border-0 bg-transparent p-0 shadow-none hover:shadow-none">
-            <div className="grid grid-cols-5 gap-2">
-              <button className="flex min-h-[76px] min-w-0 bg-surface flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 px-1 py-3 text-center text-primary-700 shadow-none">
+            <div className="grid grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/admin/orders/create')}
+                className="flex min-h-[76px] min-w-0 bg-surface flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 px-1 py-3 text-center text-fg shadow-none transition-colors hover:border-surface-border hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-primary-200"
+              >
                 <ShoppingCart className="size-3.5 shrink-0  " />
-                <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
+                <span className="max-w-full text-[0.64rem] font-semibold leading-[0.82rem]">
                   <span className="block whitespace-nowrap ">New</span>
                   <span className="block whitespace-nowrap">Sale</span>
                 </span>
               </button>
-              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-surface px-1 py-3 text-center text-primary-700 shadow-none">
+              <button
+                type="button"
+                onClick={() => navigate('/admin/purchases/create')}
+                className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-surface px-1 py-3 text-center text-fg shadow-none transition-colors hover:border-surface-border hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-primary-200"
+              >
                 <PackagePlus className="size-3.5 shrink-0" />
-                <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
+                <span className="max-w-full text-[0.64rem] font-semibold leading-[0.82rem]">
                   <span className="block whitespace-nowrap">New</span>
                   <span className="block whitespace-nowrap">Purchase</span>
                 </span>
               </button>
-              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-surface px-1 py-3 text-center text-primary-700 shadow-none">
+              <button
+                type="button"
+                onClick={() => navigate('/admin/collections')}
+                className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-surface px-1 py-3 text-center text-fg shadow-none transition-colors hover:border-surface-border hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-primary-200"
+              >
                 <Wallet className="size-3.5 shrink-0" />
-                <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
+                <span className="max-w-full text-[0.64rem] font-semibold leading-[0.82rem]">
                   <span className="block whitespace-nowrap">Collect</span>
                   <span className="block whitespace-nowrap">Payment</span>
                 </span>
               </button>
-              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-surface px-1 py-3 text-center text-primary-700 shadow-none">
+              <button
+                type="button"
+                onClick={() => navigate('/admin/orders')}
+                className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-surface px-1 py-3 text-center text-fg shadow-none transition-colors hover:border-surface-border hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-primary-200"
+              >
                 <Clock className="size-3.5 shrink-0" />
-                <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
+                <span className="max-w-full text-[0.64rem] font-semibold leading-[0.82rem]">
                   <span className="block whitespace-nowrap">Pending</span>
                   <span className="block whitespace-nowrap">Orders</span>
-                </span>
-              </button>
-              <button className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-neutral-100 bg-surface px-1 py-3 text-center text-primary-700 shadow-none">
-                <MoreHorizontal className="size-3.5 shrink-0" />
-                <span className="max-w-full text-[0.58rem] font-semibold leading-[0.72rem]">
-                  <span className="block whitespace-nowrap">More</span>
-                  <span className="block whitespace-nowrap">Actions</span>
                 </span>
               </button>
             </div>
@@ -1017,7 +1076,7 @@ export default function AdminDashboard() {
             <button
               type="button"
               onClick={() => navigate('/admin/reports')}
-              className="mt-3 inline-flex items-center gap-1 text-[0.72rem] font-semibold text-primary-600 hover:text-primary-700"
+              className="mt-3 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[0.72rem] font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-surface-muted hover:text-fg"
             >
               View Health Report
               <ChevronRight className="size-3.5" aria-hidden="true" />
@@ -1026,7 +1085,15 @@ export default function AdminDashboard() {
 
           <DashboardCard
             title="Stock Watch"
-            actions={<span className="text-[0.7rem] font-semibold text-primary-600">View all</span>}
+            actions={
+              <button
+                type="button"
+                onClick={() => navigate('/admin/inventory')}
+                className="rounded-full px-2 py-1 text-[0.7rem] font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-surface-muted hover:text-fg"
+              >
+                View all
+              </button>
+            }
             className="min-h-[350px] [&>div:first-child]:mb-3"
           >
             {stockWatchRows.length === 0 ? (
@@ -1049,7 +1116,15 @@ export default function AdminDashboard() {
 
           <DashboardCard
             title="Recent Activity"
-            actions={<span className="text-[0.7rem] font-semibold text-primary-600">View all</span>}
+            actions={
+              <button
+                type="button"
+                onClick={() => navigate('/admin/orders')}
+                className="rounded-full px-2 py-1 text-[0.7rem] font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-surface-muted hover:text-fg"
+              >
+                View all
+              </button>
+            }
             className=" mt-5 min-h-[350px]"
           >
             <div className="flex min-h-[220px] flex-col justify-between">
@@ -1172,7 +1247,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => navigate('/admin/reports')}
-                  className="inline-flex items-center gap-1.5 font-semibold text-primary-600 hover:text-primary-700"
+                  className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-surface-muted hover:text-fg"
                 >
                   View A/R Report
                   <ChevronRight className="size-4" aria-hidden="true" />
@@ -1218,8 +1293,8 @@ export default function AdminDashboard() {
                 <div className="mt-auto flex items-center justify-center pt-3 text-[0.72rem]">
                   <button
                     type="button"
-                    onClick={() => navigate('/admin/reports')}
-                    className="inline-flex items-center gap-1.5 font-semibold text-primary-600 hover:text-primary-700"
+                    onClick={() => navigate('/admin/reports?type=sales')}
+                    className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-surface-muted hover:text-fg"
                   >
                     View Sales Report
                     <ChevronRight className="size-4" aria-hidden="true" />
@@ -1287,8 +1362,8 @@ export default function AdminDashboard() {
               <div className="mt-auto flex items-center justify-center pt-4 text-[0.72rem]">
                 <button
                   type="button"
-                  onClick={() => navigate('/admin/reports')}
-                  className="inline-flex items-center gap-1.5 font-semibold text-primary-600 hover:text-primary-700"
+                  onClick={() => navigate('/admin/reports?type=expense')}
+                  className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-surface-muted hover:text-fg"
                 >
                   View Expense Report
                   <ChevronRight className="size-4" aria-hidden="true" />
@@ -1307,7 +1382,7 @@ export default function AdminDashboard() {
                     type="button"
                     onClick={() => setTopProductsMetric('amount')}
                     className={`rounded-full px-3 py-1 transition-colors ${
-                      topProductsMetric === 'amount' ? 'bg-blue-50 text-primary-700 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'
+                      topProductsMetric === 'amount' ? 'bg-surface-muted text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
                     }`}
                     aria-pressed={topProductsMetric === 'amount'}
                   >
@@ -1317,7 +1392,7 @@ export default function AdminDashboard() {
                     type="button"
                     onClick={() => setTopProductsMetric('quantity')}
                     className={`rounded-full px-3 py-1 transition-colors ${
-                      topProductsMetric === 'quantity' ? 'bg-blue-50 text-primary-700 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'
+                      topProductsMetric === 'quantity' ? 'bg-surface-muted text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
                     }`}
                     aria-pressed={topProductsMetric === 'quantity'}
                   >
@@ -1364,9 +1439,13 @@ export default function AdminDashboard() {
                   </div>
                 )}
                 <div className="mt-auto flex items-center justify-center pt-4 text-[0.7rem]">
-                  <button className="inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/products')}
+                    className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-surface-muted hover:text-fg"
+                  >
                     View Product Report
-                    <ChevronRight className="size-4 text-primary-600" />
+                    <ChevronRight className="size-4 text-current" />
                   </button>
                 </div>
               </div>
@@ -1407,9 +1486,13 @@ export default function AdminDashboard() {
                   </div>
                 )}
                 <div className="mt-auto flex items-center justify-center pt-4 text-[0.7rem]">
-                  <button className="inline-flex items-center gap-1.5 font-semibold text-primary-600">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/reports?type=customer-outstanding')}
+                    className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-surface-muted hover:text-fg"
+                  >
                     View Customer Report
-                    <ChevronRight className="size-4 text-primary-600" />
+                    <ChevronRight className="size-4 text-current" />
                   </button>
                 </div>
               </div>
@@ -1435,7 +1518,20 @@ export default function AdminDashboard() {
             >
               <DataTable
                 columns={[
-                  { key: 'orderNumber', header: 'Order #', sortable: true },
+                  {
+                    key: 'orderNumber',
+                    header: 'Order #',
+                    sortable: true,
+                    render: (row) => (
+                      <button
+                        type="button"
+                        onClick={() => openOrder(row)}
+                        className="font-medium text-fg hover:text-fg hover:underline"
+                      >
+                        {row.orderNumber}
+                      </button>
+                    ),
+                  },
                   { key: 'customerName', header: 'Customer', sortable: true },
                   {
                     key: 'status',
@@ -1456,48 +1552,12 @@ export default function AdminDashboard() {
                 searchable={false}
                 pageSize={5}
                 actions={(row) => [
-                  { label: 'View order', icon: MoreHorizontal, onClick: () => {} },
-                  ...(row.status !== 'cancelled' && row.status !== 'delivered'
-                    ? [{ label: 'Cancel order', icon: Ban, danger: true, onClick: () => {} }]
+                  { label: 'View order', icon: Eye, onClick: () => openOrder(row) },
+                  ...(!['cancelled', 'completed'].includes(row.status)
+                    ? [{ label: 'Cancel order', icon: Ban, danger: true, onClick: () => handleCancelRecentOrder(row) }]
                     : []),
                 ]}
               />
-            </DashboardCard>
-
-            <DashboardCard
-              title="Important Reports"
-              subtitle="Quick links"
-              actions={
-                <button className="inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-primary-600">
-                  All Reports
-                  <ChevronRight className="size-4" />
-                </button>
-              }
-            >
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {[
-                  'Sales Report',
-                  'Purchase Report',
-                  'Profit & Loss',
-                  'Cash Flow Report',
-                  'Inventory Report',
-                  'Tax Report',
-                  'AR Aging Report',
-                  'AP Aging Report',
-                  'Stock Valuation',
-                ].map((label) => (
-                  <button
-                    key={label}
-                    type="button"
-                    className="flex items-center gap-2.5 rounded-2xl border border-neutral-100 bg-surface px-4 py-3 text-left shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-colors hover:border-primary-200 hover:bg-primary-50/40"
-                  >
-                    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-neutral-100 text-neutral-600">
-                      <BarChart3 className="size-3.5" />
-                    </div>
-                    <span className="min-w-0 truncate text-[0.78rem] font-medium text-neutral-700">{label}</span>
-                  </button>
-                ))}
-              </div>
             </DashboardCard>
           </div>
         </div>

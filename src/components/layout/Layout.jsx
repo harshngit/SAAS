@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import Sidebar from './Sidebar'
@@ -15,6 +15,7 @@ export default function Layout() {
     return window.localStorage.getItem('saas-sidebar-expanded') === 'true'
   })
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const mainRef = useRef(null)
   const location = useLocation()
   const { theme } = useTheme()
   const wantsBackground = Boolean(theme?.customEnabled && theme.background?.url)
@@ -70,6 +71,10 @@ export default function Layout() {
     if (location.pathname.endsWith('/dashboard')) {
       getCurrentProfile()
     }
+  }, [location.pathname])
+
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [location.pathname])
 
   const glassSurfaceStyle = resolveGlassSurfaceStyle(theme, hasBackground)
@@ -128,7 +133,7 @@ export default function Layout() {
               <Topbar />
             </header>
           )}
-          <main className={`flex-1 overflow-y-auto rounded-b-2xl ${shouldHideTopbar ? 'bg-(--app-bg)' : 'bg-surface'}`}>
+          <main ref={mainRef} className={`flex-1 overflow-y-auto rounded-b-2xl ${shouldHideTopbar ? 'bg-(--app-bg)' : 'bg-surface'}`}>
             <PageWrapper>
               <Outlet />
             </PageWrapper>
