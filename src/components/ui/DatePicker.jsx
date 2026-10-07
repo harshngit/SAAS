@@ -10,6 +10,7 @@ import {
   format,
   isSameDay,
   isSameMonth,
+  addDays,
   addMonths,
   subMonths,
   isToday,
@@ -54,21 +55,26 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
   useEffect(() => {
     if (!open) return undefined
 
-    const PANEL_WIDTH = 288
-    const PANEL_HEIGHT = 360
+    const PANEL_HEIGHT = 332
+    const VIEWPORT_GAP = 16
 
     const updatePosition = () => {
       const trigger = containerRef.current?.querySelector('button[data-datepicker-trigger="true"]')
       if (!trigger) return
 
       const rect = trigger.getBoundingClientRect()
-      const shouldOpenUp = window.innerHeight - rect.bottom < PANEL_HEIGHT + 12 && rect.top > PANEL_HEIGHT
-      const left = Math.min(rect.left, window.innerWidth - PANEL_WIDTH - 16)
+      const panelWidth = Math.min(Math.max(rect.width, 320), window.innerWidth - (VIEWPORT_GAP * 2))
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+      const shouldOpenUp = spaceBelow < PANEL_HEIGHT + 12 && spaceAbove > spaceBelow
+      const preferredTop = shouldOpenUp ? rect.top - PANEL_HEIGHT - 8 : rect.bottom + 8
+      const maxTop = Math.max(VIEWPORT_GAP, window.innerHeight - PANEL_HEIGHT - VIEWPORT_GAP)
+      const left = Math.min(rect.left, window.innerWidth - panelWidth - VIEWPORT_GAP)
 
       setMenuStyle({
-        left: Math.max(16, left),
-        top: shouldOpenUp ? rect.top - PANEL_HEIGHT - 8 : rect.bottom + 8,
-        width: PANEL_WIDTH,
+        left: Math.max(VIEWPORT_GAP, left),
+        top: Math.min(Math.max(VIEWPORT_GAP, preferredTop), maxTop),
+        width: panelWidth,
       })
     }
 
@@ -84,7 +90,8 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
   const monthStart = startOfMonth(viewMonth)
   const monthEnd = endOfMonth(viewMonth)
   const gridStart = startOfWeek(monthStart)
-  const gridEnd = endOfWeek(monthEnd)
+  const naturalGridEnd = endOfWeek(monthEnd)
+  const gridEnd = addDays(gridStart, 41) > naturalGridEnd ? addDays(gridStart, 41) : naturalGridEnd
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd })
 
   const selectDay = (day) => {
@@ -118,34 +125,38 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
             style={menuStyle}
             // bg-(--modal-bg), not bg-surface: this portaled calendar popover must stay solid and
             // readable regardless of image-background mode - same token Modal.jsx/Tabs.jsx use.
-            className="fixed z-50 rounded-2xl border border-neutral-100 bg-(--modal-bg) p-4 shadow-(--shadow-popover)"
+            className="app-calendar-popover fixed z-[140] rounded-[1.25rem] border border-surface-border bg-(--modal-bg) px-5 pb-4 pt-4 shadow-(--shadow-popover)"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex h-8 items-center justify-between">
               <button
                 type="button"
                 onClick={() => setViewMonth((month) => subMonths(month, 1))}
-                className="rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100"
+                className="app-calendar-nav flex size-8 items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg"
                 aria-label="Previous month"
               >
                 <ChevronLeft className="size-4" />
               </button>
-              <p className="text-sm font-medium text-neutral-900">{format(viewMonth, 'MMMM yyyy')}</p>
+              <p className="flex items-center gap-3 text-sm font-semibold text-fg">
+                <span>{format(viewMonth, 'MMMM')}</span>
+                <span className="h-4 w-px bg-surface-border" aria-hidden="true" />
+                <span>{format(viewMonth, 'yyyy')}</span>
+              </p>
               <button
                 type="button"
                 onClick={() => setViewMonth((month) => addMonths(month, 1))}
-                className="rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100"
+                className="app-calendar-nav flex size-8 items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg"
                 aria-label="Next month"
               >
                 <ChevronRight className="size-4" />
               </button>
             </div>
 
-            <div className="mt-3 grid grid-cols-7 gap-1 text-center text-xs font-medium text-neutral-400">
+            <div className="mt-5 grid grid-cols-7 text-center text-[0.78rem] font-semibold text-fg-muted">
               {WEEKDAYS.map((day) => (
-                <div key={day}>{day}</div>
+                <div key={day} className="flex h-6 items-center justify-center">{day}</div>
               ))}
             </div>
-            <div className="mt-1 grid grid-cols-7 gap-1">
+            <div className="mt-1 grid grid-cols-7 gap-y-1">
               {days.map((day) => {
                 const inMonth = isSameMonth(day, viewMonth)
                 const selected = selectedDate && isValid(selectedDate) && isSameDay(day, selectedDate)
@@ -154,14 +165,14 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
                     key={day.toISOString()}
                     type="button"
                     onClick={() => selectDay(day)}
-                    className={`flex size-8 items-center justify-center rounded-full text-sm transition-colors ${
+                    className={`app-calendar-day mx-auto flex size-8 items-center justify-center rounded-full text-sm transition-all ${
                       selected
-                        ? 'bg-primary-600 font-medium text-white shadow-(--shadow-glow-primary)'
+                        ? 'app-calendar-day-selected font-semibold'
                         : isToday(day)
-                          ? 'font-medium text-primary-600 hover:bg-primary-50'
+                          ? 'font-semibold text-fg hover:bg-surface-muted'
                           : inMonth
-                            ? 'text-neutral-700 hover:bg-neutral-100'
-                            : 'text-neutral-300 hover:bg-neutral-50'
+                            ? 'text-fg hover:bg-surface-muted'
+                            : 'text-neutral-300 hover:bg-surface-muted/70 hover:text-fg-muted'
                     }`}
                   >
                     {format(day, 'd')}
@@ -173,7 +184,7 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
             <button
               type="button"
               onClick={() => selectDay(new Date())}
-              className="mt-3 w-full rounded-full py-1.5 text-center text-xs font-medium text-primary-600 hover:bg-primary-50"
+              className="mt-3 w-full rounded-full py-1.5 text-center text-sm font-semibold text-fg transition-colors hover:bg-surface-muted"
             >
               Today
             </button>

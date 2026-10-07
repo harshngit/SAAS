@@ -354,6 +354,49 @@
   color: var(--color-fg);
 }
 
+.app-calendar-popover {
+  --calendar-selected-bg: var(--color-primary-100);
+  --calendar-selected-text: var(--color-primary-950);
+  --calendar-selected-ring: var(--color-primary-200);
+}
+
+.app-calendar-day-selected {
+  background: var(--calendar-selected-bg);
+  color: var(--calendar-selected-text);
+  box-shadow: 0 0 0 1px var(--calendar-selected-ring);
+}
+
+[data-mode="dark"] .app-calendar-popover {
+  --color-surface-border: #202020;
+  --calendar-selected-bg: #e5e7eb;
+  --calendar-selected-text: #111827;
+  --calendar-selected-ring: #e5e7eb;
+  background: #050505;
+  color: #ffffff;
+  box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.9);
+}
+
+[data-mode="dark"] .app-calendar-popover .text-fg {
+  color: #ffffff;
+}
+
+[data-mode="dark"] .app-calendar-popover .text-fg-muted {
+  color: #aeb4c0;
+}
+
+[data-mode="dark"] .app-calendar-popover .text-neutral-300 {
+  color: #3f4652;
+}
+
+[data-mode="dark"] .app-calendar-popover .bg-surface-border {
+  background: #3a3a3a;
+}
+
+[data-mode="dark"] .app-calendar-nav:hover,
+[data-mode="dark"] .app-calendar-day:hover {
+  background: #181818;
+}
+
 /* ---- Background-image ("glass") mode ---------------------------------------------------------
    Only engages when a background image is actually set (data-bg="image" - never on data-bg="none"
    or when the attribute is absent, i.e. custom_enabled=false). Sidebar/Topbar/Card/Modal/table
