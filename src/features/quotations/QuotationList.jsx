@@ -273,7 +273,7 @@ export default function QuotationList() {
                           <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
                         )}
                       </p>
-                      <p className="mt-0.5 text-xs text-neutral-400">{quotation.itemCount} item(s)</p>
+                      <p className="mt-0.5 text-3xs text-neutral-400">{quotation.itemCount} item(s)</p>
                     </td>
                     <td className="px-6 py-5">
                       {quotation.customerId ? (

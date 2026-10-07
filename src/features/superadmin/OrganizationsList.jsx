@@ -433,7 +433,7 @@ export default function OrganizationsList() {
                     </td>
                     <td className="px-6 py-5">
                       <p className="font-semibold text-neutral-900">{organization.name}</p>
-                      <p className="mt-0.5 text-xs text-neutral-400">{organization.id}</p>
+                      <p className="mt-0.5 text-3xs text-neutral-400">{organization.id}</p>
                     </td>
                     <td className="px-6 py-5">
                       <div className="max-w-[16rem]">

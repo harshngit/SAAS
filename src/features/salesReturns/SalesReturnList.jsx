@@ -224,7 +224,7 @@ export default function SalesReturnList() {
                       <td className="px-6 py-5">
                         <p className="font-semibold text-neutral-900">{salesReturn.returnNumber}</p>
                         {salesReturn.creditAmount > 0 && (
-                          <p className="mt-0.5 text-xs text-neutral-400">Credit {formatCurrency(salesReturn.creditAmount)}</p>
+                          <p className="mt-0.5 text-3xs text-neutral-400">Credit {formatCurrency(salesReturn.creditAmount)}</p>
                         )}
                       </td>
                       <td className="px-6 py-5 text-neutral-600">{salesReturn.customerName || '—'}</td>

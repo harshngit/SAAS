@@ -69,6 +69,12 @@ export default function Profile() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [photoLoadFailed, setPhotoLoadFailed] = useState(false)
 
+  const orgAddress = currentOrganization?.address || currentOrganization?.billingAddress || ''
+  // Same keyless Google Maps pattern already used in CompanySettings.jsx for this exact
+  // organization address - a plain text-query deep link/embed, no API key or billing involved.
+  const mapUrl = orgAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(orgAddress)}` : ''
+  const mapEmbedUrl = orgAddress ? `https://www.google.com/maps?q=${encodeURIComponent(orgAddress)}&output=embed` : ''
+
   const initials = useMemo(
     () =>
       (currentUser?.name || 'User')
@@ -164,12 +170,34 @@ export default function Profile() {
           <DetailItem icon={Calendar} label="Financial Year" value={currentOrganization?.financial_year || currentOrganization?.financialYear} />
           <DetailItem icon={Calendar} label="Created" value={formatDate(currentOrganization?.created_at || currentOrganization?.createdAt)} />
         </div>
-        <div className="mt-5 flex items-start gap-3 rounded-xl border border-neutral-100 bg-neutral-50 p-4">
-          <MapPin className="mt-0.5 size-4 shrink-0 text-neutral-400" aria-hidden="true" />
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Address</p>
-            <p className="mt-0.5 text-sm font-medium text-neutral-900">{currentOrganization?.address || currentOrganization?.billingAddress || 'Not available'}</p>
+        <div className="mt-5 grid grid-cols-1 gap-4 rounded-xl border border-neutral-100 bg-neutral-50 p-4 md:grid-cols-[1fr_14rem]">
+          <div className="flex items-start gap-3">
+            <MapPin className="mt-0.5 size-4 shrink-0 text-neutral-400" aria-hidden="true" />
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Address</p>
+              <p className="mt-0.5 text-sm font-medium text-neutral-900">{orgAddress || 'Not available'}</p>
+            </div>
           </div>
+          {orgAddress && (
+            <div className="relative min-h-36 overflow-hidden rounded-xl border border-neutral-100 bg-surface">
+              <iframe
+                title={`Map location for ${currentOrganization?.name || 'organization'}`}
+                src={mapEmbedUrl}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                className="absolute inset-0 size-full border-0"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/10 via-transparent to-transparent" />
+              <a
+                href={mapUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="absolute bottom-3 right-3 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-fg shadow-sm ring-1 ring-neutral-100"
+              >
+                View on Map
+              </a>
+            </div>
+          )}
         </div>
       </Card>
 

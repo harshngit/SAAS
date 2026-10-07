@@ -39,19 +39,28 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
-export async function getReport(type, params = {}) {
+// Sends every active filter, not just date_from/date_to - the finalized backend contract accepts
+// per-report filters (customer_id, status, group_by, ageing_bucket, ...) on top of the common
+// date_from/date_to/search/page/page_size. Keeps valid falsy values (false, 0) that a naive
+// `if (value)` check would incorrectly drop, and strips only genuinely absent ones.
+export function buildReportParams(filters = {}) {
+  const params = {}
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return
+    params[key] = value
+  })
+  return params
+}
+
+export async function getReport(type, filters = {}) {
   // ANY demo mode (true OR empty) - never calls GET /reports/*. getDemoReport returns an
-  // empty result for VITE_DEMO_DATA=empty.
-  if (DEMO_MODE) return getDemoReport(type, params)
+  // empty/"not available" result for report types the local demo layer doesn't simulate.
+  if (DEMO_MODE) return getDemoReport(type, filters)
 
   try {
-    const queryParams = {}
-    if (params.date_from) queryParams.date_from = params.date_from
-    if (params.date_to) queryParams.date_to = params.date_to
-
     const { data } = await apiClient.get(`/reports/${type}`, {
       headers: authHeader(),
-      params: queryParams,
+      params: buildReportParams(filters),
     })
 
     return { success: true, report: data }
@@ -62,27 +71,52 @@ export async function getReport(type, params = {}) {
       'Unable to load this report. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, error: message, status: error.response?.status }
   }
 }
 
-export async function exportReport(type, params = {}, format = 'pdf') {
+function filenameFromContentDisposition(headerValue, fallback) {
+  if (!headerValue) return fallback
+  const utf8Match = headerValue.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match) {
+    try {
+      return decodeURIComponent(utf8Match[1])
+    } catch {
+      // fall through to the plain filename match below
+    }
+  }
+  const plainMatch = headerValue.match(/filename="?([^";]+)"?/i)
+  return plainMatch ? plainMatch[1] : fallback
+}
+
+// Exports the FULL filtered dataset - every active filter is sent (date range, search, every
+// report-specific filter, group_by), but never page/page_size: the backend export endpoint
+// ignores pagination and streams the entire filtered result itself.
+export async function exportReport(type, filters = {}, format = 'pdf') {
   if (DEMO_MODE) {
     return { success: false, error: 'Report export is disabled in demo mode.', demoUnavailable: true }
   }
 
+  const { page: _page, page_size: _pageSize, ...exportFilters } = filters
+
   try {
     const response = await apiClient.get(`/reports/${type}/export`, {
       headers: authHeader(),
-      params: { ...(params.date_from ? { date_from: params.date_from } : {}), ...(params.date_to ? { date_to: params.date_to } : {}), format },
+      params: { ...buildReportParams(exportFilters), format },
       responseType: 'blob',
     })
+
+    const fallbackExt = format === 'excel' ? 'xlsx' : 'pdf'
+    const filename = filenameFromContentDisposition(
+      response.headers?.['content-disposition'],
+      `${type}-report.${fallbackExt}`,
+    )
 
     const blob = new Blob([response.data])
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${type}-report.${format === 'excel' ? 'xlsx' : 'pdf'}`
+    link.download = filename
     document.body.appendChild(link)
     link.click()
     link.remove()
@@ -100,11 +134,13 @@ export async function exportReport(type, params = {}, format = 'pdf') {
       }
     }
 
+    // The backend's own >10,000-row message (§31) is specific and actionable - surface it
+    // verbatim instead of collapsing every export failure into a generic error.
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to export this report. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, error: message, status: error.response?.status }
   }
 }

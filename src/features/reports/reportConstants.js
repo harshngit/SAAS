@@ -1,31 +1,22 @@
-// Values must match the backend's report_type path segments exactly (hyphenated) -
-// GET /reports/{report_type} 404s on anything else.
-export const REPORT_TYPES = [
-  { value: 'daily-transaction', label: 'Daily Transaction' },
-  { value: 'sales', label: 'Sales' },
-  { value: 'purchase', label: 'Purchase' },
-  { value: 'customer-outstanding', label: 'Customer Outstanding' },
-  { value: 'supplier-outstanding', label: 'Supplier Outstanding' },
-  { value: 'payment-collection', label: 'Payment Collection' },
-  { value: 'expense', label: 'Expense' },
-  { value: 'cash-collection', label: 'Cash Collection' },
-  { value: 'gst-summary', label: 'GST Summary' },
-  { value: 'sales-return', label: 'Sales Return' },
-  { value: 'purchase-return', label: 'Purchase Return' },
-  { value: 'profit-loss', label: 'Profit & Loss' },
-]
+import { toLocalDateString } from '../../utils/format'
+import { REPORT_CONFIG } from './reportConfig'
 
-// One standard period set reused across every report + report-style screen (§43).
+// Derived from REPORT_CONFIG - the one canonical report registry - instead of a second,
+// independently-maintained list that can (and did) drift out of sync with it. Kept around only
+// for whatever still imports the flat {value,label} shape; new code should read REPORT_CONFIG /
+// reportsByCategory() directly.
+export const REPORT_TYPES = Object.entries(REPORT_CONFIG).map(([value, config]) => ({ value, label: config.label }))
+
+// One standard period set reused across every report + report-style screen.
 export const PERIOD_OPTIONS = [
   { value: 'daily', label: 'Today' },
-  { value: 'weekly', label: 'This Week' },
+  { value: 'last-7', label: 'Last 7 Days' },
+  { value: 'last-30', label: 'Last 30 Days' },
   { value: 'monthly', label: 'This Month' },
   { value: 'last-month', label: 'Last Month' },
   { value: 'fy', label: 'Financial Year' },
   { value: 'custom', label: 'Custom Range' },
 ]
-
-import { toLocalDateString } from '../../utils/format'
 
 // LOCAL calendar date - `date.toISOString().slice(0,10)` would roll back a day at local
 // midnight in IST (+5:30) and similar zones, sending the wrong date_from/date_to.
@@ -39,9 +30,17 @@ export function getDateRangeForPeriod(period, customFrom, customTo) {
     return { dateFrom: todayStr, dateTo: todayStr }
   }
 
-  if (period === 'weekly') {
+  // Today plus the previous 6 calendar days = 7 days total.
+  if (period === 'last-7') {
     const from = new Date(today)
     from.setDate(from.getDate() - 6)
+    return { dateFrom: toIsoDate(from), dateTo: todayStr }
+  }
+
+  // Today plus the previous 29 calendar days = 30 days total.
+  if (period === 'last-30') {
+    const from = new Date(today)
+    from.setDate(from.getDate() - 29)
     return { dateFrom: toIsoDate(from), dateTo: todayStr }
   }
 

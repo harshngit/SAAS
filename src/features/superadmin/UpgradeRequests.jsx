@@ -330,7 +330,7 @@ export default function UpgradeRequests() {
                   >
                     <td className="px-6 py-5">
                       <p className="font-semibold text-neutral-900">{organization.name}</p>
-                      <p className="mt-0.5 text-xs text-neutral-400">{organization.id}</p>
+                      <p className="mt-0.5 text-3xs text-neutral-400">{organization.id}</p>
                     </td>
                     <td className="px-6 py-5 text-neutral-600">{organization.plan?.name || 'No plan'}</td>
                     <td className="px-6 py-5 font-medium text-neutral-900">{organization.requested_plan?.name || 'Requested plan'}</td>

@@ -37,7 +37,9 @@ const dotClasses = {
 export default function Badge({ variant = 'neutral', dot = false, className = '', children }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium tracking-tight ring-1 ring-inset ring-black/3 ${variantClasses[variant]} ${variantBorderClasses[variant]} ${className}`}
+      // app-badge: a stable marker a list table can target to shrink this to match its own
+      // compact typography (index.css's .listing-table .app-badge) - not a visual class itself.
+      className={`app-badge inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium tracking-tight ring-1 ring-inset ring-black/3 ${variantClasses[variant]} ${variantBorderClasses[variant]} ${className}`}
     >
       {dot && <span className={`size-1.5 shrink-0 rounded-full ${dotClasses[variant]}`} aria-hidden="true" />}
       {children}

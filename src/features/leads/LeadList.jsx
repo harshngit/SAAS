@@ -6,6 +6,7 @@ import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
@@ -16,6 +17,7 @@ import { listFollowUps } from '../../api/followups'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { LeadEditForm } from './LeadForms'
 import ConvertLeadModal from './ConvertLeadModal'
 import { LEAD_STATUS_VARIANT, formatLeadStatus, getLastActivityLabel, getNextFollowUpSummary } from './leadActivity'
@@ -59,6 +61,9 @@ export default function LeadList() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [sourceFilter, setSourceFilter] = useState('all')
   const [teamFilter, setTeamFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [pageSize, setPageSize] = useState('10')
   const [page, setPage] = useState(1)
@@ -184,6 +189,8 @@ export default function LeadList() {
     [salespeople],
   )
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
   const filteredLeads = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
@@ -197,10 +204,11 @@ export default function LeadList() {
       const matchesTeam =
         teamFilter === 'all' ||
         (teamFilter === 'unassigned' ? !lead.assignedSalespersonId : lead.assignedSalespersonId === teamFilter)
+      const matchesDate = isWithinDateRange(lead.createdAt, dateFrom, dateTo)
 
-      return matchesSearch && matchesSource && matchesTeam
+      return matchesSearch && matchesSource && matchesTeam && matchesDate
     })
-  }, [leads, searchTerm, sourceFilter, teamFilter])
+  }, [leads, searchTerm, sourceFilter, teamFilter, dateFrom, dateTo])
 
   const leadSummary = useMemo(() => {
     const closedLeads = leads.filter((lead) => ['won', 'lost'].includes(lead.leadStatus))
@@ -420,13 +428,13 @@ export default function LeadList() {
           ) : isLoading ? (
             <LoadingSpinner label="Loading leads..." />
           ) : (
-            <table className="listing-table w-full min-w-280 text-left text-sm">
+            <table className="listing-table w-full min-w-252 text-left text-sm">
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="w-10 px-6 py-6">
                     <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all leads" />
                   </th>
-                  <th className="min-w-[20rem] whitespace-nowrap px-6 py-6">Lead</th>
+                  <th className="min-w-52 whitespace-nowrap px-6 py-6">Lead</th>
                   <th className="whitespace-nowrap px-6 py-6">Contact</th>
                   <th className="whitespace-nowrap px-6 py-6">Source</th>
                   <th className="whitespace-nowrap px-6 py-6">Assigned To</th>
@@ -460,7 +468,7 @@ export default function LeadList() {
                       <td className="px-6 py-5 align-middle" onClick={(event) => event.stopPropagation()}>
                         <input type="checkbox" checked={selectedIds.includes(lead.id)} onChange={() => toggleSelection(lead.id)} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label={`Select ${lead.leadId}`} />
                       </td>
-                      <td className="min-w-[20rem] px-6 py-5">
+                      <td className="min-w-52 px-6 py-5">
                         <div className="flex items-center gap-3">
                           <div className={`flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${avatarClasses[index % avatarClasses.length]}`}>
                             {getInitials(lead.name || lead.customerName || lead.mobileNumber)}
@@ -614,11 +622,21 @@ export default function LeadList() {
                   />
                 )}
               </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+                Created
+                <DateRangeFilter
+                  preset={datePreset}
+                  onPresetChange={(value) => { setDatePreset(value); setPage(1) }}
+                  customFrom={customFrom}
+                  customTo={customTo}
+                  onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }}
+                />
+              </label>
             </div>
             <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4">
               <button
                 type="button"
-                onClick={() => { setStatusFilter('all'); setSourceFilter('all'); setTeamFilter('all'); setSearchTerm(''); setPage(1) }}
+                onClick={() => { setStatusFilter('all'); setSourceFilter('all'); setTeamFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSearchTerm(''); setPage(1) }}
                 className="text-sm font-medium text-neutral-500 hover:text-neutral-900"
               >
                 Clear all

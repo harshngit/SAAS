@@ -14,11 +14,16 @@
 // Every other report type returns a truthful "not available in demo" result -
 // it never falls through to the real API.
 //
+// Every summary/row numeric field here is a RAW number, never a pre-formatted display string
+// (e.g. "₹1,250.00") - the presentation layer (ReportSummaryCards / ReportTable / chart
+// formatters, all in reportDataUtils.js) owns ALL currency/number formatting. A formatted string
+// here would silently become NaN -> "₹0" the moment that layer runs Number(value) on it.
+//
 // TODO: remove once a demo-aware reporting aggregation exists.
 // =============================================================================
 
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
-import { formatCurrency, toLocalDateString } from '../../utils/format'
+import { toLocalDateString } from '../../utils/format'
 import { demoOrdersResolved } from '../orders/orderDemoData'
 import { demoInvoicesResolved, demoReceiptsResult } from '../invoices/invoiceDemoData'
 import { agingBucket, daysOverdue, financialStatus, isInvoiceOverdue, isOpenReceivable } from '../invoices/invoiceHelpers'
@@ -43,7 +48,8 @@ const inRange = (value, from, to) => {
   return true
 }
 
-const money = (value) => formatCurrency(Math.round((Number(value) || 0) * 100) / 100)
+// Raw number, rounded to paise - NOT a formatted currency string.
+const money = (value) => Math.round((Number(value) || 0) * 100) / 100
 
 function salesReport(from, to) {
   const orders = demoOrdersResolved()
@@ -53,7 +59,7 @@ function salesReport(from, to) {
   return {
     summary: {
       sales_value: money(total),
-      orders: String(orders.length),
+      orders: orders.length,
       average_order_value: money(orders.length ? total / orders.length : 0),
     },
     rows: orders
@@ -76,8 +82,8 @@ function customerOutstandingReport() {
   return {
     summary: {
       total_outstanding: money(total),
-      overdue: money(overdue),
-      customers_with_balance: String(new Set(open.map((invoice) => invoice.customerId || invoice.customerName)).size),
+      total_overdue: money(overdue),
+      customers_with_balance: new Set(open.map((invoice) => invoice.customerId || invoice.customerName)).size,
     },
     rows: open
       .sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0))
@@ -98,7 +104,7 @@ function paymentCollectionReport(from, to) {
   return {
     summary: {
       total_collected: money(total),
-      receipts: String(receipts.length),
+      payment_count: receipts.length,
     },
     rows: receipts
       .sort((a, b) => new Date(b.receiptDate || 0) - new Date(a.receiptDate || 0))
@@ -116,17 +122,15 @@ function expenseReport(from, to) {
   if (!DEMO_EXPENSES_ENABLED) return { summary: {}, rows: [] }
   const expenses = demoExpensesResolved().filter((expense) => inRange(expense.expenseDate || expense.createdAt, from, to))
   const sum = (list) => list.reduce((acc, expense) => acc + (Number(expense.amount) || 0), 0)
+  const pending = expenses.filter((expense) => expense.statusKey === 'pending')
   const approved = expenses.filter((expense) => expense.statusKey === 'approved')
   const rejected = expenses.filter((expense) => expense.statusKey === 'rejected')
-  // Reimbursed only where the demo actually persisted a Paid payment status.
-  const reimbursed = approved.filter((expense) => String(expense.paymentStatus).toLowerCase() === 'paid')
   return {
     summary: {
-      total_submitted: money(sum(expenses)),
-      total_expense: money(sum(expenses)),
-      approved: money(sum(approved)),
-      rejected: money(sum(rejected)),
-      reimbursed: money(sum(reimbursed)),
+      approved_expense: money(sum(approved)),
+      pending_expense: money(sum(pending)),
+      rejected_expense: money(sum(rejected)),
+      entry_count: expenses.length,
     },
     rows: expenses
       .sort((a, b) => new Date(b.expenseDate || 0) - new Date(a.expenseDate || 0))

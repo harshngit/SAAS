@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 @theme {
+  /* Below Tailwind's own smallest step (text-xs = 0.75rem/12px) - for dense table/label text.
+     text-2xs = 11px, text-3xs = 10px, text-4xs = 9px. */
+  --text-2xs: 0.6875rem;
+  --text-3xs: 0.625rem;
+  --text-4xs: 0.5625rem;
+
   /* Primary: default brand accent (#00092A), with generated tints for subtle states */
   --color-primary-50: #ebefff;
   --color-primary-100: #d6dfff;
@@ -264,6 +270,16 @@
   color: var(--color-primary-950);
 }
 
+/* Sidebar nav item / section heading text color - a literal, non-theme-driven hex (not a
+   --color-primary-* token, which an org's custom accent color would override) and ONLY in light
+   mode. Dark mode is left alone entirely: the element's own text-fg/text-fg-muted Tailwind class
+   already supplies a readable, inverted color there (index.css's [data-mode="dark"] remap of
+   --color-fg/--color-fg-muted) - adding a dark-mode rule here would only risk re-breaking that. */
+:root:not([data-mode="dark"]) .app-sidebar-nav-label,
+:root:not([data-mode="dark"]) .app-sidebar-section-label {
+  color: #00092a;
+}
+
 [data-mode="dark"] .app-company-section-toggle {
   background: var(--color-surface-muted);
   border-color: var(--color-surface-border);
@@ -355,9 +371,11 @@
 }
 
 .app-calendar-popover {
-  --calendar-selected-bg: var(--color-primary-100);
-  --calendar-selected-text: var(--color-primary-950);
-  --calendar-selected-ring: var(--color-primary-200);
+  /* Bold accent (same token the primary Button gradient uses), not a pale tint - the selected
+     date, month and year chips read as "the theme color" rather than a faint badge. */
+  --calendar-selected-bg: var(--color-primary-600);
+  --calendar-selected-text: var(--color-accent-contrast);
+  --calendar-selected-ring: var(--color-primary-700);
 }
 
 .app-calendar-day-selected {
@@ -366,17 +384,35 @@
   box-shadow: 0 0 0 1px var(--calendar-selected-ring);
 }
 
+/* Today, when it isn't also the selected date: an accent-colored outline (not filled), so the
+   theme color is visible the moment the calendar opens - not only after a date is clicked. */
+.app-calendar-day-today {
+  box-shadow: inset 0 0 0 1.5px var(--color-primary-600);
+  color: var(--color-primary-600);
+}
+
+.app-calendar-nav:hover,
+.app-calendar-day:hover {
+  background: var(--color-primary-50);
+  color: var(--color-primary-700);
+}
+
 [data-mode="dark"] .app-calendar-popover {
   --color-surface-border: #202020;
-  --calendar-selected-bg: #e5e7eb;
-  --calendar-selected-text: #111827;
-  --calendar-selected-ring: #e5e7eb;
   background: #050505;
   color: #ffffff;
   box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.9);
 }
 
 [data-mode="dark"] .app-calendar-popover .text-fg {
+  color: #ffffff;
+}
+
+/* primary-600 is pinned to the exact picked accent hex, which can be too dark to read as a ring
+   against this near-black popover - primary-300 is a generated light tint of the same hue, so it
+   stays visibly "the theme color" regardless of how dark the picked accent itself is. */
+[data-mode="dark"] .app-calendar-day-today {
+  box-shadow: inset 0 0 0 1.5px var(--color-primary-300);
   color: #ffffff;
 }
 
@@ -394,7 +430,8 @@
 
 [data-mode="dark"] .app-calendar-nav:hover,
 [data-mode="dark"] .app-calendar-day:hover {
-  background: #181818;
+  background: color-mix(in srgb, var(--color-primary-600) 28%, #181818);
+  color: #ffffff;
 }
 
 /* ---- Background-image ("glass") mode ---------------------------------------------------------
@@ -538,9 +575,14 @@ body {
 }
 
 .listing-table thead th {
-  padding: 1.25rem 1.5rem;
+  /* 0.75rem/1rem (py-3/px-4) and 0.75rem (text-xs) - denser than the original 1.25rem/1.5rem +
+     0.7rem default; this ONE rule is what actually controls every .listing-table page's header
+     padding/size (a per-page Tailwind class on the same th/tr loses the specificity fight
+     against this selector, so changing padding/font here is the only way that reliably takes
+     effect across the app - see CustomerList.jsx's own now-redundant px-4/py-3/text-xs classes). */
+  padding: 0.75rem 1rem;
   color: var(--color-fg-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.16em;
   line-height: 1.2;
@@ -559,8 +601,19 @@ body {
 }
 
 .listing-table tbody td {
-  padding: 1.25rem 1.5rem;
+  padding: 0.75rem 1rem;
   color: var(--color-fg);
+  font-size: 0.6875rem; /* text-2xs */
+}
+
+/* A status Badge (src/components/ui/Badge.jsx) keeps its normal, larger size everywhere else in
+   the app (detail pages, forms, headers) - only inside a list table does it shrink to match that
+   table's own compact text, since Badge's own px-2.5/py-1/text-xs are fixed in its component
+   template and can't be overridden from the outside by a plain Tailwind className (equal
+   specificity, unreliable source-order win) - this selector's specificity reliably wins instead. */
+.listing-table .app-badge {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
 }
 
 /* Keep standard tables consistent even on feature pages that use inline table markup. */
@@ -570,9 +623,9 @@ main table:not(.od-products):not(.dd-products):not(.listing-table) thead tr {
 }
 
 main table:not(.od-products):not(.dd-products):not(.listing-table) thead th {
-  padding: 1.25rem 1.5rem;
+  padding: 0.75rem 1rem;
   color: var(--color-fg-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.16em;
   line-height: 1.2;
@@ -591,8 +644,9 @@ main table:not(.od-products):not(.dd-products):not(.listing-table) tbody tr:hove
 }
 
 main table:not(.od-products):not(.dd-products):not(.listing-table) tbody td {
-  padding: 1.25rem 1.5rem;
+  padding: 0.75rem 1rem;
   color: var(--color-fg);
+  font-size: 0.6875rem; /* text-2xs */
 }
 
 .dashboard-page-content > :first-child > :first-child:has(> h1:first-child) > h1:first-child,

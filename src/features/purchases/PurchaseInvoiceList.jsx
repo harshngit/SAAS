@@ -298,7 +298,7 @@ export default function PurchaseInvoiceList() {
                             )}
                           </span>
                           {purchase.purchaseNumber && purchase.invoiceNumber && (
-                            <p className="mt-0.5 text-xs text-neutral-400">Ref: {purchase.invoiceNumber}</p>
+                            <p className="mt-0.5 text-3xs text-neutral-400">Ref: {purchase.invoiceNumber}</p>
                           )}
                         </td>
                         <td className="whitespace-nowrap px-6 py-5 text-neutral-800">{purchase.supplierName || '—'}</td>

@@ -50,6 +50,7 @@ import Card from '../../components/ui/Card'
 import DataTable from '../../components/ui/DataTable'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import DatePicker from '../../components/ui/DatePicker'
 
 const paymentVariant = {
   paid: 'success',
@@ -877,26 +878,18 @@ export default function AdminDashboard() {
 
         {datePreset === 'custom' && (
           <div className="mt-1.5 flex flex-wrap items-end gap-2 border-t border-neutral-100 pt-2">
-            <label className="flex min-w-0 flex-col gap-1">
-              <span className="whitespace-nowrap text-[0.54rem] font-semibold uppercase tracking-[0.09em] text-neutral-400">From date</span>
-              <input
-                type="date"
-                value={customRange.from}
-                max={customRange.to || undefined}
-                onChange={(event) => setCustomRange((current) => ({ ...current, from: event.target.value }))}
-                className="h-9 rounded-xl border border-neutral-200 bg-surface px-2.5 text-[0.78rem] text-neutral-900 shadow-[0_1px_2px_rgb(15_23_42/0.03)] focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-              />
-            </label>
-            <label className="flex min-w-0 flex-col gap-1">
-              <span className="whitespace-nowrap text-[0.54rem] font-semibold uppercase tracking-[0.09em] text-neutral-400">To date</span>
-              <input
-                type="date"
-                value={customRange.to}
-                min={customRange.from || undefined}
-                onChange={(event) => setCustomRange((current) => ({ ...current, to: event.target.value }))}
-                className="h-9 rounded-xl border border-neutral-200 bg-surface px-2.5 text-[0.78rem] text-neutral-900 shadow-[0_1px_2px_rgb(15_23_42/0.03)] focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-              />
-            </label>
+            <DatePicker
+              label="From date"
+              value={customRange.from}
+              onChange={(value) => setCustomRange((current) => ({ ...current, from: value }))}
+              className="w-36"
+            />
+            <DatePicker
+              label="To date"
+              value={customRange.to}
+              onChange={(value) => setCustomRange((current) => ({ ...current, to: value }))}
+              className="w-36"
+            />
             <p className="pb-1.5 text-[0.68rem] text-neutral-400">
               {customRange.from && customRange.to
                 ? 'Press Apply to load this range.'

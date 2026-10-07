@@ -59,7 +59,12 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
   useEffect(() => {
     if (!open) return undefined
 
-    const PANEL_HEIGHT = 332
+    const MAX_PANEL_HEIGHT = 332
+    // Below this, prefer scrolling the panel's own content over flipping it to the other side -
+    // a flip that leaps the full MAX_PANEL_HEIGHT past the trigger (e.g. a "Joined"/"Created"
+    // field a few rows down inside a filter drawer) ends up covering the OTHER fields in that
+    // same drawer instead of just page content, which reads as broken, not as "smart" flipping.
+    const MIN_PANEL_HEIGHT = 260
     const VIEWPORT_GAP = 16
 
     const updatePosition = () => {
@@ -68,17 +73,22 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
 
       const rect = trigger.getBoundingClientRect()
       const panelWidth = Math.min(Math.max(rect.width, 320), window.innerWidth - (VIEWPORT_GAP * 2))
-      const spaceBelow = window.innerHeight - rect.bottom
-      const spaceAbove = rect.top
-      const shouldOpenUp = spaceBelow < PANEL_HEIGHT + 12 && spaceAbove > spaceBelow
-      const preferredTop = shouldOpenUp ? rect.top - PANEL_HEIGHT - 8 : rect.bottom + 8
-      const maxTop = Math.max(VIEWPORT_GAP, window.innerHeight - PANEL_HEIGHT - VIEWPORT_GAP)
+      const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_GAP
+      const spaceAbove = rect.top - VIEWPORT_GAP
+      const shouldOpenUp = spaceBelow < MIN_PANEL_HEIGHT && spaceAbove > spaceBelow
+      // Shrink to whatever room the chosen side actually has (down to MIN_PANEL_HEIGHT, below
+      // which the day grid itself scrolls) instead of always reserving the full 332px - that's
+      // what let the panel spill past the available space and overlap unrelated content above it.
+      const panelHeight = Math.max(MIN_PANEL_HEIGHT, Math.min(MAX_PANEL_HEIGHT, shouldOpenUp ? spaceAbove : spaceBelow))
+      const preferredTop = shouldOpenUp ? rect.top - panelHeight - 8 : rect.bottom + 8
+      const maxTop = Math.max(VIEWPORT_GAP, window.innerHeight - panelHeight - VIEWPORT_GAP)
       const left = Math.min(rect.left, window.innerWidth - panelWidth - VIEWPORT_GAP)
 
       setMenuStyle({
         left: Math.max(VIEWPORT_GAP, left),
         top: Math.min(Math.max(VIEWPORT_GAP, preferredTop), maxTop),
         width: panelWidth,
+        maxHeight: panelHeight,
       })
     }
 
@@ -174,7 +184,10 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
             style={menuStyle}
             // bg-(--modal-bg), not bg-surface: this portaled calendar popover must stay solid and
             // readable regardless of image-background mode - same token Modal.jsx/Tabs.jsx use.
-            className="app-calendar-popover fixed z-[140] rounded-[1.25rem] border border-surface-border bg-(--modal-bg) px-5 pb-4 pt-4 shadow-(--shadow-popover)"
+            // overflow-y-auto: when menuStyle.maxHeight had to shrink below the panel's natural
+            // height (cramped viewport), the day grid scrolls internally instead of the panel
+            // spilling past its box.
+            className="app-calendar-popover fixed z-[140] overflow-y-auto rounded-[1.25rem] border border-surface-border bg-(--modal-bg) px-5 pb-4 pt-4 shadow-(--shadow-popover) app-scrollbar"
           >
             <div className="flex h-8 items-center justify-between">
               <button
@@ -280,7 +293,7 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
                           selected
                             ? 'app-calendar-day-selected font-semibold'
                             : isToday(day)
-                              ? 'font-semibold text-fg hover:bg-surface-muted'
+                              ? 'app-calendar-day-today font-semibold text-fg hover:bg-surface-muted'
                               : inMonth
                                 ? 'text-fg hover:bg-surface-muted'
                                 : 'text-neutral-300 hover:bg-surface-muted/70 hover:text-fg-muted'

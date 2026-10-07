@@ -365,7 +365,7 @@ export default function StockBoard({ readOnly = false }) {
                           </div>
                           <div>
                             <span className="font-medium text-neutral-900">{item.name}</span>
-                            {item.brand && <p className="mt-0.5 text-xs text-neutral-400">{item.brand}</p>}
+                            {item.brand && <p className="mt-0.5 text-3xs text-neutral-400">{item.brand}</p>}
                           </div>
                         </div>
                       </td>

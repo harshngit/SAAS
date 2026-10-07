@@ -530,10 +530,10 @@ export default function CustomerList() {
           ) : filteredCustomers.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No customers match these filters.</p>
           ) : (
-            <table className="listing-table w-full min-w-[72rem] text-left text-sm">
+            <table className="listing-table w-full min-w-260 text-left text-2xs">
               <thead>
-                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                  <th className="w-14 px-6 py-6">
+                <tr className="border-b border-surface-border bg-surface-muted text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">
+                  <th className="w-14 px-4 py-3">
                     <input
                       type="checkbox"
                       checked={allVisibleSelected}
@@ -542,15 +542,15 @@ export default function CustomerList() {
                       aria-label="Select all customers"
                     />
                   </th>
-                  <th className="min-w-[20rem] whitespace-nowrap px-6 py-6">Customer</th>
-                  <th className="whitespace-nowrap px-6 py-6">Contact Person</th>
-                  <th className="whitespace-nowrap px-6 py-6">Location</th>
-                  <th className="whitespace-nowrap px-6 py-6">Sales Officer</th>
-                  <th className="whitespace-nowrap px-6 py-6">Last Order</th>
-                  <th className="whitespace-nowrap px-6 py-6">Last Visit</th>
-                  <th className="whitespace-nowrap px-6 py-6">Outstanding</th>
-                  <th className="whitespace-nowrap px-6 py-6">Status</th>
-                  <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
+                  <th className="min-w-52 whitespace-nowrap px-4 py-3">Customer</th>
+                  <th className="whitespace-nowrap px-4 py-3">Contact Person</th>
+                  <th className="whitespace-nowrap px-4 py-3">Location</th>
+                  <th className="whitespace-nowrap px-4 py-3">Sales Officer</th>
+                  <th className="whitespace-nowrap px-4 py-3">Last Order</th>
+                  <th className="whitespace-nowrap px-4 py-3">Last Visit</th>
+                  <th className="whitespace-nowrap px-4 py-3">Outstanding</th>
+                  <th className="whitespace-nowrap px-4 py-3">Status</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -560,7 +560,7 @@ export default function CustomerList() {
                     onClick={() => navigate(`${basePath}/${customer.id}`)}
                     className="cursor-pointer bg-surface transition-colors hover:bg-primary-50/30"
                   >
-                    <td className="px-6 py-5 align-middle" onClick={(event) => event.stopPropagation()}>
+                    <td className="px-4 py-3 align-middle" onClick={(event) => event.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedCustomerIds.includes(customer.id)}
@@ -569,7 +569,7 @@ export default function CustomerList() {
                         aria-label={`Select ${customer.name}`}
                       />
                     </td>
-                    <td className="min-w-[20rem] px-6 py-5">
+                    <td className="min-w-52 px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="flex size-9 items-center justify-center overflow-hidden rounded-full bg-primary-50 text-xs font-semibold text-primary-700 ring-1 ring-primary-100">
                           {customer.profileImage ? (
@@ -580,34 +580,34 @@ export default function CustomerList() {
                         </div>
                         <div>
                           <span className="font-medium text-neutral-900">{customer.name}</span>
-                          <p className="mt-0.5 text-xs text-neutral-400">{customer.type}</p>
+                          <p className="mt-0.5 text-3xs text-neutral-400">{customer.type}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-fg-muted">{customer.contactPerson || '—'}</td>
-                    <td className="px-6 py-5 text-fg-muted">{customer.city || '—'}</td>
-                    <td className="px-6 py-5 text-fg-muted">
+                    <td className="px-4 py-3 text-fg-muted">{customer.contactPerson || '—'}</td>
+                    <td className="px-4 py-3 text-fg-muted">{customer.city || '—'}</td>
+                    <td className="px-4 py-3 text-fg-muted">
                       {salesOfficerById.get(customer.assignedSalesOfficerId) || 'Unassigned'}
                     </td>
-                    <td className="px-6 py-5 text-fg-muted">
+                    <td className="px-4 py-3 text-fg-muted">
                       {formatListDate(customer.lastOrderDate, 'No order yet')}
                     </td>
-                    <td className="px-6 py-5 text-fg-muted">
+                    <td className="px-4 py-3 text-fg-muted">
                       {formatListDate(customer.lastVisitDate, 'No visit yet')}
                     </td>
-                    <td className="px-6 py-5">
+                    <td className="px-4 py-3">
                       {customer.outstandingBalance > 0 ? (
                         <Badge variant="warning">{formatCurrency(customer.outstandingBalance)}</Badge>
                       ) : (
                         <span className="font-medium text-neutral-700">{formatCurrency(0)}</span>
                       )}
                     </td>
-                    <td className="px-6 py-5">
+                    <td className="px-4 py-3">
                       <Badge variant={customer.status === 'active' ? 'success' : 'neutral'}>
                         {customer.status}
                       </Badge>
                     </td>
-                    <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
+                    <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"

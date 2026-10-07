@@ -38,6 +38,7 @@ import Card from "../../components/ui/Card";
 import Modal from "../../components/ui/Modal";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import Select from "../../components/ui/Select";
+import MapPickerModal from "../../components/ui/MapPickerModal";
 import { changePassword, getCurrentProfile } from "../../api/auth";
 import {
   clearOrganizationOtherDocuments,
@@ -2650,6 +2651,7 @@ export default function CompanySettings() {
   const [overview, setOverview] = useState(null);
   const [isLoadingOverview, setIsLoadingOverview] = useState(true);
   const [overviewError, setOverviewError] = useState("");
+  const [isAddressMapPickerOpen, setIsAddressMapPickerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("account");
   const [editingSections, setEditingSections] = useState({
     general: false,
@@ -2917,6 +2919,33 @@ export default function CompanySettings() {
     const nextValue = type === "checkbox" ? checked : value;
     setSaveError("");
     setCompanyData((prev) => ({ ...prev, [name]: nextValue }));
+  };
+
+  // Same MapPickerModal used by Customer/Lead forms, but the organization record has no
+  // latitude/longitude field of its own to save a pin to (confirmed: no such field anywhere in
+  // api/organizations.js's payload) - so this fills the real, already-saved address fields
+  // (registeredAddress/city/state/country/pincode) from the picked location's reverse-geocoded
+  // address instead of a fabricated coordinates field. Mirrors CustomerForm.jsx's own
+  // handleMapLocationSelected exactly: only fills a field that's currently empty (never
+  // overwrites something the user already typed), and only accepts state/country when the
+  // geocoded name matches one of this form's own dropdown options, so a Select never ends up
+  // showing a value it doesn't actually have.
+  const handleAddressMapSelect = (place) => {
+    setSaveError("");
+    const matchedState = stateOptions.find(
+      (option) => option.value.toLowerCase() === String(place.state || "").toLowerCase(),
+    )?.value;
+    const matchedCountry = countryOptions.find(
+      (option) => option.label.toLowerCase() === String(place.country || "").toLowerCase(),
+    )?.value;
+    setCompanyData((prev) => ({
+      ...prev,
+      registeredAddress: !prev.registeredAddress?.trim() && place.formattedAddress ? place.formattedAddress : prev.registeredAddress,
+      city: !prev.city?.trim() && place.city ? place.city : prev.city,
+      pincode: !prev.pincode?.trim() && place.pinZipCode ? place.pinZipCode : prev.pincode,
+      state: !prev.state && matchedState ? matchedState : prev.state,
+      country: !prev.country && matchedCountry ? matchedCountry : prev.country,
+    }));
   };
 
   const handlePasswordChange = (e) => {
@@ -3791,15 +3820,31 @@ export default function CompanySettings() {
                   onToggle={() => toggleGeneralSection("address")}
                 >
                   <div className="space-y-5">
-                    <Input
-                      label="Registered Address"
-                      name="registeredAddress"
-                      as="textarea"
-                      value={companyData.registeredAddress}
-                      onChange={handleChange}
-                      disabled={!isActiveSectionEditing}
-                      required
-                    />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <Input
+                          label="Registered Address"
+                          name="registeredAddress"
+                          as="textarea"
+                          value={companyData.registeredAddress}
+                          onChange={handleChange}
+                          disabled={!isActiveSectionEditing}
+                          required
+                        />
+                      </div>
+                      {isActiveSectionEditing && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-7 shrink-0"
+                          onClick={() => setIsAddressMapPickerOpen(true)}
+                        >
+                          <MapPin className="size-4" aria-hidden="true" />
+                          Pick on Map
+                        </Button>
+                      )}
+                    </div>
                     <Input
                       label="Branch/Office Address(es)"
                       name="branchOfficeAddresses"
@@ -3896,6 +3941,12 @@ export default function CompanySettings() {
                     />
                   </div>
                 </CompanySection>
+
+                <MapPickerModal
+                  isOpen={isAddressMapPickerOpen}
+                  onClose={() => setIsAddressMapPickerOpen(false)}
+                  onSelect={handleAddressMapSelect}
+                />
               </section>
             ) : activeTab === "branding" ? (
               <section className="pb-5 pt-5" data-completion-section="branding-main">

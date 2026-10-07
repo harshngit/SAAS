@@ -545,7 +545,7 @@ export default function SupplierList() {
                         </div>
                         <div>
                           <span className="font-medium text-neutral-900">{supplier.name}</span>
-                          <p className="mt-0.5 text-xs text-neutral-400">
+                          <p className="mt-0.5 text-3xs text-neutral-400">
                             {[supplier.supplierCode, supplier.category].filter(Boolean).join(' · ')}
                           </p>
                         </div>
@@ -553,7 +553,7 @@ export default function SupplierList() {
                     </td>
                     <td className="px-6 py-5 text-neutral-600">
                       <span>{supplier.contactPerson || '-'}</span>
-                      <p className="mt-0.5 text-xs text-neutral-400">{supplier.phone}</p>
+                      <p className="mt-0.5 text-3xs text-neutral-400">{supplier.phone}</p>
                     </td>
                     <td className="px-6 py-5 text-neutral-600">{supplier.city || '-'}</td>
                     <td className="px-6 py-5 text-neutral-600">{getProductCount(supplier)}</td>

@@ -423,7 +423,7 @@ export default function ProductList() {
                     <td className="px-6 py-5 text-neutral-600">{product.brand || '-'}</td>
                     <td className="px-6 py-5 text-neutral-600">
                       <div>{product.categoryLabel || product.category || '-'}</div>
-                      {product.subCategory && <div className="mt-0.5 text-xs text-neutral-400">{product.subCategory}</div>}
+                      {product.subCategory && <div className="mt-0.5 text-3xs text-neutral-400">{product.subCategory}</div>}
                     </td>
                     <td className="px-6 py-5 text-neutral-600">{(product.preferredSupplierId && supplierNameById[String(product.preferredSupplierId)]) || '-'}</td>
                     <td className="px-6 py-5 text-neutral-600">

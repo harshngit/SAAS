@@ -1431,7 +1431,7 @@ export default function UserManagement() {
                             >
                               {user.name}
                             </Link>
-                            {user.phone && <p className="mt-0.5 text-xs text-neutral-400">{user.phone}</p>}
+                            {user.phone && <p className="mt-0.5 text-3xs text-neutral-400">{user.phone}</p>}
                           </div>
                         </div>
                       </td>
