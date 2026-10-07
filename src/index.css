@@ -276,7 +276,8 @@
    already supplies a readable, inverted color there (index.css's [data-mode="dark"] remap of
    --color-fg/--color-fg-muted) - adding a dark-mode rule here would only risk re-breaking that. */
 :root:not([data-mode="dark"]) .app-sidebar-nav-label,
-:root:not([data-mode="dark"]) .app-sidebar-section-label {
+:root:not([data-mode="dark"]) .app-sidebar-section-label,
+:root:not([data-mode="dark"]) .app-sidebar-nav-label-active {
   color: #00092a;
 }
 

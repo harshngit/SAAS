@@ -122,7 +122,7 @@ export function resolveHomePath({ fullAccess, role, currentUser } = {}) {
 export const roleMenus = {
   [ROLES.SUPER_ADMIN]: [
     {
-      section: 'Main menu',
+      section: 'Main Menu',
       items: [
         { label: 'Dashboard', path: '/superadmin/dashboard', icon: LayoutDashboard },
         { label: 'Organizations', path: '/superadmin/organizations', icon: Building2 },
@@ -205,7 +205,7 @@ export const roleMenus = {
   ],
   [ROLES.SALES_OFFICER]: [
     {
-      section: 'Main menu',
+      section: 'Main Menu',
       items: [
         { label: 'Dashboard', path: '/sales/dashboard', icon: LayoutDashboard, module: 'dashboard' },
         { label: 'Customers', path: '/sales/customers', icon: Users, module: 'customers' },
@@ -250,7 +250,7 @@ export const roleMenus = {
   ],
   [ROLES.ACCOUNTANT]: [
     {
-      section: 'Main menu',
+      section: 'Main Menu',
       items: [
         { label: 'Dashboard', path: '/accounts/dashboard', icon: LayoutDashboard, module: 'dashboard' },
         { label: 'Supplier Invoices', path: '/accounts/supplier-invoices', icon: PackagePlus, module: 'invoices' },

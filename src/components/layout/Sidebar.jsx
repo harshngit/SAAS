@@ -40,7 +40,7 @@ const sectionIcons = {
   'My Work': ClipboardCheck,
   Administration: UserCog,
   System: Settings,
-  'Main menu': BarChart3,
+  'Main Menu': BarChart3,
 }
 
 function CollapsedTooltip({ label }) {
@@ -364,8 +364,11 @@ export default function Sidebar({
                               // always a light accent tint (Part 2.6), even in dark mode, but
                               // --color-neutral-900 INVERTS to a light value there (Part 2.3) -
                               // that pairing went light-on-light. --color-primary-900 is a fixed
-                              // dark shade of the accent ramp and isn't part of that inversion.
-                              ? 'bg-(--sidebar-active-bg) text-primary-900 shadow-[inset_0_0_0_1px_rgb(0_9_42/0.12)]'
+                              // dark shade of the accent ramp and isn't part of that inversion, so
+                              // dark mode keeps using it untouched. app-sidebar-nav-label-active
+                              // (index.css, light mode only) overrides this to the exact literal
+                              // #00092A requested for light mode specifically.
+                              ? 'app-sidebar-nav-label-active bg-(--sidebar-active-bg) text-primary-900 shadow-[inset_0_0_0_1px_rgb(0_9_42/0.12)]'
                               : 'app-sidebar-nav-label text-fg-muted hover:bg-neutral-50 hover:text-fg'
                           }`
                         }
