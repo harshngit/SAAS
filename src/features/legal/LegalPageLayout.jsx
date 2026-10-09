@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Droplet } from 'lucide-react'
+import Card from '../../components/ui/Card'
 import { LEGAL_PAGES } from './legalNav'
 
 // Shared chrome for every Help/Legal page (Help & FAQ, Privacy, Terms, Refund Policy,
@@ -11,7 +12,28 @@ import { LEGAL_PAGES } from './legalNav'
 // Select.jsx use), not the plain theme-reactive Card component - Card auto-applies the
 // .theme-glass blur whenever Image background mode is on, which is exactly the heavy-glass-on-
 // long-text problem these pages must avoid.
-export default function LegalPageLayout({ title, description, children }) {
+//
+// `embedded`: used only by the /admin/settings/* aliases (AppRoutes.jsx), which render these
+// SAME content components inside the authenticated Sidebar/Topbar shell instead of this
+// page's own standalone logo-header/Back-link/cross-nav-footer chrome - that chrome would
+// otherwise double up with the admin layout and its footer nav would route the user back out
+// to the public pages. Renders just the title/description/content, same ui/Card others admin
+// pages use, no duplicated legal text - same component, same props, one extra flag.
+export default function LegalPageLayout({ title, description, children, embedded = false }) {
+  if (embedded) {
+    return (
+      <div className="space-y-5">
+        <div>
+          <h1 className="text-2xl font-semibold text-neutral-900">{title}</h1>
+          {description && <p className="mt-1 text-sm text-neutral-500">{description}</p>}
+        </div>
+        <Card>
+          <div className="space-y-6 text-sm leading-6 text-neutral-700">{children}</div>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-svh bg-(--app-bg) px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-3xl">

@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Crown,
   Droplet,
+  FileText,
   LayoutDashboard,
   Package,
   Receipt,
@@ -17,7 +18,8 @@ import {
   Sparkles,
   Truck,
   UserCog,
-  Warehouse,
+  Users,
+  UsersRound,
   X,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
@@ -33,13 +35,18 @@ const NAV_BADGE_COUNTS = {
 
 const sectionIcons = {
   Overview: LayoutDashboard,
-  'Sales Operation': Package,
-  Operations: Warehouse,
-  'Delivery Operations': Truck,
-  Finance: Receipt,
-  'My Work': ClipboardCheck,
+  CRM: Users,
+  ERP: Package,
+  'Finance Management': Receipt,
+  'Invoice Management': FileText,
+  'Sales & Delivery Management': Truck,
   Administration: UserCog,
-  System: Settings,
+  'Employee Management': UsersRound,
+  Settings: Settings,
+  // Still used by the Delivery Partner / Sales Officer / Accountant / Super Admin role menus,
+  // which this restructuring intentionally leaves untouched (§19/§24 of the brief).
+  'Delivery Operations': Truck,
+  'My Work': ClipboardCheck,
   'Main Menu': BarChart3,
 }
 
@@ -146,11 +153,11 @@ export default function Sidebar({
       Object.fromEntries(
         // Open the first section by default for every role (covers single-section roles like
         // Sales Officer/Delivery Partner/Accountant/Super Admin, whose only group isn't named
-        // 'Overview') plus 'Sales Operation' specifically, to keep Admin's existing two-open
-        // default unchanged.
+        // 'Overview') plus 'CRM' specifically (Admin's first substantive section after the
+        // restructuring), to keep Admin's existing two-open default unchanged.
         nextMenuGroups.map((group, index) => [
           group.section,
-          index === 0 || group.section === 'Sales Operation',
+          index === 0 || group.section === 'CRM',
         ]),
       ),
     )
@@ -353,13 +360,18 @@ export default function Sidebar({
                         onClick={onCloseMobile}
                         aria-label={!isExpanded ? item.label : undefined}
                         title={!isExpanded ? item.label : undefined}
-                          className={({ isActive }) =>
-                          `group relative flex items-center rounded-l-lg rounded-r-2xl py-2 text-[0.750rem] font-medium transition-all duration-150 ${
+                          className={({ isActive }) => {
+                          // NavLink's own isActive only matches pathname - items that share a base
+                          // route but differ by query string (e.g. the Reports/Profit & Loss/GST
+                          // shortcuts, all "/admin/reports") would otherwise all highlight at once.
+                          // activeWhen, when present, overrides with a query-param-aware check.
+                          const computedActive = item.activeWhen ? item.activeWhen(location) : isActive
+                          return `group relative flex items-center rounded-l-lg rounded-r-2xl py-2 text-[0.750rem] font-medium transition-all duration-150 ${
                             isExpanded
                               ? 'gap-3 px-3.5 md:justify-start'
                               : 'gap-3 px-3.5 md:gap-0 md:rounded-2xl md:px-0 md:justify-center'
                           } ${
-                            isActive
+                            computedActive
                               // text-primary-900, not text-neutral-900: --sidebar-active-bg is
                               // always a light accent tint (Part 2.6), even in dark mode, but
                               // --color-neutral-900 INVERTS to a light value there (Part 2.3) -
@@ -371,13 +383,15 @@ export default function Sidebar({
                               ? 'app-sidebar-nav-label-active bg-(--sidebar-active-bg) text-primary-900 shadow-[inset_0_0_0_1px_rgb(0_9_42/0.12)]'
                               : 'app-sidebar-nav-label text-fg-muted hover:bg-neutral-50 hover:text-fg'
                           }`
-                        }
+                        }}
                       >
-                        {({ isActive }) => (
+                        {({ isActive }) => {
+                          const computedActive = item.activeWhen ? item.activeWhen(location) : isActive
+                          return (
                           <>
                             <span
                               className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary-800 transition-opacity ${
-                                isActive ? 'opacity-100' : 'opacity-0'
+                                computedActive ? 'opacity-100' : 'opacity-0'
                               } ${isExpanded ? '' : 'md:hidden'}`}
                               aria-hidden="true"
                             />
@@ -402,7 +416,8 @@ export default function Sidebar({
                               <CollapsedTooltip label={badgeCount > 0 ? `${item.label} (${badgeCount})` : item.label} />
                             )}
                           </>
-                        )}
+                          )
+                        }}
                       </NavLink>
                       )
                     })}

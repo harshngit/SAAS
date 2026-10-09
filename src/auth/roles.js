@@ -2,7 +2,6 @@ import {
   LayoutDashboard,
   Building2,
   CreditCard,
-  BarChart3,
   Package,
   Users,
   ShoppingCart,
@@ -10,7 +9,6 @@ import {
   Truck,
   Receipt,
   FileText,
-  UserCog,
   MapPin,
   Wallet,
   Store,
@@ -20,19 +18,13 @@ import {
   History,
   UserPlus,
   ClipboardList,
-  CheckSquare,
   Calendar,
   CalendarClock,
   PackageCheck,
   PackageX,
-  LogIn,
-  LogOut,
   TrendingUp,
   IndianRupee,
-  Check,
-  XCircle,
   FileCheck,
-  DollarSign,
   PieChart,
   UsersRound,
   Activity,
@@ -48,6 +40,8 @@ import {
   HandCoins,
   Palette,
   UserCircle,
+  Scale,
+  HelpCircle,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -141,44 +135,102 @@ export const roleMenus = {
       ],
     },
     {
-      section: 'Sales Operation',
+      section: 'CRM',
       items: [
-        { label: 'Customers', path: '/admin/customers', icon: UsersRound, module: 'customers' },
         { label: 'Leads', path: '/admin/leads', icon: UserPlus, module: 'leads' },
         { label: 'Quotations', path: '/admin/quotations', icon: FileText, module: 'quotations' },
-        { label: 'Suppliers', path: '/admin/suppliers', icon: Factory, module: 'suppliers' },
-        { label: 'Categories', path: '/admin/categories', icon: Tags, module: 'products' },
-        { label: 'Brands', path: '/admin/brands', icon: Award, module: 'products' },
-        { label: 'Products', path: '/admin/products', icon: Package, module: 'products' },
+        { label: 'Customers', path: '/admin/customers', icon: UsersRound, module: 'customers' },
       ],
     },
     {
-      section: 'Operations',
+      section: 'ERP',
       items: [
+        { label: 'Brands', path: '/admin/brands', icon: Award, module: 'products' },
+        { label: 'Categories', path: '/admin/categories', icon: Tags, module: 'products' },
+        { label: 'Products', path: '/admin/products', icon: Package, module: 'products' },
+        { label: 'Suppliers', path: '/admin/suppliers', icon: Factory, module: 'suppliers' },
         { label: 'Inventory', path: '/admin/inventory', icon: Warehouse, module: 'inventory' },
         { label: 'Warehouses', path: '/admin/warehouses', icon: Building2, module: 'inventory' },
-        { label: 'Orders', path: '/admin/orders', icon: ShoppingCart, module: 'sales_orders' },
-        { label: 'Sales Returns', path: '/admin/sales-returns', icon: Undo2, module: 'sales_returns' },
-        { label: 'Vehicle Stock', path: '/admin/vehicle-stock', icon: Car, module: 'vehicle_stock' },
-        { label: 'Vehicles', path: '/admin/vehicles', icon: Bus, module: 'vehicle_stock' },
         { label: 'Purchases', path: '/admin/purchases', icon: PackagePlus, module: 'purchases' },
         { label: 'Purchase Returns', path: '/admin/purchase-returns', icon: Undo2, module: 'purchases' },
-        { label: 'Deliveries', path: '/admin/deliveries', icon: Truck, module: 'deliveries' },
       ],
     },
     {
-      section: 'Finance',
+      section: 'Finance Management',
       items: [
-        { label: 'Sales Invoices', path: '/admin/invoices', icon: FileText, module: 'invoices' },
         { label: 'Receivables', path: '/admin/receivables', icon: IndianRupee, module: 'invoices' },
-        { label: 'Supplier Invoices', path: '/admin/supplier-invoices', icon: Receipt, module: 'invoices' },
         { label: 'Accounts Payable', path: '/admin/payables', icon: Wallet, module: 'invoices' },
         { label: 'Supplier Payments', path: '/admin/supplier-payments', icon: Wallet, module: 'invoices' },
         { label: 'Collection Reconciliation', path: '/admin/collections', icon: HandCoins, module: 'payments' },
         // Cash Reconciliation (/admin/reconciliation/cash) is FRONTEND-READY / BACKEND LATER
         // (no persisted session) - route + component kept, sidebar entry hidden for MVP.
         { label: 'Expenses', path: '/admin/expenses', icon: Receipt, module: 'expenses' },
-        { label: 'Reports', path: '/admin/reports', icon: FileSpreadsheet, module: 'reports' },
+        {
+          label: 'Reports',
+          path: '/admin/reports',
+          icon: FileSpreadsheet,
+          module: 'reports',
+          // Active only when NOT one of the two shortcut reports below, so exactly one of the
+          // three Reports-family items highlights at a time instead of all three at once (NavLink
+          // only matches on pathname by default, which all three of these share).
+          activeWhen: (location) =>
+            location.pathname === '/admin/reports' &&
+            !['profit-loss', 'gst-summary'].includes(new URLSearchParams(location.search).get('report')),
+        },
+        {
+          label: 'Profit and Loss Sheet',
+          path: '/admin/reports?report=profit-loss',
+          icon: TrendingUp,
+          module: 'reports',
+          // Reuses the real Reports module's profit-loss report (src/features/reports/reportConfig.js) -
+          // no second P&L calculation exists or is created here.
+          activeWhen: (location) =>
+            location.pathname === '/admin/reports' && new URLSearchParams(location.search).get('report') === 'profit-loss',
+        },
+        // BACKEND LATER: no balance-sheet report exists in the Reports module's confirmed report
+        // types - this opens an honest "not available yet" page rather than fabricating figures.
+        { label: 'Balance Sheet', path: '/admin/reports/balance-sheet', icon: Scale, module: 'reports' },
+        // Real GET /reports/cash-flow-sheet report (recorded cash in/out, not a React-computed
+        // statement) - distinct from Daily Transactions' same-day net_cash_flow figure.
+        { label: 'Cash Flow Sheet', path: '/admin/reports/cash-flow-sheet', icon: Activity, module: 'reports' },
+        {
+          label: 'GST Filing Sheet',
+          path: '/admin/reports?report=gst-summary',
+          icon: FileCheck,
+          module: 'reports',
+          // Reuses the real Reports module's gst-summary report - never the old standalone GST page.
+          activeWhen: (location) =>
+            location.pathname === '/admin/reports' && new URLSearchParams(location.search).get('report') === 'gst-summary',
+        },
+      ],
+    },
+    {
+      // Intentionally duplicates 4 items from Finance Management (client requirement) - every
+      // duplicate below points at the exact same path/module as its Finance Management twin, so
+      // both are the same canonical page/permission, never a second implementation.
+      section: 'Invoice Management',
+      items: [
+        { label: 'Sales Invoices', path: '/admin/invoices', icon: FileText, module: 'invoices' },
+        { label: 'Supplier Invoices', path: '/admin/supplier-invoices', icon: Receipt, module: 'invoices' },
+        { label: 'Receivables', path: '/admin/receivables', icon: IndianRupee, module: 'invoices' },
+        { label: 'Accounts Payable', path: '/admin/payables', icon: Wallet, module: 'invoices' },
+        { label: 'Supplier Payments', path: '/admin/supplier-payments', icon: Wallet, module: 'invoices' },
+        { label: 'Collection Reconciliation', path: '/admin/collections', icon: HandCoins, module: 'payments' },
+      ],
+    },
+    {
+      section: 'Sales & Delivery Management',
+      items: [
+        { label: 'Orders', path: '/admin/orders', icon: ShoppingCart, module: 'sales_orders' },
+        { label: 'Sales Returns', path: '/admin/sales-returns', icon: Undo2, module: 'sales_returns' },
+        { label: 'Deliveries', path: '/admin/deliveries', icon: Truck, module: 'deliveries' },
+        // Real GET /reports/sales-overview report (one row per Sales Order, aggregated delivery
+        // fields) - a genuine combined Orders + Deliveries view, not a client-side merge of the
+        // two separately-paginated lists. Gated like every other report under Finance
+        // Management's Reports family, since it is now part of that same backend domain.
+        { label: 'Sales', path: '/admin/sales-overview', icon: PieChart, module: 'reports' },
+        { label: 'Vehicle Stock', path: '/admin/vehicle-stock', icon: Car, module: 'vehicle_stock' },
+        { label: 'Vehicles', path: '/admin/vehicles', icon: Bus, module: 'vehicle_stock' },
       ],
     },
     {
@@ -187,19 +239,33 @@ export const roleMenus = {
         { label: 'Company Settings', path: '/admin/company-settings', icon: Store, module: 'settings' },
         { label: 'Plans', path: '/admin/plans', icon: CreditCard },
         { label: 'Billing History', path: '/admin/billing-history', icon: Receipt },
-        { label: 'Staff', path: '/admin/users', icon: Users, module: 'users' },
-        { label: 'Roles & Permissions', path: '/admin/roles', icon: ShieldCheck, module: 'users', action: 'edit' },
-        { label: 'Object Field Settings', path: '/admin/object-fields', icon: SlidersHorizontal, module: 'settings' },
-        { label: 'Attendance', path: '/admin/attendance', icon: ClipboardCheck, module: 'attendance' },
-        { label: 'Leaves', path: '/admin/leaves', icon: CalendarClock, module: 'leaves' },
-        { label: 'Audit Logs', path: '/admin/audit-logs', icon: History, module: 'reports' },
+        { label: 'Audit Log', path: '/admin/audit-logs', icon: History, module: 'reports' },
+        { label: 'My Profile', path: '/profile', icon: UserCircle },
       ],
     },
     {
-      section: 'System',
+      section: 'Employee Management',
       items: [
-        { label: 'My Profile', path: '/profile', icon: UserCircle },
+        { label: 'Staff', path: '/admin/users', icon: Users, module: 'users' },
+        { label: 'Attendance', path: '/admin/attendance', icon: ClipboardCheck, module: 'attendance' },
+        { label: 'Leaves', path: '/admin/leaves', icon: CalendarClock, module: 'leaves' },
+        { label: 'Roles & Permissions', path: '/admin/roles', icon: ShieldCheck, module: 'users', action: 'edit' },
+      ],
+    },
+    {
+      section: 'Settings',
+      items: [
+        { label: 'Objects & Fields Settings', path: '/admin/object-fields', icon: SlidersHorizontal, module: 'settings' },
+        { label: 'Invoice Changes', path: '/admin/invoices/settings', icon: SlidersHorizontal, module: 'invoices', action: 'edit' },
         { label: 'Appearance & Branding', path: '/admin/theme-settings', icon: Palette, module: 'settings' },
+        // Authenticated aliases of the public legal pages (src/features/legal/*) - same content
+        // components, rendered embedded inside this Sidebar/Topbar shell (AppRoutes.jsx) instead
+        // of their own standalone page chrome, so clicking these keeps the user inside Admin.
+        // The public routes (/terms, /privacy, /help, /legal) are unchanged and still work.
+        { label: 'Terms & Conditions', path: '/admin/settings/terms', icon: FileText },
+        { label: 'Privacy Policy', path: '/admin/settings/privacy', icon: ShieldCheck },
+        { label: 'Help & FAQ', path: '/admin/settings/help', icon: HelpCircle },
+        { label: 'View All Policies', path: '/admin/settings/policies', icon: ClipboardList },
       ],
     },
   ],

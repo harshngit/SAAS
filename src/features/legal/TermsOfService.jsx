@@ -3,9 +3,9 @@ import LegalSection from './LegalSection'
 
 const LAST_UPDATED = '[LAST UPDATED DATE]'
 
-export default function TermsOfService() {
+export default function TermsOfService({ embedded = false }) {
   return (
-    <LegalPageLayout title="Terms of Service" description={`Last updated: ${LAST_UPDATED}`}>
+    <LegalPageLayout title="Terms of Service" description={`Last updated: ${LAST_UPDATED}`} embedded={embedded}>
       <p className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-xs text-amber-700">
         This page is a product draft. Bracketed placeholders mark details that still need final legal/business sign-off before
         these terms are treated as complete.

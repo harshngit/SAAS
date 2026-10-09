@@ -40,6 +40,9 @@ import SupplierInvoiceDetail from '../features/supplierInvoices/SupplierInvoiceD
 import PayablesList from '../features/payables/PayablesList'
 import SupplierPaymentsList from '../features/supplierPayments/SupplierPaymentsList'
 import ReportsHub from '../features/reports/ReportsHub'
+import BalanceSheet from '../features/reports/BalanceSheet'
+import CashFlowSheet from '../features/reports/CashFlowSheet'
+import SalesOverview from '../features/sales/SalesOverview'
 import NotificationsList from '../features/notifications/NotificationsList'
 import AuditLogList from '../features/auditLogs/AuditLogList'
 import CustomerList from '../features/customers/CustomerList'
@@ -701,6 +704,38 @@ export default function AppRoutes() {
               </RequirePermissionRoute>
             }
           />
+          <Route
+            path="/admin/reports/balance-sheet"
+            element={
+              <RequirePermissionRoute module="reports" action="view">
+                <BalanceSheet />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/reports/cash-flow-sheet"
+            element={
+              <RequirePermissionRoute module="reports" action="view">
+                <CashFlowSheet />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/sales-overview"
+            element={
+              <RequirePermissionRoute module="reports" action="view">
+                <SalesOverview />
+              </RequirePermissionRoute>
+            }
+          />
+          {/* Authenticated aliases of the public legal pages (/terms, /privacy, /help, /legal) -
+              same content components, embedded=true skips their own standalone page chrome so
+              they render inside this Layout's Sidebar/Topbar instead of leaving it. No module
+              gate: these aren't permission-scoped anywhere else in the app either. */}
+          <Route path="/admin/settings/terms" element={<TermsOfService embedded />} />
+          <Route path="/admin/settings/privacy" element={<PrivacyPolicy embedded />} />
+          <Route path="/admin/settings/help" element={<HelpFaq embedded />} />
+          <Route path="/admin/settings/policies" element={<LegalIndex embedded />} />
           <Route path="/admin/notifications" element={<NotificationsList />} />
           <Route
             path="/admin/audit-logs"

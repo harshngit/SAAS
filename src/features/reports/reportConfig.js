@@ -141,11 +141,15 @@ export const ENTITY_ROUTES = {
   invoice: (invoiceNumber) => (invoiceNumber ? `/admin/invoices/${invoiceNumber}` : null),
   salesReturn: (id) => (id ? `/admin/sales-returns/${id}` : null),
   purchaseReturn: (id) => (id ? `/admin/purchase-returns/${id}` : null),
+  delivery: (id) => (id ? `/admin/deliveries/${id}` : null),
 }
 
 // ---- column helpers -----------------------------------------------------------------------
-const col = (key, label, type = 'text', extra = {}) => ({ key, label, type, ...extra })
-const ref = (key, label, refType, idKey, extra = {}) => ({ key, label, type: 'reference', refType, idKey, ...extra })
+// Exported so the bespoke Sales Overview / Cash Flow Sheet pages (which have their own custom
+// layouts and aren't wired into REPORT_CONFIG/FinancialReports) can build ReportTable-compatible
+// fallback columns the exact same way every report below does, instead of a second definition.
+export const col = (key, label, type = 'text', extra = {}) => ({ key, label, type, ...extra })
+export const ref = (key, label, refType, idKey, extra = {}) => ({ key, label, type: 'reference', refType, idKey, ...extra })
 
 // ---- per-report config --------------------------------------------------------------------
 // filters[].type: 'entity' (searchable Select backed by a shared, already-loaded list),
@@ -436,7 +440,9 @@ export const REPORT_CONFIG = {
   'gst-summary': {
     label: 'GST Summary',
     category: 'financial',
-    description: 'Output GST, input GST and net tax position.',
+    // Worded to describe tax position/preparation only - this report does not file or submit
+    // GSTR returns, so its description must never imply that.
+    description: 'GST summary for filing preparation: output GST, input GST and net tax position.',
     filters: [],
     summaryCards: [
       { keys: ['output_gst'], label: 'Output GST', format: 'currency' },

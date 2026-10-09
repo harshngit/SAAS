@@ -207,9 +207,9 @@ const SECTIONS = [
   },
 ]
 
-export default function HelpFaq() {
+export default function HelpFaq({ embedded = false }) {
   return (
-    <LegalPageLayout title="Help & FAQ" description="Answers to common questions about using Beas Suite.">
+    <LegalPageLayout title="Help & FAQ" description="Answers to common questions about using Beas Suite." embedded={embedded}>
       <div className="space-y-6">
         {SECTIONS.map((section) => (
           <FaqSection key={section.title} title={section.title} items={section.items} />
