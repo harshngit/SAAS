@@ -13,7 +13,9 @@ import { listActivePlans } from '../../api/plans'
 import { getCurrentOrganizationState, requestPlanUpgrade } from '../../api/organizations'
 import { getCurrentProfile } from '../../api/auth'
 import { payForPlan } from './planPayment'
+import PlanComparisonTable from './PlanComparisonTable'
 import { useAuthStore } from '../../store/authStore'
+import { useEntitlements } from '../../entitlements/EntitlementsContext'
 import { useTheme } from '../../theme/useTheme'
 import { formatCurrency } from '../../utils/format'
 
@@ -75,6 +77,7 @@ const getFeatureDescription = (feature) => {
 
 export default function AdminPlans() {
   const navigate = useNavigate()
+  const { refreshEntitlements } = useEntitlements()
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const [billingCycle, setBillingCycle] = useState('monthly')
   const [plans, setPlans] = useState([])
@@ -238,10 +241,12 @@ export default function AdminPlans() {
     }
 
     // verify's response is the full OrganizationOut - apply it immediately, then refresh the
-    // auth store's copy (GET /auth/me) so the rest of the app picks up the new plan too.
+    // auth store's copy (GET /auth/me) so the rest of the app picks up the new plan too, and the
+    // effective entitlements (sidebar/route gates read stale data otherwise until next reload).
     setOrganizationState(result.organization)
     setRequestedPlanId(null)
     getCurrentProfile()
+    refreshEntitlements()
     showToast({
       title: 'Plan activated',
       message: result.organization?.plan_expires_at
@@ -514,6 +519,7 @@ export default function AdminPlans() {
         )}
       </div>
 
+      {!isLoading && plans.length > 0 && <PlanComparisonTable plans={plans} />}
     </div>
   )
 }

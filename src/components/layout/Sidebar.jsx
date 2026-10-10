@@ -25,6 +25,7 @@ import {
 import { useAuthStore } from '../../store/authStore'
 import { roleMenus, roleLabels, ROLES, resolveWorkspaceRole } from '../../auth/roles'
 import { usePermission } from '../../auth/usePermission'
+import { useEntitlements } from '../../entitlements/EntitlementsContext'
 import { listSuperAdminOrganizations } from '../../api/superadmin'
 import { getMyAttendance } from '../../api/attendance'
 import { durationLabel, formatTimeLabel, normalizeAttendanceRecord } from '../../features/attendance/attendanceUtils'
@@ -78,14 +79,23 @@ export default function Sidebar({
   const currentUser = useAuthStore((state) => state.currentUser)
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const { can, role } = usePermission()
+  const { hasFeature } = useEntitlements()
   // Custom roles fall back to their workspace's canonical menu (then permission-filtered below).
   const currentRole = resolveWorkspaceRole({ role, currentUser })
   // Items without a `module` tag (personal pages, or concepts the backend doesn't model yet,
-  // like Visits/Follow-ups) are always shown - only permission-mapped items get gated.
+  // like Visits/Follow-ups) are always shown - only permission-mapped items get gated. `feature`
+  // is the separate plan-entitlement layer (§3 of the Plan Entitlements brief) - BOTH the role
+  // permission AND the plan feature must allow an item for it to show; neither check replaces
+  // the other. hasFeature() is a no-op "always true" for Super Admin / items with no `feature`
+  // tag, so this is a pure addition for the items that opted in.
   const menuGroups = (currentRole ? roleMenus[currentRole] || [] : [])
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !item.module || can(item.module, item.action || 'view')),
+      items: group.items.filter(
+        (item) =>
+          (!item.module || can(item.module, item.action || 'view')) &&
+          (!item.feature || hasFeature(item.feature)),
+      ),
     }))
     .filter((group) => group.items.length > 0)
   const [openSections, setOpenSections] = useState({})

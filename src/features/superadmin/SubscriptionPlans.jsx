@@ -183,6 +183,7 @@ export default function SubscriptionPlans() {
                     </p>
                     <p className="mt-1 text-sm text-neutral-500">
                       per {cycleLabel} · {plan.max_users ? `${plan.max_users} users` : 'Unlimited users'} ·{' '}
+                      {plan.max_warehouses ? `${plan.max_warehouses} warehouses` : 'Unlimited warehouses'} ·{' '}
                       {plan.max_orders ? `${plan.max_orders} orders` : 'Unlimited orders'}
                     </p>
                   </div>

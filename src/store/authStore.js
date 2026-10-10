@@ -80,6 +80,12 @@ export const useAuthStore = create(
       // refresh resolves. Org-scoped implicitly: it's part of the same persisted authProfile
       // blob as `user`/`organization`, so a different login/org always overwrites it.
       orgTheme: storedAuthProfile?.theme ? normalizeOrganizationTheme(storedAuthProfile.theme) : DEFAULT_THEME,
+      // Plan Entitlements (features/limits/plan/trial info from GET /organizations/me/
+      // entitlements) - cached in the SAME manually-persisted authProfile blob as orgTheme, for
+      // the exact same reason: synchronously available on first paint so the sidebar/routes never
+      // flash a blocked item before the real fetch resolves. null until EntitlementsProvider's
+      // first successful fetch for this org.
+      entitlements: storedAuthProfile?.entitlements ?? null,
 
       setAuthenticatedSession: ({
         user,
@@ -170,6 +176,16 @@ export const useAuthStore = create(
         set({ authTokens: tokens })
       },
 
+      // Called after EntitlementsProvider's fetch resolves (and after any action that changes
+      // the effective entitlements server-side - plan upgrade, Super Admin override/plan edit) so
+      // the cached copy stays authoritative without waiting for the next full /auth/me call.
+      setEntitlements: (entitlements) => {
+        set((state) => {
+          if (state.authProfile) saveAuthProfile({ ...state.authProfile, entitlements })
+          return { entitlements }
+        })
+      },
+
       // full_access (Admin) is granted everything without consulting the permissions matrix.
       hasPermission: (module, action) => {
         const { fullAccess, permissions } = get()
@@ -192,6 +208,7 @@ export const useAuthStore = create(
           // render with the previous org's theme, even for the instant before the fresh
           // /auth/me response comes back.
           orgTheme: DEFAULT_THEME,
+          entitlements: null,
         })
       },
     }),

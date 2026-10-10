@@ -8,7 +8,10 @@ const PANEL_WIDTH = 360
 // Compact categorized report library - a single trigger button that opens one grouped panel
 // (category headings, each with its reports as name + short description), rather than 15
 // permanent tabs. Keeps the selector itself small; the grouping does the scanning work.
-export default function ReportSelector({ value, onChange, className = '' }) {
+// isVisible: optional (reportValue) => boolean, used to hide plan-disentitled report types from
+// the picker (§5 of the Plan Entitlements brief) without touching REPORT_CONFIG itself - a report
+// a user can't open is simply never offered, rather than offered and then blocked.
+export default function ReportSelector({ value, onChange, className = '', isVisible }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [position, setPosition] = useState(null)
@@ -16,8 +19,11 @@ export default function ReportSelector({ value, onChange, className = '' }) {
   const panelRef = useRef(null)
   const triggerRef = useRef(null)
 
-  const categories = reportsByCategory()
-  const current = categories.flatMap((category) => category.reports).find((report) => report.value === value)
+  const allCategories = reportsByCategory()
+  const categories = isVisible
+    ? allCategories.map((category) => ({ ...category, reports: category.reports.filter((report) => isVisible(report.value)) })).filter((category) => category.reports.length > 0)
+    : allCategories
+  const current = allCategories.flatMap((category) => category.reports).find((report) => report.value === value)
 
   const normalizedQuery = query.trim().toLowerCase()
   const visibleCategories = categories

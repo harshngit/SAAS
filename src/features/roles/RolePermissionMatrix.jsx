@@ -5,6 +5,8 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { getRolesCatalog } from '../../api/roles'
+import { useEntitlements } from '../../entitlements/EntitlementsContext'
+import { MODULE_TO_ENTITLEMENT_KEY } from '../../entitlements/entitlementKeys'
 
 // "Workspace" only picks the user's primary shell / dashboard family - it is NOT a permission
 // whitelist. Backend authorization is entirely role.permissions[module][action]. A custom role
@@ -74,6 +76,7 @@ function buildMatrix(permissions, moduleKeys, actionKeys) {
 }
 
 export default function RolePermissionMatrix({ role, saving, formError, onClose, onSave }) {
+  const { hasFeature } = useEntitlements()
   const isEditing = Boolean(role)
   const [name, setName] = useState(role?.name || '')
   const [nameError, setNameError] = useState('')
@@ -205,9 +208,21 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
 
   const renderModuleRow = (module) => {
     const moduleLabel = moduleLabelFor(module.key, module.label)
+    const entitlementKey = MODULE_TO_ENTITLEMENT_KEY[module.key]
+    // Helper text only (§11) - the checkboxes below stay fully interactive and whatever was
+    // already saved stays saved, so an org that later upgrades its plan doesn't lose role
+    // permissions it configured while on a lower plan.
+    const isPlanBlocked = entitlementKey && !hasFeature(entitlementKey)
     return (
       <tr key={module.key} className="border-b border-neutral-50 last:border-b-0">
-        <td className="sticky left-0 z-10 bg-surface px-4 py-3 font-medium text-neutral-900">{moduleLabel}</td>
+        <td className="sticky left-0 z-10 bg-surface px-4 py-3 font-medium text-neutral-900">
+          {moduleLabel}
+          {isPlanBlocked && (
+            <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[0.65rem] font-medium text-amber-700">
+              Not available on the current plan
+            </span>
+          )}
+        </td>
         <td className="px-3 py-3 text-center">
           <input
             type="checkbox"

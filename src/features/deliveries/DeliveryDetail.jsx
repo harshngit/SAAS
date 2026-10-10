@@ -64,6 +64,8 @@ import {
 import { formatCurrency } from '../../utils/format'
 import { useAuthStore } from '../../store/authStore'
 import { usePermission } from '../../auth/usePermission'
+import { useEntitlements } from '../../entitlements/EntitlementsContext'
+import { ENTITLEMENT_KEYS } from '../../entitlements/entitlementKeys'
 import { useToast } from '../../components/ui/toastContext'
 import DeliveryDetailView from './DeliveryDetailView'
 
@@ -205,6 +207,8 @@ export default function DeliveryDetail() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const { can } = usePermission()
+  const { hasFeature } = useEntitlements()
+  const hasWhatsAppDeliveryFeature = hasFeature(ENTITLEMENT_KEYS.NOTIFICATIONS_WHATSAPP_DELIVERY)
   const currentUser = useAuthStore((state) => state.currentUser)
   const isAdminView = window.location.pathname.startsWith('/admin')
   const basePath = isAdminView ? '/admin/deliveries' : '/delivery/deliveries'
@@ -1665,7 +1669,7 @@ export default function DeliveryDetail() {
                     <Receipt className="size-4" aria-hidden="true" />
                     Delivery Receipt
                   </Button>
-                  {customerPhone && (
+                  {customerPhone && hasWhatsAppDeliveryFeature && (
                     <Button type="button" variant="outline" onClick={handleShareOnWhatsApp}>
                       <MessageCircle className="size-4" aria-hidden="true" />
                       Share on WhatsApp

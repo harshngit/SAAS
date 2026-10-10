@@ -31,6 +31,8 @@ import { useToast } from '../../components/ui/toastContext'
 import { ROLES, roleLabels } from '../../auth/roles'
 import { RequirePermission } from '../../auth/RequirePermission'
 import { useAuthStore } from '../../store/authStore'
+import { useEntitlements } from '../../entitlements/EntitlementsContext'
+import { LIMIT_KEYS } from '../../entitlements/entitlementKeys'
 import { getFileUrl, uploadFiles as uploadGenericFiles } from '../../api/files'
 import { createUser, listRoles, listUsers, permanentlyDeleteUser, updateUserStatus } from '../../api/users'
 import { getSystemRoleFromRoleName, normalizeApiUser, staffRoleOptions } from './userRoleUtils'
@@ -460,6 +462,7 @@ export default function UserManagement() {
   const currentUser = useAuthStore((state) => state.currentUser)
   const isAdmin = currentUser?.role === ROLES.ADMIN
   const isSuperAdmin = currentUser?.role === ROLES.SUPER_ADMIN
+  const { getLimit } = useEntitlements()
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
   const [activeRoleFilter, setActiveRoleFilter] = useState('all')
@@ -473,6 +476,7 @@ export default function UserManagement() {
   const [listError, setListError] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formError, setFormError] = useState('')
+  const [planLimitReached, setPlanLimitReached] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [statusUser, setStatusUser] = useState(null)
   const [statusError, setStatusError] = useState('')
@@ -553,6 +557,7 @@ export default function UserManagement() {
 
   const handleOpenModal = () => {
     setFormError('')
+    setPlanLimitReached(false)
     setActiveStaffSection('1')
     setUploadPreviews((current) => {
       Object.values(current).forEach(revokeUploadPreviewUrls)
@@ -574,6 +579,7 @@ export default function UserManagement() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setFormError('')
+    setPlanLimitReached(false)
     setUploadPreviews((current) => {
       Object.values(current).forEach(revokeUploadPreviewUrls)
       uploadPreviewsRef.current = {}
@@ -792,11 +798,13 @@ export default function UserManagement() {
     }
 
     setIsSaving(true)
+    setPlanLimitReached(false)
     const result = await createUser(payload)
 
     if (!result.success) {
       setIsSaving(false)
       setFormError(result.error)
+      setPlanLimitReached(result.planCode === 'PLAN_LIMIT_REACHED')
       return
     }
 
@@ -1225,6 +1233,9 @@ export default function UserManagement() {
             {formError && (
               <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {formError}
+                {planLimitReached && (
+                  <Link to="/admin/plans" className="ml-2 font-medium underline hover:no-underline">View Plans</Link>
+                )}
               </div>
             )}
 
@@ -1363,10 +1374,23 @@ export default function UserManagement() {
 
             <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               <RequirePermission module="users" action="create">
-                <Button onClick={handleOpenModal} size="sm">
-                  <Plus className="size-4" />
-                  Add Staff
-                </Button>
+                {(() => {
+                  const maxUsers = getLimit(LIMIT_KEYS.MAX_USERS)
+                  const atUserLimit = maxUsers !== null && users.length >= maxUsers
+                  return (
+                    <div className="flex items-center gap-2">
+                      {atUserLimit && (
+                        <span className="text-xs text-neutral-500">
+                          {maxUsers} user limit reached - <Link to="/admin/plans" className="font-medium text-primary-600 hover:underline">View Plans</Link>
+                        </span>
+                      )}
+                      <Button onClick={handleOpenModal} size="sm" disabled={atUserLimit} title={atUserLimit ? `Your current plan allows ${maxUsers} user(s).` : undefined}>
+                        <Plus className="size-4" />
+                        Add Staff
+                      </Button>
+                    </div>
+                  )
+                })()}
               </RequirePermission>
               <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
             </div>

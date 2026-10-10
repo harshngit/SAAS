@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from '../components/layout/Layout'
 import ProtectedRoute from '../auth/ProtectedRoute'
 import RequirePermissionRoute from '../auth/RequirePermission'
+import { ENTITLEMENT_KEYS } from '../entitlements/entitlementKeys'
 import Login from '../features/auth/Login'
 import Register from '../auth/Register'
 import GoogleAuthCallback from '../features/auth/GoogleAuthCallback'
@@ -225,7 +226,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/users"
             element={
-              <RequirePermissionRoute module="users">
+              <RequirePermissionRoute module="users" feature={ENTITLEMENT_KEYS.EMPLOYEE_STAFF}>
                 <UserManagement />
               </RequirePermissionRoute>
             }
@@ -233,7 +234,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/users/edit/:user_id"
             element={
-              <RequirePermissionRoute module="users" action="edit">
+              <RequirePermissionRoute module="users" action="edit" feature={ENTITLEMENT_KEYS.EMPLOYEE_STAFF}>
                 <UserEdit />
               </RequirePermissionRoute>
             }
@@ -241,7 +242,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/users/:user_id"
             element={
-              <RequirePermissionRoute module="users" action="view">
+              <RequirePermissionRoute module="users" action="view" feature={ENTITLEMENT_KEYS.EMPLOYEE_STAFF}>
                 <UserDetail />
               </RequirePermissionRoute>
             }
@@ -249,7 +250,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/roles"
             element={
-              <RequirePermissionRoute module="users" action="edit">
+              <RequirePermissionRoute module="users" action="edit" feature={ENTITLEMENT_KEYS.EMPLOYEE_ROLES_PERMISSIONS}>
                 <RolesList />
               </RequirePermissionRoute>
             }
@@ -257,7 +258,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/roles/new"
             element={
-              <RequirePermissionRoute module="users" action="edit">
+              <RequirePermissionRoute module="users" action="edit" feature={ENTITLEMENT_KEYS.EMPLOYEE_ROLES_PERMISSIONS}>
                 <RoleForm />
               </RequirePermissionRoute>
             }
@@ -265,7 +266,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/roles/edit/:role_id"
             element={
-              <RequirePermissionRoute module="users" action="edit">
+              <RequirePermissionRoute module="users" action="edit" feature={ENTITLEMENT_KEYS.EMPLOYEE_ROLES_PERMISSIONS}>
                 <RoleForm />
               </RequirePermissionRoute>
             }
@@ -275,7 +276,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/attendance"
             element={
-              <RequirePermissionRoute module="attendance" action="view">
+              <RequirePermissionRoute module="attendance" action="view" feature={ENTITLEMENT_KEYS.EMPLOYEE_ATTENDANCE}>
                 <AdminAttendance />
               </RequirePermissionRoute>
             }
@@ -283,7 +284,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/attendance/:userId"
             element={
-              <RequirePermissionRoute module="attendance" action="view">
+              <RequirePermissionRoute module="attendance" action="view" feature={ENTITLEMENT_KEYS.EMPLOYEE_ATTENDANCE}>
                 <AttendanceDetail />
               </RequirePermissionRoute>
             }
@@ -315,7 +316,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/leads"
             element={
-              <RequirePermissionRoute module="leads" action="view">
+              <RequirePermissionRoute module="leads" action="view" feature={ENTITLEMENT_KEYS.CRM_LEADS}>
                 <LeadList />
               </RequirePermissionRoute>
             }
@@ -323,7 +324,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/leads/new"
             element={
-              <RequirePermissionRoute module="leads" action="create">
+              <RequirePermissionRoute module="leads" action="create" feature={ENTITLEMENT_KEYS.CRM_LEADS}>
                 <LeadFormPage />
               </RequirePermissionRoute>
             }
@@ -331,7 +332,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/leads/:id"
             element={
-              <RequirePermissionRoute module="leads" action="view">
+              <RequirePermissionRoute module="leads" action="view" feature={ENTITLEMENT_KEYS.CRM_LEADS}>
                 <LeadDetail />
               </RequirePermissionRoute>
             }
@@ -339,7 +340,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/quotations"
             element={
-              <RequirePermissionRoute module="quotations" action="view">
+              <RequirePermissionRoute module="quotations" action="view" feature={ENTITLEMENT_KEYS.CRM_QUOTATIONS}>
                 <QuotationList />
               </RequirePermissionRoute>
             }
@@ -347,7 +348,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/quotations/new"
             element={
-              <RequirePermissionRoute module="quotations" action="create">
+              <RequirePermissionRoute module="quotations" action="create" feature={ENTITLEMENT_KEYS.CRM_QUOTATIONS}>
                 <QuotationFormPage />
               </RequirePermissionRoute>
             }
@@ -355,7 +356,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/quotations/:id/edit"
             element={
-              <RequirePermissionRoute module="quotations" action="edit">
+              <RequirePermissionRoute module="quotations" action="edit" feature={ENTITLEMENT_KEYS.CRM_QUOTATIONS}>
                 <QuotationFormPage />
               </RequirePermissionRoute>
             }
@@ -363,7 +364,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/quotations/:id"
             element={
-              <RequirePermissionRoute module="quotations" action="view">
+              <RequirePermissionRoute module="quotations" action="view" feature={ENTITLEMENT_KEYS.CRM_QUOTATIONS}>
                 <QuotationDetail />
               </RequirePermissionRoute>
             }
@@ -459,7 +460,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/vehicle-stock"
             element={
-              <RequirePermissionRoute module="vehicle_stock" action="view">
+              <RequirePermissionRoute module="vehicle_stock" action="view" feature={ENTITLEMENT_KEYS.SALES_VEHICLE_STOCK}>
                 <VehicleStockOverview />
               </RequirePermissionRoute>
             }
@@ -467,7 +468,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/vehicles"
             element={
-              <RequirePermissionRoute module="vehicle_stock" action="view">
+              <RequirePermissionRoute module="vehicle_stock" action="view" feature={ENTITLEMENT_KEYS.SALES_VEHICLES}>
                 <VehicleList />
               </RequirePermissionRoute>
             }
@@ -475,7 +476,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/vehicles/:id"
             element={
-              <RequirePermissionRoute module="vehicle_stock" action="view">
+              <RequirePermissionRoute module="vehicle_stock" action="view" feature={ENTITLEMENT_KEYS.SALES_VEHICLES}>
                 <VehicleDetail />
               </RequirePermissionRoute>
             }
@@ -699,7 +700,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/reports"
             element={
-              <RequirePermissionRoute module="reports" action="view">
+              <RequirePermissionRoute module="reports" action="view" feature={ENTITLEMENT_KEYS.FINANCE_REPORTS}>
                 <ReportsHub />
               </RequirePermissionRoute>
             }
@@ -707,7 +708,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/reports/balance-sheet"
             element={
-              <RequirePermissionRoute module="reports" action="view">
+              <RequirePermissionRoute module="reports" action="view" feature={ENTITLEMENT_KEYS.REPORT_BALANCE_SHEET}>
                 <BalanceSheet />
               </RequirePermissionRoute>
             }
@@ -715,7 +716,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/reports/cash-flow-sheet"
             element={
-              <RequirePermissionRoute module="reports" action="view">
+              <RequirePermissionRoute module="reports" action="view" feature={ENTITLEMENT_KEYS.REPORT_CASH_FLOW}>
                 <CashFlowSheet />
               </RequirePermissionRoute>
             }
@@ -723,7 +724,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/sales-overview"
             element={
-              <RequirePermissionRoute module="reports" action="view">
+              <RequirePermissionRoute module="reports" action="view" feature={ENTITLEMENT_KEYS.SALES_SALES}>
                 <SalesOverview />
               </RequirePermissionRoute>
             }
@@ -756,7 +757,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/leaves"
             element={
-              <RequirePermissionRoute module="leaves" action="view">
+              <RequirePermissionRoute module="leaves" action="view" feature={ENTITLEMENT_KEYS.EMPLOYEE_LEAVES}>
                 <LeaveApprovalQueue />
               </RequirePermissionRoute>
             }

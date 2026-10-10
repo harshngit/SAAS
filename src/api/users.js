@@ -1,5 +1,6 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { planErrorCode } from './entitlements'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (errorData?.code === 'ECONNABORTED') {
@@ -356,7 +357,9 @@ export async function createUser(payload) {
       'Unable to create staff. Please try again.',
     )
 
-    return { success: false, error: message }
+    // planCode lets UserManagement.jsx show a dedicated max_users plan-limit UI instead of the
+    // generic error banner (§8) - the raw axios error is otherwise lost once stringified above.
+    return { success: false, error: message, planCode: planErrorCode(error) }
   }
 }
 

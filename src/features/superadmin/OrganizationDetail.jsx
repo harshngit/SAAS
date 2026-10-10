@@ -35,6 +35,7 @@ import {
 } from '../../api/superadmin'
 import { getSuperAdminSubscriptionPayments } from '../../api/billing'
 import { formatCurrency } from '../../utils/format'
+import OrganizationPlanAccess from './OrganizationPlanAccess'
 
 const PAYMENT_STATUS_VARIANT = { paid: 'success', failed: 'danger', created: 'warning' }
 
@@ -523,6 +524,8 @@ export default function OrganizationDetail() {
           )}
         </Card>
       </div>
+
+      <OrganizationPlanAccess orgId={id} />
 
       <Card title="Payments" subtitle="Online subscription payments for this organization">
         {isLoadingPayments ? (

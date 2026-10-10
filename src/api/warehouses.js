@@ -1,5 +1,6 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { planErrorCode } from './entitlements'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -140,7 +141,9 @@ export async function createWarehouse(payload) {
       'Unable to create warehouse. Please try again.',
     )
 
-    return { success: false, error: message }
+    // planCode lets WarehouseList.jsx show a dedicated max_warehouses plan-limit UI instead of
+    // the generic error banner (§9) - the raw axios error is otherwise lost once stringified above.
+    return { success: false, error: message, planCode: planErrorCode(error) }
   }
 }
 

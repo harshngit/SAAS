@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Boxes, ChevronLeft, ChevronRight, ClipboardList, Download, Edit, Eye, PackageSearch, Plus, RotateCw, Search, SlidersHorizontal, Trash2, Warehouse as WarehouseIcon, X } from 'lucide-react'
 import {
   adjustWarehouseStock,
@@ -11,6 +11,9 @@ import {
   updateWarehouse,
 } from '../../api/warehouses'
 import { listProducts } from '../../api/products'
+import { useEntitlements } from '../../entitlements/EntitlementsContext'
+import { LIMIT_KEYS } from '../../entitlements/entitlementKeys'
+import { useToast } from '../../components/ui/toastContext'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -105,6 +108,11 @@ export default function WarehouseList() {
   const [page, setPage] = useState(1)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
+
+  const { getLimit } = useEntitlements()
+  const { showToast } = useToast()
+  const maxWarehouses = getLimit(LIMIT_KEYS.MAX_WAREHOUSES)
+  const atWarehouseLimit = maxWarehouses !== null && warehouses.length >= maxWarehouses
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingWarehouse, setEditingWarehouse] = useState(null)
@@ -253,6 +261,9 @@ export default function WarehouseList() {
 
     if (!result.success) {
       setFormError(result.error)
+      if (result.planCode === 'PLAN_LIMIT_REACHED') {
+        showToast({ title: 'Plan limit reached', message: `${result.error} Visit Plans to upgrade.`, variant: 'error', duration: 5000 })
+      }
       setIsSaving(false)
       return
     }
@@ -306,7 +317,7 @@ export default function WarehouseList() {
     <div className="listing-page space-y-4">
       <Card className="overflow-hidden p-0">
         <div className="border-b border-neutral-100 px-5 py-5">
-          <div className="flex flex-col gap-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Warehouses</h1><p className="mt-1 text-xs text-neutral-400">{rows.length} warehouses in view</p></div><div className="flex flex-wrap items-center justify-end gap-2"><div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Search warehouses..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportWarehousesCsv()}><Download className="size-4" />Export</Button><Button type="button" onClick={() => openForm()} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Warehouse</Button></div></div></div>
+          <div className="flex flex-col gap-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Warehouses</h1><p className="mt-1 text-xs text-neutral-400">{rows.length} warehouses in view</p></div><div className="flex flex-wrap items-center justify-end gap-2"><div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Search warehouses..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportWarehousesCsv()}><Download className="size-4" />Export</Button>{atWarehouseLimit && <span className="text-xs text-neutral-500">{maxWarehouses} warehouse limit reached - <Link to="/admin/plans" className="font-medium text-primary-600 hover:underline">View Plans</Link></span>}<Button type="button" onClick={() => openForm()} size="sm" className="h-9 rounded-2xl px-3.5" disabled={atWarehouseLimit} title={atWarehouseLimit ? `Your current plan allows ${maxWarehouses} warehouse(s).` : undefined}><Plus className="size-4" />Add Warehouse</Button></div></div></div>
           <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">{[{ label: 'Total Warehouses', value: stats.total, detail: `${stats.active} active`, icon: WarehouseIcon }, { label: 'Active Warehouses', value: stats.active, detail: 'currently active', icon: ClipboardList }, { label: 'Stock Units', value: stats.stockUnits, detail: `${stats.lowStock} low stock`, icon: Boxes }, { label: 'Low Stock Items', value: stats.lowStock, detail: 'needs attention', icon: PackageSearch }].map(({ label, value, detail, icon: Icon }, index) => <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>)}</div>
         </div>
       </Card>

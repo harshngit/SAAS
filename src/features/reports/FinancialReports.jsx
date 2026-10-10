@@ -19,6 +19,9 @@ import { listBrands } from '../../api/brands'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { ROLES } from '../../auth/roles'
 import { usePermission } from '../../auth/usePermission'
+import { useEntitlements } from '../../entitlements/EntitlementsContext'
+import { REPORT_TYPE_TO_ENTITLEMENT_KEY } from '../../entitlements/entitlementKeys'
+import PlanRestricted from '../../entitlements/PlanRestricted'
 import { DEMO_MODE } from '../../config/demoMode'
 import { PERIOD_OPTIONS, getDateRangeForPeriod } from './reportConstants'
 import { getReportConfig, resolveValidGroupBy } from './reportConfig'
@@ -48,6 +51,16 @@ export default function FinancialReports({
 }) {
   const { can } = usePermission()
   const canExport = can('reports', 'export')
+  const { hasFeature } = useEntitlements()
+  // A report type with no listed entitlement key (none today - every REPORT_CONFIG key has one,
+  // see entitlementKeys.js) is treated as entitled rather than guessed-blocked.
+  const isReportEntitled = useCallback(
+    (type) => {
+      const key = REPORT_TYPE_TO_ENTITLEMENT_KEY[type]
+      return !key || hasFeature(key)
+    },
+    [hasFeature],
+  )
 
   const [searchParams, setSearchParams] = useSearchParams()
   const initialType = getReportConfig(searchParams.get('report')) ? searchParams.get('report') : DEFAULT_REPORT
@@ -236,6 +249,15 @@ export default function FinancialReports({
   const requestIdRef = useRef(0)
 
   const loadReport = useCallback(async () => {
+    // Never call the API for a report this organization's plan doesn't entitle - a direct/typed
+    // ?report= query must not even attempt the request, let alone silently fall back to another
+    // report (§5).
+    if (!isReportEntitled(reportType)) {
+      setIsLoading(false)
+      setReport(null)
+      return
+    }
+
     const requestId = ++requestIdRef.current
     setIsLoading(true)
     setLoadError('')
@@ -257,7 +279,7 @@ export default function FinancialReports({
     }
 
     setReport(result.report)
-  }, [reportType, requestParams])
+  }, [reportType, requestParams, isReportEntitled])
 
   useEffect(() => {
     loadReport()
@@ -301,7 +323,7 @@ export default function FinancialReports({
       <Card className="p-0">
         <div className="space-y-3 border-b border-neutral-100 px-4 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <ReportSelector value={reportType} onChange={handleReportTypeChange} className="lg:w-72" />
+            <ReportSelector value={reportType} onChange={handleReportTypeChange} className="lg:w-72" isVisible={isReportEntitled} />
 
             <div className="flex flex-wrap items-center gap-2">
               {!config?.noAsOfDate && (
@@ -349,7 +371,7 @@ export default function FinancialReports({
                 </Button>
               )}
 
-              {canExport && !DEMO_MODE && (
+              {canExport && !DEMO_MODE && isReportEntitled(reportType) && (
                 <>
                   <Button type="button" variant="secondary" size="sm" loading={isExporting === 'pdf'} disabled={Boolean(isExporting) || isLoading} onClick={() => handleExport('pdf')}>
                     <Download className="size-4" aria-hidden="true" />
@@ -400,7 +422,9 @@ export default function FinancialReports({
             <p className="mb-4 text-xs text-neutral-400">Report export (PDF / Excel) is disabled in demo mode.</p>
           )}
 
-          {isLoading ? (
+          {!isReportEntitled(reportType) ? (
+            <PlanRestricted description={`${config?.label || 'This report'} is not included in your current plan.`} />
+          ) : isLoading ? (
             <LoadingSpinner label={`Loading ${config?.label || 'report'}…`} />
           ) : loadError && !isDemoUnavailable ? (
             <EmptyState
