@@ -156,7 +156,7 @@ export default function LeadFormPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 pb-10">
+    <div className="flex w-full flex-col gap-6 pb-10">
       <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-neutral-500">
         <Link to={basePath} className="transition-colors hover:text-neutral-900">
           Home

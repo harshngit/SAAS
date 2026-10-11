@@ -33,12 +33,20 @@ function formatApiError(errorData, fallbackMessage = 'Something went wrong. Plea
 
 export async function listSuperAdminOrganizations(filters = {}) {
   try {
+    // page_size defaults to the backend's own documented max (100) - OrganizationsList.jsx does
+    // its own client-side search/date-filter/pagination over the full result set (same model it
+    // used before this endpoint started paginating), so this keeps that working rather than
+    // silently truncating to the backend's own default page_size of 10.
     const params = Object.fromEntries(
-      Object.entries(filters).filter(([, value]) => value != null && value !== ''),
+      Object.entries({ page_size: 100, ...filters }).filter(([, value]) => value != null && value !== ''),
     )
 
     const { data } = await apiClient.get('/superadmin/organizations', { params })
-    return { success: true, organizations: Array.isArray(data) ? data : [] }
+    // GET /superadmin/organizations now returns a paginated { items, total, page, page_size,
+    // total_pages } wrapper instead of a bare array - read `items`, falling back to a bare array
+    // for safety if an older/different shape is ever returned.
+    const organizations = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, organizations, total: data?.total ?? organizations.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

@@ -9,6 +9,7 @@ import Modal from '../../components/ui/Modal'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/Tabs'
 import { listPlans, createPlan, updatePlan, updatePlanStatus, deletePlan } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
+import { buildPlanSummaryBullets, formatLimitValue } from '../../entitlements/entitlementKeys'
 import PlanForm from './PlanForm'
 import SuperAdminPageHeader from './SuperAdminPageHeader'
 
@@ -182,9 +183,9 @@ export default function SubscriptionPlans() {
                       )}
                     </p>
                     <p className="mt-1 text-sm text-neutral-500">
-                      per {cycleLabel} · {plan.max_users ? `${plan.max_users} users` : 'Unlimited users'} ·{' '}
-                      {plan.max_warehouses ? `${plan.max_warehouses} warehouses` : 'Unlimited warehouses'} ·{' '}
-                      {plan.max_orders ? `${plan.max_orders} orders` : 'Unlimited orders'}
+                      per {cycleLabel} · {formatLimitValue(plan.max_users)} users ·{' '}
+                      {formatLimitValue(plan.max_warehouses)} warehouses ·{' '}
+                      {formatLimitValue(plan.max_orders)} orders
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-1">
@@ -227,10 +228,13 @@ export default function SubscriptionPlans() {
                 </div>
 
                 <ul className="flex-1 space-y-2">
-                  {(plan.features || []).map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-neutral-600">
+                  {/* Generated from the Plan's own structured entitlements/limits - the Super
+                      Admin sees the SAME truthful summary an organization's plan card would show,
+                      not whatever the free-text Marketing Features field happens to still say. */}
+                  {buildPlanSummaryBullets(plan).map((bullet) => (
+                    <li key={bullet} className="flex items-start gap-2 text-sm text-neutral-600">
                       <Check className="mt-0.5 size-4 shrink-0 text-green-600" aria-hidden="true" />
-                      <span>{feature}</span>
+                      <span>{bullet}</span>
                     </li>
                   ))}
                 </ul>

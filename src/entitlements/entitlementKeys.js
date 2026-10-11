@@ -248,3 +248,104 @@ export const ENTITLEMENT_GROUPS = [
 
 export const ALL_ENTITLEMENT_KEYS = Object.values(ENTITLEMENT_KEYS)
 export const ALL_LIMIT_KEYS = Object.values(LIMIT_KEYS)
+
+// The one place every numeric Plan limit is formatted, so "Unlimited" can never again mean
+// "we don't actually know this value" - a prior pass's bug (Super Admin Org Detail showing
+// "Plan Default: Unlimited" for a Basic org whose real max_warehouses is 1, because the lookup
+// came back undefined and a `?? 'Unlimited'` fallback quietly turned "unknown" into "unlimited").
+//
+//   null      -> "Unlimited"  (the backend's own confirmed semantics: LimitOverrideUpsert.value's
+//                own doc says "null = unlimited", and every Plan max_* field already uses this
+//                same nullable-int convention across this codebase)
+//   number    -> the number itself, exactly, including 0
+//   undefined -> "—"          (missing/unavailable - NEVER presented as a real unlimited value)
+export function formatLimitValue(value) {
+  if (value === null) return 'Unlimited'
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  return '—'
+}
+
+function limitBullet(value, singular, plural = `${singular}s`) {
+  if (value === null) return `Unlimited ${plural}`
+  if (typeof value !== 'number') return null // unknown - omit rather than guess
+  return `${value} ${value === 1 ? singular : plural}`
+}
+
+function anyOn(entitlements, keys) {
+  return keys.some((key) => entitlements[key])
+}
+
+// Generates the plan card's capability bullets FROM the structured entitlements/limits
+// themselves - never from the free-text Marketing Features the Super Admin can also type in
+// PlanForm.jsx. That free-text field is presentation-only; if it goes stale (e.g. still reads
+// "Leads, Quotations & Sales Orders" after Leads/Quotations were turned off), these generated
+// bullets are what the plan card/comparison/Organization Detail actually show, so the UI can
+// never contradict what the plan truly entitles an organization to.
+export function buildPlanSummaryBullets(plan) {
+  const entitlements = plan?.entitlements || {}
+  const bullets = []
+
+  const usersBullet = limitBullet(plan?.max_users, 'Admin User')
+  if (usersBullet) bullets.push(usersBullet)
+
+  const warehousesBullet = limitBullet(plan?.max_warehouses, 'Warehouse')
+  if (warehousesBullet) bullets.push(warehousesBullet)
+
+  const hasCrmCore = entitlements[ENTITLEMENT_KEYS.CRM_CUSTOMERS]
+  const hasCrmAdvanced = anyOn(entitlements, [ENTITLEMENT_KEYS.CRM_LEADS, ENTITLEMENT_KEYS.CRM_QUOTATIONS])
+  if (hasCrmCore) bullets.push(hasCrmAdvanced ? 'Customers, Leads & Quotations' : 'Customers & Core CRM')
+
+  const erpKeys = [
+    ENTITLEMENT_KEYS.ERP_BRANDS, ENTITLEMENT_KEYS.ERP_CATEGORIES, ENTITLEMENT_KEYS.ERP_PRODUCTS,
+    ENTITLEMENT_KEYS.ERP_SUPPLIERS, ENTITLEMENT_KEYS.ERP_INVENTORY, ENTITLEMENT_KEYS.ERP_WAREHOUSES,
+    ENTITLEMENT_KEYS.ERP_PURCHASES, ENTITLEMENT_KEYS.ERP_PURCHASE_RETURNS,
+  ]
+  if (anyOn(entitlements, erpKeys)) bullets.push('Core ERP')
+
+  const hasOrders = anyOn(entitlements, [ENTITLEMENT_KEYS.SALES_ORDERS, ENTITLEMENT_KEYS.SALES_DELIVERIES])
+  const hasVehicles = anyOn(entitlements, [ENTITLEMENT_KEYS.SALES_VEHICLES, ENTITLEMENT_KEYS.SALES_VEHICLE_STOCK])
+  if (hasOrders) bullets.push(hasVehicles ? 'Orders, Deliveries & Vehicle Tracking' : 'Orders & Deliveries')
+
+  if (anyOn(entitlements, [ENTITLEMENT_KEYS.INVOICE_SALES_INVOICES, ENTITLEMENT_KEYS.INVOICE_SUPPLIER_INVOICES])) {
+    bullets.push('Invoice Management')
+  }
+
+  const hasAdvancedReports = anyOn(entitlements, [
+    ENTITLEMENT_KEYS.REPORT_PROFIT_LOSS, ENTITLEMENT_KEYS.REPORT_CASH_FLOW, ENTITLEMENT_KEYS.REPORT_GST_FILING,
+  ])
+  if (entitlements[ENTITLEMENT_KEYS.FINANCE_REPORTS]) bullets.push(hasAdvancedReports ? 'Advanced Financial Reports' : 'Basic Reports')
+
+  const employeeKeys = [
+    ENTITLEMENT_KEYS.EMPLOYEE_STAFF, ENTITLEMENT_KEYS.EMPLOYEE_ATTENDANCE,
+    ENTITLEMENT_KEYS.EMPLOYEE_LEAVES, ENTITLEMENT_KEYS.EMPLOYEE_ROLES_PERMISSIONS,
+  ]
+  if (anyOn(entitlements, employeeKeys)) bullets.push('Employee Management')
+
+  if (entitlements[ENTITLEMENT_KEYS.NOTIFICATIONS_WHATSAPP_DELIVERY]) bullets.push('WhatsApp Delivery Notifications')
+
+  return bullets
+}
+
+// The compact "1 user · 1 warehouse · 500 orders · 2 GB storage" line shown under a plan card's
+// price - every part is a real configured Plan limit (max_users/max_warehouses/max_orders/
+// max_storage_gb), never a usage figure. A part is omitted (not guessed) when its value is
+// genuinely unknown (undefined).
+export function buildPlanLimitsSummary(plan) {
+  const parts = []
+
+  const usersPart = limitBullet(plan?.max_users, 'user')
+  if (usersPart) parts.push(usersPart)
+
+  const warehousesPart = limitBullet(plan?.max_warehouses, 'warehouse')
+  if (warehousesPart) parts.push(warehousesPart)
+
+  const orders = plan?.max_orders
+  if (orders === null) parts.push('Unlimited orders')
+  else if (typeof orders === 'number') parts.push(`${orders.toLocaleString('en-IN')} orders`)
+
+  const storage = plan?.max_storage_gb
+  if (storage === null) parts.push('Unlimited storage')
+  else if (typeof storage === 'number') parts.push(`${storage} GB storage`)
+
+  return parts.join(' · ')
+}

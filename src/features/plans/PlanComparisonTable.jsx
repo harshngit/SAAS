@@ -1,6 +1,6 @@
-import { Check, Minus } from 'lucide-react'
+import { Check, Database, Minus } from 'lucide-react'
 import Card from '../../components/ui/Card'
-import { ENTITLEMENT_KEYS } from '../../entitlements/entitlementKeys'
+import { ENTITLEMENT_KEYS, formatLimitValue } from '../../entitlements/entitlementKeys'
 
 // Every row reads straight from each plan's own real `entitlements`/`max_*` fields (the same
 // source the backend uses to compute GET /organizations/me/entitlements) - never a hardcoded
@@ -25,12 +25,17 @@ const ROWS = [
   { label: 'Cash Flow', type: 'feature', key: ENTITLEMENT_KEYS.REPORT_CASH_FLOW },
   { label: 'GST Filing', type: 'feature', key: ENTITLEMENT_KEYS.REPORT_GST_FILING },
   { label: 'WhatsApp Delivery Notifications', type: 'feature', key: ENTITLEMENT_KEYS.NOTIFICATIONS_WHATSAPP_DELIVERY },
+  // Icon + its own top border, same treatment the plan cards give their Storage block - visually
+  // sets this row apart as a limit, not another feature checkmark.
+  { label: 'Storage', type: 'limit', key: 'max_storage_gb', unit: 'GB', icon: Database, separator: true },
 ]
 
 function cellValue(plan, row) {
   if (row.type === 'limit') {
     const value = plan[row.key]
-    return value === null || value === undefined ? 'Unlimited' : String(value)
+    const formatted = formatLimitValue(value)
+    // Only a real number gets the unit suffix - "Unlimited"/"—" stay bare.
+    return row.unit && typeof value === 'number' ? `${formatted} ${row.unit}` : formatted
   }
   const entitlements = plan.entitlements || {}
   const isOn = row.anyOf ? row.anyOf.some((key) => entitlements[key]) : Boolean(entitlements[row.key])
@@ -56,8 +61,17 @@ export default function PlanComparisonTable({ plans }) {
           </thead>
           <tbody className="divide-y divide-neutral-50">
             {ROWS.map((row) => (
-              <tr key={row.label}>
-                <td className="px-4 py-2.5 font-medium text-neutral-700">{row.label}</td>
+              <tr key={row.label} className={row.separator ? 'border-t-2 border-neutral-100' : ''}>
+                <td className="px-4 py-2.5 font-medium text-neutral-700">
+                  {row.icon ? (
+                    <span className="flex items-center gap-1.5">
+                      <row.icon className="size-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
+                      {row.label}
+                    </span>
+                  ) : (
+                    row.label
+                  )}
+                </td>
                 {plans.map((plan) => (
                   <td key={plan.id} className="px-4 py-2.5 text-center text-neutral-700">{cellValue(plan, row)}</td>
                 ))}

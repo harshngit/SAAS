@@ -13,16 +13,18 @@ import {
   Search,
   SlidersHorizontal,
   Timer,
+  Trash2,
   X,
 } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import ActionMenu from '../../components/ui/ActionMenu'
-import { listSuperAdminOrganizations } from '../../api/superadmin'
+import { deleteOrganization, listSuperAdminOrganizations } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 
@@ -137,11 +139,38 @@ export default function OrganizationsList() {
   const [selectedIds, setSelectedIds] = useState([])
   const statusFilter = searchParams.get('status') || ''
   const upgradeStatusFilter = searchParams.get('upgrade_status') || ''
+  // Plan/Business Type have no backend query param (confirmed against the live API - only
+  // status/upgrade_status/search/page/page_size are real filters on GET /superadmin/organizations),
+  // so these two are applied client-side over the already-fully-loaded page, same approach the
+  // Created date filter already uses below.
+  const [planFilter, setPlanFilter] = useState('')
+  const [businessTypeFilter, setBusinessTypeFilter] = useState('')
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+
+  // The Filters drawer is a STAGE - nothing above takes effect until "Apply Filters" commits it.
+  // Previously every Select applied instantly while the Apply button did nothing, which is the
+  // inconsistency that made the panel feel broken: it visibly offers a staged "configure, then
+  // Apply" flow but didn't behave like one.
+  const [draftStatus, setDraftStatus] = useState(statusFilter)
+  const [draftUpgradeStatus, setDraftUpgradeStatus] = useState(upgradeStatusFilter)
+  const [draftPlan, setDraftPlan] = useState(planFilter)
+  const [draftBusinessType, setDraftBusinessType] = useState(businessTypeFilter)
+  const [draftDatePreset, setDraftDatePreset] = useState(datePreset)
+  const [draftCustomFrom, setDraftCustomFrom] = useState(customFrom)
+  const [draftCustomTo, setDraftCustomTo] = useState(customTo)
+
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
+
+  // Single-row delete (reuses the same DELETE /superadmin/organizations/{id} OrganizationDetail.jsx
+  // already calls) and bulk delete (no bulk-delete endpoint exists - this loops the same real
+  // single-delete call per selected row and reports partial failures honestly rather than
+  // pretending a bulk endpoint exists).
+  const [deleteTarget, setDeleteTarget] = useState(null) // { ids: string[], names: string[] }
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const setStatusFilter = (value) => {
     setSearchParams((current) => {
@@ -160,6 +189,43 @@ export default function OrganizationsList() {
       return next
     })
   }
+
+  const openFilters = () => {
+    // Re-seed the drafts from the currently ACTIVE filters every time the drawer opens, so
+    // reopening it never shows a stale in-progress edit from a previous open-then-close-without-
+    // applying.
+    setDraftStatus(statusFilter)
+    setDraftUpgradeStatus(upgradeStatusFilter)
+    setDraftPlan(planFilter)
+    setDraftBusinessType(businessTypeFilter)
+    setDraftDatePreset(datePreset)
+    setDraftCustomFrom(customFrom)
+    setDraftCustomTo(customTo)
+    setShowFilters(true)
+  }
+
+  const applyFilters = () => {
+    setStatusFilter(draftStatus)
+    setUpgradeStatusFilter(draftUpgradeStatus)
+    setPlanFilter(draftPlan)
+    setBusinessTypeFilter(draftBusinessType)
+    setDatePreset(draftDatePreset)
+    setCustomFrom(draftCustomFrom)
+    setCustomTo(draftCustomTo)
+    setShowFilters(false)
+  }
+
+  const resetFilters = () => {
+    setDraftStatus('')
+    setDraftUpgradeStatus('')
+    setDraftPlan('')
+    setDraftBusinessType('')
+    setDraftDatePreset('all')
+    setDraftCustomFrom('')
+    setDraftCustomTo('')
+  }
+
+  const activeFilterCount = [statusFilter, upgradeStatusFilter, planFilter, businessTypeFilter, datePreset !== 'all' ? datePreset : ''].filter(Boolean).length
 
   useEffect(() => {
     let isMounted = true
@@ -191,10 +257,29 @@ export default function OrganizationsList() {
     }
   }, [statusFilter, upgradeStatusFilter])
 
+  // Options are derived from whatever is actually loaded - never a guessed/hardcoded list - so a
+  // plan or business type that doesn't currently exist on any organization never appears as a
+  // dead filter option.
+  const planOptions = useMemo(() => {
+    const distinct = Array.from(new Set(organizations.map((organization) => organization.plan).filter((plan) => plan && plan !== 'No plan')))
+    distinct.sort((a, b) => a.localeCompare(b))
+    return [{ value: '', label: 'All plans' }, { value: 'No plan', label: 'No plan' }, ...distinct.map((plan) => ({ value: plan, label: plan }))]
+  }, [organizations])
+
+  const businessTypeOptions = useMemo(() => {
+    const distinct = Array.from(new Set(organizations.map((organization) => organization.businessType).filter((type) => type && type !== '-')))
+    distinct.sort((a, b) => a.localeCompare(b))
+    return [{ value: '', label: 'All business types' }, ...distinct.map((type) => ({ value: type, label: type }))]
+  }, [organizations])
+
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const dateFilteredOrganizations = useMemo(
-    () => organizations.filter((organization) => isWithinDateRange(organization.createdAt, dateFrom, dateTo)),
-    [organizations, dateFrom, dateTo],
+    () =>
+      organizations
+        .filter((organization) => isWithinDateRange(organization.createdAt, dateFrom, dateTo))
+        .filter((organization) => !planFilter || organization.plan === planFilter)
+        .filter((organization) => !businessTypeFilter || organization.businessType === businessTypeFilter),
+    [organizations, dateFrom, dateTo, planFilter, businessTypeFilter],
   )
 
   const visibleOrganizations = useMemo(() => {
@@ -218,7 +303,7 @@ export default function OrganizationsList() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, statusFilter, upgradeStatusFilter, datePreset, customFrom, customTo, rowsPerPage])
+  }, [searchTerm, statusFilter, upgradeStatusFilter, planFilter, businessTypeFilter, datePreset, customFrom, customTo, rowsPerPage])
 
   const stats = useMemo(
     () => ({
@@ -260,6 +345,44 @@ export default function OrganizationsList() {
     }
   }
 
+  const openDeleteConfirm = (rows) => {
+    setDeleteError('')
+    setDeleteTarget({ ids: rows.map((row) => row.id), names: rows.map((row) => row.name) })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+
+    setIsDeleting(true)
+    setDeleteError('')
+
+    const results = await Promise.all(deleteTarget.ids.map((id) => deleteOrganization(id)))
+    const failedIndexes = results.map((result, index) => (result.success ? null : index)).filter((index) => index !== null)
+    const deletedIds = deleteTarget.ids.filter((_, index) => !failedIndexes.includes(index))
+
+    setIsDeleting(false)
+
+    if (deletedIds.length > 0) {
+      setOrganizations((current) => current.filter((organization) => !deletedIds.includes(organization.id)))
+      setSelectedIds((current) => current.filter((id) => !deletedIds.includes(id)))
+    }
+
+    if (failedIndexes.length > 0) {
+      const failedNames = failedIndexes.map((index) => deleteTarget.names[index])
+      const firstError = results.find((result) => !result.success)?.error
+      setDeleteError(
+        deletedIds.length > 0
+          ? `Deleted ${deletedIds.length} of ${deleteTarget.ids.length}. Could not delete ${failedNames.join(', ')}: ${firstError}`
+          : `Could not delete ${failedNames.join(', ')}: ${firstError}`,
+      )
+      // Keep the modal open so the failure (and which orgs are still pending) stays visible.
+      setDeleteTarget((current) => (current ? { ids: deleteTarget.ids.filter((_, index) => failedIndexes.includes(index)), names: failedNames } : current))
+      return
+    }
+
+    setDeleteTarget(null)
+  }
+
   return (
     <div className="listing-page space-y-4">
       <Card className="overflow-hidden p-0">
@@ -287,10 +410,10 @@ export default function OrganizationsList() {
                   variant="outline"
                   size="sm"
                   className="h-9 rounded-xl px-3.5"
-              onClick={() => setShowFilters((value) => !value)}
+              onClick={openFilters}
             >
               <SlidersHorizontal className="size-4" aria-hidden="true" />
-              Filter
+              Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
                 </Button>
                 <Button
               type="button"
@@ -327,14 +450,14 @@ export default function OrganizationsList() {
       {showFilters && createPortal(
         <div className="fixed inset-0 z-[100] flex justify-end bg-slate-950/35 backdrop-blur-[2px]" onClick={() => setShowFilters(false)}>
           <aside
-            className="h-full w-full max-w-sm border-l border-surface-border bg-surface p-6 shadow-[0_24px_70px_-32px_rgb(15_23_42/0.6)]"
+            className="flex h-full w-full max-w-sm flex-col border-l border-surface-border bg-surface shadow-[0_24px_70px_-32px_rgb(15_23_42/0.6)]"
             onClick={(event) => event.stopPropagation()}
             aria-label="Organization filters"
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-surface-border p-6">
               <div>
                 <h2 className="font-(--font-display) text-lg font-semibold tracking-tight text-fg">Filters</h2>
-                <p className="mt-1 text-sm text-fg-muted">Refine organizations by status, upgrade request, and created date.</p>
+                <p className="mt-1 text-sm text-fg-muted">Refine organizations by status, upgrade request, plan, business type and created date.</p>
               </div>
               <button
                 type="button"
@@ -346,37 +469,77 @@ export default function OrganizationsList() {
               </button>
             </div>
 
-            <div className="mt-6 space-y-5">
-              <Select label="Status" options={statusFilterOptions} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
+              <Select label="Status" options={statusFilterOptions} value={draftStatus} onChange={(event) => setDraftStatus(event.target.value)} />
               <Select
                 label="Upgrade request"
                 options={upgradeStatusFilterOptions}
-                value={upgradeStatusFilter}
-                onChange={(event) => setUpgradeStatusFilter(event.target.value)}
+                value={draftUpgradeStatus}
+                onChange={(event) => setDraftUpgradeStatus(event.target.value)}
+              />
+              <Select label="Plan" options={planOptions} value={draftPlan} onChange={(event) => setDraftPlan(event.target.value)} searchable />
+              <Select
+                label="Business type"
+                options={businessTypeOptions}
+                value={draftBusinessType}
+                onChange={(event) => setDraftBusinessType(event.target.value)}
+                searchable
               />
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-fg">Created</label>
                 <DateRangeFilter
-                  preset={datePreset}
-                  onPresetChange={setDatePreset}
-                  customFrom={customFrom}
-                  customTo={customTo}
+                  preset={draftDatePreset}
+                  onPresetChange={setDraftDatePreset}
+                  customFrom={draftCustomFrom}
+                  customTo={draftCustomTo}
                   onCustomChange={({ from, to }) => {
-                    setCustomFrom(from)
-                    setCustomTo(to)
+                    setDraftCustomFrom(from)
+                    setDraftCustomTo(to)
                   }}
                 />
               </div>
             </div>
 
-            <div className="mt-8 flex justify-end">
-              <Button type="button" onClick={() => setShowFilters(false)}>
+            <div className="flex shrink-0 justify-between gap-3 border-t border-surface-border p-6">
+              <Button type="button" variant="secondary" onClick={resetFilters}>
+                Reset
+              </Button>
+              <Button type="button" onClick={applyFilters}>
                 Apply Filters
               </Button>
             </div>
           </aside>
         </div>,
         document.body,
+      )}
+
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary-100 bg-primary-50/60 px-5 py-3">
+          <p className="text-sm font-medium text-primary-900">{selectedIds.length} selected</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => exportOrganizationsCsv(organizations.filter((organization) => selectedIds.includes(organization.id)))}
+            >
+              <Download className="size-4" aria-hidden="true" />
+              Export Selected
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              onClick={() => openDeleteConfirm(organizations.filter((organization) => selectedIds.includes(organization.id)))}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              Delete Selected
+            </Button>
+            <button type="button" onClick={() => setSelectedIds([])} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">
+              Clear
+            </button>
+          </div>
+        </div>
       )}
 
       <Card className="overflow-hidden p-0">
@@ -484,6 +647,12 @@ export default function OrganizationsList() {
                               icon: Download,
                               onClick: () => exportOrganizationsCsv([organization]),
                             },
+                            {
+                              label: 'Delete',
+                              icon: Trash2,
+                              danger: true,
+                              onClick: () => openDeleteConfirm([organization]),
+                            },
                           ]}
                         />
                       </div>
@@ -546,6 +715,51 @@ export default function OrganizationsList() {
           </div>
         )}
       </Card>
+
+      <Modal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => {
+          if (isDeleting) return
+          setDeleteError('')
+          setDeleteTarget(null)
+        }}
+        title={deleteTarget && deleteTarget.ids.length > 1 ? `Delete ${deleteTarget.ids.length} Organizations` : 'Delete Organization'}
+      >
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-neutral-600">
+            {deleteTarget && deleteTarget.ids.length > 1 ? (
+              <>
+                Delete <span className="font-semibold text-neutral-900">{deleteTarget.names.join(', ')}</span>? This permanently removes
+                all of their users, customers, products, and data. This cannot be undone.
+              </>
+            ) : (
+              <>
+                Delete <span className="font-semibold text-neutral-900">{deleteTarget?.names?.[0] || 'this organization'}</span>? This
+                permanently removes all of its users, customers, products, and data. This cannot be undone.
+              </>
+            )}
+          </p>
+          {deleteError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</div>
+          )}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isDeleting}
+              onClick={() => {
+                setDeleteError('')
+                setDeleteTarget(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" loading={isDeleting} onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

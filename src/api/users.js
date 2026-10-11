@@ -383,8 +383,12 @@ export async function listRoles() {
 
 export async function listUsers(params = {}) {
   try {
+    // page_size defaults to the backend's own documented max (100) unless the caller explicitly
+    // paginates - every existing caller (staff roster, salesperson dropdowns, Sidebar, reports
+    // filters) expects the full org roster in one call, same as before this endpoint started
+    // paginating (default page_size is only 10).
     const queryParams = Object.fromEntries(
-      Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+      Object.entries({ page_size: 100, ...params }).filter(([, value]) => value !== undefined && value !== null && value !== ''),
     )
 
     const { data } = await apiClient.get('/users', {
@@ -392,7 +396,11 @@ export async function listUsers(params = {}) {
       params: queryParams,
     })
 
-    return { success: true, users: data }
+    // GET /users now returns a paginated { items, total, page, page_size, total_pages } wrapper
+    // instead of a bare array - read `items`, falling back to a bare array for safety if an
+    // older/different shape is ever returned.
+    const users = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, users, total: data?.total ?? users.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

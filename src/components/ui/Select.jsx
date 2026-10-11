@@ -255,7 +255,13 @@ const Select = forwardRef(function Select(
             // bg-(--modal-bg), not bg-surface: this floating options panel is portaled above
             // everything else on the page, so it must stay solid and readable regardless of
             // image-background mode - same always-solid token Modal.jsx/Tabs.jsx use.
-            className="fixed z-50 overflow-x-hidden overflow-y-auto rounded-xl border border-surface-border bg-(--modal-bg) p-1 text-sm text-fg shadow-popover"
+            // z-[140] (not z-50, Modal.jsx's own backdrop level): a Select used inside a side
+            // drawer/panel built at a higher stacking level (e.g. a filter drawer at z-[100])
+            // would otherwise render this menu BEHIND that drawer's backdrop - invisible and
+            // unclickable, forcing the user to type into the search box with no list to pick
+            // from. Matches the level DatePicker.jsx's own popover already uses for the same
+            // reason, so every floating field control stacks consistently above any modal/drawer.
+            className="fixed z-[140] overflow-x-hidden overflow-y-auto rounded-xl border border-surface-border bg-(--modal-bg) p-1 text-sm text-fg shadow-popover"
           >
             {visibleOptions.length === 0 ? (
               <div className="cursor-default rounded-lg px-3 py-2 text-neutral-400">No matches</div>

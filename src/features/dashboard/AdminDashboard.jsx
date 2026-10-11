@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatCompactCurrency, formatCurrency } from '../../utils/format'
 import { getAdminDashboard } from '../../api/dashboard'
+import { getOrganizationOverview } from '../../api/organizations'
 import { getExpenseCategories } from '../../api/expenses'
 import { cancelOrder, listOrders } from '../../api/orders'
 import { listWarehouses } from '../../api/warehouses'
@@ -18,6 +19,7 @@ import {
   Clock,
   CreditCard,
   Eye,
+  HardDrive,
   IndianRupee,
   PackagePlus,
   Search,
@@ -484,6 +486,12 @@ const DEFAULT_EXPENSE_CATEGORIES = ['Salaries', 'Rent & Utilities', 'Purchase Re
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
+  // Real storage usage DOES exist - GET /organizations/overview returns a `storage` block
+  // ({files, used_mb, used_gb, limit_gb, percent_used}), confirmed against the live backend
+  // schema. An earlier pass only checked for a dedicated storage-usage endpoint by path name and
+  // missed that this data is embedded in the overview response CompanySettings.jsx already uses -
+  // corrected here rather than continuing to show the honest-but-now-wrong "not tracked yet" state.
+  const [storageOverview, setStorageOverview] = useState(null)
   const [datePreset, setDatePreset] = useState('this_month')
   const [customRange, setCustomRange] = useState({ from: '', to: '' })
   // Dashboard scope filters - '' means "all". Applied on the Apply button, sent to GET /dashboard/admin.
@@ -538,6 +546,18 @@ export default function AdminDashboard() {
     loadDashboard(datePreset, customRange)
     // Only refetch when the user explicitly applies a new preset (Apply button) - not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Minimal activity_limit (1) - only the `storage` block is needed here, not recent_activity
+  // (that's the Audit Log page's own job). Fails soft: the Storage Usage card below just omits
+  // the usage figures if this doesn't load, never fabricating a fallback value.
+  useEffect(() => {
+    let isMounted = true
+    getOrganizationOverview(1).then((result) => {
+      if (!isMounted || !result.success) return
+      setStorageOverview(result.overview?.storage || null)
+    })
+    return () => { isMounted = false }
   }, [])
 
   // Filter dropdown option lists (real mode only; demo dashboards aren't scope-filtered).
@@ -1065,6 +1085,39 @@ export default function AdminDashboard() {
                 {formatCompactCurrency(periodSales)} this month · {targetProgress}%
               </p>
             </div>
+
+            {/* Real usage - GET /organizations/overview's `storage` block (files/used_mb/used_gb/
+                limit_gb/percent_used), the same source CompanySettings.jsx's own overview already
+                reads. limit_gb is the backend's own already-resolved effective limit (plan default
+                + any org override), so it's used directly rather than re-deriving it from
+                entitlements here. Renders nothing extra if this hasn't loaded - no fabricated
+                fallback figure. */}
+            {storageOverview && (
+              <div className="mt-3 border-t border-neutral-100 pt-3">
+                <div className="flex items-center justify-between text-[0.7rem] font-medium text-neutral-500">
+                  <span className="flex items-center gap-1.5">
+                    <HardDrive className="size-3.5 text-neutral-400" aria-hidden="true" />
+                    Storage Usage
+                  </span>
+                  <span className="font-semibold text-neutral-800">
+                    {storageOverview.used_gb < 1 ? `${Math.round(storageOverview.used_mb)} MB` : `${storageOverview.used_gb.toFixed(1)} GB`}
+                    {' '}of {storageOverview.limit_gb == null ? 'Unlimited' : `${storageOverview.limit_gb} GB`}
+                  </span>
+                </div>
+                {storageOverview.percent_used != null && (
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-neutral-100">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${storageOverview.percent_used >= 90 ? 'bg-red-500' : storageOverview.percent_used >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`}
+                      style={{ width: `${Math.min(100, storageOverview.percent_used)}%` }}
+                    />
+                  </div>
+                )}
+                <p className="mt-1 text-[0.64rem] text-neutral-400">
+                  {storageOverview.files} file{storageOverview.files === 1 ? '' : 's'}
+                  {storageOverview.percent_used != null && ` · ${storageOverview.percent_used.toFixed(0)}% used`}
+                </p>
+              </div>
+            )}
 
             <button
               type="button"

@@ -16,6 +16,7 @@ import {
   Phone,
   Settings,
   Trash2,
+  Warehouse,
   X,
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
@@ -30,11 +31,13 @@ import {
   approveOrganizationUpgrade,
   deleteOrganization,
   getOrganization,
+  listPlans,
   rejectOrganizationUpgrade,
   updateOrganizationStatus,
 } from '../../api/superadmin'
 import { getSuperAdminSubscriptionPayments } from '../../api/billing'
 import { formatCurrency } from '../../utils/format'
+import { buildPlanSummaryBullets, formatLimitValue } from '../../entitlements/entitlementKeys'
 import OrganizationPlanAccess from './OrganizationPlanAccess'
 
 const PAYMENT_STATUS_VARIANT = { paid: 'success', failed: 'danger', created: 'warning' }
@@ -168,6 +171,12 @@ export default function OrganizationDetail() {
   const [isLoadingPayments, setIsLoadingPayments] = useState(true)
   const [paymentsError, setPaymentsError] = useState('')
 
+  // GET /superadmin/organizations/{id} embeds `plan` loosely (same caveat as the entitlements
+  // endpoint - see OrganizationPlanAccess.jsx's own comment), so the authoritative Super Admin
+  // Plans list is fetched alongside it and used to backfill any limit field the embedded object
+  // doesn't actually carry, rather than ever guessing "missing means unlimited".
+  const [plansById, setPlansById] = useState({})
+
   useEffect(() => {
     let isMounted = true
 
@@ -204,8 +213,15 @@ export default function OrganizationDetail() {
       setPayments(result.payments)
     }
 
+    async function loadPlans() {
+      const result = await listPlans()
+      if (!isMounted || !result.success) return
+      setPlansById(Object.fromEntries(result.plans.map((planRecord) => [planRecord.id, planRecord])))
+    }
+
     load()
     loadPayments()
+    loadPlans()
 
     return () => {
       isMounted = false
@@ -495,23 +511,36 @@ export default function OrganizationDetail() {
 
         <Card className="min-h-[220px]">
           <SectionTitle icon={CreditCard} title="Plan Details" />
-          {organization.plan ? (
-            <div>
-              <DetailRow icon={Building2} label="Users" value={organization.plan.max_users || 'Unlimited'} />
-              <DetailRow icon={CreditCard} label="Orders / month" value={organization.plan.max_orders || 'Unlimited'} />
-              <DetailRow icon={Calendar} label="Billing Cycle" value={titleCase(organization.billing_cycle) || '-'} />
-              {organization.plan.features?.length > 0 && (
-                <ul className="mt-4 space-y-2">
-                  {organization.plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-fg-muted">
-                      <Check className="mt-0.5 size-4 shrink-0 text-primary-600" aria-hidden="true" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ) : (
+          {organization.plan ? (() => {
+            const fullPlan = organization.plan.id ? plansById[organization.plan.id] : undefined
+            const resolveLimit = (limitKey) => {
+              const embedded = organization.plan[limitKey]
+              return embedded !== undefined ? embedded : fullPlan?.[limitKey]
+            }
+            // Base Plan only - this card is deliberately NOT adjusted by organization overrides
+            // (that's "Plan & Access" below). Bullets are generated from the Plan's own
+            // structured entitlements/limits, never the free-text Marketing Features, so this
+            // can never claim a feature the Plan doesn't actually entitle.
+            const bullets = buildPlanSummaryBullets({ ...organization.plan, ...fullPlan })
+            return (
+              <div>
+                <DetailRow icon={Building2} label="Users" value={formatLimitValue(resolveLimit('max_users'))} />
+                <DetailRow icon={Warehouse} label="Warehouses" value={formatLimitValue(resolveLimit('max_warehouses'))} />
+                <DetailRow icon={CreditCard} label="Orders / month" value={formatLimitValue(resolveLimit('max_orders'))} />
+                <DetailRow icon={Calendar} label="Billing Cycle" value={titleCase(organization.billing_cycle) || '-'} />
+                {bullets.length > 0 && (
+                  <ul className="mt-4 space-y-2">
+                    {bullets.map((bullet) => (
+                      <li key={bullet} className="flex items-start gap-2 text-sm text-fg-muted">
+                        <Check className="mt-0.5 size-4 shrink-0 text-primary-600" aria-hidden="true" />
+                        <span>{bullet}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )
+          })() : (
             <div className="flex min-h-[150px] flex-col items-center justify-center rounded-2xl border border-dashed border-surface-border bg-surface-muted/25 px-6 py-7 text-center">
               <CreditCard className="size-8 text-fg-muted" aria-hidden="true" />
               <p className="mt-3 text-sm font-semibold text-fg">No active plan</p>

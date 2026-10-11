@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, CreditCard, Crown, Wallet } from 'lucide-react'
+import { Check, CreditCard, Crown, Database, Wallet } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -10,12 +10,13 @@ import Modal from '../../components/ui/Modal'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/Tabs'
 import { useToast } from '../../components/ui/toastContext'
 import { listActivePlans } from '../../api/plans'
-import { getCurrentOrganizationState, requestPlanUpgrade } from '../../api/organizations'
+import { getCurrentOrganizationState, getOrganizationOverview, requestPlanUpgrade } from '../../api/organizations'
 import { getCurrentProfile } from '../../api/auth'
 import { payForPlan } from './planPayment'
 import PlanComparisonTable from './PlanComparisonTable'
 import { useAuthStore } from '../../store/authStore'
 import { useEntitlements } from '../../entitlements/EntitlementsContext'
+import { buildPlanLimitsSummary, buildPlanSummaryBullets, formatLimitValue } from '../../entitlements/entitlementKeys'
 import { useTheme } from '../../theme/useTheme'
 import { formatCurrency } from '../../utils/format'
 
@@ -25,59 +26,14 @@ function formatDateLabel(value) {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-const getFeatureDescription = (feature) => {
-  const normalizedFeature = feature.toLowerCase()
-
-  if (normalizedFeature.includes('user')) {
-    return normalizedFeature.includes('unlimited')
-      ? 'Invite every team member without seat limits.'
-      : 'Set up the right number of staff accounts for daily work.'
-  }
-
-  if (normalizedFeature.includes('order')) {
-    return normalizedFeature.includes('unlimited')
-      ? 'Keep processing orders as your business grows.'
-      : 'Handle monthly order volume with clear plan limits.'
-  }
-
-  if (normalizedFeature.includes('dashboard')) {
-    return 'Track the most important business activity from one place.'
-  }
-
-  if (normalizedFeature.includes('report')) {
-    return 'Review performance, activity, and business trends faster.'
-  }
-
-  if (normalizedFeature.includes('gst') || normalizedFeature.includes('invoice')) {
-    return 'Create cleaner billing records with tax-ready details.'
-  }
-
-  if (normalizedFeature.includes('support')) {
-    return 'Get help faster when your team needs assistance.'
-  }
-
-  if (normalizedFeature.includes('integration')) {
-    return 'Connect workflows with the tools your business depends on.'
-  }
-
-  if (normalizedFeature.includes('warehouse')) {
-    return 'Manage inventory activity across multiple locations.'
-  }
-
-  if (normalizedFeature.includes('delivery')) {
-    return 'Monitor delivery movement and customer fulfilment status.'
-  }
-
-  if (normalizedFeature.includes('analytics')) {
-    return 'Turn operational data into clearer business decisions.'
-  }
-
-  return 'Included to support smoother day-to-day operations.'
-}
-
 export default function AdminPlans() {
   const navigate = useNavigate()
   const { refreshEntitlements } = useEntitlements()
+  // Real storage usage (used_gb/used_mb/files) - GET /organizations/overview's `storage` block,
+  // the same source CompanySettings.jsx already reads and the Dashboard's Storage Usage card now
+  // reads too. used_gb is one real figure for this org; each card below pairs it with ITS OWN
+  // max_storage_gb to show what the usage percentage would genuinely be on that plan.
+  const [storageOverview, setStorageOverview] = useState(null)
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const [billingCycle, setBillingCycle] = useState('monthly')
   const [plans, setPlans] = useState([])
@@ -110,14 +66,19 @@ export default function AdminPlans() {
       setIsLoading(true)
       setListError('')
 
-      const [organizationResult, plansResult] = await Promise.all([
+      const [organizationResult, plansResult, overviewResult] = await Promise.all([
         getCurrentOrganizationState(),
         listActivePlans(),
+        getOrganizationOverview(1), // activity_limit minimal - only the `storage` block is needed here
       ])
 
       if (!isMounted) return
 
       setIsLoading(false)
+
+      if (overviewResult.success) {
+        setStorageOverview(overviewResult.overview?.storage || null)
+      }
 
       if (organizationResult.success) {
         setOrganizationState(organizationResult.organization)
@@ -295,8 +256,8 @@ export default function AdminPlans() {
       </Modal>
 
       <section className="rounded-2xl border border-surface-border bg-surface p-5 shadow-(--shadow-card)">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-4">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:divide-x lg:divide-neutral-100">
+          <div className="flex min-w-0 items-center gap-4 lg:pr-5">
             <div className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
               <Crown className="size-6" aria-hidden="true" />
             </div>
@@ -323,7 +284,38 @@ export default function AdminPlans() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Real usage - GET /organizations/overview's `storage` block (used_gb/used_mb/files/
+              limit_gb/percent_used, the backend's own already-resolved effective limit). */}
+          <div className="min-w-0 shrink-0 lg:w-56 lg:px-5">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-500">
+              <Database className="size-3.5 shrink-0" aria-hidden="true" />
+              <span>Storage</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-100">
+              {storageOverview?.percent_used != null && (
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${storageOverview.percent_used >= 90 ? 'bg-red-500' : storageOverview.percent_used >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`}
+                  style={{ width: `${Math.min(100, storageOverview.percent_used)}%` }}
+                />
+              )}
+            </div>
+            <div className="mt-1 flex items-center justify-between text-[0.68rem] text-neutral-400">
+              {storageOverview ? (
+                <>
+                  <span>
+                    {storageOverview.used_gb < 1 ? `${Math.round(storageOverview.used_mb)} MB` : `${storageOverview.used_gb.toFixed(1)} GB`} used
+                  </span>
+                  <span className="font-medium text-neutral-600">
+                    {storageOverview.limit_gb == null ? 'Unlimited' : `${storageOverview.limit_gb} GB`}
+                  </span>
+                </>
+              ) : (
+                <span>—</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 lg:ml-auto lg:pl-5">
             <Button variant="outline" size="sm" onClick={() => navigate('/admin/billing-history')}>
               <CreditCard className="size-4" aria-hidden="true" />
               Manage Billing
@@ -415,7 +407,7 @@ export default function AdminPlans() {
                           </h3>
                         </div>
                         <p className={`mt-4 text-sm leading-6 ${isFeatured ? 'text-white/70' : 'text-neutral-500'}`}>
-                          {plan.features?.[0] || `per ${cycleLabel}`}
+                          per {cycleLabel}
                         </p>
                       </div>
                       {isCurrent && <Badge variant="primary">Active</Badge>}
@@ -423,9 +415,12 @@ export default function AdminPlans() {
                     </div>
 
                     <ul className="mt-7 flex-1 space-y-3.5">
-                      {(plan.features || []).map((feature) => (
+                      {/* Generated from the Plan's actual structured entitlements/limits, never
+                          the free-text Marketing Features - a card can never claim a feature the
+                          Plan doesn't really entitle (see entitlementKeys.js buildPlanSummaryBullets). */}
+                      {buildPlanSummaryBullets(plan).map((bullet) => (
                         <li
-                          key={feature}
+                          key={bullet}
                           className={`flex items-start gap-3 rounded-2xl px-0 py-1 text-sm transition-colors duration-200 ${
                             isFeatured ? 'text-white/85 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'
                           }`}
@@ -442,17 +437,49 @@ export default function AdminPlans() {
                               aria-hidden="true"
                             />
                           </span>
-                          <span className="min-w-0">
-                            <span className={`block font-medium ${isFeatured ? 'text-white' : 'text-neutral-800'}`}>
-                              {feature}
-                            </span>
-                            <span className={`mt-1 block text-xs leading-5 ${isFeatured ? 'text-white/62' : 'text-neutral-500'}`}>
-                              {getFeatureDescription(feature)}
-                            </span>
+                          <span className={`min-w-0 font-medium ${isFeatured ? 'text-white' : 'text-neutral-800'}`}>
+                            {bullet}
                           </span>
                         </li>
                       ))}
                     </ul>
+
+                    {/* Real usage (storageOverview.used_gb, same org-wide figure on every card)
+                        paired with THIS card's own max_storage_gb - what the usage percentage
+                        would genuinely be if this plan were active, never a fabricated number. */}
+                    {(() => {
+                      const usedGb = storageOverview?.used_gb
+                      const cardLimitGb = plan.max_storage_gb
+                      const percent = usedGb != null && typeof cardLimitGb === 'number' && cardLimitGb > 0
+                        ? Math.min(100, (usedGb / cardLimitGb) * 100)
+                        : null
+                      return (
+                        <div className={`mt-5 rounded-xl border px-3.5 py-3 ${isFeatured ? 'border-white/15 bg-white/5' : 'border-neutral-100 bg-neutral-50'}`}>
+                          <div className="flex items-center justify-between gap-2 text-xs font-medium">
+                            <span className={`flex items-center gap-1.5 ${isFeatured ? 'text-white/80' : 'text-neutral-600'}`}>
+                              <Database className="size-3.5" aria-hidden="true" />
+                              Storage
+                            </span>
+                            <span className={isFeatured ? 'text-white' : 'text-neutral-900'}>
+                              {cardLimitGb === undefined ? '—' : cardLimitGb === null ? 'Unlimited' : `${formatLimitValue(cardLimitGb)} GB`}
+                            </span>
+                          </div>
+                          <div className={`mt-2 h-1.5 overflow-hidden rounded-full ${isFeatured ? 'bg-white/10' : 'bg-neutral-200'}`}>
+                            {percent != null && (
+                              <div
+                                className={`h-full rounded-full ${isFeatured ? 'bg-white/70' : percent >= 90 ? 'bg-red-500' : percent >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`}
+                                style={{ width: `${percent}%` }}
+                              />
+                            )}
+                          </div>
+                          <p className={`mt-1.5 text-[0.65rem] ${isFeatured ? 'text-white/50' : 'text-neutral-400'}`}>
+                            {usedGb == null
+                              ? 'Usage tracking isn’t available yet.'
+                              : `${usedGb < 1 ? `${Math.round(storageOverview.used_mb)} MB` : `${usedGb.toFixed(1)} GB`} used${percent != null ? ` (${percent.toFixed(0)}%)` : ''}`}
+                          </p>
+                        </div>
+                      )
+                    })()}
 
                     <div className={`mt-8 border-t pt-6 ${isFeatured ? 'border-white/15' : 'border-neutral-100'}`}>
                       <div>
@@ -467,6 +494,11 @@ export default function AdminPlans() {
                         <p className={`mt-1 text-xs ${isFeatured ? 'text-white/65' : 'text-neutral-500'}`}>
                           per {cycleLabel}
                         </p>
+                        {buildPlanLimitsSummary(plan) && (
+                          <p className={`mt-2 text-xs ${isFeatured ? 'text-white/55' : 'text-neutral-400'}`}>
+                            {buildPlanLimitsSummary(plan)}
+                          </p>
+                        )}
                       </div>
 
                       {!isCurrent && !onlinePaymentUnavailable && (

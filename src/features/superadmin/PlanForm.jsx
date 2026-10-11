@@ -45,6 +45,7 @@ function buildFormState(plan) {
     max_users: plan?.max_users ?? '',
     max_warehouses: plan?.max_warehouses ?? '',
     max_orders: plan?.max_orders ?? '',
+    max_storage_gb: plan?.max_storage_gb ?? '',
     features: featuresToText(plan?.features),
     entitlements: buildEntitlementsState(plan?.entitlements),
     is_default: Boolean(plan?.is_default),
@@ -122,6 +123,7 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
       max_users: toNullableNumber(formData.max_users),
       max_warehouses: toNullableNumber(formData.max_warehouses),
       max_orders: toNullableNumber(formData.max_orders),
+      max_storage_gb: toNullableNumber(formData.max_storage_gb),
       features: featuresFromText(formData.features),
       entitlements: formData.entitlements,
       is_default: formData.is_default,
@@ -142,6 +144,7 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
       max_users: plan.max_users ?? null,
       max_warehouses: plan.max_warehouses ?? null,
       max_orders: plan.max_orders ?? null,
+      max_storage_gb: plan.max_storage_gb ?? null,
       features: Array.isArray(plan.features) ? plan.features : [],
       entitlements: buildEntitlementsState(plan.entitlements),
       is_default: Boolean(plan.is_default),
@@ -155,14 +158,29 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={plan ? `Edit ${plan.name}` : 'Create Plan'} size="2xl">
-      <form onSubmit={handleSubmit} className="space-y-5">
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={plan ? `Edit ${plan.name}` : 'Create Plan'}
+      className="max-w-5xl"
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={handleClose} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button type="submit" form="plan-form" loading={isSubmitting}>
+            {plan ? 'Save Changes' : 'Create Plan'}
+          </Button>
+        </>
+      }
+    >
+      <form id="plan-form" onSubmit={handleSubmit} className="space-y-5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">General</p>
           <div className="mt-3 space-y-4">
             <Input label="Plan Name" value={formData.name} onChange={handleChange('name')} required />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <Input label="Price / month" type="number" min="0" step="1" value={formData.price_monthly} onChange={handleChange('price_monthly')} required />
               <Input label="Price / year" type="number" min="0" step="1" value={formData.price_yearly} onChange={handleChange('price_yearly')} required />
               <Input label="Original price / month" type="number" min="0" step="1" value={formData.original_price_monthly} onChange={handleChange('original_price_monthly')} />
@@ -187,10 +205,11 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Limits</p>
           <p className="mt-0.5 text-xs text-neutral-500">Leave blank for unlimited.</p>
-          <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Input label="Max Users" type="number" min="0" placeholder="Unlimited" value={formData.max_users} onChange={handleChange('max_users')} />
             <Input label="Max Warehouses" type="number" min="0" placeholder="Unlimited" value={formData.max_warehouses} onChange={handleChange('max_warehouses')} />
             <Input label="Max Orders" type="number" min="0" placeholder="Unlimited" value={formData.max_orders} onChange={handleChange('max_orders')} />
+            <Input label="Max Storage (GB)" type="number" min="0" placeholder="Unlimited" value={formData.max_storage_gb} onChange={handleChange('max_storage_gb')} />
           </div>
         </div>
 
@@ -207,7 +226,7 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
                       {allOn ? 'Clear all' : 'Enable all'}
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {group.keys.map((key) => (
                       <label key={key} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50">
                         <input
@@ -237,15 +256,6 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
         </p>
 
         {submitError && <p className="text-sm text-red-600">{submitError}</p>}
-
-        <div className="flex justify-end gap-3 border-t border-neutral-100 pt-4">
-          <Button type="button" variant="secondary" onClick={handleClose} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button type="submit" loading={isSubmitting}>
-            {plan ? 'Save Changes' : 'Create Plan'}
-          </Button>
-        </div>
       </form>
     </Modal>
   )

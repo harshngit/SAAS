@@ -16,7 +16,13 @@ import {
   upsertFeatureOverride,
   upsertLimitOverride,
 } from '../../api/entitlements'
-import { ENTITLEMENT_GROUPS, LIMIT_KEYS, entitlementLabel, limitLabel } from '../../entitlements/entitlementKeys'
+import { listPlans } from '../../api/superadmin'
+import { ENTITLEMENT_GROUPS, LIMIT_KEYS, entitlementLabel, formatLimitValue, limitLabel } from '../../entitlements/entitlementKeys'
+
+// Only these 3 are real, editable Plan limits surfaced anywhere in this UI today (PlanForm.jsx's
+// own Limits section) - max_storage_gb is deliberately excluded, storage usage/limits are out of
+// scope for this pass.
+const DISPLAYED_LIMIT_KEYS = [LIMIT_KEYS.MAX_USERS, LIMIT_KEYS.MAX_WAREHOUSES, LIMIT_KEYS.MAX_ORDERS]
 
 function formatDate(value) {
   if (!value) return '—'
@@ -36,11 +42,19 @@ const LIMIT_KEY_OPTIONS = Object.values(LIMIT_KEYS).map((key) => ({ value: key, 
 // `features`/`limits` ARE the effective values).
 export default function OrganizationPlanAccess({ orgId }) {
   const [data, setData] = useState(null)
+  // GET /superadmin/organizations/{org_id}/entitlements embeds `plan` as a loosely-typed object
+  // (OrganizationAdminEntitlementsOut.plan has no declared sub-schema in the backend's own
+  // OpenAPI spec) - its max_users/max_warehouses/max_orders can't be trusted to always be
+  // present. The real Super Admin Plans list (GET /superadmin/plans, already used by
+  // PlanForm.jsx/SubscriptionPlans.jsx) is the one place these fields are formally typed and
+  // guaranteed, so it's fetched here too and used to backfill whatever `data.plan` is missing -
+  // this is what fixed "Plan Default: Unlimited" actually showing the real configured value.
+  const [plansById, setPlansById] = useState({})
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
 
-  const [editTarget, setEditTarget] = useState(null) // { kind: 'feature' | 'limit', existing? }
+  const [editTarget, setEditTarget] = useState(null) // { kind: 'feature' | 'limit', existing?, presetKey? }
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
@@ -53,13 +67,16 @@ export default function OrganizationPlanAccess({ orgId }) {
   const load = async () => {
     setIsLoading(true)
     setLoadError('')
-    const result = await getOrganizationEntitlementsAdmin(orgId)
+    const [entitlementsResult, plansResult] = await Promise.all([getOrganizationEntitlementsAdmin(orgId), listPlans()])
     setIsLoading(false)
-    if (!result.success) {
-      setLoadError(result.error)
+    if (!entitlementsResult.success) {
+      setLoadError(entitlementsResult.error)
       return
     }
-    setData(result.entitlements)
+    setData(entitlementsResult.entitlements)
+    if (plansResult.success) {
+      setPlansById(Object.fromEntries(plansResult.plans.map((planRecord) => [planRecord.id, planRecord])))
+    }
   }
 
   useEffect(() => {
@@ -107,9 +124,19 @@ export default function OrganizationPlanAccess({ orgId }) {
   }
 
   const plan = data.plan
-  const planEntitlements = plan?.entitlements || {}
+  const fullPlan = plan?.id ? plansById[plan.id] : undefined
+  const planEntitlements = plan?.entitlements || fullPlan?.entitlements || {}
   const featureOverrides = data.feature_overrides || []
   const limitOverrides = data.limit_overrides || []
+
+  // The embedded `plan` value wins when it genuinely has the field; only falls through to the
+  // full Plan record when that field is actually absent (undefined) - never when it's a real 0
+  // or a real null (confirmed-unlimited).
+  const resolvePlanDefault = (limitKey) => {
+    const embedded = plan?.[limitKey]
+    if (embedded !== undefined) return embedded
+    return fullPlan?.[limitKey]
+  }
 
   return (
     <div className="space-y-4">
@@ -202,52 +229,62 @@ export default function OrganizationPlanAccess({ orgId }) {
       <Card
         title="Limit Overrides"
         subtitle="A custom numeric limit for this organization only - overrides the plan default."
-        actions={
-          <Button size="sm" variant="outline" onClick={() => { setSaveError(''); setEditTarget({ kind: 'limit' }) }}>
-            <Plus className="size-4" aria-hidden="true" />
-            Add Override
-          </Button>
-        }
       >
-        {limitOverrides.length === 0 ? (
-          <p className="py-4 text-center text-sm text-neutral-400">No limit overrides configured - every limit follows its plan default.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-neutral-100">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                  <th className="px-4 py-2.5">Limit</th>
-                  <th className="px-4 py-2.5">Plan Default</th>
-                  <th className="px-4 py-2.5">Override</th>
-                  <th className="px-4 py-2.5">Effective</th>
-                  <th className="px-4 py-2.5">Expiry</th>
-                  <th className="px-4 py-2.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-50">
-                {limitOverrides.map((override) => {
-                  const planDefault = plan?.[override.limit_key]
-                  const effective = data.limits?.[override.limit_key]
-                  return (
-                    <tr key={override.id}>
-                      <td className="px-4 py-2.5 font-medium text-neutral-900">{limitLabel(override.limit_key)}</td>
-                      <td className="px-4 py-2.5 text-neutral-600">{planDefault ?? 'Unlimited'}</td>
-                      <td className="px-4 py-2.5">{override.is_active ? <Badge variant="primary">{override.value ?? 'Unlimited'}</Badge> : <Badge variant="neutral">Expired</Badge>}</td>
-                      <td className="px-4 py-2.5 font-semibold text-neutral-900">{effective ?? 'Unlimited'}</td>
-                      <td className="px-4 py-2.5 text-neutral-600">{override.expires_at ? formatDate(override.expires_at) : '—'}</td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex justify-end gap-2">
-                          <button type="button" onClick={() => { setSaveError(''); setEditTarget({ kind: 'limit', existing: override }) }} className="text-xs font-medium text-primary-600 hover:underline">Edit</button>
-                          <button type="button" onClick={() => setResetTarget({ kind: 'limit', key: override.limit_key, label: limitLabel(override.limit_key) })} className="text-xs font-medium text-neutral-500 hover:text-red-600 hover:underline">Reset</button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="overflow-x-auto rounded-xl border border-neutral-100">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <th className="px-4 py-2.5">Limit</th>
+                <th className="px-4 py-2.5">Plan Default</th>
+                <th className="px-4 py-2.5">Override</th>
+                <th className="px-4 py-2.5">Effective</th>
+                <th className="px-4 py-2.5">Expiry</th>
+                <th className="px-4 py-2.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-50">
+              {/* Every known limit always gets a row, active override or not - a reset override
+                  must keep showing its (now-default) effective value rather than the row simply
+                  vanishing, which would read as a stale/missing state. */}
+              {DISPLAYED_LIMIT_KEYS.map((limitKey) => {
+                const override = limitOverrides.find((item) => item.limit_key === limitKey && item.is_active)
+                const planDefaultValue = resolvePlanDefault(limitKey)
+                const effectiveValue = data.limits?.[limitKey]
+                return (
+                  <tr key={limitKey}>
+                    <td className="px-4 py-2.5 font-medium text-neutral-900">{limitLabel(limitKey)}</td>
+                    <td className="px-4 py-2.5 text-neutral-600">{formatLimitValue(planDefaultValue)}</td>
+                    <td className="px-4 py-2.5">
+                      {override ? <Badge variant="primary">{formatLimitValue(override.value)}</Badge> : <Badge variant="neutral">Default</Badge>}
+                    </td>
+                    <td className="px-4 py-2.5 font-semibold text-neutral-900">{formatLimitValue(effectiveValue)}</td>
+                    <td className="px-4 py-2.5 text-neutral-600">{override?.expires_at ? formatDate(override.expires_at) : '—'}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setSaveError(''); setEditTarget({ kind: 'limit', existing: override || null, presetKey: limitKey }) }}
+                          className="text-xs font-medium text-primary-600 hover:underline"
+                        >
+                          {override ? 'Edit' : 'Set Override'}
+                        </button>
+                        {override && (
+                          <button
+                            type="button"
+                            onClick={() => setResetTarget({ kind: 'limit', key: limitKey, label: limitLabel(limitKey) })}
+                            className="text-xs font-medium text-neutral-500 hover:text-red-600 hover:underline"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       <OverrideEditorModal
@@ -304,7 +341,7 @@ function OverrideEditorModal({ target, orgId, isSaving, saveError, onClose, onSa
 
   useEffect(() => {
     if (!target) return
-    setKey(isFeature ? existing?.entitlement_key || '' : existing?.limit_key || '')
+    setKey(target.presetKey || (isFeature ? existing?.entitlement_key || '' : existing?.limit_key || ''))
     setEffect(existing?.effect || 'ALLOW')
     setLimitValue(existing?.value ?? '')
     setIsUnlimited(Boolean(existing) && existing.value === null)
@@ -342,14 +379,14 @@ function OverrideEditorModal({ target, orgId, isSaving, saveError, onClose, onSa
   }
 
   return (
-    <Modal isOpen={Boolean(target)} onClose={() => !isSaving && onClose()} title={existing ? 'Edit Override' : `Add ${isFeature ? 'Feature' : 'Limit'} Override`}>
+    <Modal isOpen={Boolean(target)} onClose={() => !isSaving && onClose()} title={existing ? 'Edit Override' : `${target?.presetKey ? 'Set' : 'Add'} ${isFeature ? 'Feature' : 'Limit'} Override`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Select
           label={isFeature ? 'Feature' : 'Limit'}
           options={[{ value: '', label: 'Select...' }, ...(isFeature ? FEATURE_KEY_OPTIONS : LIMIT_KEY_OPTIONS)]}
           value={key}
           onChange={(event) => setKey(event.target.value)}
-          disabled={Boolean(existing)}
+          disabled={Boolean(existing) || Boolean(target?.presetKey)}
           searchable
         />
 
