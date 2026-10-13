@@ -5,8 +5,6 @@ import { ENTITLEMENT_KEYS, formatLimitValue } from '../../entitlements/entitleme
 // Every row reads straight from each plan's own real `entitlements`/`max_*` fields (the same
 // source the backend uses to compute GET /organizations/me/entitlements) - never a hardcoded
 // per-plan-name guess, so this can never drift from what a plan is actually configured to allow.
-// Balance Sheet is deliberately NOT a row here - there is still no real backend report for it
-// (see BalanceSheet.jsx), so no plan can honestly be marked as including it.
 const ROWS = [
   { label: 'Users', type: 'limit', key: 'max_users' },
   { label: 'Warehouses', type: 'limit', key: 'max_warehouses' },
@@ -24,6 +22,7 @@ const ROWS = [
   { label: 'Profit & Loss', type: 'feature', key: ENTITLEMENT_KEYS.REPORT_PROFIT_LOSS },
   { label: 'Cash Flow', type: 'feature', key: ENTITLEMENT_KEYS.REPORT_CASH_FLOW },
   { label: 'GST Filing', type: 'feature', key: ENTITLEMENT_KEYS.REPORT_GST_FILING },
+  { label: 'Balance Sheet', type: 'feature', key: ENTITLEMENT_KEYS.REPORT_BALANCE_SHEET },
   { label: 'WhatsApp Delivery Notifications', type: 'feature', key: ENTITLEMENT_KEYS.NOTIFICATIONS_WHATSAPP_DELIVERY },
   // Icon + its own top border, same treatment the plan cards give their Storage block - visually
   // sets this row apart as a limit, not another feature checkmark.

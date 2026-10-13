@@ -75,6 +75,59 @@ export async function getReport(type, filters = {}) {
   }
 }
 
+// Exports exactly ONE row, confirmed via the live backend contract: GET /reports/{type}/export/{row_id}.
+// Takes the same filters the visible report/full-export use (minus page/page_size), since the
+// row-export endpoint shares the same query-param surface - the row_id alone does not uniquely
+// resolve a row if filters (e.g. date_from/date_to) have moved on since the row was fetched.
+export async function exportReportRow(type, rowId, filters = {}, format = 'pdf') {
+  if (DEMO_MODE) {
+    return { success: false, error: 'Row export is disabled in demo mode.', demoUnavailable: true }
+  }
+
+  try {
+    const response = await apiClient.get(`/reports/${type}/export/${encodeURIComponent(rowId)}`, {
+      headers: authHeader(),
+      params: { ...buildReportParams(filters), format },
+      responseType: 'blob',
+    })
+
+    const fallbackExt = format === 'excel' ? 'xlsx' : 'pdf'
+    const filename = filenameFromContentDisposition(
+      response.headers?.['content-disposition'],
+      `${type}-row.${fallbackExt}`,
+    )
+
+    const blob = new Blob([response.data])
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+
+    return { success: true }
+  } catch (error) {
+    let errorData = error.response?.data
+
+    if (errorData instanceof Blob) {
+      try {
+        errorData = JSON.parse(await errorData.text())
+      } catch {
+        errorData = null
+      }
+    }
+
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to export this row. Please try again.',
+    )
+
+    return { success: false, error: message, status: error.response?.status }
+  }
+}
+
 function filenameFromContentDisposition(headerValue, fallback) {
   if (!headerValue) return fallback
   const utf8Match = headerValue.match(/filename\*=UTF-8''([^;]+)/i)

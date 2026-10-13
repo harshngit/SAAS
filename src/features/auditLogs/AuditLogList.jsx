@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   CheckCircle2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleUserRound,
@@ -52,6 +51,12 @@ const ACTION_COLOR_BY_TYPE = {
   document: 'text-amber-600 bg-amber-50',
   employee: 'text-green-600 bg-green-50',
 }
+
+const ROWS_PER_PAGE_OPTIONS = [
+  { value: '25', label: '25' },
+  { value: '50', label: '50' },
+  { value: '100', label: '100' },
+]
 
 const TYPE_LABEL = {
   company_profile: 'Company Profile',
@@ -378,18 +383,13 @@ export default function AuditLogList() {
               <span className="hidden h-4 w-px bg-surface-border sm:block" aria-hidden="true" />
               <label className="flex items-center gap-3">
                 <span>Rows per page</span>
-                <span className="relative">
-                  <select
-                    value={rowsPerPage}
-                    onChange={(event) => setRowsPerPage(Number(event.target.value))}
-                    className="h-10 appearance-none rounded-full border border-surface-border bg-surface py-0 pl-5 pr-10 text-sm font-medium text-fg shadow-(--shadow-xs) outline-none transition-all focus:border-primary-400 focus:ring-4 focus:ring-primary-500/12"
-                  >
-                    {[25, 50, 100].map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" aria-hidden="true" />
-                </span>
+                <Select
+                  options={ROWS_PER_PAGE_OPTIONS}
+                  value={String(rowsPerPage)}
+                  onChange={(event) => setRowsPerPage(Number(event.target.value))}
+                  triggerClassName="h-8 bg-surface py-1 text-xs"
+                  className="w-20"
+                />
               </label>
             </div>
             <div className="flex items-center gap-4 sm:justify-end">

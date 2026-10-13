@@ -216,8 +216,11 @@ function normalizeLead(lead) {
 export async function listLeads(params = {}) {
   try {
     // All filters are optional & additive (crm_changes Phase 1 §11-12). Existing callers
-    // that pass nothing keep working; the backend default limit is 100.
-    const queryParams = {}
+    // that pass nothing keep working; page_size defaults to the backend's own documented max
+    // (100) since every existing caller expects the full matching set in one call (GET /leads
+    // now returns a paginated { items, total, page, page_size, total_pages } wrapper, default
+    // page_size 10, not the bare array / limit-offset shape this was originally written against).
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.status) queryParams.status = params.status
     if (params.search) queryParams.search = params.search
     if (params.leadSource || params.lead_source) queryParams.lead_source = params.leadSource || params.lead_source
@@ -226,16 +229,14 @@ export async function listLeads(params = {}) {
     }
     if (params.createdFrom || params.created_from) queryParams.created_from = params.createdFrom || params.created_from
     if (params.createdTo || params.created_to) queryParams.created_to = params.createdTo || params.created_to
-    if (params.limit != null) queryParams.limit = params.limit
-    if (params.offset != null) queryParams.offset = params.offset
 
     const { data } = await apiClient.get('/leads', {
       headers: authHeader(),
       params: queryParams,
     })
 
-    const leads = Array.isArray(data) ? data : data?.leads || []
-    return { success: true, leads: leads.map(normalizeLead) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, leads: rows.map(normalizeLead), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

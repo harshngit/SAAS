@@ -242,7 +242,7 @@ export async function listInvoices(params = {}) {
   }
 
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.customer_id) queryParams.customer_id = params.customer_id
     if (params.status) queryParams.status = params.status
     if (params.order_id) queryParams.order_id = params.order_id
@@ -252,8 +252,8 @@ export async function listInvoices(params = {}) {
       params: queryParams,
     })
 
-    const invoices = Array.isArray(data) ? data : data?.invoices || []
-    return { success: true, invoices: invoices.map(normalizeInvoice) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, invoices: rows.map(normalizeInvoice), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

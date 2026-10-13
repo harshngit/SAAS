@@ -1,5 +1,6 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { handleStorageLimitError } from '../components/ui/storageLimitContext'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -445,6 +446,10 @@ export async function uploadPurchaseDocument(purchaseId, file) {
 
     return { success: true, document: data }
   } catch (error) {
+    if (handleStorageLimitError(error)) {
+      return { success: false, error: 'Storage limit reached.', code: 'PLAN_STORAGE_LIMIT_REACHED' }
+    }
+
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,

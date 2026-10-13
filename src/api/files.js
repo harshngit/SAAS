@@ -1,5 +1,6 @@
 import { useAuthStore } from '../store/authStore'
 import { API_BASE_URL, apiClient } from './client'
+import { handleStorageLimitError } from '../components/ui/storageLimitContext'
 
 function isAbsoluteUrl(value) {
   return /^https?:\/\//i.test(String(value || '').trim())
@@ -103,6 +104,13 @@ export async function uploadFile(file) {
       },
     }
   } catch (error) {
+    // Single central check for every upload call site (logos, documents, product images,
+    // receipts, POD, theme backgrounds, ...) - they all go through this one function, so the
+    // shared storage-limit modal fires from here rather than being re-implemented per component.
+    if (handleStorageLimitError(error)) {
+      return { success: false, error: 'Storage limit reached.', code: 'PLAN_STORAGE_LIMIT_REACHED' }
+    }
+
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,

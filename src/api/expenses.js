@@ -1,5 +1,6 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { handleStorageLimitError } from '../components/ui/storageLimitContext'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -126,7 +127,7 @@ export async function getExpenseCategories() {
 
 export async function listExpenses(params = {}) {
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.category) queryParams.category = params.category
     if (params.status) queryParams.status = toExpenseStatusParam(params.status)
     if (params.submitted_by) queryParams.submitted_by = params.submitted_by
@@ -136,8 +137,8 @@ export async function listExpenses(params = {}) {
       params: queryParams,
     })
 
-    const expenses = Array.isArray(data) ? data : data?.expenses || []
-    return { success: true, expenses: expenses.map(normalizeExpense) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, expenses: rows.map(normalizeExpense), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
@@ -217,6 +218,10 @@ export async function uploadExpenseReceipt(expenseId, file) {
 
     return { success: true, expense: normalizeExpense(data) }
   } catch (error) {
+    if (handleStorageLimitError(error)) {
+      return { success: false, error: 'Storage limit reached.', code: 'PLAN_STORAGE_LIMIT_REACHED' }
+    }
+
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,

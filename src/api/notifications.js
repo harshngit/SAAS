@@ -55,11 +55,11 @@ export async function listNotifications(unreadOnly = false) {
   try {
     const { data } = await apiClient.get('/notifications', {
       headers: authHeader(),
-      params: unreadOnly ? { unread_only: true } : undefined,
+      params: { page_size: 100, ...(unreadOnly ? { unread_only: true } : {}) },
     })
 
-    const notifications = Array.isArray(data) ? data : data?.notifications || []
-    return { success: true, notifications: notifications.map(normalizeNotification) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, notifications: rows.map(normalizeNotification), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

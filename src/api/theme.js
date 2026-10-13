@@ -1,6 +1,7 @@
 import { apiClient } from './client'
 import { useAuthStore } from '../store/authStore'
 import { getFileUrl } from './files'
+import { handleStorageLimitError } from '../components/ui/storageLimitContext'
 
 // Organization theme / appearance - "Organization Theme / Appearance API - Current Contract"
 // (the older fonts/card-style/theme-logo/admin-only-GET sections are gone; do not resurrect them).
@@ -117,6 +118,10 @@ export async function uploadThemeBackground(file) {
     const url = data?.url || data?.background?.url || data?.theme?.background?.url || ''
     return { success: true, url: getFileUrl(url) }
   } catch (error) {
+    if (handleStorageLimitError(error)) {
+      return { success: false, error: 'Storage limit reached.', code: 'PLAN_STORAGE_LIMIT_REACHED' }
+    }
+
     const errorData = error.response?.data
     return {
       success: false,

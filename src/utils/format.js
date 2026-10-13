@@ -58,3 +58,32 @@ export function formatDateTime(value) {
   if (Number.isNaN(date.getTime())) return value
   return `${dateFormatter.format(date)} · ${timeFormatter.format(date)}`
 }
+
+const KIB = 1024
+const MIB = KIB * 1024
+const GIB = MIB * 1024
+
+// Strips a trailing ".0"/".00" instead of showing it - 2147483648 bytes reads as "2 GB", not
+// "2.00 GB", while 350000000 still reads as "334 MB" (1 decimal below 10 units, none above).
+function trimDecimal(value, decimals) {
+  return parseFloat(value.toFixed(decimals)).toString()
+}
+
+// Binary (1024-based) byte formatting - the storage backend's own stated convention
+// (1 GB = 1024^3 bytes), used consistently everywhere storage is shown. Never NaN/undefined/
+// Infinity: any non-finite or missing input returns "—" instead.
+export function formatBytes(bytes) {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes < 0) return '—'
+  if (bytes === 0) return '0 B'
+  if (bytes < KIB) return `${bytes} B`
+  if (bytes < MIB) return `${trimDecimal(bytes / KIB, 1)} KB`
+  if (bytes < GIB) return `${trimDecimal(bytes / MIB, bytes / MIB >= 10 ? 0 : 1)} MB`
+  return `${trimDecimal(bytes / GIB, bytes / GIB >= 10 ? 1 : 2)} GB`
+}
+
+// null when the value is missing/non-finite (e.g. unlimited storage, where the backend sends
+// percentage_used: null) - callers render nothing rather than ever showing "NaN%"/"Infinity%".
+export function formatStoragePercent(value) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null
+  return `${Math.round(value)}%`
+}

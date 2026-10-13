@@ -398,7 +398,11 @@ export async function updateCustomer(customerId, payload) {
 
 export async function listCustomers(params = {}) {
   try {
-    const queryParams = {}
+    // page_size defaults to the backend's own documented max (100) unless the caller explicitly
+    // paginates - CustomerList.jsx does its own client-side search/filter/pagination over the
+    // full result set (same model it used before this endpoint started paginating), so this
+    // keeps that working rather than silently truncating to the backend's own default of 10.
+    const queryParams = { page_size: params.page_size || 100 }
 
     if (params.search) queryParams.search = params.search
     if (params.category) queryParams.category = params.category
@@ -414,7 +418,10 @@ export async function listCustomers(params = {}) {
       params: queryParams,
     })
 
-    return { success: true, customers: Array.isArray(data) ? data : data?.customers || [] }
+    // GET /customers now returns a paginated { items, total, page, page_size, total_pages }
+    // wrapper instead of a bare array - read `items`, falling back to a bare array for safety.
+    const customers = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, customers, total: data?.total ?? customers.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

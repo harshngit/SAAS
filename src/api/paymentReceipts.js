@@ -103,7 +103,7 @@ export async function listPaymentReceipts(params = {}) {
   }
 
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.customer_id) queryParams.customer_id = params.customer_id
     if (params.invoice_id) queryParams.invoice_id = params.invoice_id
 
@@ -112,8 +112,8 @@ export async function listPaymentReceipts(params = {}) {
       params: queryParams,
     })
 
-    const receipts = Array.isArray(data) ? data : data?.receipts || []
-    return { success: true, receipts: receipts.map(normalizeReceipt) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, receipts: rows.map(normalizeReceipt), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

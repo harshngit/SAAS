@@ -121,10 +121,11 @@ export async function getMyLeaves() {
   try {
     const { data } = await apiClient.get('/leaves/me', {
       headers: authHeader(),
+      params: { page_size: 100 },
     })
 
-    const leaves = Array.isArray(data) ? data : data?.leaves || []
-    return { success: true, leaves: leaves.map(normalizeLeave) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, leaves: rows.map(normalizeLeave), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
@@ -138,7 +139,7 @@ export async function getMyLeaves() {
 
 export async function listLeaves(params = {}) {
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.userId || params.user_id) queryParams.user_id = params.userId || params.user_id
     if (params.status) queryParams.status = params.status
     if (params.leaveType || params.leave_type) queryParams.leave_type = params.leaveType || params.leave_type
@@ -150,8 +151,8 @@ export async function listLeaves(params = {}) {
       params: queryParams,
     })
 
-    const leaves = Array.isArray(data) ? data : data?.leaves || []
-    return { success: true, leaves: leaves.map(normalizeLeave) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, leaves: rows.map(normalizeLeave), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

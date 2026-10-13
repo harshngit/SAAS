@@ -113,9 +113,7 @@ function normalizeVehicle(vehicle) {
 
 export async function listVehicles(params = {}) {
   try {
-    const queryParams = {}
-    if (params.skip !== undefined) queryParams.skip = params.skip
-    if (params.limit !== undefined) queryParams.limit = params.limit
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.status && params.status !== 'all') queryParams.status = params.status
     if (params.search) queryParams.search = params.search
     // Legacy caller support.
@@ -128,8 +126,8 @@ export async function listVehicles(params = {}) {
       params: queryParams,
     })
 
-    const vehicles = Array.isArray(data) ? data : data?.vehicles || []
-    return { success: true, vehicles: vehicles.map(normalizeVehicle) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, vehicles: rows.map(normalizeVehicle), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

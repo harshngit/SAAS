@@ -302,7 +302,7 @@ function normalizeOrder(order) {
 
 export async function listOrders(params = {}) {
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.status) queryParams.status = params.status
     if (params.fulfilment_status) queryParams.fulfilment_status = params.fulfilment_status
     if (params.customer_id) queryParams.customer_id = params.customer_id
@@ -314,8 +314,8 @@ export async function listOrders(params = {}) {
       params: queryParams,
     })
 
-    const orders = Array.isArray(data) ? data : data?.orders || []
-    return { success: true, orders: orders.map(normalizeOrder) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, orders: rows.map(normalizeOrder), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

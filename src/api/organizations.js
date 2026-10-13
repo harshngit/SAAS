@@ -2,6 +2,7 @@ import axios from 'axios'
 import { apiClient, API_BASE_URL } from './client'
 import { useAuthStore } from '../store/authStore'
 import { getFileUrl } from './files'
+import { handleStorageLimitError } from '../components/ui/storageLimitContext'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -148,6 +149,10 @@ export async function uploadOrganizationLogo(file) {
 
     return { success: true, url: data?.url }
   } catch (error) {
+    if (handleStorageLimitError(error)) {
+      return { success: false, error: 'Storage limit reached.', code: 'PLAN_STORAGE_LIMIT_REACHED' }
+    }
+
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
@@ -169,6 +174,10 @@ export async function uploadOrganizationSignature(file) {
 
     return { success: true, url: data?.url }
   } catch (error) {
+    if (handleStorageLimitError(error)) {
+      return { success: false, error: 'Storage limit reached.', code: 'PLAN_STORAGE_LIMIT_REACHED' }
+    }
+
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
@@ -190,6 +199,10 @@ export async function uploadOrganizationSettingsFile(file) {
 
     return { success: true, url: data?.url }
   } catch (error) {
+    if (handleStorageLimitError(error)) {
+      return { success: false, error: 'Storage limit reached.', code: 'PLAN_STORAGE_LIMIT_REACHED' }
+    }
+
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
@@ -214,6 +227,10 @@ export async function uploadOrganizationOtherDocuments(files) {
 
     return { success: true, documents: Array.isArray(data) ? data : [] }
   } catch (error) {
+    if (handleStorageLimitError(error)) {
+      return { success: false, error: 'Storage limit reached.', code: 'PLAN_STORAGE_LIMIT_REACHED' }
+    }
+
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,

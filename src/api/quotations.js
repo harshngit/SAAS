@@ -166,10 +166,11 @@ export async function listQuotations() {
   try {
     const { data } = await apiClient.get('/quotations', {
       headers: authHeader(),
+      params: { page_size: 100 },
     })
 
-    const quotations = Array.isArray(data) ? data : data?.quotations || []
-    return { success: true, quotations: quotations.map(normalizeQuotation) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, quotations: rows.map(normalizeQuotation), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

@@ -199,7 +199,7 @@ export async function listDeliveryPartners() {
 
 export async function listDeliveries(params = {}) {
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.status) queryParams.status = params.status
     if (params.order_id) queryParams.order_id = params.order_id
     if (params.delivery_partner_id) queryParams.delivery_partner_id = params.delivery_partner_id
@@ -210,8 +210,8 @@ export async function listDeliveries(params = {}) {
       params: queryParams,
     })
 
-    const deliveries = Array.isArray(data) ? data : data?.deliveries || []
-    return { success: true, deliveries: deliveries.map(normalizeDelivery) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, deliveries: rows.map(normalizeDelivery), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
@@ -509,10 +509,11 @@ export async function getAssignedDeliveries() {
   try {
     const { data } = await apiClient.get('/deliveries/assigned', {
       headers: authHeader(),
+      params: { page_size: 100 },
     })
 
-    const orders = Array.isArray(data) ? data : data?.orders || []
-    return { success: true, orders: orders.map(normalizeAssignedOrder) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, orders: rows.map(normalizeAssignedOrder), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

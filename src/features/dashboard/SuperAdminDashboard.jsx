@@ -547,14 +547,14 @@ export default function SuperAdminDashboard() {
             title="Organizations Growth"
             subtitle="Cumulative organizations on the platform"
             actions={
-              <div className="grid h-10 grid-cols-5 overflow-hidden rounded-xl border border-neutral-200 bg-white text-[0.72rem] font-bold text-slate-700 shadow-[0_8px_22px_-20px_rgb(15_23_42/0.45)]">
+              <div className="grid h-8 grid-cols-5 overflow-hidden rounded-lg border border-neutral-200 bg-white text-[0.68rem] font-bold text-slate-700 shadow-[0_8px_22px_-20px_rgb(15_23_42/0.45)]">
                 {growthRangeOptions.map((range) => (
                   <button
                     key={range.value}
                     type="button"
                     onClick={() => setGrowthRange(range.value)}
                     aria-pressed={growthRange === range.value}
-                    className={`min-w-16 border-r border-neutral-200 px-4 transition-all duration-200 last:border-r-0 ${
+                    className={`min-w-11 border-r border-neutral-200 px-2 transition-all duration-200 last:border-r-0 ${
                       growthRange === range.value
                         ? 'bg-primary-700 text-white'
                         : 'text-slate-600 hover:bg-primary-50 hover:text-primary-800'

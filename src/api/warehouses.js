@@ -203,7 +203,7 @@ export async function deleteWarehouse(warehouseId) {
 
 export async function getWarehouseStock(params = {}) {
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.warehouse_id) queryParams.warehouse_id = params.warehouse_id
     if (params.product_id) queryParams.product_id = params.product_id
     if (params.low_stock_only !== undefined) queryParams.low_stock_only = params.low_stock_only
@@ -213,7 +213,8 @@ export async function getWarehouseStock(params = {}) {
       params: queryParams,
     })
 
-    return { success: true, stock: Array.isArray(data) ? data : data?.stock || [] }
+    const stock = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, stock, total: data?.total ?? stock.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

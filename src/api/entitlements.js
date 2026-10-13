@@ -22,19 +22,22 @@ function formatApiError(errorData, fallbackMessage = 'Something went wrong. Plea
   return String(errorData)
 }
 
-// The backend's runtime plan-restriction errors (PLAN_FEATURE_NOT_AVAILABLE / PLAN_LIMIT_REACHED)
-// are detail *codes*, not something OpenAPI enumerates - read defensively from whichever shape the
-// error body actually uses (a bare code string, or a {code, message} object under `detail`).
+const PLAN_ERROR_CODES = ['PLAN_FEATURE_NOT_AVAILABLE', 'PLAN_LIMIT_REACHED', 'PLAN_STORAGE_LIMIT_REACHED']
+
+// The backend's runtime plan-restriction errors (PLAN_FEATURE_NOT_AVAILABLE / PLAN_LIMIT_REACHED /
+// PLAN_STORAGE_LIMIT_REACHED) are detail *codes*, not something OpenAPI enumerates - read
+// defensively from whichever shape the error body actually uses (a bare code string, a
+// {code, message} object under `detail`, or the X-Error-Code response header persistent-upload
+// endpoints may also set).
 export function planErrorCode(error) {
   const detail = error?.response?.data?.detail
-  if (typeof detail === 'string') {
-    if (detail === 'PLAN_FEATURE_NOT_AVAILABLE' || detail === 'PLAN_LIMIT_REACHED') return detail
-    return null
-  }
+  if (typeof detail === 'string' && PLAN_ERROR_CODES.includes(detail)) return detail
   if (detail && typeof detail === 'object') {
     const code = detail.code || detail.error_code
-    if (code === 'PLAN_FEATURE_NOT_AVAILABLE' || code === 'PLAN_LIMIT_REACHED') return code
+    if (PLAN_ERROR_CODES.includes(code)) return code
   }
+  const headerCode = error?.response?.headers?.['x-error-code']
+  if (PLAN_ERROR_CODES.includes(headerCode)) return headerCode
   return null
 }
 
@@ -137,5 +140,37 @@ export async function resetAllOverrides(orgId) {
     return { success: true }
   } catch (error) {
     return { success: false, error: formatApiError(error.response?.data?.detail, 'Unable to reset overrides.') }
+  }
+}
+
+// GET /organizations/me/storage-usage - the real breakdown (files/documents, stored reports,
+// application data) + effective limit + percentage, already resolved by the backend (plan
+// default + any organization override). Never recomputed here.
+export async function getMyStorageUsage() {
+  try {
+    const { data } = await apiClient.get('/organizations/me/storage-usage')
+    return { success: true, usage: data }
+  } catch (error) {
+    return { success: false, error: formatApiError(error.response?.data?.detail, 'Unable to load storage usage.') }
+  }
+}
+
+export async function getOrganizationStorageUsageAdmin(orgId) {
+  try {
+    const { data } = await apiClient.get(`/superadmin/organizations/${orgId}/storage-usage`)
+    return { success: true, usage: data }
+  } catch (error) {
+    return { success: false, error: formatApiError(error.response?.data?.detail, 'Unable to load organization storage usage.') }
+  }
+}
+
+// Returns the freshly recalculated OrganizationStorageUsageOut directly - callers can apply it
+// without a second GET.
+export async function recalculateOrganizationStorageUsage(orgId) {
+  try {
+    const { data } = await apiClient.post(`/superadmin/organizations/${orgId}/storage-usage/recalculate`)
+    return { success: true, usage: data }
+  } catch (error) {
+    return { success: false, error: formatApiError(error.response?.data?.detail, 'Unable to recalculate storage usage.') }
   }
 }

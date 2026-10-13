@@ -109,6 +109,29 @@ export const SUPPLIER_PAYMENT_STATUS_OPTIONS = [
   { value: 'voided', label: 'Voided' },
 ]
 
+export const GST_CLASSIFICATION_OPTIONS = [
+  { value: 'output', label: 'Output' },
+  { value: 'output_adjustment', label: 'Output Adjustment' },
+  { value: 'input', label: 'Input' },
+  { value: 'input_adjustment', label: 'Input Adjustment' },
+]
+
+export const GST_INVOICE_TYPE_OPTIONS = [
+  { value: 'sales_invoice', label: 'Sales Invoice' },
+  { value: 'sales_return', label: 'Sales Return' },
+  { value: 'supplier_invoice', label: 'Supplier Invoice' },
+  { value: 'purchase_return', label: 'Purchase Return' },
+]
+
+// Confirmed via the live backend's own tagged query-param descriptions ("statement-of-pl: ..." /
+// "notes-to-pl: ...") - both statement-of-pl and notes-to-pl share this exact 4-value vocabulary.
+export const PL_SECTION_OPTIONS = [
+  { value: 'revenue', label: 'Revenue' },
+  { value: 'sales_returns', label: 'Sales Returns' },
+  { value: 'cogs', label: 'Cost of Goods Sold' },
+  { value: 'operating_expenses', label: 'Operating Expenses' },
+]
+
 export const SALES_GROUP_BY_OPTIONS = [
   { value: 'transaction', label: 'By Transaction' },
   { value: 'customer', label: 'By Customer' },
@@ -166,6 +189,14 @@ export const REPORT_CONFIG = {
     label: 'Daily Transactions',
     category: 'financial',
     description: 'Business activity and actual cash movement for the selected day(s).',
+    // Row-level reference/party text, same reasoning applied to every report below: real
+    // free-text columns a backend search plausibly matches against. profit-loss is the one
+    // report with no rows at all (see its own supportsSearch: false), so it's the only exception.
+    supportsSearch: true,
+    // Row export's row_id: this report has no single reliable id field across every
+    // transaction_type (sale/purchase/payment/expense) - its own displayed `reference` is the
+    // best real identifier the row carries, `id` as a last-resort fallback if the row has one.
+    resolveRowId: (row) => row.reference || row.id || null,
     filters: [],
     summaryCards: [
       { keys: ['sales'], label: 'Sales', format: 'currency' },
@@ -195,6 +226,12 @@ export const REPORT_CONFIG = {
     label: 'Sales',
     category: 'sales',
     description: 'Invoice-based sales performance and collections.',
+    supportsSearch: true,
+    // Row export's row_id: this report is invoice-based (its own description says so) - the
+    // backend's row resolver expects the invoice identifier, NOT order_id (a real, separate
+    // field - order.invoice_id/invoice_number vs order.id, the two are not interchangeable).
+    // order_id stays only as a last-resort fallback for resilience, never the primary choice.
+    resolveRowId: (row) => row.invoice_number || row.invoice_id || row.order_id || null,
     filters: [
       { key: 'customer_id', type: 'entity', entity: 'customer', label: 'Customer' },
       { key: 'product_id', type: 'entity', entity: 'product', label: 'Product' },
@@ -228,6 +265,10 @@ export const REPORT_CONFIG = {
     label: 'Purchases',
     category: 'purchases',
     description: 'Purchase order value and supplier activity.',
+    supportsSearch: true,
+    // Same pattern as Sales - prefer the invoice identifier if the row carries one, purchase_id
+    // as a real (already-confirmed, used for its own ref() column) fallback.
+    resolveRowId: (row) => row.invoice_number || row.invoice_id || row.purchase_id || null,
     filters: [
       { key: 'supplier_id', type: 'entity', entity: 'supplier', label: 'Supplier' },
       { key: 'product_id', type: 'entity', entity: 'product', label: 'Product' },
@@ -258,6 +299,8 @@ export const REPORT_CONFIG = {
     category: 'sales',
     description: 'Current customer receivables and ageing.',
     noAsOfDate: true,
+    supportsSearch: true,
+    rowIdKey: 'invoice_number',
     filters: [
       { key: 'customer_id', type: 'entity', entity: 'customer', label: 'Customer' },
       { key: 'ageing_bucket', type: 'select', label: 'Ageing Bucket', options: AGEING_BUCKET_OPTIONS },
@@ -292,6 +335,8 @@ export const REPORT_CONFIG = {
     category: 'purchases',
     description: 'Current supplier payables and ageing.',
     noAsOfDate: true,
+    supportsSearch: true,
+    rowIdKey: 'invoice_no',
     filters: [
       { key: 'supplier_id', type: 'entity', entity: 'supplier', label: 'Supplier' },
       { key: 'payment_status', type: 'select', label: 'Payment Status', options: INVOICE_PAYMENT_STATUS_OPTIONS },
@@ -330,6 +375,8 @@ export const REPORT_CONFIG = {
     label: 'Payment Collection',
     category: 'sales',
     description: 'Customer payments received, by mode and reference.',
+    supportsSearch: true,
+    resolveRowId: (row) => row.receipt_no || row.id || null,
     filters: [
       { key: 'customer_id', type: 'entity', entity: 'customer', label: 'Customer' },
       { key: 'payment_mode', type: 'select', label: 'Payment Mode', options: PAYMENT_MODE_FILTER_OPTIONS },
@@ -358,6 +405,8 @@ export const REPORT_CONFIG = {
     label: 'Supplier Payments',
     category: 'purchases',
     description: 'Payments made to suppliers and their invoice allocation.',
+    supportsSearch: true,
+    resolveRowId: (row) => row.payment_number || row.id || null,
     filters: [
       { key: 'supplier_id', type: 'entity', entity: 'supplier', label: 'Supplier' },
       { key: 'payment_mode', type: 'select', label: 'Payment Method', options: PAYMENT_MODE_FILTER_OPTIONS },
@@ -387,6 +436,8 @@ export const REPORT_CONFIG = {
     label: 'Cash Collection',
     category: 'sales',
     description: 'Cash-only customer collections (including cash splits of mixed payments).',
+    supportsSearch: true,
+    resolveRowId: (row) => row.reference || row.id || null,
     filters: [
       { key: 'customer_id', type: 'entity', entity: 'customer', label: 'Customer' },
     ],
@@ -407,10 +458,15 @@ export const REPORT_CONFIG = {
     label: 'Expenses',
     category: 'financial',
     description: 'Submitted business expenses, approvals and reimbursement.',
+    supportsSearch: true,
+    resolveRowId: (row) => row.expense_ref || row.id || null,
     filters: [
       { key: 'category', type: 'entity', entity: 'expenseCategory', label: 'Category' },
       { key: 'status', type: 'select', label: 'Status', options: EXPENSE_STATUS_OPTIONS },
       { key: 'payment_mode', type: 'select', label: 'Payment Mode', options: PAYMENT_MODE_FILTER_OPTIONS },
+      // vendor_id = the paid-to supplier (backend's own "expense: vendor (supplier) id"), reuses
+      // the existing supplier entity picker - not a second vendor concept.
+      { key: 'vendor_id', type: 'entity', entity: 'supplier', label: 'Vendor' },
     ],
     summaryCards: [
       { keys: ['approved_expense', 'approved'], label: 'Approved Expense', format: 'currency' },
@@ -443,30 +499,56 @@ export const REPORT_CONFIG = {
     // Worded to describe tax position/preparation only - this report does not file or submit
     // GSTR returns, so its description must never imply that.
     description: 'GST summary for filing preparation: output GST, input GST and net tax position.',
-    filters: [],
+    supportsSearch: true,
+    // Row export's row_id: prefers the row's own source_id when the backend sends one, else a
+    // composite of the two fields every row always has (invoice_type + invoice_number) - never
+    // just invoice_number alone, since the same number can exist across different document types.
+    resolveRowId: (row) => row.source_id || (row.invoice_type && row.invoice_number ? `${row.invoice_type}:${row.invoice_number}` : null) || row.id || null,
+    filters: [
+      { key: 'customer_id', type: 'entity', entity: 'customer', label: 'Customer' },
+      { key: 'supplier_id', type: 'entity', entity: 'supplier', label: 'Supplier' },
+      { key: 'invoice_number', type: 'text', label: 'Invoice Number' },
+      { key: 'gst_number', type: 'text', label: 'GST Number' },
+      { key: 'gst_classification', type: 'select', label: 'GST Classification', options: GST_CLASSIFICATION_OPTIONS },
+      { key: 'invoice_type', type: 'select', label: 'Invoice Type', options: GST_INVOICE_TYPE_OPTIONS },
+      { key: 'status', type: 'text', label: 'Status' },
+      { key: 'min_amount', type: 'number', label: 'Min Amount' },
+      { key: 'max_amount', type: 'number', label: 'Max Amount' },
+      { key: 'min_taxable_value', type: 'number', label: 'Min Taxable Value' },
+      { key: 'max_taxable_value', type: 'number', label: 'Max Taxable Value' },
+      { key: 'min_tax_amount', type: 'number', label: 'Min Tax Amount' },
+      { key: 'max_tax_amount', type: 'number', label: 'Max Tax Amount' },
+    ],
     summaryCards: [
       { keys: ['output_gst'], label: 'Output GST', format: 'currency' },
       { keys: ['input_gst'], label: 'Input GST', format: 'currency' },
-      { keys: ['adjustment'], label: 'Adjustment', format: 'currency' },
       { keys: ['net_gst'], label: 'Net GST', format: 'currency' },
     ],
     columns: [
       col('date', 'Date', 'date'),
-      // Not linked: this row can be an output-side (sales invoice) or input-side (purchase)
-      // entry - `type` tells which, but there's no single safe entity type to route either way.
-      col('reference', 'Reference', 'text'),
-      col('party', 'Party', 'text'),
+      col('invoice_number', 'Invoice #', 'text'),
+      col('party', 'Customer / Supplier', 'text'),
+      col('gst_number', 'GST Number', 'text'),
+      col('invoice_type', 'Invoice Type', 'status'),
+      col('gst_classification', 'GST Classification', 'status'),
       col('taxable_value', 'Taxable Value', 'currency', { align: 'right' }),
-      col('tax_rate', 'Tax Rate', 'percent', { align: 'right' }),
-      col('tax_amount', 'Tax Amount', 'currency', { align: 'right' }),
-      col('type', 'Type', 'status'),
+      // The backend's current data model does not store CGST/SGST/IGST as separate components -
+      // only the combined tax amount. Never derive/guess a split here; show total_gst only.
+      col('total_gst', 'Total GST', 'currency', { align: 'right' }),
+      col('amount', 'Invoice Amount', 'currency', { align: 'right' }),
+      col('status', 'Status', 'status'),
     ],
+    // The main table always needs transaction-level rows, never the aggregate/category view -
+    // the summary cards above already cover the aggregate (output_gst/input_gst/net_gst).
+    fixedParams: { group_by: 'transaction' },
   },
 
   'sales-return': {
     label: 'Sales Returns',
     category: 'sales',
     description: 'Customer returns and credit issued against sales.',
+    supportsSearch: true,
+    resolveRowId: (row) => row.return_no || row.id || null,
     filters: [
       { key: 'customer_id', type: 'entity', entity: 'customer', label: 'Customer' },
       { key: 'status', type: 'select', label: 'Status', options: SALES_RETURN_STATUS_OPTIONS },
@@ -492,9 +574,15 @@ export const REPORT_CONFIG = {
     label: 'Purchase Returns',
     category: 'purchases',
     description: 'Returns made to suppliers against purchases.',
+    supportsSearch: true,
+    resolveRowId: (row) => row.return_no || row.id || null,
     filters: [
       { key: 'supplier_id', type: 'entity', entity: 'supplier', label: 'Supplier' },
       { key: 'status', type: 'select', label: 'Status', options: PURCHASE_RETURN_STATUS_OPTIONS },
+      // The originating Purchase has no searchable-entity picker in this Reports module yet (only
+      // customer/supplier/product are) - a plain id field is still real and functional without
+      // inventing a new entity-search mechanism for this one filter.
+      { key: 'purchase_id', type: 'text', label: 'Purchase ID' },
     ],
     summaryCards: [
       { keys: ['total_amount'], label: 'Total Amount', format: 'currency' },
@@ -520,26 +608,49 @@ export const REPORT_CONFIG = {
     filters: [],
     summaryCards: [
       { keys: ['net_sales'], label: 'Net Sales', format: 'currency' },
-      { keys: ['cogs'], label: 'COGS', format: 'currency' },
       { keys: ['gross_profit'], label: 'Gross Profit', format: 'currency' },
-      { keys: ['operating_expenses'], label: 'Operating Expenses', format: 'currency' },
       { keys: ['net_profit'], label: 'Net Profit', format: 'currency' },
-      { keys: ['gross_margin_percent', 'gross_margin'], label: 'Gross Margin %', format: 'percent' },
-      { keys: ['net_margin_percent', 'net_margin'], label: 'Net Margin %', format: 'percent' },
     ],
     columns: [],
     isSpecialView: 'pnl',
-    chartTitle: 'Net Sales / COGS / Expenses / Profit',
-    // No confirmed chart.data point shape for P&L (likely several numeric fields on one point,
-    // exactly the ambiguous case field-guessing must not resolve on its own) - chart renders
-    // only if the backend response's own point literally uses the generic label/value shape
-    // (see ReportChart's explicit-only resolution), otherwise it stays hidden.
+    // A pure aggregate statement with no rows - there is nothing for a free-text search to match.
+    supportsSearch: false,
+  },
+
+  'cash-flow-sheet': {
+    label: 'Cash Flow',
+    category: 'financial',
+    description: 'Recorded cash inflows and outflows for the selected period.',
+    supportsSearch: true,
+    resolveRowId: (row) => row.reference || row.id || null,
+    filters: [
+      { key: 'movement_type', type: 'text', label: 'Transaction / Source Type' },
+      { key: 'payment_mode', type: 'select', label: 'Payment Mode', options: PAYMENT_MODE_FILTER_OPTIONS },
+    ],
+    summaryCards: [
+      { keys: ['cash_in'], label: 'Total Inflow', format: 'currency' },
+      { keys: ['cash_out'], label: 'Total Outflow', format: 'currency' },
+      { keys: ['net_cash_flow'], label: 'Net Cash Flow', format: 'currency' },
+    ],
+    columns: [
+      col('date', 'Date', 'date'),
+      col('reference', 'Reference #', 'text'),
+      col('transaction_type', 'Transaction Type', 'status'),
+      col('party', 'Party', 'text'),
+      col('description', 'Description', 'text'),
+      col('payment_mode', 'Payment Mode', 'status'),
+      col('cash_in', 'Inflow', 'currency', { align: 'right' }),
+      col('cash_out', 'Outflow', 'currency', { align: 'right' }),
+      col('amount', 'Net Amount', 'currency', { align: 'right' }),
+    ],
   },
 
   'inventory-summary': {
     label: 'Inventory Summary',
     category: 'inventory',
     description: 'Current stock position and current-cost valuation.',
+    supportsSearch: true,
+    rowIdKey: 'product_id',
     filters: [
       { key: 'warehouse_id', type: 'entity', entity: 'warehouse', label: 'Warehouse' },
       { key: 'product_id', type: 'entity', entity: 'product', label: 'Product' },
@@ -576,6 +687,8 @@ export const REPORT_CONFIG = {
     label: 'Stock Movement',
     category: 'inventory',
     description: 'Every stock-in / stock-out event across warehouses.',
+    supportsSearch: true,
+    resolveRowId: (row) => row.reference || row.id || null,
     filters: [
       { key: 'warehouse_id', type: 'entity', entity: 'warehouse', label: 'Warehouse' },
       { key: 'product_id', type: 'entity', entity: 'product', label: 'Product' },
@@ -599,6 +712,102 @@ export const REPORT_CONFIG = {
       col('balance_after', 'Balance After', 'number', { align: 'right' }),
       col('reference', 'Reference', 'text'),
       col('note', 'Note', 'text'),
+    ],
+  },
+
+  'statement-of-pl': {
+    label: 'Statement of P&L',
+    category: 'financial',
+    description: 'Transaction-level detail behind the Profit & Loss statement.',
+    supportsSearch: true,
+    // Row export's row_id: prefers the row's own source_id when sent, else a composite of its
+    // own section + reference - never reference alone (the same reference text can repeat
+    // across different sections, e.g. a sales invoice number vs its own later return entry).
+    resolveRowId: (row) => row.source_id || (row.section && row.reference ? `${row.section}:${row.reference}` : null) || row.id || null,
+    filters: [
+      { key: 'section', type: 'select', label: 'Section', options: PL_SECTION_OPTIONS },
+    ],
+    summaryCards: [],
+    columns: [
+      col('date', 'Date', 'date'),
+      col('reference', 'Reference', 'text'),
+      col('party', 'Party', 'text'),
+      col('description', 'Description', 'text'),
+      col('amount', 'Amount', 'currency', { align: 'right', signed: true }),
+      col('status', 'Status', 'status'),
+    ],
+  },
+
+  'notes-to-pl': {
+    label: 'Notes to P&L',
+    category: 'financial',
+    description: 'Transactions making up one P&L line item (Revenue, Sales Returns, COGS or Operating Expenses).',
+    supportsSearch: true,
+    // The backend itself requires line_item (400s without it) - the panel's own select is the
+    // UI for it, never a value this frontend guesses or defaults.
+    requiredFilterKey: 'line_item',
+    requiredFilterPrompt: 'Select a line item to see its underlying transactions.',
+    resolveRowId: (row) => row.source_id || (row.reference ? `${row.line_item || ''}:${row.reference}` : null) || row.id || null,
+    filters: [
+      { key: 'line_item', type: 'select', label: 'Line Item', options: PL_SECTION_OPTIONS },
+    ],
+    summaryCards: [],
+    columns: [
+      col('date', 'Date', 'date'),
+      col('reference', 'Reference', 'text'),
+      col('party', 'Party', 'text'),
+      col('description', 'Description', 'text'),
+      col('amount', 'Amount', 'currency', { align: 'right', signed: true }),
+      col('status', 'Status', 'status'),
+    ],
+  },
+
+  'balance-sheet': {
+    label: 'Balance Sheet',
+    category: 'financial',
+    description: 'Assets, liabilities and equity as of a single date.',
+    // A point-in-time statement, not a date-range report - suppresses the generic Date From/To
+    // panel in favour of the single `as_of_date` filter below.
+    noAsOfDate: true,
+    supportsSearch: true,
+    // Lowest-confidence row_id of every report in this module: `particulars` is a free-text
+    // line label (e.g. "Accounts Receivable"), not a confirmed id field - it's a last-resort
+    // fallback here, tried only after real id-shaped candidates that may or may not exist on
+    // the real row. This report's true row shape was not independently verifiable.
+    resolveRowId: (row) => row.source_id || row.id || row.particulars || null,
+    filters: [
+      { key: 'as_of_date', type: 'date', label: 'As Of Date' },
+    ],
+    summaryCards: [],
+    columns: [
+      col('section', 'Section', 'status'),
+      col('particulars', 'Particulars', 'text'),
+      col('amount', 'Amount', 'currency', { align: 'right' }),
+    ],
+  },
+
+  'notes-to-balance-sheet': {
+    label: 'Notes to Balance Sheet',
+    category: 'financial',
+    description: 'Breakdown of one Balance Sheet schedule.',
+    noAsOfDate: true,
+    supportsSearch: true,
+    requiredFilterKey: 'schedule',
+    requiredFilterPrompt: 'Select a schedule to see its breakdown.',
+    // Same low-confidence caveat as balance-sheet above - this report's true row shape was not
+    // independently verifiable.
+    resolveRowId: (row) => row.source_id || row.id || row.particulars || null,
+    filters: [
+      // No confirmed schedule enum exists in the backend contract yet (unlike gst_classification/
+      // invoice_type/section/line_item, which are all explicitly documented) - left as free text
+      // rather than guessing a list of valid values.
+      { key: 'schedule', type: 'text', label: 'Schedule' },
+      { key: 'as_of_date', type: 'date', label: 'As Of Date' },
+    ],
+    summaryCards: [],
+    columns: [
+      col('particulars', 'Particulars', 'text'),
+      col('amount', 'Amount', 'currency', { align: 'right' }),
     ],
   },
 }

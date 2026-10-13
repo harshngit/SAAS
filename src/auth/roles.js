@@ -43,6 +43,7 @@ import {
   UserCircle,
   Scale,
   HelpCircle,
+  Calculator,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -178,8 +179,9 @@ export const roleMenus = {
         { label: 'Accounts Payable', path: '/admin/payables', icon: Wallet, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_ACCOUNTS_PAYABLE },
         { label: 'Supplier Payments', path: '/admin/supplier-payments', icon: Wallet, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_SUPPLIER_PAYMENTS },
         { label: 'Collection Reconciliation', path: '/admin/collections', icon: HandCoins, module: 'payments', feature: ENTITLEMENT_KEYS.FINANCE_COLLECTION_RECONCILIATION },
-        // Cash Reconciliation (/admin/reconciliation/cash) is FRONTEND-READY / BACKEND LATER
-        // (no persisted session) - route + component kept, sidebar entry hidden for MVP.
+        // Separate feature from Collection Reconciliation above - day-close cash/drawer
+        // reconciliation against GET /cash-reconciliation, not delivery-collection matching.
+        { label: 'Cash Reconciliation', path: '/admin/reconciliation/cash', icon: Calculator, module: 'payments' },
         { label: 'Expenses', path: '/admin/expenses', icon: Receipt, module: 'expenses', feature: ENTITLEMENT_KEYS.FINANCE_EXPENSES },
         {
           label: 'Reports',
@@ -192,7 +194,7 @@ export const roleMenus = {
           // only matches on pathname by default, which all three of these share).
           activeWhen: (location) =>
             location.pathname === '/admin/reports' &&
-            !['profit-loss', 'gst-summary'].includes(new URLSearchParams(location.search).get('report')),
+            !['profit-loss', 'gst-summary', 'cash-flow-sheet'].includes(new URLSearchParams(location.search).get('report')),
         },
         {
           label: 'Profit and Loss Sheet',
@@ -208,13 +210,19 @@ export const roleMenus = {
           activeWhen: (location) =>
             location.pathname === '/admin/reports' && new URLSearchParams(location.search).get('report') === 'profit-loss',
         },
-        // BACKEND LATER: no balance-sheet report exists in the Reports module's confirmed report
-        // types - this opens an honest "not available yet" page rather than fabricating figures.
-        // Still plan-gated by report.balance_sheet like the other 3 report shortcuts (§22).
+        // Renders the real canonical Balance Sheet report, pre-selected - plan-gated by
+        // report.balance_sheet (Pro plan and above), same as the other 3 report shortcuts.
         { label: 'Balance Sheet', path: '/admin/reports/balance-sheet', icon: Scale, module: 'reports', feature: ENTITLEMENT_KEYS.REPORT_BALANCE_SHEET },
         // Real GET /reports/cash-flow-sheet report (recorded cash in/out, not a React-computed
         // statement) - distinct from Daily Transactions' same-day net_cash_flow figure.
-        { label: 'Cash Flow Sheet', path: '/admin/reports/cash-flow-sheet', icon: Activity, module: 'reports', feature: ENTITLEMENT_KEYS.REPORT_CASH_FLOW },
+        {
+          label: 'Cash Flow Sheet',
+          path: '/admin/reports?report=cash-flow-sheet',
+          icon: Activity,
+          module: 'reports',
+          feature: ENTITLEMENT_KEYS.REPORT_CASH_FLOW,
+          activeWhen: (location) => location.pathname === '/admin/reports' && new URLSearchParams(location.search).get('report') === 'cash-flow-sheet',
+        },
         {
           label: 'GST Filing Sheet',
           path: '/admin/reports?report=gst-summary',
@@ -334,10 +342,9 @@ export const roleMenus = {
         { label: 'Sales Invoices', path: '/accounts/invoices/sales', icon: ShoppingCart, module: 'invoices', feature: ENTITLEMENT_KEYS.INVOICE_SALES_INVOICES },
         { label: 'Receivables', path: '/accounts/receivables', icon: TrendingUp, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_RECEIVABLES },
         { label: 'Collection Reconciliation', path: '/accounts/collections', icon: HandCoins, module: 'payments', feature: ENTITLEMENT_KEYS.FINANCE_COLLECTION_RECONCILIATION },
+        { label: 'Cash Reconciliation', path: '/accounts/reconciliation/cash', icon: Calculator, module: 'payments' },
         { label: 'Expense Approval', path: '/accounts/expenses/approval', icon: Receipt, module: 'expenses', action: 'approve', feature: ENTITLEMENT_KEYS.FINANCE_EXPENSES },
         { label: 'Leaves', path: '/accounts/leaves', icon: CalendarClock, module: 'leaves', feature: ENTITLEMENT_KEYS.EMPLOYEE_LEAVES },
-        // Cash Reconciliation (/accounts/reconciliation/cash) is FRONTEND-READY / BACKEND LATER
-        // (no persisted session) - route + component kept, sidebar entry hidden for MVP.
         { label: 'GST Summary', path: '/accounts/gst', icon: FileCheck, module: 'gst', feature: ENTITLEMENT_KEYS.REPORT_GST_FILING },
         { label: 'Financial Reports', path: '/accounts/reports', icon: FileSpreadsheet, module: 'reports', feature: ENTITLEMENT_KEYS.FINANCE_REPORTS },
       ],

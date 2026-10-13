@@ -57,7 +57,10 @@ export async function checkIn(type) {
 
 export async function getMyAttendance(params = {}) {
   try {
-    const queryParams = {}
+    // GET /attendance/me now returns a paginated { items, total, ... } wrapper (default
+    // page_size 10, max 100) instead of a bare array - every existing caller expects the full
+    // matching set in one call, same as before this endpoint started paginating.
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.date_from) queryParams.date_from = params.date_from
     if (params.date_to) queryParams.date_to = params.date_to
 
@@ -66,7 +69,8 @@ export async function getMyAttendance(params = {}) {
       params: queryParams,
     })
 
-    return { success: true, records: Array.isArray(data) ? data : data?.records || [] }
+    const records = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, records, total: data?.total ?? records.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
@@ -80,7 +84,7 @@ export async function getMyAttendance(params = {}) {
 
 export async function getAttendance(params = {}) {
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.user_id) queryParams.user_id = params.user_id
     if (params.date_from) queryParams.date_from = params.date_from
     if (params.date_to) queryParams.date_to = params.date_to
@@ -90,7 +94,8 @@ export async function getAttendance(params = {}) {
       params: queryParams,
     })
 
-    return { success: true, records: Array.isArray(data) ? data : data?.records || [] }
+    const records = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, records, total: data?.total ?? records.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

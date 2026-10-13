@@ -101,20 +101,19 @@ export async function createSupplier(payload) {
 
 export async function listSuppliers(params = {}) {
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
 
     if (params.search) queryParams.search = params.search
     if (params.category) queryParams.category = params.category
     if (params.is_active !== undefined && params.is_active !== null) queryParams.is_active = params.is_active
-    if (params.skip !== undefined) queryParams.skip = params.skip
-    if (params.limit !== undefined) queryParams.limit = params.limit
 
     const { data } = await apiClient.get('/suppliers', {
       headers: authHeader(),
       params: queryParams,
     })
 
-    return { success: true, suppliers: Array.isArray(data) ? data : data?.suppliers || [] }
+    const suppliers = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, suppliers, total: data?.total ?? suppliers.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

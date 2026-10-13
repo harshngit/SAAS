@@ -1,6 +1,7 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
 import { toStoredFilePath } from './files'
+import { handleStorageLimitError } from '../components/ui/storageLimitContext'
 
 // cover_image / images must be stored as "/files/{id}" paths - never a base64 data: URL and
 // never a full frontend-origin URL. Returns null when there is no image.
@@ -480,6 +481,10 @@ export async function addProductAttachments(productId, files) {
 
     return { success: true, attachments: Array.isArray(data) ? data : data?.attachments || [] }
   } catch (error) {
+    if (handleStorageLimitError(error)) {
+      return { success: false, error: 'Storage limit reached.', code: 'PLAN_STORAGE_LIMIT_REACHED' }
+    }
+
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
@@ -530,7 +535,7 @@ export async function deleteProductsBulk(productIds) {
 
 export async function listProducts(params = {}) {
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
 
     if (params.search) queryParams.search = params.search
     if (params.category_id) queryParams.category_id = params.category_id
@@ -542,7 +547,8 @@ export async function listProducts(params = {}) {
       params: queryParams,
     })
 
-    return { success: true, products: Array.isArray(data) ? data : data?.products || [] }
+    const products = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, products, total: data?.total ?? products.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

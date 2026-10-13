@@ -160,14 +160,14 @@ export async function listCollections(params = {}) {
   if (COLLECTION_DEMO_ENABLED) return listDemoCollections(params)
 
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.status && params.status !== 'all') queryParams.status = params.status
     if (params.search) queryParams.search = params.search
     if (params.customer_id) queryParams.customer_id = params.customer_id
     if (params.order_id) queryParams.order_id = params.order_id
     const { data } = await apiClient.get('/deliveries/collections', { headers: authHeader(), params: queryParams })
-    const rows = Array.isArray(data) ? data : data?.collections || []
-    return { success: true, collections: rows.map(normalizeCollection) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, collections: rows.map(normalizeCollection), total: data?.total ?? rows.length }
   } catch (error) {
     return { success: false, error: collectionError(error, 'Unable to load collections. Please try again.') }
   }

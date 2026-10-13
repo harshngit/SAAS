@@ -153,7 +153,7 @@ function buildVisitBody(payload) {
 
 export async function listVisits(params = {}) {
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.customerId || params.customer_id) queryParams.customer_id = params.customerId || params.customer_id
     if (params.leadId || params.lead_id) queryParams.lead_id = params.leadId || params.lead_id
     if (params.userId || params.user_id) queryParams.user_id = params.userId || params.user_id
@@ -164,8 +164,8 @@ export async function listVisits(params = {}) {
       params: queryParams,
     })
 
-    const visits = Array.isArray(data) ? data : data?.visits || []
-    return { success: true, visits: visits.map(normalizeVisit) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, visits: rows.map(normalizeVisit), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

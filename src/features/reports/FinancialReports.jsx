@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Download, FileSpreadsheet, RefreshCw, SlidersHorizontal, X } from 'lucide-react'
+import { AlertTriangle, Download, FileSpreadsheet, RefreshCw, SlidersHorizontal, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import DatePicker from '../../components/ui/DatePicker'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
-import { exportReport, getReport } from '../../api/reports'
+import { exportReport, exportReportRow, getReport } from '../../api/reports'
 import { listCustomers } from '../../api/customers'
 import { listSuppliers } from '../../api/suppliers'
 import { listProducts } from '../../api/products'
@@ -48,6 +48,13 @@ const SEARCHED_ENTITY_TYPES = new Set(['customer', 'supplier', 'product'])
 export default function FinancialReports({
   title = 'Reports',
   description = 'Access, review and export every business report for your organization',
+  defaultReport = DEFAULT_REPORT,
+  // Pins this page to exactly `defaultReport` - no Report Type switcher, and a crafted
+  // ?report=... in the URL is ignored. Needed wherever this component is reached through a
+  // permission gate NARROWER than the generic Reports page's own `module="reports"` (e.g.
+  // /accounts/gst's module="gst") - without this, the in-page switcher would let a role with
+  // only that narrower permission view every OTHER report too, which "reports" alone gates.
+  lockReportType = false,
 }) {
   const { can } = usePermission()
   const canExport = can('reports', 'export')
@@ -63,21 +70,37 @@ export default function FinancialReports({
   )
 
   const [searchParams, setSearchParams] = useSearchParams()
-  const initialType = getReportConfig(searchParams.get('report')) ? searchParams.get('report') : DEFAULT_REPORT
+  const initialType = lockReportType
+    ? (getReportConfig(defaultReport) ? defaultReport : DEFAULT_REPORT)
+    : getReportConfig(searchParams.get('report'))
+      ? searchParams.get('report')
+      : getReportConfig(defaultReport)
+        ? defaultReport
+        : DEFAULT_REPORT
   const [reportType, setReportType] = useState(initialType)
   const config = getReportConfig(reportType)
 
   const [period, setPeriod] = useState(searchParams.get('period') || 'monthly')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo] = useState('')
+  // dateFrom/dateTo are the APPLIED range (what the request actually uses); draftDateFrom/
+  // draftDateTo are what the always-visible filter panel's Date From/Date To fields show while
+  // being edited - the two only converge when Apply Filters is clicked, matching the mockup's
+  // explicit Apply step instead of applying every keystroke immediately.
+  const initialRange = getDateRangeForPeriod(searchParams.get('period') || 'monthly', '', '')
+  const [dateFrom, setDateFrom] = useState(initialRange.dateFrom)
+  const [dateTo, setDateTo] = useState(initialRange.dateTo)
+  const [draftDateFrom, setDraftDateFrom] = useState(initialRange.dateFrom)
+  const [draftDateTo, setDraftDateTo] = useState(initialRange.dateTo)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({})
-  const [filterLabels, setFilterLabels] = useState({})
+  const [draftFilters, setDraftFilters] = useState({})
+  const [draftFilterLabels, setDraftFilterLabels] = useState({})
   const [groupBy, setGroupBy] = useState(() => resolveValidGroupBy(getReportConfig(initialType), searchParams.get('group_by')))
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState('25')
-  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
+  // Open by default - the filter panel is always-visible chrome now, not something a user has to
+  // discover behind a toggle; the button still lets them collapse it out of the way.
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(true)
 
   const [report, setReport] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -138,11 +161,6 @@ export default function FinancialReports({
     return () => clearTimeout(timeout)
   }, [searchInput])
 
-  const { dateFrom, dateTo } = useMemo(
-    () => getDateRangeForPeriod(period, customFrom, customTo),
-    [period, customFrom, customTo],
-  )
-
   // Resets everything report-scoped (filters/search/page/groupBy/stale rows) in one place, so
   // both the click handler and the browser-navigation sync effect below apply EXACTLY the same
   // reset - no second, slightly different code path to drift out of sync with it.
@@ -151,12 +169,12 @@ export default function FinancialReports({
     const nextGroupBy = resolveValidGroupBy(nextConfig, urlGroupBy)
     setReportType(nextType)
     setFilters({})
-    setFilterLabels({})
+    setDraftFilters({})
+    setDraftFilterLabels({})
     setSearchInput('')
     setSearch('')
     setGroupBy(nextGroupBy)
     setPage(1)
-    setMoreFiltersOpen(false)
     setReport(null)
     return nextGroupBy
   }, [])
@@ -171,18 +189,30 @@ export default function FinancialReports({
     setSearchParams(nextParams, { replace: true })
   }
 
+  // The toolbar's quick-select period preset still applies immediately (it's a convenience
+  // shortcut, not part of the staged filter panel) - it updates the APPLIED range directly and
+  // keeps the panel's draft Date From/To fields in sync with it.
   const handlePeriodChange = (value) => {
     setPeriod(value)
+    if (value !== 'custom') {
+      const range = getDateRangeForPeriod(value, '', '')
+      setDateFrom(range.dateFrom)
+      setDateTo(range.dateTo)
+      setDraftDateFrom(range.dateFrom)
+      setDraftDateTo(range.dateTo)
+    }
     setPage(1)
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set('period', value)
     setSearchParams(nextParams, { replace: true })
   }
 
-  const handleFilterChange = (key, value, label) => {
-    setFilters((current) => ({ ...current, [key]: value }))
-    if (label !== undefined) setFilterLabels((current) => ({ ...current, [key]: label }))
-    setPage(1)
+  // Report-specific filters + the panel's own Date From/To only ever touch DRAFT state here -
+  // nothing is applied/refetched until Apply Filters commits it (matching the mockup's explicit
+  // Apply step, reusing this codebase's existing staged-filter pattern).
+  const handleDraftFilterChange = (key, value, label) => {
+    setDraftFilters((current) => ({ ...current, [key]: value }))
+    if (label !== undefined) setDraftFilterLabels((current) => ({ ...current, [key]: label }))
   }
 
   const handleGroupByChange = (value) => {
@@ -193,12 +223,41 @@ export default function FinancialReports({
     setSearchParams(nextParams, { replace: true })
   }
 
+  const handleApplyFilters = () => {
+    setFilters(draftFilters)
+    setDateFrom(draftDateFrom)
+    setDateTo(draftDateTo)
+    setPage(1)
+
+    // Only relabels the toolbar's period dropdown as "Custom Range" when the applied dates
+    // actually diverge from that preset's own range - changing just a report filter (status,
+    // customer, ...) without touching the dates must not silently rename "This Month" to custom.
+    const presetRange = getDateRangeForPeriod(period, '', '')
+    if (draftDateFrom !== presetRange.dateFrom || draftDateTo !== presetRange.dateTo) {
+      setPeriod('custom')
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.set('period', 'custom')
+      setSearchParams(nextParams, { replace: true })
+    }
+  }
+
   const handleClearFilters = () => {
     setFilters({})
-    setFilterLabels({})
+    setDraftFilters({})
+    setDraftFilterLabels({})
     setSearchInput('')
     setSearch('')
     setPage(1)
+
+    const defaultRange = getDateRangeForPeriod('monthly', '', '')
+    setPeriod('monthly')
+    setDateFrom(defaultRange.dateFrom)
+    setDateTo(defaultRange.dateTo)
+    setDraftDateFrom(defaultRange.dateFrom)
+    setDraftDateTo(defaultRange.dateTo)
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('period', 'monthly')
+    setSearchParams(nextParams, { replace: true })
   }
 
   // Keeps local state in sync with the URL for navigation this component didn't itself trigger
@@ -207,7 +266,7 @@ export default function FinancialReports({
   // a searchParams change, reportType/groupBy already match by the time this runs and it's a no-op.
   useEffect(() => {
     const urlReport = searchParams.get('report')
-    const nextType = getReportConfig(urlReport) ? urlReport : DEFAULT_REPORT
+    const nextType = lockReportType ? defaultReport : getReportConfig(urlReport) ? urlReport : DEFAULT_REPORT
     const urlGroupBy = searchParams.get('group_by')
 
     if (nextType !== reportType) {
@@ -225,19 +284,35 @@ export default function FinancialReports({
     if (urlPeriod && urlPeriod !== period) {
       setPeriod(urlPeriod)
       setPage(1)
+      if (urlPeriod !== 'custom') {
+        const range = getDateRangeForPeriod(urlPeriod, '', '')
+        setDateFrom(range.dateFrom)
+        setDateTo(range.dateTo)
+        setDraftDateFrom(range.dateFrom)
+        setDraftDateTo(range.dateTo)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   const activeFilterCount = Object.values(filters).filter((value) => value !== undefined && value !== '' && value !== false).length
 
+  // Every param here is scoped to what THIS report actually supports - never one giant object
+  // blindly spread onto every report type. `filters` itself can only ever hold keys from the
+  // current report's own config.filters (set via handleDraftFilterChange, cleared on report
+  // switch), `search` is only included when the report's own config opts in, and `group_by` is
+  // either the user-selectable dropdown value (Sales/Purchase) or a report's own fixed value
+  // (e.g. GST's permanent `group_by=transaction` for its transaction-level table) - never both
+  // at once since a report config never defines both mechanisms.
   const requestParams = useMemo(() => {
-    const params = { ...filters, search: search || undefined, page, page_size: Number(pageSize) }
+    const params = { ...filters, page, page_size: Number(pageSize) }
+    if (config?.supportsSearch !== false && search) params.search = search
     if (groupBy) params.group_by = groupBy
     if (!config?.noAsOfDate) {
       params.date_from = dateFrom
       params.date_to = dateTo
     }
+    if (config?.fixedParams) Object.assign(params, config.fixedParams)
     return params
   }, [filters, search, page, pageSize, groupBy, config, dateFrom, dateTo])
 
@@ -248,12 +323,24 @@ export default function FinancialReports({
   // as an error.
   const requestIdRef = useRef(0)
 
+  // Some reports (notes-to-pl's line_item, notes-to-balance-sheet's schedule) 400 without a
+  // required selector value - never guessed/defaulted here, only ever the value the user picked
+  // in the (always-visible) filter panel.
+  const missingRequiredFilter = Boolean(config?.requiredFilterKey) && !filters[config.requiredFilterKey]
+
   const loadReport = useCallback(async () => {
     // Never call the API for a report this organization's plan doesn't entitle - a direct/typed
     // ?report= query must not even attempt the request, let alone silently fall back to another
     // report (§5).
     if (!isReportEntitled(reportType)) {
       setIsLoading(false)
+      setReport(null)
+      return
+    }
+
+    if (config?.requiredFilterKey && !filters[config.requiredFilterKey]) {
+      setIsLoading(false)
+      setLoadError('')
       setReport(null)
       return
     }
@@ -269,7 +356,10 @@ export default function FinancialReports({
     setIsLoading(false)
 
     if (!result.success) {
-      setLoadError(result.error)
+      // A 400 here means the request sent a filter this report doesn't support - should be
+      // prevented by reportConfig's own per-report filter scoping, but if it ever happens, this
+      // reads as an honest, actionable message rather than raw backend JSON.
+      setLoadError(result.status === 400 ? 'One or more selected filters are not supported for this report.' : result.error)
       return
     }
 
@@ -279,7 +369,7 @@ export default function FinancialReports({
     }
 
     setReport(result.report)
-  }, [reportType, requestParams, isReportEntitled])
+  }, [reportType, requestParams, isReportEntitled, config, filters])
 
   useEffect(() => {
     loadReport()
@@ -295,12 +385,13 @@ export default function FinancialReports({
     setIsExporting('')
 
     if (!result.success) {
-      setExportError(result.error)
+      setExportError(result.status === 400 ? 'One or more selected filters are not supported for this report.' : result.error)
     }
   }
 
   const rows = Array.isArray(report?.rows) ? report.rows : []
   const columns = useMemo(() => resolveColumns(report, config?.columns || []), [report, config])
+
   const pagination = report?.pagination
   const total = pagination?.total ?? rows.length
   const totalPages = pagination?.total_pages ?? 1
@@ -313,6 +404,37 @@ export default function FinancialReports({
     ? Object.keys(report?.summary || {}).length > 0
     : rows.length > 0
 
+  const resolveRowId = useCallback(
+    (row) => {
+      if (typeof config?.resolveRowId === 'function') return config.resolveRowId(row)
+      if (config?.rowIdKey) return row[config.rowIdKey] ?? null
+      return row.id ?? null
+    },
+    [config],
+  )
+
+  const handleExportRow = async (row, format) => {
+    const rowId = resolveRowId(row)
+    if (!rowId) {
+      setExportError("Couldn't export this row — please refresh the report and try again.")
+      return
+    }
+    const { page: _page, page_size: _pageSize, ...exportParams } = requestParams
+    const result = await exportReportRow(reportType, rowId, exportParams, format)
+    if (!result.success) {
+      setExportError(
+        result.status === 404
+          ? "Couldn't export this row — please refresh the report and try again."
+          : result.error,
+      )
+    }
+  }
+
+  // The backend's own honesty signal for Balance Sheet (and, generically, any other report that
+  // sends it) - never hidden/suppressed, shown exactly as the backend worded it.
+  const completenessStatus = report?.summary?.completeness_status ?? report?.meta?.completeness?.status
+  const completenessMessage = report?.summary?.completeness_message ?? report?.meta?.completeness?.message
+
   return (
     <div className="space-y-5">
       <div>
@@ -323,32 +445,30 @@ export default function FinancialReports({
       <Card className="p-0">
         <div className="space-y-3 border-b border-neutral-100 px-4 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <ReportSelector value={reportType} onChange={handleReportTypeChange} className="lg:w-72" isVisible={isReportEntitled} />
+            {lockReportType ? (
+              <h2 className="text-lg font-semibold text-neutral-900">{config?.label || title}</h2>
+            ) : (
+              <ReportSelector value={reportType} onChange={handleReportTypeChange} className="lg:w-72" isVisible={isReportEntitled} />
+            )}
 
             <div className="flex flex-wrap items-center gap-2">
               {!config?.noAsOfDate && (
-                <>
-                  <Select
-                    options={PERIOD_OPTIONS}
-                    value={period}
-                    onChange={(event) => handlePeriodChange(event.target.value)}
-                    className="w-44"
-                  />
-                  {period === 'custom' && (
-                    <>
-                      <DatePicker value={customFrom} onChange={(value) => { setCustomFrom(value); setPage(1) }} placeholder="From date" className="w-36" />
-                      <DatePicker value={customTo} onChange={(value) => { setCustomTo(value); setPage(1) }} placeholder="To date" className="w-36" />
-                    </>
-                  )}
-                </>
+                <Select
+                  options={PERIOD_OPTIONS}
+                  value={period}
+                  onChange={(event) => handlePeriodChange(event.target.value)}
+                  className="w-44"
+                />
               )}
 
-              <input
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search…"
-                className="h-10 w-40 rounded-xl border border-neutral-200 bg-surface px-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-              />
+              {config?.supportsSearch !== false && (
+                <input
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder="Search…"
+                  className="h-10 w-40 rounded-xl border border-neutral-200 bg-surface px-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+              )}
 
               {config?.groupBy && (
                 <Select
@@ -364,7 +484,7 @@ export default function FinancialReports({
                 Refresh
               </Button>
 
-              {config?.filters?.length > 0 && (
+              {(!config?.noAsOfDate || config?.filters?.length > 0) && (
                 <Button type="button" variant={moreFiltersOpen ? 'secondary' : 'outline'} size="sm" onClick={() => setMoreFiltersOpen((prev) => !prev)}>
                   <SlidersHorizontal className="size-4" aria-hidden="true" />
                   Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
@@ -393,22 +513,33 @@ export default function FinancialReports({
             <p className="text-xs font-medium text-neutral-400">{config.valuationNote}</p>
           )}
 
-          {moreFiltersOpen && config?.filters?.length > 0 && (
+          {moreFiltersOpen && (!config?.noAsOfDate || config?.filters?.length > 0) && (
             <div className="flex flex-wrap items-end gap-2 rounded-xl border border-neutral-100 bg-neutral-50/60 p-3">
-              {config.filters.map((filter) => (
+              {!config?.noAsOfDate && (
+                <>
+                  <DatePicker label="Date From" value={draftDateFrom} onChange={setDraftDateFrom} placeholder="From date" className="w-40" />
+                  <DatePicker label="Date To" value={draftDateTo} onChange={setDraftDateTo} placeholder="To date" className="w-40" />
+                </>
+              )}
+
+              {config?.filters?.map((filter) => (
                 <ReportFilterControl
                   key={filter.key}
                   filter={filter}
-                  value={filters[filter.key]}
-                  selectedLabel={filterLabels[filter.key]}
-                  onChange={(value, label) => handleFilterChange(filter.key, value, label)}
+                  value={draftFilters[filter.key]}
+                  selectedLabel={draftFilterLabels[filter.key]}
+                  onChange={(value, label) => handleDraftFilterChange(filter.key, value, label)}
                   entityOptions={entityOptions}
                   searchEntity={searchEntity}
                 />
               ))}
+
+              <Button type="button" size="sm" onClick={handleApplyFilters}>
+                Apply Filters
+              </Button>
               <button type="button" onClick={handleClearFilters} className="flex h-10 items-center gap-1 px-2 text-sm font-medium text-neutral-500 hover:text-neutral-900">
                 <X className="size-3.5" aria-hidden="true" />
-                Clear filters
+                Clear Filters
               </button>
             </div>
           )}
@@ -435,21 +566,31 @@ export default function FinancialReports({
             />
           ) : isDemoUnavailable ? (
             <EmptyState icon={FileSpreadsheet} title="Not available in demo mode" description="This report isn't simulated in demo mode. Connect the real backend to view it." />
+          ) : missingRequiredFilter ? (
+            <EmptyState icon={FileSpreadsheet} title="Select a filter to continue" description={config?.requiredFilterPrompt || 'This report needs one more selection before it can load.'} />
           ) : !hasData ? (
             <EmptyState icon={FileSpreadsheet} title="No report data found" description="No records match the selected filters." />
           ) : (
             <div className="space-y-5">
+              {completenessStatus && completenessStatus !== 'complete' && (
+                <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <span>{completenessMessage || 'This statement is not yet based on complete operational records.'}</span>
+                </div>
+              )}
+
               <ReportSummaryCards summary={report?.summary} cards={config?.summaryCards || []} />
 
               {config?.isSpecialView === 'pnl' ? (
                 <>
-                  <ProfitLossStatement summary={report?.summary} />
+                  <ProfitLossStatement summary={report?.summary} reportType={reportType} requestParams={requestParams} />
                   <ReportChart chart={report?.chart} fallbackTitle={config?.chartTitle} chartKeys={config?.chartKeys} />
                 </>
               ) : (
                 <>
                   <ReportChart chart={report?.chart} fallbackTitle={config?.chartTitle} chartKeys={config?.chartKeys} />
-                  <ReportTable columns={columns} rows={rows} />
+
+                  <ReportTable columns={columns} rows={rows} sortable resolveRowId={resolveRowId} onExportRow={handleExportRow} />
 
                   <div className="flex flex-col items-center justify-between gap-3 pt-1 text-sm text-neutral-500 sm:flex-row">
                     <div className="flex items-center gap-3">
@@ -495,6 +636,25 @@ function ReportFilterControl({ filter, value, selectedLabel, onChange, entityOpt
         onChange={(event) => onChange(event.target.value)}
         placeholder={filter.label}
         className="h-10 w-48 rounded-xl border border-neutral-200 bg-surface px-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+      />
+    )
+  }
+
+  if (filter.type === 'date') {
+    return <DatePicker label={filter.label} value={value || ''} onChange={onChange} placeholder={filter.label} className="w-40" />
+  }
+
+  if (filter.type === 'number') {
+    return (
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={value ?? ''}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={filter.label}
+        aria-label={filter.label}
+        className="h-10 w-40 rounded-xl border border-neutral-200 bg-surface px-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
       />
     )
   }

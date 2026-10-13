@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CheckCircle2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -50,6 +49,12 @@ const statusFilterOptions = [
   { value: 'locked', label: 'Locked' },
   { value: 'inactive', label: 'Inactive' },
   { value: 'suspended', label: 'Suspended' },
+]
+
+const ROWS_PER_PAGE_OPTIONS = [
+  { value: '10', label: '10' },
+  { value: '25', label: '25' },
+  { value: '50', label: '50' },
 ]
 
 const upgradeStatusFilterOptions = [
@@ -673,20 +678,13 @@ export default function OrganizationsList() {
               <span className="hidden h-4 w-px bg-surface-border sm:block" aria-hidden="true" />
               <label className="flex items-center gap-3">
                 <span>Rows per page</span>
-                <span className="relative">
-                  <select
-                    value={rowsPerPage}
-                    onChange={(event) => setRowsPerPage(Number(event.target.value))}
-                    className="h-10 appearance-none rounded-full border border-surface-border bg-surface py-0 pl-5 pr-10 text-sm font-medium text-fg shadow-(--shadow-xs) outline-none transition-all focus:border-primary-400 focus:ring-4 focus:ring-primary-500/12"
-                  >
-                    {[10, 25, 50].map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" aria-hidden="true" />
-                </span>
+                <Select
+                  options={ROWS_PER_PAGE_OPTIONS}
+                  value={String(rowsPerPage)}
+                  onChange={(event) => setRowsPerPage(Number(event.target.value))}
+                  triggerClassName="h-8 bg-surface py-1 text-xs"
+                  className="w-20"
+                />
               </label>
             </div>
             <div className="flex items-center gap-4 sm:justify-end">
@@ -726,19 +724,27 @@ export default function OrganizationsList() {
         title={deleteTarget && deleteTarget.ids.length > 1 ? `Delete ${deleteTarget.ids.length} Organizations` : 'Delete Organization'}
       >
         <div className="space-y-5">
-          <p className="text-sm leading-6 text-neutral-600">
-            {deleteTarget && deleteTarget.ids.length > 1 ? (
-              <>
-                Delete <span className="font-semibold text-neutral-900">{deleteTarget.names.join(', ')}</span>? This permanently removes
-                all of their users, customers, products, and data. This cannot be undone.
-              </>
-            ) : (
-              <>
-                Delete <span className="font-semibold text-neutral-900">{deleteTarget?.names?.[0] || 'this organization'}</span>? This
-                permanently removes all of its users, customers, products, and data. This cannot be undone.
-              </>
-            )}
-          </p>
+          {deleteTarget && deleteTarget.ids.length > 1 ? (
+            <>
+              <p className="text-sm leading-6 text-neutral-600">
+                This permanently removes all users, customers, products, and data for the following{' '}
+                <span className="font-semibold text-neutral-900">{deleteTarget.ids.length} organizations</span>. This cannot be undone.
+              </p>
+              <ul className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-neutral-100 bg-neutral-50/60 p-3">
+                {deleteTarget.names.map((name, index) => (
+                  <li key={deleteTarget.ids[index] || name} className="flex items-center gap-2 text-sm text-neutral-700">
+                    <span className="size-1.5 shrink-0 rounded-full bg-neutral-300" aria-hidden="true" />
+                    <span className="truncate">{name}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="text-sm leading-6 text-neutral-600">
+              Delete <span className="font-semibold text-neutral-900">{deleteTarget?.names?.[0] || 'this organization'}</span>? This
+              permanently removes all of its users, customers, products, and data. This cannot be undone.
+            </p>
+          )}
           {deleteError && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</div>
           )}

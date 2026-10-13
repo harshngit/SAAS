@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, RotateCcw } from 'lucide-react'
+import { Plus, RefreshCw, RotateCcw } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -8,21 +8,25 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import { useToast } from '../../components/ui/toastContext'
 import {
   deleteFeatureOverride,
   deleteLimitOverride,
   getOrganizationEntitlementsAdmin,
+  getOrganizationStorageUsageAdmin,
+  recalculateOrganizationStorageUsage,
   resetAllOverrides,
   upsertFeatureOverride,
   upsertLimitOverride,
 } from '../../api/entitlements'
 import { listPlans } from '../../api/superadmin'
 import { ENTITLEMENT_GROUPS, LIMIT_KEYS, entitlementLabel, formatLimitValue, limitLabel } from '../../entitlements/entitlementKeys'
+import { formatBytes, formatDateTime, formatStoragePercent } from '../../utils/format'
 
-// Only these 3 are real, editable Plan limits surfaced anywhere in this UI today (PlanForm.jsx's
-// own Limits section) - max_storage_gb is deliberately excluded, storage usage/limits are out of
-// scope for this pass.
-const DISPLAYED_LIMIT_KEYS = [LIMIT_KEYS.MAX_USERS, LIMIT_KEYS.MAX_WAREHOUSES, LIMIT_KEYS.MAX_ORDERS]
+// Every editable Plan limit surfaced anywhere in this UI (PlanForm.jsx's own Limits section) -
+// max_storage_gb included alongside max_users/max_warehouses/max_orders, all through this same
+// generic Plan-Default/Override/Effective/Expiry table and the existing limit-override API.
+const DISPLAYED_LIMIT_KEYS = [LIMIT_KEYS.MAX_USERS, LIMIT_KEYS.MAX_WAREHOUSES, LIMIT_KEYS.MAX_ORDERS, LIMIT_KEYS.MAX_STORAGE_GB]
 
 function formatDate(value) {
   if (!value) return '—'
@@ -41,6 +45,7 @@ const LIMIT_KEY_OPTIONS = Object.values(LIMIT_KEYS).map((key) => ({ value: key, 
 // override + expiry itself, the backend already did that (OrganizationAdminEntitlementsOut's
 // `features`/`limits` ARE the effective values).
 export default function OrganizationPlanAccess({ orgId }) {
+  const { showToast } = useToast()
   const [data, setData] = useState(null)
   // GET /superadmin/organizations/{org_id}/entitlements embeds `plan` as a loosely-typed object
   // (OrganizationAdminEntitlementsOut.plan has no declared sub-schema in the backend's own
@@ -63,6 +68,42 @@ export default function OrganizationPlanAccess({ orgId }) {
 
   const [isResetAllOpen, setIsResetAllOpen] = useState(false)
   const [isResettingAll, setIsResettingAll] = useState(false)
+
+  // Kept independent from the main entitlements `load()` so a storage-usage failure never blocks
+  // the Plan & Access / Overrides sections above, and vice versa.
+  const [storageUsage, setStorageUsage] = useState(null)
+  const [isLoadingStorage, setIsLoadingStorage] = useState(true)
+  const [storageError, setStorageError] = useState('')
+  const [isRecalculating, setIsRecalculating] = useState(false)
+
+  const loadStorageUsage = async () => {
+    setIsLoadingStorage(true)
+    setStorageError('')
+    const result = await getOrganizationStorageUsageAdmin(orgId)
+    setIsLoadingStorage(false)
+    if (!result.success) {
+      setStorageError(result.error)
+      return
+    }
+    setStorageUsage(result.usage)
+  }
+
+  useEffect(() => {
+    loadStorageUsage()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId])
+
+  const handleRecalculate = async () => {
+    setIsRecalculating(true)
+    const result = await recalculateOrganizationStorageUsage(orgId)
+    setIsRecalculating(false)
+    if (!result.success) {
+      showToast({ title: 'Recalculation failed', message: result.error, variant: 'error' })
+      return
+    }
+    setStorageUsage(result.usage)
+    showToast({ title: 'Storage usage recalculated.' })
+  }
 
   const load = async () => {
     setIsLoading(true)
@@ -97,7 +138,13 @@ export default function OrganizationPlanAccess({ orgId }) {
       return
     }
     setResetTarget(null)
-    await load()
+    // Resetting the max_storage_gb override changes the effective limit the Storage Usage panel
+    // resolves against - refetch it too, so the panel never shows a stale limit until a manual
+    // reload/recalculate. Any other limit/feature reset is unrelated to storage, so load() alone
+    // is enough there.
+    const tasks = [load()]
+    if (resetTarget.kind === 'limit' && resetTarget.key === LIMIT_KEYS.MAX_STORAGE_GB) tasks.push(loadStorageUsage())
+    await Promise.all(tasks)
   }
 
   const handleResetAll = async () => {
@@ -110,7 +157,9 @@ export default function OrganizationPlanAccess({ orgId }) {
       return
     }
     setIsResetAllOpen(false)
-    await load()
+    // Reset All can reset a max_storage_gb override among everything else - always refresh
+    // storage usage alongside the entitlements reload.
+    await Promise.all([load(), loadStorageUsage()])
   }
 
   if (isLoading) return <Card><LoadingSpinner label="Loading plan & access…" /></Card>
@@ -157,6 +206,71 @@ export default function OrganizationPlanAccess({ orgId }) {
             </p>
           </div>
         </div>
+      </Card>
+
+      <Card
+        title="Storage Usage"
+        subtitle="Real-time storage breakdown for this organization, resolved from its plan default plus any limit override above."
+        actions={
+          <Button size="sm" variant="outline" loading={isRecalculating} onClick={handleRecalculate}>
+            <RefreshCw className="size-4" aria-hidden="true" />
+            Recalculate
+          </Button>
+        }
+      >
+        {isLoadingStorage ? (
+          <LoadingSpinner label="Loading storage usage…" />
+        ) : !storageUsage ? (
+          <EmptyState title="Unable to load storage usage" description={storageError || 'Please try again.'} action={{ label: 'Retry', onClick: loadStorageUsage }} />
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-neutral-900">{formatBytes(storageUsage.total_used_bytes)}</span>
+                <span className="text-sm text-neutral-400">
+                  of {storageUsage.is_unlimited ? 'Unlimited' : formatBytes(storageUsage.effective_limit_bytes)} used
+                </span>
+              </div>
+              {storageUsage.is_over_limit ? (
+                <Badge variant="danger">Over Limit</Badge>
+              ) : storageUsage.is_unlimited ? (
+                <Badge variant="neutral">Unlimited</Badge>
+              ) : formatStoragePercent(storageUsage.percentage_used) ? (
+                <Badge variant={storageUsage.percentage_used >= 80 ? 'warning' : 'success'}>{formatStoragePercent(storageUsage.percentage_used)} used</Badge>
+              ) : null}
+            </div>
+
+            {!storageUsage.is_unlimited && (
+              <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-100">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${storageUsage.is_over_limit || storageUsage.percentage_used >= 90 ? 'bg-red-500' : storageUsage.percentage_used >= 80 ? 'bg-amber-500' : 'bg-primary-600'}`}
+                  style={{ width: `${Math.min(100, storageUsage.percentage_used ?? 0)}%` }}
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-neutral-100 px-4 py-3">
+                <p className="text-xs font-medium text-neutral-400">Files & Documents</p>
+                <p className="mt-1 text-sm font-semibold text-neutral-900">{formatBytes(storageUsage.files_documents_bytes)}</p>
+              </div>
+              <div className="rounded-xl border border-neutral-100 px-4 py-3">
+                <p className="text-xs font-medium text-neutral-400">Application Data</p>
+                <p className="mt-1 text-sm font-semibold text-neutral-900">{formatBytes(storageUsage.application_data_bytes)}</p>
+                <p className="mt-0.5 text-[0.68rem] text-neutral-400">Approximate</p>
+              </div>
+              <div className="rounded-xl border border-neutral-100 px-4 py-3">
+                <p className="text-xs font-medium text-neutral-400">Reports & Exports</p>
+                <p className="mt-1 text-sm font-semibold text-neutral-900">{formatBytes(storageUsage.stored_reports_bytes ?? 0)}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-neutral-400">
+              Last calculated: {formatDateTime(storageUsage.calculated_at)}
+              {storageUsage.limit_source && ` · Limit source: ${storageUsage.limit_source === 'organization_override' ? 'Organization Override' : storageUsage.limit_source === 'plan' ? 'Plan Default' : 'Fallback'}`}
+            </p>
+          </div>
+        )}
       </Card>
 
       {actionError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>}
@@ -293,9 +407,13 @@ export default function OrganizationPlanAccess({ orgId }) {
         isSaving={isSaving}
         saveError={saveError}
         onClose={() => setEditTarget(null)}
-        onSaved={async () => {
+        onSaved={async ({ kind, key } = {}) => {
           setEditTarget(null)
-          await load()
+          // Same reasoning as the single-reset path above - only a saved max_storage_gb limit
+          // override can move the Storage Usage panel's effective limit.
+          const tasks = [load()]
+          if (kind === 'limit' && key === LIMIT_KEYS.MAX_STORAGE_GB) tasks.push(loadStorageUsage())
+          await Promise.all(tasks)
         }}
         setIsSaving={setIsSaving}
         setSaveError={setSaveError}
@@ -359,6 +477,22 @@ function OverrideEditorModal({ target, orgId, isSaving, saveError, onClose, onSa
       return
     }
 
+    // max_storage_gb specifically must never silently fall through "blank -> null/unlimited" the
+    // way the generic toNullableValue path does for every other limit - a blank Custom Value here
+    // has to be a blocked, explained error, not an accidental Unlimited override. Other limit keys
+    // keep their existing (generic) behavior unchanged.
+    if (!isFeature && key === LIMIT_KEYS.MAX_STORAGE_GB && !isUnlimited) {
+      if (limitValue === '' || limitValue === null || limitValue === undefined) {
+        setSaveError('Enter a storage limit or select Unlimited.')
+        return
+      }
+      const parsedLimit = Number(limitValue)
+      if (!Number.isFinite(parsedLimit) || parsedLimit <= 0) {
+        setSaveError('Storage limit must be greater than 0 GB.')
+        return
+      }
+    }
+
     setIsSaving(true)
     setSaveError('')
 
@@ -375,7 +509,7 @@ function OverrideEditorModal({ target, orgId, isSaving, saveError, onClose, onSa
       return
     }
 
-    onSaved()
+    onSaved({ kind: target.kind, key })
   }
 
   return (
@@ -402,7 +536,8 @@ function OverrideEditorModal({ target, orgId, isSaving, saveError, onClose, onSa
             <Input
               label="Custom Value"
               type="number"
-              min="0"
+              min={key === LIMIT_KEYS.MAX_STORAGE_GB ? '1' : '0'}
+              step={key === LIMIT_KEYS.MAX_STORAGE_GB ? '1' : undefined}
               value={limitValue}
               onChange={(event) => setLimitValue(event.target.value)}
               disabled={isUnlimited}

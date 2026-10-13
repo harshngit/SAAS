@@ -10,15 +10,16 @@ import Modal from '../../components/ui/Modal'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/Tabs'
 import { useToast } from '../../components/ui/toastContext'
 import { listActivePlans } from '../../api/plans'
-import { getCurrentOrganizationState, getOrganizationOverview, requestPlanUpgrade } from '../../api/organizations'
+import { getCurrentOrganizationState, requestPlanUpgrade } from '../../api/organizations'
 import { getCurrentProfile } from '../../api/auth'
+import { getMyStorageUsage } from '../../api/entitlements'
 import { payForPlan } from './planPayment'
 import PlanComparisonTable from './PlanComparisonTable'
 import { useAuthStore } from '../../store/authStore'
 import { useEntitlements } from '../../entitlements/EntitlementsContext'
 import { buildPlanLimitsSummary, buildPlanSummaryBullets, formatLimitValue } from '../../entitlements/entitlementKeys'
 import { useTheme } from '../../theme/useTheme'
-import { formatCurrency } from '../../utils/format'
+import { formatBytes, formatCurrency, formatStoragePercent } from '../../utils/format'
 
 function formatDateLabel(value) {
   if (!value) return '—'
@@ -29,11 +30,13 @@ function formatDateLabel(value) {
 export default function AdminPlans() {
   const navigate = useNavigate()
   const { refreshEntitlements } = useEntitlements()
-  // Real storage usage (used_gb/used_mb/files) - GET /organizations/overview's `storage` block,
-  // the same source CompanySettings.jsx already reads and the Dashboard's Storage Usage card now
-  // reads too. used_gb is one real figure for this org; each card below pairs it with ITS OWN
-  // max_storage_gb to show what the usage percentage would genuinely be on that plan.
-  const [storageOverview, setStorageOverview] = useState(null)
+  // Real current-organization usage - GET /organizations/me/storage-usage (total_used_bytes,
+  // effective_limit_bytes/gb, percentage_used, is_unlimited, is_over_limit - all backend-resolved).
+  // Only ever shown against the CURRENT plan (the banner, and the current plan's own card) - a
+  // card for a plan the organization ISN'T on shows only that plan's storage ALLOWANCE, never a
+  // projected "your data would use X%" figure (that's explicitly out of scope for this pass).
+  const [storageUsage, setStorageUsage] = useState(null)
+  const [storageError, setStorageError] = useState('')
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const [billingCycle, setBillingCycle] = useState('monthly')
   const [plans, setPlans] = useState([])
@@ -66,19 +69,14 @@ export default function AdminPlans() {
       setIsLoading(true)
       setListError('')
 
-      const [organizationResult, plansResult, overviewResult] = await Promise.all([
+      const [organizationResult, plansResult] = await Promise.all([
         getCurrentOrganizationState(),
         listActivePlans(),
-        getOrganizationOverview(1), // activity_limit minimal - only the `storage` block is needed here
       ])
 
       if (!isMounted) return
 
       setIsLoading(false)
-
-      if (overviewResult.success) {
-        setStorageOverview(overviewResult.overview?.storage || null)
-      }
 
       if (organizationResult.success) {
         setOrganizationState(organizationResult.organization)
@@ -110,6 +108,22 @@ export default function AdminPlans() {
       isMounted = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Independent of the plan-list load above - a storage API failure must not block the rest of
+  // this page, it just leaves the storage sections showing their own "unavailable" state.
+  const loadStorageUsage = async () => {
+    setStorageError('')
+    const result = await getMyStorageUsage()
+    if (!result.success) {
+      setStorageError(result.error)
+      return
+    }
+    setStorageUsage(result.usage)
+  }
+
+  useEffect(() => {
+    loadStorageUsage()
   }, [])
 
   const currentPlanId = organizationState?.plan_id || organizationState?.plan?.id
@@ -284,35 +298,37 @@ export default function AdminPlans() {
             </div>
           </div>
 
-          {/* Real usage - GET /organizations/overview's `storage` block (used_gb/used_mb/files/
-              limit_gb/percent_used, the backend's own already-resolved effective limit). */}
+          {/* Real usage - GET /organizations/me/storage-usage, already resolved by the backend
+              (plan default + any organization override + is_unlimited/is_over_limit). Fails soft:
+              shows "—" rather than a fabricated figure if the request hasn't succeeded. */}
           <div className="min-w-0 shrink-0 lg:w-56 lg:px-5">
             <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-500">
               <Database className="size-3.5 shrink-0" aria-hidden="true" />
               <span>Storage</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-100">
-              {storageOverview?.percent_used != null && (
+              {storageUsage && !storageUsage.is_unlimited && (
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ${storageOverview.percent_used >= 90 ? 'bg-red-500' : storageOverview.percent_used >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`}
-                  style={{ width: `${Math.min(100, storageOverview.percent_used)}%` }}
+                  className={`h-full rounded-full transition-all duration-500 ${storageUsage.is_over_limit || storageUsage.percentage_used >= 90 ? 'bg-red-500' : storageUsage.percentage_used >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`}
+                  style={{ width: `${Math.min(100, storageUsage.percentage_used ?? 0)}%` }}
                 />
               )}
             </div>
             <div className="mt-1 flex items-center justify-between text-[0.68rem] text-neutral-400">
-              {storageOverview ? (
+              {storageUsage ? (
                 <>
-                  <span>
-                    {storageOverview.used_gb < 1 ? `${Math.round(storageOverview.used_mb)} MB` : `${storageOverview.used_gb.toFixed(1)} GB`} used
-                  </span>
+                  <span>{formatBytes(storageUsage.total_used_bytes)} used</span>
                   <span className="font-medium text-neutral-600">
-                    {storageOverview.limit_gb == null ? 'Unlimited' : `${storageOverview.limit_gb} GB`}
+                    {storageUsage.is_unlimited ? 'Unlimited' : formatBytes(storageUsage.effective_limit_bytes)}
                   </span>
                 </>
               ) : (
-                <span>—</span>
+                <span>{storageError || 'Storage usage unavailable'}</span>
               )}
             </div>
+            {storageUsage?.is_over_limit && (
+              <p className="mt-1 text-[0.65rem] font-medium text-red-600">Storage limit reached</p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:ml-auto lg:pl-5">
@@ -444,42 +460,38 @@ export default function AdminPlans() {
                       ))}
                     </ul>
 
-                    {/* Real usage (storageOverview.used_gb, same org-wide figure on every card)
-                        paired with THIS card's own max_storage_gb - what the usage percentage
-                        would genuinely be if this plan were active, never a fabricated number. */}
-                    {(() => {
-                      const usedGb = storageOverview?.used_gb
-                      const cardLimitGb = plan.max_storage_gb
-                      const percent = usedGb != null && typeof cardLimitGb === 'number' && cardLimitGb > 0
-                        ? Math.min(100, (usedGb / cardLimitGb) * 100)
-                        : null
-                      return (
-                        <div className={`mt-5 rounded-xl border px-3.5 py-3 ${isFeatured ? 'border-white/15 bg-white/5' : 'border-neutral-100 bg-neutral-50'}`}>
-                          <div className="flex items-center justify-between gap-2 text-xs font-medium">
-                            <span className={`flex items-center gap-1.5 ${isFeatured ? 'text-white/80' : 'text-neutral-600'}`}>
-                              <Database className="size-3.5" aria-hidden="true" />
-                              Storage
-                            </span>
-                            <span className={isFeatured ? 'text-white' : 'text-neutral-900'}>
-                              {cardLimitGb === undefined ? '—' : cardLimitGb === null ? 'Unlimited' : `${formatLimitValue(cardLimitGb)} GB`}
-                            </span>
-                          </div>
+                    {/* Every card shows its own Plan storage ALLOWANCE (max_storage_gb) - never a
+                        usage figure for a plan the organization isn't on, since there's no real
+                        "your data would use X% here" projection implemented (explicitly out of
+                        scope). Only the CURRENT plan's card additionally shows real usage,
+                        beneath its allowance, from the same GET /organizations/me/storage-usage
+                        the banner above uses. */}
+                    <div className={`mt-5 rounded-xl border px-3.5 py-3 ${isFeatured ? 'border-white/15 bg-white/5' : 'border-neutral-100 bg-neutral-50'}`}>
+                      <div className="flex items-center justify-between gap-2 text-xs font-medium">
+                        <span className={`flex items-center gap-1.5 ${isFeatured ? 'text-white/80' : 'text-neutral-600'}`}>
+                          <Database className="size-3.5" aria-hidden="true" />
+                          Storage
+                        </span>
+                        <span className={isFeatured ? 'text-white' : 'text-neutral-900'}>
+                          {plan.max_storage_gb === undefined ? '—' : plan.max_storage_gb === null ? 'Unlimited' : `${formatLimitValue(plan.max_storage_gb)} GB`}
+                        </span>
+                      </div>
+                      {isCurrent && storageUsage && (
+                        <>
                           <div className={`mt-2 h-1.5 overflow-hidden rounded-full ${isFeatured ? 'bg-white/10' : 'bg-neutral-200'}`}>
-                            {percent != null && (
+                            {!storageUsage.is_unlimited && (
                               <div
-                                className={`h-full rounded-full ${isFeatured ? 'bg-white/70' : percent >= 90 ? 'bg-red-500' : percent >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`}
-                                style={{ width: `${percent}%` }}
+                                className={`h-full rounded-full ${isFeatured ? 'bg-white/70' : storageUsage.is_over_limit || storageUsage.percentage_used >= 90 ? 'bg-red-500' : storageUsage.percentage_used >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`}
+                                style={{ width: `${Math.min(100, storageUsage.percentage_used ?? 0)}%` }}
                               />
                             )}
                           </div>
                           <p className={`mt-1.5 text-[0.65rem] ${isFeatured ? 'text-white/50' : 'text-neutral-400'}`}>
-                            {usedGb == null
-                              ? 'Usage tracking isn’t available yet.'
-                              : `${usedGb < 1 ? `${Math.round(storageOverview.used_mb)} MB` : `${usedGb.toFixed(1)} GB`} used${percent != null ? ` (${percent.toFixed(0)}%)` : ''}`}
+                            {formatBytes(storageUsage.total_used_bytes)} used{formatStoragePercent(storageUsage.percentage_used) ? ` (${formatStoragePercent(storageUsage.percentage_used)})` : ''}
                           </p>
-                        </div>
-                      )
-                    })()}
+                        </>
+                      )}
+                    </div>
 
                     <div className={`mt-8 border-t pt-6 ${isFeatured ? 'border-white/15' : 'border-neutral-100'}`}>
                       <div>

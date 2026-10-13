@@ -86,9 +86,11 @@ function CollapsibleSection({ title, subtitle, defaultOpen = false, children }) 
 
 export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, submitError }) {
   const [formData, setFormData] = useState(() => buildFormState(plan))
+  const [validationError, setValidationError] = useState('')
 
   const handleClose = () => {
     setFormData(buildFormState(plan))
+    setValidationError('')
     onClose()
   }
 
@@ -113,6 +115,20 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    setValidationError('')
+
+    // blank = Unlimited (the backend's own nullable-int convention); when a value IS provided it
+    // must be a real positive storage allowance - 0/negative/NaN would silently become a plan
+    // nobody can store anything on, and the backend failing this is a worse UX than catching it
+    // here with a clear message.
+    const storageRaw = formData.max_storage_gb
+    if (storageRaw !== '' && storageRaw !== null && storageRaw !== undefined) {
+      const parsedStorage = Number(storageRaw)
+      if (!Number.isFinite(parsedStorage) || parsedStorage <= 0) {
+        setValidationError('Max Storage (GB) must be greater than 0, or left blank for unlimited.')
+        return
+      }
+    }
 
     const nextValues = {
       name: formData.name.trim(),
@@ -209,7 +225,7 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
             <Input label="Max Users" type="number" min="0" placeholder="Unlimited" value={formData.max_users} onChange={handleChange('max_users')} />
             <Input label="Max Warehouses" type="number" min="0" placeholder="Unlimited" value={formData.max_warehouses} onChange={handleChange('max_warehouses')} />
             <Input label="Max Orders" type="number" min="0" placeholder="Unlimited" value={formData.max_orders} onChange={handleChange('max_orders')} />
-            <Input label="Max Storage (GB)" type="number" min="0" placeholder="Unlimited" value={formData.max_storage_gb} onChange={handleChange('max_storage_gb')} />
+            <Input label="Max Storage (GB)" type="number" min="1" step="1" placeholder="Unlimited" value={formData.max_storage_gb} onChange={handleChange('max_storage_gb')} />
           </div>
         </div>
 
@@ -255,7 +271,7 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
           Free-text bullet points shown on the plan card (e.g. &ldquo;1 Admin User&rdquo;) - presentation only, separate from Feature Access above.
         </p>
 
-        {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+        {(validationError || submitError) && <p className="text-sm text-red-600">{validationError || submitError}</p>}
       </form>
     </Modal>
   )

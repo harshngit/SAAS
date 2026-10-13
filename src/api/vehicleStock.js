@@ -281,7 +281,7 @@ export async function endOfDayReturn(sessionId, items) {
 
 export async function listVehicleStockSessions(params = {}) {
   try {
-    const queryParams = {}
+    const queryParams = { page_size: params.page_size || 100 }
     if (params.delivery_partner_id) queryParams.delivery_partner_id = params.delivery_partner_id
     if (params.status) queryParams.status = params.status
 
@@ -290,8 +290,8 @@ export async function listVehicleStockSessions(params = {}) {
       params: queryParams,
     })
 
-    const sessions = Array.isArray(data) ? data : data?.sessions || []
-    return { success: true, sessions: sessions.map(normalizeSession) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, sessions: rows.map(normalizeSession), total: data?.total ?? rows.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

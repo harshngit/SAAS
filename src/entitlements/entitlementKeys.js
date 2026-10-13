@@ -90,6 +90,15 @@ export const REPORT_TYPE_TO_ENTITLEMENT_KEY = {
   'stock-movement': ENTITLEMENT_KEYS.REPORT_STOCK_MOVEMENT,
   'profit-loss': ENTITLEMENT_KEYS.REPORT_PROFIT_LOSS,
   'gst-summary': ENTITLEMENT_KEYS.REPORT_GST_FILING,
+  'cash-flow-sheet': ENTITLEMENT_KEYS.REPORT_CASH_FLOW,
+  // Both are P&L detail views, not a separate Plan feature - gated by the same entitlement as
+  // the profit-loss report itself.
+  'statement-of-pl': ENTITLEMENT_KEYS.REPORT_PROFIT_LOSS,
+  'notes-to-pl': ENTITLEMENT_KEYS.REPORT_PROFIT_LOSS,
+  // Without this mapping, isReportEntitled() would treat these as always-entitled (an unmapped
+  // type defaults to "entitled") - the exact Plan-gating bypass this entry exists to prevent.
+  'balance-sheet': ENTITLEMENT_KEYS.REPORT_BALANCE_SHEET,
+  'notes-to-balance-sheet': ENTITLEMENT_KEYS.REPORT_BALANCE_SHEET,
 }
 
 // roles.js sidebar items and RequirePermissionRoute both key off the EXISTING role-permission

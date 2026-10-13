@@ -114,9 +114,11 @@ export async function verifyRazorpayPayment({ razorpayOrderId, razorpayPaymentId
 
 export async function getPaymentHistory() {
   try {
-    const { data } = await apiClient.get('/billing/payments', { headers: authHeader() })
-    const payments = Array.isArray(data) ? data : data?.payments || []
-    return { success: true, payments: payments.map(normalizePayment) }
+    // GET /billing/payments now returns a paginated { items, total, ... } wrapper (default
+    // page_size 10, max 100) instead of a bare array.
+    const { data } = await apiClient.get('/billing/payments', { headers: authHeader(), params: { page_size: 100 } })
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, payments: rows.map(normalizePayment) }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
@@ -132,10 +134,10 @@ export async function getSuperAdminSubscriptionPayments(organizationId) {
   try {
     const { data } = await apiClient.get('/superadmin/subscription-payments', {
       headers: authHeader(),
-      params: organizationId ? { organization_id: organizationId } : undefined,
+      params: { page_size: 100, ...(organizationId ? { organization_id: organizationId } : {}) },
     })
-    const payments = Array.isArray(data) ? data : data?.payments || []
-    return { success: true, payments: payments.map(normalizePayment) }
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, payments: rows.map(normalizePayment) }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

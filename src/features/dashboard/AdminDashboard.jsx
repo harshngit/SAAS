@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { formatCompactCurrency, formatCurrency } from '../../utils/format'
+import { formatBytes, formatCompactCurrency, formatCurrency, formatStoragePercent } from '../../utils/format'
 import { getAdminDashboard } from '../../api/dashboard'
-import { getOrganizationOverview } from '../../api/organizations'
+import { getMyStorageUsage } from '../../api/entitlements'
 import { getExpenseCategories } from '../../api/expenses'
 import { cancelOrder, listOrders } from '../../api/orders'
 import { listWarehouses } from '../../api/warehouses'
@@ -486,12 +486,14 @@ const DEFAULT_EXPENSE_CATEGORIES = ['Salaries', 'Rent & Utilities', 'Purchase Re
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
-  // Real storage usage DOES exist - GET /organizations/overview returns a `storage` block
-  // ({files, used_mb, used_gb, limit_gb, percent_used}), confirmed against the live backend
-  // schema. An earlier pass only checked for a dedicated storage-usage endpoint by path name and
-  // missed that this data is embedded in the overview response CompanySettings.jsx already uses -
-  // corrected here rather than continuing to show the honest-but-now-wrong "not tracked yet" state.
-  const [storageOverview, setStorageOverview] = useState(null)
+  // Real storage usage - GET /organizations/me/storage-usage (files_documents_bytes/
+  // stored_reports_bytes/application_data_bytes/total_used_bytes/effective_limit_bytes/
+  // percentage_used/is_unlimited/is_over_limit, already resolved by the backend). Independent
+  // loading/error state so a failure here never blocks the rest of the dashboard - see the
+  // loadStorageUsage effect below.
+  const [storageUsage, setStorageUsage] = useState(null)
+  const [isLoadingStorage, setIsLoadingStorage] = useState(true)
+  const [storageError, setStorageError] = useState('')
   const [datePreset, setDatePreset] = useState('this_month')
   const [customRange, setCustomRange] = useState({ from: '', to: '' })
   // Dashboard scope filters - '' means "all". Applied on the Apply button, sent to GET /dashboard/admin.
@@ -548,17 +550,23 @@ export default function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Minimal activity_limit (1) - only the `storage` block is needed here, not recent_activity
-  // (that's the Audit Log page's own job). Fails soft: the Storage Usage card below just omits
-  // the usage figures if this doesn't load, never fabricating a fallback value.
-  useEffect(() => {
-    let isMounted = true
-    getOrganizationOverview(1).then((result) => {
-      if (!isMounted || !result.success) return
-      setStorageOverview(result.overview?.storage || null)
-    })
-    return () => { isMounted = false }
+  // Independent of loadDashboard above - a storage API failure must never take down the rest of
+  // the dashboard, it only leaves this one section showing its own retry-able error state.
+  const loadStorageUsage = useCallback(async () => {
+    setIsLoadingStorage(true)
+    setStorageError('')
+    const result = await getMyStorageUsage()
+    setIsLoadingStorage(false)
+    if (!result.success) {
+      setStorageError(result.error)
+      return
+    }
+    setStorageUsage(result.usage)
   }, [])
+
+  useEffect(() => {
+    loadStorageUsage()
+  }, [loadStorageUsage])
 
   // Filter dropdown option lists (real mode only; demo dashboards aren't scope-filtered).
   // listCompanies fails soft to [] -> the Company dropdown just shows "All Companies".
@@ -944,7 +952,7 @@ export default function AdminDashboard() {
             footer="View Sales Report"
             icon={Wallet}
             tone="mint"
-            onClick={() => navigate('/admin/reports?type=sales')}
+            onClick={() => navigate('/admin/reports?report=sales')}
           />
           <KpiCard
             title="Purchases"
@@ -952,7 +960,7 @@ export default function AdminDashboard() {
             footer="View Purchase Report"
             icon={ShoppingCart}
             tone="amber"
-            onClick={() => navigate('/admin/reports?type=purchase')}
+            onClick={() => navigate('/admin/reports?report=purchase')}
           />
           <KpiCard
             title="Expenses"
@@ -960,12 +968,12 @@ export default function AdminDashboard() {
             footer="View Expense Report"
             icon={CreditCard}
             tone="violet"
-            onClick={() => navigate('/admin/reports?type=expense')}
+            onClick={() => navigate('/admin/reports?report=expense')}
           />
           <ProfitSummaryCard
             grossProfit={grossProfit}
             netProfit={netProfit}
-            onClick={() => navigate('/admin/reports?type=profit-loss')}
+            onClick={() => navigate('/admin/reports?report=profit-loss')}
           />
           <KpiCard
             title="New Customers"
@@ -982,7 +990,7 @@ export default function AdminDashboard() {
             footer="View Growth Report"
             icon={Sparkles}
             tone="pink"
-            onClick={() => navigate('/admin/reports?type=sales')}
+            onClick={() => navigate('/admin/reports?report=sales')}
           />
         </div>
       </div>
@@ -1086,38 +1094,86 @@ export default function AdminDashboard() {
               </p>
             </div>
 
-            {/* Real usage - GET /organizations/overview's `storage` block (files/used_mb/used_gb/
-                limit_gb/percent_used), the same source CompanySettings.jsx's own overview already
-                reads. limit_gb is the backend's own already-resolved effective limit (plan default
-                + any org override), so it's used directly rather than re-deriving it from
-                entitlements here. Renders nothing extra if this hasn't loaded - no fabricated
-                fallback figure. */}
-            {storageOverview && (
-              <div className="mt-3 border-t border-neutral-100 pt-3">
-                <div className="flex items-center justify-between text-[0.7rem] font-medium text-neutral-500">
-                  <span className="flex items-center gap-1.5">
-                    <HardDrive className="size-3.5 text-neutral-400" aria-hidden="true" />
-                    Storage Usage
-                  </span>
-                  <span className="font-semibold text-neutral-800">
-                    {storageOverview.used_gb < 1 ? `${Math.round(storageOverview.used_mb)} MB` : `${storageOverview.used_gb.toFixed(1)} GB`}
-                    {' '}of {storageOverview.limit_gb == null ? 'Unlimited' : `${storageOverview.limit_gb} GB`}
-                  </span>
+            {/* Real usage - GET /organizations/me/storage-usage, already resolved by the backend
+                (plan default + any organization override, is_unlimited/is_over_limit computed
+                server-side). Independent loading/error state (isLoadingStorage/storageError) -
+                a failure here only affects this one compact section, never the rest of the card
+                or the dashboard. */}
+            <div className="mt-3 border-t border-neutral-100 pt-3">
+              {isLoadingStorage ? (
+                <div className="animate-pulse space-y-1.5">
+                  <div className="h-3 w-24 rounded bg-neutral-100" />
+                  <div className="h-2 w-full rounded-full bg-neutral-100" />
                 </div>
-                {storageOverview.percent_used != null && (
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-neutral-100">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${storageOverview.percent_used >= 90 ? 'bg-red-500' : storageOverview.percent_used >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`}
-                      style={{ width: `${Math.min(100, storageOverview.percent_used)}%` }}
-                    />
+              ) : !storageUsage ? (
+                <div className="flex items-center justify-between text-[0.7rem] font-medium text-neutral-400">
+                  <span className="flex items-center gap-1.5">
+                    <HardDrive className="size-3.5" aria-hidden="true" />
+                    {storageError || 'Storage usage unavailable'}
+                  </span>
+                  <button type="button" onClick={loadStorageUsage} className="font-semibold text-primary-600 hover:underline">
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-[0.7rem] font-medium text-neutral-500">
+                    <span className="flex items-center gap-1.5">
+                      <HardDrive className="size-3.5 text-neutral-400" aria-hidden="true" />
+                      Storage Usage
+                    </span>
+                    {!storageUsage.is_unlimited && formatStoragePercent(storageUsage.percentage_used) && (
+                      <span className={`font-semibold ${storageUsage.is_over_limit ? 'text-red-600' : storageUsage.percentage_used >= 80 ? 'text-amber-600' : 'text-neutral-800'}`}>
+                        {formatStoragePercent(storageUsage.percentage_used)} used
+                      </span>
+                    )}
                   </div>
-                )}
-                <p className="mt-1 text-[0.64rem] text-neutral-400">
-                  {storageOverview.files} file{storageOverview.files === 1 ? '' : 's'}
-                  {storageOverview.percent_used != null && ` · ${storageOverview.percent_used.toFixed(0)}% used`}
-                </p>
-              </div>
-            )}
+
+                  {!storageUsage.is_unlimited && (
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-neutral-100">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${storageUsage.is_over_limit ? 'bg-red-500' : storageUsage.percentage_used >= 80 ? 'bg-amber-500' : 'bg-primary-600'}`}
+                        style={{ width: `${Math.min(100, storageUsage.percentage_used ?? 0)}%` }}
+                      />
+                    </div>
+                  )}
+
+                  <p className="mt-1 text-[0.64rem] text-neutral-400">
+                    {formatBytes(storageUsage.total_used_bytes)}
+                    {storageUsage.is_unlimited ? ' used' : ` of ${formatBytes(storageUsage.effective_limit_bytes)} used`}
+                  </p>
+
+                  {storageUsage.is_over_limit ? (
+                    <p className="mt-1.5 flex items-center justify-between gap-2 text-[0.68rem] font-semibold text-red-600">
+                      Storage limit reached
+                      <button type="button" onClick={() => navigate('/admin/plans')} className="underline-offset-2 hover:underline">View Plans</button>
+                    </p>
+                  ) : storageUsage.is_unlimited ? (
+                    <p className="mt-1.5 text-[0.68rem] font-medium text-neutral-500">Unlimited Storage</p>
+                  ) : storageUsage.percentage_used >= 80 ? (
+                    <p className="mt-1.5 text-[0.68rem] font-medium text-amber-600">Storage almost full</p>
+                  ) : null}
+
+                  {/* Breakdown - real values only; Reports & Exports still shows "0 B" rather
+                      than being hidden when stored_reports_bytes is 0 (report downloads are
+                      currently generated in-memory and aren't persisted). */}
+                  <div className="mt-2 space-y-1 text-[0.68rem] text-neutral-500">
+                    <div className="flex items-center justify-between">
+                      <span>Files &amp; Documents</span>
+                      <span className="font-medium text-neutral-700">{formatBytes(storageUsage.files_documents_bytes)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Application Data</span>
+                      <span className="font-medium text-neutral-700">{formatBytes(storageUsage.application_data_bytes)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Reports &amp; Exports</span>
+                      <span className="font-medium text-neutral-700">{formatBytes(storageUsage.stored_reports_bytes ?? 0)}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
             <button
               type="button"
@@ -1349,7 +1405,7 @@ export default function AdminDashboard() {
                 <div className="mt-auto flex items-center justify-center pt-3 text-[0.72rem]">
                   <button
                     type="button"
-                    onClick={() => navigate('/admin/reports?type=sales')}
+                    onClick={() => navigate('/admin/reports?report=sales')}
                     className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-surface-muted hover:text-fg"
                   >
                     View Sales Report
@@ -1418,7 +1474,7 @@ export default function AdminDashboard() {
               <div className="mt-auto flex items-center justify-center pt-4 text-[0.72rem]">
                 <button
                   type="button"
-                  onClick={() => navigate('/admin/reports?type=expense')}
+                  onClick={() => navigate('/admin/reports?report=expense')}
                   className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-surface-muted hover:text-fg"
                 >
                   View Expense Report
@@ -1544,7 +1600,7 @@ export default function AdminDashboard() {
                 <div className="mt-auto flex items-center justify-center pt-4 text-[0.7rem]">
                   <button
                     type="button"
-                    onClick={() => navigate('/admin/reports?type=customer-outstanding')}
+                    onClick={() => navigate('/admin/reports?report=customer-outstanding')}
                     className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-semibold text-fg-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-surface-muted hover:text-fg"
                   >
                     View Customer Report

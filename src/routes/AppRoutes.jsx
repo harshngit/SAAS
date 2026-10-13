@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from '../components/layout/Layout'
+import StorageLimitModal from '../components/ui/StorageLimitModal'
 import ProtectedRoute from '../auth/ProtectedRoute'
 import RequirePermissionRoute from '../auth/RequirePermission'
 import { ENTITLEMENT_KEYS } from '../entitlements/entitlementKeys'
@@ -41,8 +42,6 @@ import SupplierInvoiceDetail from '../features/supplierInvoices/SupplierInvoiceD
 import PayablesList from '../features/payables/PayablesList'
 import SupplierPaymentsList from '../features/supplierPayments/SupplierPaymentsList'
 import ReportsHub from '../features/reports/ReportsHub'
-import BalanceSheet from '../features/reports/BalanceSheet'
-import CashFlowSheet from '../features/reports/CashFlowSheet'
 import SalesOverview from '../features/sales/SalesOverview'
 import NotificationsList from '../features/notifications/NotificationsList'
 import AuditLogList from '../features/auditLogs/AuditLogList'
@@ -81,7 +80,6 @@ import ExpenseApprovalQueue from '../features/expenses/ExpenseApprovalQueue'
 import CashReconciliation from '../features/reconciliation/CashReconciliation'
 import ReceivablesPayables from '../features/outstanding/ReceivablesPayables'
 import CollectionReconciliation from '../features/collections/CollectionReconciliation'
-import GSTSummary from '../features/gst/GSTSummary'
 import FinancialReports from '../features/reports/FinancialReports'
 import OrganizationsList from '../features/superadmin/OrganizationsList'
 import OrganizationDetail from '../features/superadmin/OrganizationDetail'
@@ -126,6 +124,7 @@ function RootRedirect() {
 export default function AppRoutes() {
   return (
     <BrowserRouter>
+      <StorageLimitModal />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -705,11 +704,15 @@ export default function AppRoutes() {
               </RequirePermissionRoute>
             }
           />
+          {/* Renders the same canonical Reports component as every other report - the old
+              "coming soon" placeholder is gone now that the backend has a real Balance Sheet.
+              Same module="reports" permission as the base Reports page, so (like Cash Flow
+              Sheet) no lockReportType is needed - switching away via the dropdown is safe. */}
           <Route
             path="/admin/reports/balance-sheet"
             element={
               <RequirePermissionRoute module="reports" action="view" feature={ENTITLEMENT_KEYS.REPORT_BALANCE_SHEET}>
-                <BalanceSheet />
+                <FinancialReports defaultReport="balance-sheet" />
               </RequirePermissionRoute>
             }
           />
@@ -717,7 +720,7 @@ export default function AppRoutes() {
             path="/admin/reports/cash-flow-sheet"
             element={
               <RequirePermissionRoute module="reports" action="view" feature={ENTITLEMENT_KEYS.REPORT_CASH_FLOW}>
-                <CashFlowSheet />
+                <FinancialReports defaultReport="cash-flow-sheet" />
               </RequirePermissionRoute>
             }
           />
@@ -1176,11 +1179,15 @@ export default function AppRoutes() {
               </RequirePermissionRoute>
             }
           />
+          {/* Renders the SAME canonical Reports component Admin's "GST Filing Sheet" shortcut
+              uses (?report=gst-summary) - no second GST implementation. The route and its
+              module="gst" permission check (distinct from "reports" - a role can be granted one
+              without the other via Roles & Permissions) are both preserved exactly as before. */}
           <Route
             path="/accounts/gst"
             element={
               <RequirePermissionRoute module="gst" action="view">
-                <GSTSummary />
+                <FinancialReports defaultReport="gst-summary" lockReportType title="GST Summary" description="GST summary and detailed transaction rows for filing preparation." />
               </RequirePermissionRoute>
             }
           />
