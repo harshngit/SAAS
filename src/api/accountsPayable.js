@@ -144,6 +144,8 @@ export async function listAccountsPayable(params = {}) {
     if (params.search) query.search = params.search
     query.page = params.page ?? 1
     query.page_size = Math.min(Math.max(params.page_size ?? 50, 1), 100)
+    if (params.sort_by) query.sort_by = params.sort_by
+    if (params.sort_order) query.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/accounts-payable', { params: query })
     const rows = Array.isArray(data) ? data : data?.items || data?.results || data?.data || []

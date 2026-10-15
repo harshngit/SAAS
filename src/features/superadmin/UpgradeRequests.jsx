@@ -10,12 +10,15 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/Tabs'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import {
   approveOrganizationUpgrade,
   listSuperAdminOrganizations,
   rejectOrganizationUpgrade,
 } from '../../api/superadmin'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 
 const tabOptions = [
   { value: 'pending', label: 'Pending' },
@@ -52,8 +55,8 @@ function StatTile({ label, value, detail, icon: Icon }) {
   )
 }
 
-function exportUpgradeRequestsCsv(rows) {
-  const csvRows = [
+function exportUpgradeRequests(rows) {
+  const dataRows = [
     ['Organization', 'Current Plan', 'Requested Plan', 'Decision', 'Requested', 'Contact'],
     ...rows.map((organization) => [
       organization.name,
@@ -64,15 +67,7 @@ function exportUpgradeRequestsCsv(rows) {
       organization.email || '',
     ]),
   ]
-  const csv = csvRows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'upgrade-requests.csv'
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
+  exportRowsToExcel('upgrade-requests', dataRows)
 }
 
 export default function UpgradeRequests() {
@@ -92,12 +87,15 @@ export default function UpgradeRequests() {
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  // GET /superadmin/organizations supports sort_by/sort_order (confirmed against the live
+  // backend contract) - this page already loads its full matching set in one call per tab.
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
 
   const loadRequests = async () => {
     setIsLoading(true)
     setListError('')
 
-    const result = await listSuperAdminOrganizations({ upgrade_status: activeTab })
+    const result = await listSuperAdminOrganizations({ upgrade_status: activeTab, ...sortParams })
 
     setIsLoading(false)
 
@@ -116,7 +114,7 @@ export default function UpgradeRequests() {
   useEffect(() => {
     loadRequests()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab])
+  }, [activeTab, sortParams])
 
   const handleApprove = async (organization) => {
     setActionError('')
@@ -207,7 +205,7 @@ export default function UpgradeRequests() {
                   <SlidersHorizontal className="size-4" aria-hidden="true" />
                   Filter
                 </Button>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportUpgradeRequestsCsv(visibleRequests)}>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportUpgradeRequests(visibleRequests)}>
                   <Download className="size-4" aria-hidden="true" />
                   Export
                 </Button>
@@ -312,11 +310,11 @@ export default function UpgradeRequests() {
             <table className="listing-table w-full min-w-[72rem] text-left text-sm">
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                  <th className="whitespace-nowrap px-6 py-6">Organization</th>
+                  <SortableHeaderCell label="Organization" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Current Plan</th>
                   <th className="whitespace-nowrap px-6 py-6">Requested Plan</th>
-                  <th className="whitespace-nowrap px-6 py-6">Requested</th>
-                  <th className="whitespace-nowrap px-6 py-6">Contact</th>
+                  <SortableHeaderCell label="Requested" sortKey="upgrade_requested_at" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Contact" sortKey="email" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Status</th>
                   <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>

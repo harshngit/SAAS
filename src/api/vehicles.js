@@ -120,6 +120,8 @@ export async function listVehicles(params = {}) {
     if (params.is_active !== undefined && params.is_active !== null) queryParams.is_active = params.is_active
     const defaultDriverId = params.defaultDriverId ?? params.default_driver_id
     if (defaultDriverId) queryParams.default_driver_id = defaultDriverId
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/vehicles', {
       headers: authHeader(),

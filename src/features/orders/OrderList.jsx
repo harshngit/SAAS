@@ -12,9 +12,12 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { RequirePermission } from '../../auth/RequirePermission'
 import { deleteOrder, listOrders } from '../../api/orders'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 import { listDeliveryPartners } from '../../api/deliveries'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
@@ -76,6 +79,12 @@ export default function OrderList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [pageSize, setPageSize] = useState('10')
   const [page, setPage] = useState(1)
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    setPage(1)
+  }
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
@@ -87,7 +96,7 @@ export default function OrderList() {
     setIsLoading(true)
     setListError('')
 
-    const result = await listOrders({})
+    const result = await listOrders(sortParams)
     const demoRows = DEMO_ORDERS_ENABLED ? demoOrdersResolved() : []
 
     if (!result.success) {
@@ -99,7 +108,7 @@ export default function OrderList() {
 
     setOrders([...result.orders, ...demoRows])
     setIsLoading(false)
-  }, [])
+  }, [sortParams])
 
   useEffect(() => {
     loadOrders()
@@ -161,7 +170,7 @@ export default function OrderList() {
       : [...new Set([...current, ...paginatedOrders.map((order) => order.id)])])
   }
 
-  const exportOrdersCsv = (onlySelected = false) => {
+  const exportOrders = (onlySelected = false) => {
     const ordersToExport = onlySelected ? filteredOrders.filter((order) => selectedIds.includes(order.id)) : filteredOrders
     const rows = [
       ['Order Number', 'Customer', 'Order Date', 'Items', 'Total', 'Order Status', 'Payment Status', 'Fulfilment', 'Delivery Partner', 'Source'],
@@ -178,15 +187,7 @@ export default function OrderList() {
         order.quotationId ? 'Quotation' : 'Direct',
       ]),
     ]
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'orders.csv'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    exportRowsToExcel('orders', rows)
   }
 
   const handleDeleteOrder = async (order) => {
@@ -225,7 +226,7 @@ export default function OrderList() {
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search orders..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" aria-hidden="true" />Filter</Button>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportOrdersCsv()}><Download className="size-4" aria-hidden="true" />Export</Button>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportOrders()}><Download className="size-4" aria-hidden="true" />Export</Button>
                 <RequirePermission module="sales_orders" action="create"><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" aria-hidden="true" />Bulk Import</Button></RequirePermission>
                 <RequirePermission module="sales_orders" action="create"><Button size="sm" onClick={() => navigate(`${basePath}/create`)} className="h-9 rounded-2xl px-3.5"><Plus className="size-4" aria-hidden="true" />New Order</Button></RequirePermission>
               </div>
@@ -243,7 +244,7 @@ export default function OrderList() {
       {selectedIds.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
           <p className="text-sm font-medium text-primary-900">{selectedIds.length} order{selectedIds.length === 1 ? '' : 's'} selected</p>
-          <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportOrdersCsv(true)}>
+          <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportOrders(true)}>
             <Download className="size-4" aria-hidden="true" />
             Download
           </Button>
@@ -269,13 +270,13 @@ export default function OrderList() {
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="w-14 px-6 py-6"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all orders" /></th>
-                  <th className="whitespace-nowrap px-6 py-6">Order #</th>
-                  <th className="whitespace-nowrap px-6 py-6">Customer</th>
-                  <th className="whitespace-nowrap px-6 py-6">Order Date</th>
+                  <SortableHeaderCell label="Order #" sortKey="order_number" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Customer" sortKey="customer_id" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Order Date" sortKey="order_date" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Items</th>
-                  <th className="whitespace-nowrap px-6 py-6">Total</th>
-                  <th className="whitespace-nowrap px-6 py-6">Order Status</th>
-                  <th className="whitespace-nowrap px-6 py-6">Payment</th>
+                  <SortableHeaderCell label="Total" sortKey="total" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Order Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Payment" sortKey="payment_status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Fulfilment</th>
                   <th className="whitespace-nowrap px-6 py-6">Delivery Status</th>
                   <th className="whitespace-nowrap px-6 py-6">Delivery Partner</th>

@@ -9,6 +9,8 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { ROLES } from '../../auth/roles'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { getCurrentVehicleStock, listVehicleStockSessions } from '../../api/vehicleStock'
@@ -85,8 +87,35 @@ function QtyCell({ value, className = '' }) {
 }
 
 function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn, heading }) {
-  const items = session.items || []
-  const totalRemaining = items.reduce((sum, item) => sum + availableOf(item), 0)
+  // /vehicle-stock's backend sort_by/sort_order sorts SESSION/header records, not these
+  // in-session line items (confirmed against the live backend contract) - so this never sends
+  // a sort_by request for this table. `items` is already the full, already-loaded array for
+  // this one session (no pagination at this level), so sorting it locally is genuine, not a
+  // "sort only the visible page" shortcut.
+  const rawItems = useMemo(() => session.items || [], [session.items])
+  const { sortBy, sortOrder, toggleSort } = useSortState()
+  const items = useMemo(() => {
+    if (!sortBy) return rawItems
+    const accessors = {
+      productName: (item) => friendly(item.productName)?.toLowerCase() || '',
+      loaded: (item) => loadedOf(item),
+      extra: (item) => extraOf(item),
+      deliveredQuantity: (item) => Number(item.deliveredQuantity) || 0,
+      returnedQuantity: (item) => Number(item.returnedQuantity) || 0,
+      available: (item) => availableOf(item),
+    }
+    const accessor = accessors[sortBy]
+    if (!accessor) return rawItems
+    const sorted = [...rawItems].sort((a, b) => {
+      const valueA = accessor(a)
+      const valueB = accessor(b)
+      if (valueA < valueB) return -1
+      if (valueA > valueB) return 1
+      return 0
+    })
+    return sortOrder === 'desc' ? sorted.reverse() : sorted
+  }, [rawItems, sortBy, sortOrder])
+  const totalRemaining = rawItems.reduce((sum, item) => sum + availableOf(item), 0)
   const contextBits = [
     session.vehicleNumber || 'Vehicle not assigned',
     session.vehicleType,
@@ -147,14 +176,14 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn, heading }
             <table className="listing-table w-full min-w-3xl text-left text-sm">
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                  <th className="px-6 py-6">Product</th>
+                  <SortableHeaderCell label="Product" sortKey="productName" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
                   <th className="px-6 py-6">SKU / Variant</th>
                   <th className="px-6 py-6">UOM</th>
-                  <th className="px-6 py-6 text-right">Loaded</th>
-                  <th className="px-6 py-6 text-right">Extra</th>
-                  <th className="px-6 py-6 text-right">Delivered</th>
-                  <th className="px-6 py-6 text-right">Returned</th>
-                  <th className="px-6 py-6 text-right">Available</th>
+                  <SortableHeaderCell label="Loaded" sortKey="loaded" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} align="right" className="px-6 py-6" />
+                  <SortableHeaderCell label="Extra" sortKey="extra" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} align="right" className="px-6 py-6" />
+                  <SortableHeaderCell label="Delivered" sortKey="deliveredQuantity" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} align="right" className="px-6 py-6" />
+                  <SortableHeaderCell label="Returned" sortKey="returnedQuantity" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} align="right" className="px-6 py-6" />
+                  <SortableHeaderCell label="Available" sortKey="available" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} align="right" className="px-6 py-6" />
                   <th className="px-6 py-6">Status</th>
                   <th className="px-6 py-6 text-right">Actions</th>
                 </tr>

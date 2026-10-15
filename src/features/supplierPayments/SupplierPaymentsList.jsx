@@ -8,6 +8,8 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { formatCurrency } from '../../utils/format'
 import { usePermission } from '../../auth/usePermission'
 import { DEMO_MODE } from '../../config/demoMode'
@@ -99,6 +101,15 @@ export default function SupplierPaymentsList() {
   const [quickViewId, setQuickViewId] = useState(null)
   const [refresh, setRefresh] = useState(0)
   const [page, setPage] = useState(1)
+  // Column-header sorting (backend sort_by/sort_order, GET /supplier-payments supports it) takes
+  // priority over the existing Recent/Oldest/Amount toolbar control, which only ever re-sorts
+  // the already-fetched current page - see `filtered` below for how they compose.
+  const { sortBy: headerSortBy, sortOrder: headerSortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    if (!DEMO_MODE) setPage(1)
+  }
 
   const [realPayments, setRealPayments] = useState([])
   const [realSupplierOptions, setRealSupplierOptions] = useState([{ value: 'all', label: 'All Suppliers' }])
@@ -121,6 +132,7 @@ export default function SupplierPaymentsList() {
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
       search: search.trim() || undefined,
+      ...sortParams,
     })
     setIsLoading(false)
     if (!result.success) {
@@ -131,7 +143,7 @@ export default function SupplierPaymentsList() {
     }
     setRealPayments(result.payments)
     setRealTotal(result.total)
-  }, [page, statusFilter, modeFilter, dateFrom, dateTo, search, supplierFilter])
+  }, [page, statusFilter, modeFilter, dateFrom, dateTo, search, supplierFilter, sortParams])
 
   useEffect(() => {
     loadReal()
@@ -180,7 +192,9 @@ export default function SupplierPaymentsList() {
     return [{ value: 'all', label: 'All Suppliers' }, ...Array.from(suppliers, ([value, label]) => ({ value, label }))]
   }, [realSupplierOptions, rows])
 
-  // Real mode filters are server-side; sorting remains presentation-only over the current page.
+  // Real mode filters are server-side; the Recent/Oldest/Amount toolbar sort remains
+  // presentation-only over the current page. A clicked column header instead sorts via the
+  // backend's sort_by/sort_order (see loadReal above) and takes priority once active.
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
     const out = DEMO_MODE
@@ -198,13 +212,15 @@ export default function SupplierPaymentsList() {
         })
       : rows
 
+    if (!DEMO_MODE && headerSortBy) return out
+
     return out.sort((left, right) => {
       if (sortFilter === 'amount') return safeNumber(right.amount) - safeNumber(left.amount)
       const leftTime = new Date(left.paymentDate || 0).getTime()
       const rightTime = new Date(right.paymentDate || 0).getTime()
       return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
     })
-  }, [rows, search, supplierFilter, modeFilter, statusFilter, dateFrom, dateTo, sortFilter])
+  }, [rows, search, supplierFilter, modeFilter, statusFilter, dateFrom, dateTo, sortFilter, headerSortBy])
 
   // Header stats: demo -> demo ledger; real -> aggregate of the RECORDED payments on this page
   // (the backend has no supplier-payment summary endpoint, so this is page-scoped and labelled).
@@ -289,14 +305,14 @@ export default function SupplierPaymentsList() {
             <table className="listing-table w-full min-w-4xl text-left text-sm">
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                  <th className="whitespace-nowrap px-6 py-6">Payment #</th>
-                  <th className="whitespace-nowrap px-6 py-6">Supplier</th>
-                  <th className="whitespace-nowrap px-6 py-6">Payment Date</th>
-                  <th className="whitespace-nowrap px-6 py-6 text-right">Amount</th>
+                  <SortableHeaderCell label="Payment #" sortKey="payment_number" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Supplier" sortKey="supplier_id" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Payment Date" sortKey="payment_date" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Amount" sortKey="amount" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} align="right" className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6 text-right">Allocated</th>
                   <th className="whitespace-nowrap px-6 py-6 text-right">Unallocated</th>
-                  <th className="whitespace-nowrap px-6 py-6">Method</th>
-                  <th className="whitespace-nowrap px-6 py-6">Status</th>
+                  <SortableHeaderCell label="Method" sortKey="payment_method" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Status" sortKey="status" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="w-12 px-6 py-6" />
                 </tr>
               </thead>

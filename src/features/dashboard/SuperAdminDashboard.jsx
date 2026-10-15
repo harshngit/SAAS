@@ -36,6 +36,7 @@ import ActionMenu from '../../components/ui/ActionMenu'
 import { deleteOrganization, listSuperAdminOrganizations, updateOrganizationStatus } from '../../api/superadmin'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 
 const statusVariant = {
   trial: 'info',
@@ -186,7 +187,7 @@ function MiniTable({ columns, rows, emptyText }) {
   )
 }
 
-function exportDashboardReportCsv({ stats, dateWindow, organizations }) {
+function exportDashboardReport({ stats, dateWindow, organizations }) {
   const summaryRows = [
     ['Metric', 'Value'],
     ['Date Range', dateWindow.label],
@@ -207,17 +208,7 @@ function exportDashboardReportCsv({ stats, dateWindow, organizations }) {
       organization.priceMonthly,
     ]),
   ]
-  const csv = summaryRows
-    .map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'superadmin-dashboard-report.csv'
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
+  exportRowsToExcel('superadmin-dashboard-report', summaryRows)
 }
 
 export default function SuperAdminDashboard() {
@@ -479,7 +470,7 @@ export default function SuperAdminDashboard() {
           </div>
           <button
             type="button"
-            onClick={() => exportDashboardReportCsv({ stats, dateWindow, organizations: organizationsInDateWindow })}
+            onClick={() => exportDashboardReport({ stats, dateWindow, organizations: organizationsInDateWindow })}
             className="inline-flex h-11 items-center justify-center gap-3 rounded-xl border border-primary-100 bg-primary-50 px-5 text-sm font-bold text-primary-800 shadow-[0_12px_26px_-24px_rgb(0_9_42/0.65)]"
           >
             <ArrowDownToLine className="size-4" aria-hidden="true" />

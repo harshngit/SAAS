@@ -156,6 +156,8 @@ export async function listSupplierPayments(params = {}) {
     if (params.search) query.search = params.search
     query.page = params.page ?? 1
     query.page_size = Math.min(Math.max(params.page_size ?? 25, 1), 100)
+    if (params.sort_by) query.sort_by = params.sort_by
+    if (params.sort_order) query.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/supplier-payments', { params: query })
     const { rows, total } = unwrapList(data)

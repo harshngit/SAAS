@@ -257,9 +257,9 @@ export default function CollectionReconciliation() {
                       { key: 'deliveryNumber', header: 'Delivery #', sortable: true, render: (r) => r.deliveryNumber || '—' },
                       { key: 'orderNumber', header: 'Order #', sortable: true, render: (r) => r.orderNumber || '—' },
                       { key: 'customerName', header: 'Customer', sortable: true, render: (r) => r.customerName || '—' },
-                      { key: 'deliveryPartnerName', header: 'Delivery Partner', render: (r) => r.deliveryPartnerName || '—' },
+                      { key: 'deliveryPartnerName', header: 'Delivery Partner', sortable: true, render: (r) => r.deliveryPartnerName || '—' },
                       { key: '_amount', header: 'Amount', sortable: true, align: 'right', render: (r) => formatCurrency(r._amount) },
-                      { key: '_modeLabel', header: 'Payment Mode' },
+                      { key: '_modeLabel', header: 'Payment Mode', sortable: true },
                       { key: '_recordedAtLabel', header: 'Recorded At', sortable: true },
                       {
                         key: 'status',

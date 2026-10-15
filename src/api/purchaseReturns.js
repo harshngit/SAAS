@@ -169,6 +169,8 @@ export async function listPurchaseReturns(params = {}) {
     if (params.dateTo || params.date_to) queryParams.date_to = params.dateTo || params.date_to
     if (params.page) queryParams.page = params.page
     if (params.pageSize || params.page_size) queryParams.page_size = params.pageSize || params.page_size
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/purchase-returns', {
       headers: authHeader(),

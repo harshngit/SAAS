@@ -569,10 +569,14 @@ body {
 }
 
 /* Shared visual language for primary list tables - theme-aware (Part 2.3/2.4: this one block is
-   what themes every page's .listing-table without touching each page). */
+   what themes every page's .listing-table without touching each page). Header background/text
+   use the org's own accent + its WCAG-computed contrast color (ThemeProvider/themeConfig.js) -
+   never a fixed color - so every .listing-table header re-colors itself automatically whenever
+   the accent changes (default, a preset, or a fully custom picked color), in both light and
+   dark mode, with no per-page change required. */
 .listing-table thead tr {
   border-bottom: 1px solid var(--color-surface-border);
-  background: var(--color-surface-muted);
+  background: var(--color-accent);
 }
 
 .listing-table thead th {
@@ -582,12 +586,12 @@ body {
      against this selector, so changing padding/font here is the only way that reliably takes
      effect across the app - see CustomerList.jsx's own now-redundant px-4/py-3/text-xs classes). */
   padding: 0.75rem 1rem;
-  color: var(--color-fg-muted);
+  color: var(--color-accent-contrast);
   font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: normal;
   line-height: 1.2;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 
@@ -617,20 +621,21 @@ body {
   font-size: 0.6875rem;
 }
 
-/* Keep standard tables consistent even on feature pages that use inline table markup. */
+/* Keep standard tables consistent even on feature pages that use inline table markup - same
+   accent-themed header as .listing-table above. */
 main table:not(.od-products):not(.dd-products):not(.listing-table) thead tr {
   border-bottom: 1px solid var(--color-surface-border);
-  background: var(--color-surface-muted);
+  background: var(--color-accent);
 }
 
 main table:not(.od-products):not(.dd-products):not(.listing-table) thead th {
   padding: 0.75rem 1rem;
-  color: var(--color-fg-muted);
+  color: var(--color-accent-contrast);
   font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: normal;
   line-height: 1.2;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 

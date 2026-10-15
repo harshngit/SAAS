@@ -24,7 +24,10 @@ import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 import { getOrganizationOverview } from '../../api/organizations'
 
 // Same real recent_activity vocabulary already proven correct in CompanySettings.jsx's own
@@ -95,19 +98,10 @@ function formatTimestamp(value) {
 // activity_limit, 1-100) - the fullest real audit trail this endpoint can return in one call.
 const ACTIVITY_LIMIT = 100
 
-function exportAuditLogsCsv(rows) {
+function exportAuditLogs(rows) {
   const headers = ['Date', 'Type', 'Title', 'Description', 'By']
-  const csvRows = rows.map((log) => [formatTimestamp(log.at), typeLabel(log.type), log.title || '', log.description || '', log.by || ''])
-  const csv = [headers, ...csvRows]
-    .map((values) => values.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'audit-log.csv'
-  link.click()
-  URL.revokeObjectURL(url)
+  const dataRows = rows.map((log) => [formatTimestamp(log.at), typeLabel(log.type), log.title || '', log.description || '', log.by || ''])
+  exportRowsToExcel('audit-log', [headers, ...dataRows])
 }
 
 export default function AuditLogList() {
@@ -206,13 +200,37 @@ export default function AuditLogList() {
     [logs, dateFrom, dateTo, typeFilter, actorFilter],
   )
 
+  // This activity feed (getOrganizationOverview) loads its full matching set in one call with
+  // no backend sort_by - sorting is done locally over the already-loaded array.
+  const { sortBy, sortOrder, toggleSort } = useSortState()
   const visibleLogs = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
-    if (!query) return filteredLogs
-    return filteredLogs.filter((log) =>
-      [log.title, log.description, log.by, typeLabel(log.type)].filter(Boolean).some((value) => String(value).toLowerCase().includes(query)),
-    )
-  }, [filteredLogs, searchTerm])
+    const base = !query
+      ? filteredLogs
+      : filteredLogs.filter((log) =>
+          [log.title, log.description, log.by, typeLabel(log.type)].filter(Boolean).some((value) => String(value).toLowerCase().includes(query)),
+        )
+
+    if (!sortBy) return base
+
+    const accessors = {
+      title: (log) => log.title?.toLowerCase() || '',
+      type: (log) => typeLabel(log.type)?.toLowerCase() || '',
+      by: (log) => log.by?.toLowerCase() || '',
+      at: (log) => new Date(log.at || 0).getTime(),
+    }
+    const accessor = accessors[sortBy]
+    if (!accessor) return base
+
+    const sorted = [...base].sort((a, b) => {
+      const valueA = accessor(a)
+      const valueB = accessor(b)
+      if (valueA < valueB) return -1
+      if (valueA > valueB) return 1
+      return 0
+    })
+    return sortOrder === 'desc' ? sorted.reverse() : sorted
+  }, [filteredLogs, searchTerm, sortBy, sortOrder])
 
   const totalPages = Math.max(1, Math.ceil(visibleLogs.length / rowsPerPage))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -256,7 +274,7 @@ export default function AuditLogList() {
                 <SlidersHorizontal className="size-4" aria-hidden="true" />
                 Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
               </Button>
-              <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportAuditLogsCsv(visibleLogs)}>
+              <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportAuditLogs(visibleLogs)}>
                 <Download className="size-4" aria-hidden="true" />
                 Export
               </Button>
@@ -337,10 +355,10 @@ export default function AuditLogList() {
             <table className="listing-table w-full min-w-[56rem] text-left text-sm">
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                  <th className="px-6 py-6">Action</th>
-                  <th className="px-6 py-6">Type</th>
-                  <th className="px-6 py-6">By</th>
-                  <th className="px-6 py-6">Date</th>
+                  <SortableHeaderCell label="Action" sortKey="title" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
+                  <SortableHeaderCell label="Type" sortKey="type" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
+                  <SortableHeaderCell label="By" sortKey="by" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
+                  <SortableHeaderCell label="Date" sortKey="at" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
                 </tr>
               </thead>
               <tbody>

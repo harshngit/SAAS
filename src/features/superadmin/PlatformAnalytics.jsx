@@ -28,6 +28,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import ActionMenu from '../../components/ui/ActionMenu'
 import { listSuperAdminOrganizations } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 
 const statusVariant = {
   active: 'success',
@@ -136,7 +137,7 @@ function MetricCard({ icon: Icon, label, value, tone = 'green' }) {
   )
 }
 
-function exportAnalyticsCsv(organizations) {
+function exportAnalytics(organizations) {
   const rows = [
     ['Organization', 'Plan', 'Status', 'Email', 'Created'],
     ...organizations.map((org) => [
@@ -147,15 +148,7 @@ function exportAnalyticsCsv(organizations) {
       formatDateLabel(org.created_at, true),
     ]),
   ]
-  const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'platform-analytics.csv'
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
+  exportRowsToExcel('platform-analytics', rows)
 }
 
 export default function PlatformAnalytics() {
@@ -391,7 +384,7 @@ export default function PlatformAnalytics() {
               </div>
             )}
           </div>
-          <Button type="button" onClick={() => exportAnalyticsCsv(filteredOrganizations)} size="sm" className="h-9 rounded-xl px-5 text-[12px] font-bold">
+          <Button type="button" onClick={() => exportAnalytics(filteredOrganizations)} size="sm" className="h-9 rounded-xl px-5 text-[12px] font-bold">
             <ArrowDownToLine className="size-4" aria-hidden="true" />
             Export Report
           </Button>

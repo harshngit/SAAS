@@ -270,6 +270,8 @@ export async function listPurchases(params = {}) {
     if (params.tag) queryParams.tag = params.tag
     if (params.skip !== undefined) queryParams.skip = params.skip
     if (params.limit !== undefined) queryParams.limit = params.limit
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/purchases', {
       headers: authHeader(),

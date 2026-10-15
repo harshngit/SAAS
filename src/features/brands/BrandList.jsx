@@ -16,8 +16,11 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 
 const emptyForm = {
   name: '',
@@ -141,6 +144,15 @@ export default function BrandList() {
   // Product count per brand - derived from the existing listProducts() API (one call for the
   // whole page, not per row), never a fake/invented number. Absent entries just show '-'.
   const [productCountByBrandId, setProductCountByBrandId] = useState({})
+  // GET /brands has no sort_by/sort_order support (confirmed against the live backend contract)
+  // and this page already loads its full matching set in one call (no server pagination) - so
+  // sorting here is done locally over the already-loaded array, never against the backend.
+  const { sortBy, sortOrder, toggleSort } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    setPage(1)
+  }
 
   useEffect(() => {
     listProducts().then((result) => {
@@ -191,9 +203,31 @@ export default function BrandList() {
     })
   }, [brands, searchTerm, statusFilter, dateFrom, dateTo])
 
+  const sortedBrands = useMemo(() => {
+    if (!sortBy) return filteredBrands
+
+    const accessors = {
+      name: (brand) => brand.name?.toLowerCase() || '',
+      description: (brand) => brand.description?.toLowerCase() || '',
+      products: (brand) => productCountByBrandId[brand.id] || 0,
+      status: (brand) => (brand.isActive ? 1 : 0),
+    }
+    const accessor = accessors[sortBy]
+    if (!accessor) return filteredBrands
+
+    const sorted = [...filteredBrands].sort((a, b) => {
+      const valueA = accessor(a)
+      const valueB = accessor(b)
+      if (valueA < valueB) return -1
+      if (valueA > valueB) return 1
+      return 0
+    })
+    return sortOrder === 'desc' ? sorted.reverse() : sorted
+  }, [filteredBrands, sortBy, sortOrder, productCountByBrandId])
+
   const totalPages = Math.max(1, Math.ceil(filteredBrands.length / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
-  const visibleBrands = filteredBrands.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize))
+  const visibleBrands = sortedBrands.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize))
   const allVisibleSelected = visibleBrands.length > 0 && visibleBrands.every((brand) => selectedIds.includes(brand.id))
   const rangeStart = filteredBrands.length === 0 ? 0 : (currentPage - 1) * Number(pageSize) + 1
   const rangeEnd = Math.min(filteredBrands.length, currentPage * Number(pageSize))
@@ -251,17 +285,10 @@ export default function BrandList() {
     setSelectedIds((current) => [...new Set([...current, ...visibleBrands.map((brand) => brand.id)])])
   }
 
-  const exportSelectedBrands = () => {
-    const rows = [['Brand', 'Description', 'Status'], ...brands.filter((brand) => selectedIds.includes(brand.id)).map((brand) => [brand.name, brand.description, brand.isActive ? 'Active' : 'Inactive'])]
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'brands.csv'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+  const exportBrands = (onlySelected = false) => {
+    const brandsToExport = onlySelected ? brands.filter((brand) => selectedIds.includes(brand.id)) : sortedBrands
+    const rows = [['Brand', 'Description', 'Status'], ...brandsToExport.map((brand) => [brand.name, brand.description, brand.isActive ? 'Active' : 'Inactive'])]
+    exportRowsToExcel('brands', rows)
   }
 
   const handleDelete = async () => {
@@ -365,9 +392,10 @@ export default function BrandList() {
                 </div>
               )}
             </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => exportBrands()}><Download className="size-4" aria-hidden="true" />Export</Button>
               {selectedIds.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={exportSelectedBrands}><Download className="size-4" aria-hidden="true" />Download</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => exportBrands(true)}><Download className="size-4" aria-hidden="true" />Download</Button>
                   <Button type="button" variant="danger" size="sm" onClick={() => setDeleteTarget({ type: 'bulk' })}><Trash2 className="size-4" aria-hidden="true" />Delete Selected</Button>
                 </div>
               )}
@@ -418,10 +446,10 @@ export default function BrandList() {
                       className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                     />
                   </th>
-                  <th className="whitespace-nowrap px-6 py-6">Brand</th>
-                  <th className="whitespace-nowrap px-6 py-6">Description</th>
-                  <th className="whitespace-nowrap px-6 py-6">Products</th>
-                  <th className="whitespace-nowrap px-6 py-6">Status</th>
+                  <SortableHeaderCell label="Brand" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Description" sortKey="description" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Products" sortKey="products" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>

@@ -308,6 +308,8 @@ export async function listOrders(params = {}) {
     if (params.customer_id) queryParams.customer_id = params.customer_id
     if (params.assigned_delivery_partner_id) queryParams.assigned_delivery_partner_id = params.assigned_delivery_partner_id
     if (params.search) queryParams.search = params.search
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/orders', {
       headers: authHeader(),

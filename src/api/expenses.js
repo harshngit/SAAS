@@ -131,6 +131,8 @@ export async function listExpenses(params = {}) {
     if (params.category) queryParams.category = params.category
     if (params.status) queryParams.status = toExpenseStatusParam(params.status)
     if (params.submitted_by) queryParams.submitted_by = params.submitted_by
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/expenses', {
       headers: authHeader(),

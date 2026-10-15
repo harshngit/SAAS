@@ -162,11 +162,15 @@ function normalizeQuotation(quotation) {
   }
 }
 
-export async function listQuotations() {
+export async function listQuotations(params = {}) {
   try {
+    const queryParams = { page_size: 100 }
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
+
     const { data } = await apiClient.get('/quotations', {
       headers: authHeader(),
-      params: { page_size: 100 },
+      params: queryParams,
     })
 
     const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []

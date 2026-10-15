@@ -404,19 +404,24 @@ export default function FinancialReports({
     ? Object.keys(report?.summary || {}).length > 0
     : rows.length > 0
 
+  // Statement-style reports (balance-sheet, notes-to-balance-sheet) explicitly opt out - their
+  // rows are line items, not individually-exportable documents, and have no confirmed id field.
+  const rowExportEnabled = config?.supportsRowExport !== false
+
   const resolveRowId = useCallback(
     (row) => {
+      if (!rowExportEnabled) return null
       if (typeof config?.resolveRowId === 'function') return config.resolveRowId(row)
       if (config?.rowIdKey) return row[config.rowIdKey] ?? null
       return row.id ?? null
     },
-    [config],
+    [config, rowExportEnabled],
   )
 
   const handleExportRow = async (row, format) => {
     const rowId = resolveRowId(row)
     if (!rowId) {
-      setExportError("Couldn't export this row — please refresh the report and try again.")
+      setExportError('This row cannot be exported individually.')
       return
     }
     const { page: _page, page_size: _pageSize, ...exportParams } = requestParams
@@ -590,7 +595,13 @@ export default function FinancialReports({
                 <>
                   <ReportChart chart={report?.chart} fallbackTitle={config?.chartTitle} chartKeys={config?.chartKeys} />
 
-                  <ReportTable columns={columns} rows={rows} sortable resolveRowId={resolveRowId} onExportRow={handleExportRow} />
+                  <ReportTable
+                    columns={columns}
+                    rows={rows}
+                    sortable
+                    resolveRowId={rowExportEnabled ? resolveRowId : undefined}
+                    onExportRow={rowExportEnabled ? handleExportRow : undefined}
+                  />
 
                   <div className="flex flex-col items-center justify-between gap-3 pt-1 text-sm text-neutral-500 sm:flex-row">
                     <div className="flex items-center gap-3">

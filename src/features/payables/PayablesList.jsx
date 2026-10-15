@@ -9,6 +9,8 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
@@ -63,6 +65,15 @@ export default function PayablesList() {
   const [recordPreset, setRecordPreset] = useState(null)
   const [refresh, setRefresh] = useState(0)
   const [page, setPage] = useState(1)
+  // Column-header sorting (backend sort_by/sort_order, GET /accounts-payable supports it) takes
+  // priority over the existing Recent/Oldest/Outstanding/Due Date toolbar control, which only
+  // ever re-sorts the already-fetched current page - see `filtered` below for how they compose.
+  const { sortBy: headerSortBy, sortOrder: headerSortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    if (!DEMO_MODE) setPage(1)
+  }
 
   // ---- real data ------------------------------------------------------
   const [realPayables, setRealPayables] = useState([])
@@ -84,6 +95,7 @@ export default function PayablesList() {
         search: search.trim() || undefined,
         page,
         page_size: PAGE_SIZE,
+        ...sortParams,
       }),
       getAccountsPayableSummary({ supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined }),
     ])
@@ -98,7 +110,7 @@ export default function PayablesList() {
     setRealPayables(listResult.payables)
     setRealTotal(listResult.total)
     setRealSummary(summaryResult.success ? summaryResult.summary : null)
-  }, [ageingFilter, page, paymentStatusFilter, search, supplierFilter])
+  }, [ageingFilter, page, paymentStatusFilter, search, supplierFilter, sortParams])
 
   useEffect(() => {
     loadReal()
@@ -172,6 +184,10 @@ export default function PayablesList() {
 
   const filtered = useMemo(() => {
     if (!DEMO_MODE) {
+      // A clicked column header already sorted `rows` via the backend's sort_by/sort_order -
+      // keep that order rather than re-sorting it by date/outstanding here.
+      if (headerSortBy) return rows
+
       return [...rows].sort((left, right) => {
         if (sortFilter === 'outstanding') return safeNumber(right.outstanding) - safeNumber(left.outstanding)
         if (sortFilter === 'dueDate') return new Date(left.dueDate || 0).getTime() - new Date(right.dueDate || 0).getTime()
@@ -202,7 +218,7 @@ export default function PayablesList() {
       const rightTime = new Date(right.invoiceDate || 0).getTime()
       return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
     })
-  }, [rows, search, supplierFilter, paymentStatusFilter, dueFilter, ageingFilter, sortFilter, dateFrom, dateTo])
+  }, [rows, search, supplierFilter, paymentStatusFilter, dueFilter, ageingFilter, sortFilter, dateFrom, dateTo, headerSortBy])
 
   // Header metrics: real -> ALWAYS the backend summary (reflects all matching payables, not the
   // visible page). Demo -> derived from the demo store.
@@ -331,14 +347,14 @@ export default function PayablesList() {
             <table className="listing-table w-full min-w-4xl text-left text-sm">
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                  <th className="whitespace-nowrap px-6 py-6">Supplier</th>
-                  <th className="whitespace-nowrap px-6 py-6">Supplier Invoice #</th>
-                  <th className="whitespace-nowrap px-6 py-6">Invoice Date</th>
-                  <th className="whitespace-nowrap px-6 py-6">Due Date</th>
-                  <th className="whitespace-nowrap px-6 py-6 text-right">Total</th>
-                  <th className="whitespace-nowrap px-6 py-6 text-right">Paid</th>
-                  <th className="whitespace-nowrap px-6 py-6 text-right">Outstanding</th>
-                  <th className="whitespace-nowrap px-6 py-6">Payment</th>
+                  <SortableHeaderCell label="Supplier" sortKey="supplier_id" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Supplier Invoice #" sortKey="supplier_invoice_number" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Invoice Date" sortKey="invoice_date" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Due Date" sortKey="due_date" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Total" sortKey="grand_total" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} align="right" className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Paid" sortKey="amount_paid" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} align="right" className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Outstanding" sortKey="outstanding_amount" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} align="right" className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Payment" sortKey="payment_status" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Ageing</th>
                   <th className="whitespace-nowrap px-6 py-6 text-right">Action</th>
                 </tr>

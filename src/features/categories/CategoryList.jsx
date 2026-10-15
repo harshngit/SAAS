@@ -17,8 +17,11 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 import { readImageAsDataUrl } from '../../utils/imageFile'
 import { getFileUrl } from '../../api/files'
 
@@ -231,6 +234,16 @@ export default function CategoryList() {
   const [deleteError, setDeleteError] = useState('')
   const [detailsError, setDetailsError] = useState('')
   const [isDetailsLoading, setIsDetailsLoading] = useState(false)
+  // GET /categories has no sort_by/sort_order support (confirmed against the live backend
+  // contract) and this page already loads its full matching set in one call - so column-header
+  // sorting is done locally. It takes priority over the existing Recent/Oldest toolbar sort
+  // once a header is clicked; clearing it (3rd click) falls back to that existing control.
+  const { sortBy, sortOrder, toggleSort } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    setPage(1)
+  }
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
@@ -248,6 +261,27 @@ export default function CategoryList() {
         .some((value) => value.toLowerCase().includes(normalizedSearch))
     })
 
+    if (sortBy) {
+      const accessors = {
+        name: (category) => category.name?.toLowerCase() || '',
+        parent: (category) => (category.parentId ? categories.find((item) => item.id === category.parentId)?.name?.toLowerCase() || '' : ''),
+        image: (category) => (category.image ? 1 : 0),
+        description: (category) => category.description?.toLowerCase() || '',
+      }
+      const accessor = accessors[sortBy]
+
+      if (accessor) {
+        const sorted = [...filtered].sort((a, b) => {
+          const valueA = accessor(a)
+          const valueB = accessor(b)
+          if (valueA < valueB) return -1
+          if (valueA > valueB) return 1
+          return 0
+        })
+        return sortOrder === 'desc' ? sorted.reverse() : sorted
+      }
+    }
+
     return filtered.sort((left, right) => {
       const leftTime = new Date(left.createdAt || 0).getTime()
       const rightTime = new Date(right.createdAt || 0).getTime()
@@ -255,7 +289,7 @@ export default function CategoryList() {
       if (categorySort === 'oldest') return leftTime - rightTime
       return rightTime - leftTime
     })
-  }, [categoryFilter, categorySort, categories, searchTerm, dateFrom, dateTo])
+  }, [categoryFilter, categorySort, categories, searchTerm, dateFrom, dateTo, sortBy, sortOrder])
 
   const totalPages = Math.max(1, Math.ceil(filteredCategories.length / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
@@ -400,17 +434,10 @@ export default function CategoryList() {
     setSelectedIds((current) => [...new Set([...current, ...visibleCategories.map((category) => category.id)])])
   }
 
-  const exportSelectedCategories = () => {
-    const rows = [['Category', 'Parent', 'Description'], ...categories.filter((category) => selectedIds.includes(category.id)).map((category) => [category.name, category.parentId ? categories.find((item) => item.id === category.parentId)?.name || '' : '', category.description])]
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'categories.csv'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+  const exportCategories = (onlySelected = false) => {
+    const categoriesToExport = onlySelected ? categories.filter((category) => selectedIds.includes(category.id)) : filteredCategories
+    const rows = [['Category', 'Parent', 'Description'], ...categoriesToExport.map((category) => [category.name, category.parentId ? categories.find((item) => item.id === category.parentId)?.name || '' : '', category.description])]
+    exportRowsToExcel('categories', rows)
   }
 
   const handleDelete = async () => {
@@ -521,8 +548,9 @@ export default function CategoryList() {
                 </div>
               )}
             </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => exportCategories()}><Download className="size-4" aria-hidden="true" />Export</Button>
               {selectedIds.length > 0 && (
-                <div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" onClick={exportSelectedCategories}><Download className="size-4" aria-hidden="true" />Download</Button><Button type="button" variant="danger" size="sm" onClick={() => setDeleteTarget({ type: 'bulk' })}><Trash2 className="size-4" aria-hidden="true" />Delete Selected</Button></div>
+                <div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" onClick={() => exportCategories(true)}><Download className="size-4" aria-hidden="true" />Download</Button><Button type="button" variant="danger" size="sm" onClick={() => setDeleteTarget({ type: 'bulk' })}><Trash2 className="size-4" aria-hidden="true" />Delete Selected</Button></div>
               )}
               <Button type="button" size="sm" onClick={() => navigate('/admin/categories/new')}>
                 <Plus className="size-4" aria-hidden="true" />
@@ -580,10 +608,10 @@ export default function CategoryList() {
                       className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                     />
                   </th>
-                  <th className="whitespace-nowrap px-6 py-6">Category</th>
-                  <th className="whitespace-nowrap px-6 py-6">Parent</th>
-                  <th className="whitespace-nowrap px-6 py-6">Image</th>
-                  <th className="whitespace-nowrap px-6 py-6">Description</th>
+                  <SortableHeaderCell label="Category" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Parent" sortKey="parent" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Image" sortKey="image" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Description" sortKey="description" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>

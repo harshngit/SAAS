@@ -9,6 +9,8 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { formatCurrency } from '../../utils/format'
@@ -105,6 +107,15 @@ export default function SupplierInvoiceList() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [page, setPage] = useState(1)
+  // Column-header sorting (backend sort_by/sort_order, GET /supplier-invoices supports it) takes
+  // priority over the existing Recent/Oldest/Due Date toolbar control, which only ever re-sorts
+  // the already-fetched current page - see `rows` below for how the two compose.
+  const { sortBy: headerSortBy, sortOrder: headerSortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    if (!DEMO_MODE) setPage(1)
+  }
 
   const [realInvoices, setRealInvoices] = useState([])
   const [realSupplierOptions, setRealSupplierOptions] = useState([{ value: 'all', label: 'All Suppliers' }])
@@ -124,6 +135,7 @@ export default function SupplierInvoiceList() {
       search: search.trim() || undefined,
       page,
       page_size: PAGE_SIZE,
+      ...sortParams,
     })
     setIsLoading(false)
     if (!result.success) {
@@ -134,7 +146,7 @@ export default function SupplierInvoiceList() {
     }
     setRealInvoices(result.invoices)
     setRealTotal(result.total)
-  }, [lifecycleFilter, page, paymentStatusFilter, search, supplierFilter, verificationFilter])
+  }, [lifecycleFilter, page, paymentStatusFilter, search, supplierFilter, verificationFilter, sortParams])
 
   useEffect(() => {
     load()
@@ -180,6 +192,10 @@ export default function SupplierInvoiceList() {
 
   const filtered = useMemo(() => {
     if (!DEMO_MODE) {
+      // A clicked column header already sorted `rows` via the backend's sort_by/sort_order -
+      // keep that order rather than re-sorting it by date here.
+      if (headerSortBy) return rows
+
       return [...rows].sort((left, right) => {
         if (sortFilter === 'dueDate') return new Date(left.dueDate || 0).getTime() - new Date(right.dueDate || 0).getTime()
         const leftTime = new Date(left.invoiceDate || 0).getTime()
@@ -211,7 +227,7 @@ export default function SupplierInvoiceList() {
       const rightTime = new Date(right.invoiceDate || 0).getTime()
       return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
     })
-  }, [rows, search, supplierFilter, lifecycleFilter, verificationFilter, paymentStatusFilter, sortFilter, dateFrom, dateTo])
+  }, [rows, search, supplierFilter, lifecycleFilter, verificationFilter, paymentStatusFilter, sortFilter, dateFrom, dateTo, headerSortBy])
 
   const stats = useMemo(() => {
     const totalValue = rows.reduce((sum, row) => sum + safeNumber(row.grandTotal), 0)
@@ -316,16 +332,16 @@ export default function SupplierInvoiceList() {
             <table className="listing-table w-full min-w-4xl text-left text-sm">
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                  <th className="whitespace-nowrap px-6 py-6">Supplier Invoice #</th>
-                  <th className="whitespace-nowrap px-6 py-6">Supplier</th>
+                  <SortableHeaderCell label="Supplier Invoice #" sortKey="supplier_invoice_number" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Supplier" sortKey="supplier_id" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Purchase</th>
-                  <th className="whitespace-nowrap px-6 py-6">Invoice Date</th>
-                  <th className="whitespace-nowrap px-6 py-6">Due Date</th>
-                  <th className="whitespace-nowrap px-6 py-6 text-right">Total</th>
-                  <th className="whitespace-nowrap px-6 py-6 text-right">Outstanding</th>
-                  <th className="whitespace-nowrap px-6 py-6">Status</th>
-                  <th className="whitespace-nowrap px-6 py-6">Verification</th>
-                  <th className="whitespace-nowrap px-6 py-6">Payment</th>
+                  <SortableHeaderCell label="Invoice Date" sortKey="invoice_date" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Due Date" sortKey="due_date" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Total" sortKey="grand_total" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} align="right" className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Outstanding" sortKey="outstanding_amount" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} align="right" className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Status" sortKey="status" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Verification" sortKey="verification_status" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Payment" sortKey="payment_status" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="w-12 px-6 py-6" />
                 </tr>
               </thead>

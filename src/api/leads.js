@@ -229,6 +229,8 @@ export async function listLeads(params = {}) {
     }
     if (params.createdFrom || params.created_from) queryParams.created_from = params.createdFrom || params.created_from
     if (params.createdTo || params.created_to) queryParams.created_to = params.createdTo || params.created_to
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/leads', {
       headers: authHeader(),

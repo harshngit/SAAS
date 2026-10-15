@@ -6,6 +6,8 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import StatCard from '../../components/ui/StatCard'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import ListFilterPanel from '../../components/ui/ListFilterPanel'
@@ -51,6 +53,12 @@ export default function PurchaseReturnList() {
   const [loadError, setLoadError] = useState('')
   const [realStats, setRealStats] = useState(null)
   const [supplierOptions, setSupplierOptions] = useState([{ value: 'all', label: 'All suppliers' }])
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    setPage(1)
+  }
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const hasExtraFilters = supplierFilter !== 'all' || datePreset !== 'all'
@@ -98,6 +106,7 @@ export default function PurchaseReturnList() {
       search: debouncedSearch || undefined,
       page,
       pageSize: Number(pageSize),
+      ...sortParams,
     })
 
     if (!result.success) {
@@ -111,7 +120,7 @@ export default function PurchaseReturnList() {
     setRealReturns(result.purchaseReturns)
     setTotal(result.total ?? result.purchaseReturns.length)
     setIsLoading(false)
-  }, [statusFilter, supplierFilter, dateFrom, dateTo, debouncedSearch, page, pageSize])
+  }, [statusFilter, supplierFilter, dateFrom, dateTo, debouncedSearch, page, pageSize, sortParams])
 
   useEffect(() => {
     loadReal()
@@ -252,13 +261,13 @@ export default function PurchaseReturnList() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  <th className="whitespace-nowrap px-4 py-3">Return</th>
-                  <th className="whitespace-nowrap px-4 py-3">Supplier</th>
+                  <SortableHeaderCell label="Return" sortKey="return_number" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Supplier" sortKey="supplier_id" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
                   <th className="whitespace-nowrap px-4 py-3">Purchase / GRN</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right">Items</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right">Return Qty</th>
-                  <th className="whitespace-nowrap px-4 py-3">Return Date</th>
-                  <th className="whitespace-nowrap px-4 py-3">Status</th>
+                  <SortableHeaderCell label="Return Date" sortKey="return_date" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
                 </tr>
               </thead>
               <tbody>

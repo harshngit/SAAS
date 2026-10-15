@@ -10,6 +10,8 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { formatCurrency } from '../../utils/format'
 import { DEMO_MODE } from '../../config/demoMode'
 import { deletePurchase, listPurchases } from '../../api/purchases'
@@ -62,6 +64,14 @@ export default function PurchaseInvoiceList() {
   const [receivingStatusFilter, setReceivingStatusFilter] = useState('all')
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all')
   const [sortFilter, setSortFilter] = useState('recent')
+  // Column-header sorting (backend sort_by/sort_order, GET /purchases supports it) takes
+  // priority over the existing Recent/Oldest toolbar control once a header is clicked; clearing
+  // it (3rd click) falls back to that existing date-based default - see filteredPurchases below.
+  const { sortBy: headerSortBy, sortOrder: headerSortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+  }
 
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -79,7 +89,7 @@ export default function PurchaseInvoiceList() {
       return
     }
 
-    const result = await listPurchases({})
+    const result = await listPurchases(sortParams)
     if (!result.success) {
       setPurchases([])
       setListError(result.error)
@@ -89,7 +99,7 @@ export default function PurchaseInvoiceList() {
 
     setPurchases(result.purchases)
     setIsLoading(false)
-  }, [])
+  }, [sortParams])
 
   useEffect(() => {
     loadPurchases()
@@ -115,12 +125,16 @@ export default function PurchaseInvoiceList() {
       return matchesSearch && matchesSupplier && matchesPurchaseStatus && matchesReceiving && matchesPayment
     })
 
+    // A clicked column header already sorted this array via the backend's sort_by/sort_order -
+    // keep that order (filter() is order-preserving) rather than re-sorting it by date here.
+    if (headerSortBy) return filtered
+
     return filtered.sort((left, right) => {
       const leftTime = new Date(left.purchaseDate || left.invoiceDate || left.createdAt || 0).getTime()
       const rightTime = new Date(right.purchaseDate || right.invoiceDate || right.createdAt || 0).getTime()
       return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
     })
-  }, [purchases, search, supplierFilter, purchaseStatusFilter, receivingStatusFilter, paymentStatusFilter, sortFilter])
+  }, [purchases, search, supplierFilter, purchaseStatusFilter, receivingStatusFilter, paymentStatusFilter, sortFilter, headerSortBy])
 
   const stats = useMemo(() => {
     const totalValue = purchases.reduce((sum, purchase) => sum + (purchase.total || 0), 0)
@@ -271,11 +285,11 @@ export default function PurchaseInvoiceList() {
               <table className="listing-table hidden w-full min-w-6xl text-left text-sm md:table">
                 <thead>
                   <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Purchase #</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Supplier</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Purchase Date</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Warehouse</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Grand Total</th>
+                    <SortableHeaderCell label="Purchase #" sortKey="purchase_number" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400" />
+                    <SortableHeaderCell label="Supplier" sortKey="supplier_id" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400" />
+                    <SortableHeaderCell label="Purchase Date" sortKey="purchase_date" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400" />
+                    <SortableHeaderCell label="Warehouse" sortKey="warehouse_id" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400" />
+                    <SortableHeaderCell label="Grand Total" sortKey="total" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} align="right" className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400" />
                     <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Receiving Status</th>
                     <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Payment Status</th>
                     <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Purchase Status</th>

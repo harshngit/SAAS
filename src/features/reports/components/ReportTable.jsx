@@ -170,7 +170,7 @@ export default function ReportTable({ columns, rows, getRowKey, sortable = false
                       <button
                         type="button"
                         disabled={!rowId || Boolean(exportingRow)}
-                        title={rowId ? 'Export this row as PDF' : "This row can't be exported - refresh the report and try again"}
+                        title={rowId ? 'Export this row as PDF' : 'This row cannot be exported individually'}
                         onClick={() => handleRowExportClick(row, rowKey, 'pdf')}
                         className="flex size-7 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 hover:border-primary-300 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-40"
                       >
@@ -183,7 +183,7 @@ export default function ReportTable({ columns, rows, getRowKey, sortable = false
                       <button
                         type="button"
                         disabled={!rowId || Boolean(exportingRow)}
-                        title={rowId ? 'Export this row as Excel' : "This row can't be exported - refresh the report and try again"}
+                        title={rowId ? 'Export this row as Excel' : 'This row cannot be exported individually'}
                         onClick={() => handleRowExportClick(row, rowKey, 'excel')}
                         className="flex size-7 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 hover:border-primary-300 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-40"
                       >

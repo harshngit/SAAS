@@ -239,6 +239,8 @@ export async function listSupplierInvoices(params = {}) {
     if (params.page_size !== undefined) query.page_size = params.page_size
     if (params.skip !== undefined) query.skip = params.skip
     if (params.limit !== undefined) query.limit = params.limit
+    if (params.sort_by) query.sort_by = params.sort_by
+    if (params.sort_order) query.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/supplier-invoices', { params: query })
     const { rows, total } = unwrapList(data)

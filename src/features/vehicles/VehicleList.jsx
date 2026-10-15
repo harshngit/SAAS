@@ -13,6 +13,8 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import {
@@ -66,6 +68,10 @@ export default function VehicleList() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  // This page already loads its full matching set in one call (listVehicles, page_size 100) and
+  // sorts it locally via the existing Recent/Name/Number toolbar control - column-header clicks
+  // reuse that same local sort, taking priority once a header is clicked.
+  const { sortBy: headerSortBy, sortOrder: headerSortOrder, toggleSort } = useSortState()
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -135,12 +141,32 @@ export default function VehicleList() {
       return matchesSearch && matchesStatus && matchesAvailability && matchesType && matchesDate
     })
 
+    if (headerSortBy) {
+      const accessors = {
+        vehicle_number: (vehicle) => vehicle.vehicleNumber?.toLowerCase() || '',
+        vehicle_type: (vehicle) => vehicle.vehicleType?.toLowerCase() || '',
+        capacity: (vehicle) => Number(vehicle.capacity) || 0,
+        status: (vehicle) => vehicleStatus(vehicle) || '',
+      }
+      const accessor = accessors[headerSortBy]
+      if (accessor) {
+        const sorted = [...filtered].sort((a, b) => {
+          const valueA = accessor(a)
+          const valueB = accessor(b)
+          if (valueA < valueB) return -1
+          if (valueA > valueB) return 1
+          return 0
+        })
+        return headerSortOrder === 'desc' ? sorted.reverse() : sorted
+      }
+    }
+
     return filtered.sort((left, right) => {
       if (sortFilter === 'number') return String(left.vehicleNumber).localeCompare(String(right.vehicleNumber))
       if (sortFilter === 'name') return vehicleDisplayName(left).localeCompare(vehicleDisplayName(right))
       return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()
     })
-  }, [vehicles, search, statusFilter, availabilityFilter, typeFilter, sortFilter, dateFrom, dateTo])
+  }, [vehicles, search, statusFilter, availabilityFilter, typeFilter, sortFilter, dateFrom, dateTo, headerSortBy, headerSortOrder])
 
   const openForm = (vehicle = null) => {
     setEditingVehicle(vehicle)
@@ -293,11 +319,11 @@ export default function VehicleList() {
                 <thead>
                   <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                     <th className="whitespace-nowrap px-6 py-6">Vehicle</th>
-                    <th className="whitespace-nowrap px-6 py-6">Vehicle Number</th>
-                    <th className="whitespace-nowrap px-6 py-6">Type</th>
-                    <th className="whitespace-nowrap px-6 py-6">Capacity</th>
+                    <SortableHeaderCell label="Vehicle Number" sortKey="vehicle_number" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
+                    <SortableHeaderCell label="Type" sortKey="vehicle_type" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
+                    <SortableHeaderCell label="Capacity" sortKey="capacity" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
                     <th className="whitespace-nowrap px-6 py-6">Assigned To</th>
-                    <th className="whitespace-nowrap px-6 py-6">Status</th>
+                    <SortableHeaderCell label="Status" sortKey="status" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
                     <th className="whitespace-nowrap px-6 py-6">Availability</th>
                     <th className="w-12 px-6 py-6" />
                   </tr>

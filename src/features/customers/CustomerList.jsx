@@ -29,7 +29,10 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 import { ROLES } from '../../auth/roles'
 import { RequirePermission } from '../../auth/RequirePermission'
 import { createCustomer, deleteCustomer as deleteCustomerApi, getCustomer, listCustomers, updateCustomer } from '../../api/customers'
@@ -52,7 +55,10 @@ const normalizeCustomer = (customer) => ({
     || customer.profile_image
     || customer.basic_information?.profile_image_id,
   ),
-  type: customer.category || customer.type || '',
+  // GET /customers (flat CustomerOut) names this field `category` - genuinely the same Customer
+  // Category concept as the sectioned detail/edit endpoints' `customer_category`, just a
+  // different key name at this endpoint. `customer.type` was never a real backend field here.
+  type: customer.category || '',
   billingAddress: customer.billing_address || customer.billingAddress || customer.address || '',
   deliveryAddress: customer.delivery_address || customer.deliveryAddress || customer.address || '',
   assignedSalesOfficerId: customer.assigned_sales_officer_id || customer.assignedSalesOfficerId || '',
@@ -130,6 +136,12 @@ export default function CustomerList() {
   const [deleteCustomer, setDeleteCustomer] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    setPage(1)
+  }
 
   const salesOfficers = useMemo(
     () => staffUsers.filter((user) => user.role === ROLES.SALES_OFFICER && user.status === 'active'),
@@ -183,6 +195,7 @@ export default function CustomerList() {
         : isAdmin && salesOfficerFilter !== 'all'
           ? salesOfficerFilter
           : undefined,
+      ...sortParams,
     }
 
     const [customerResult] = await Promise.all([
@@ -199,7 +212,7 @@ export default function CustomerList() {
 
     setCustomers(customerResult.customers.map(normalizeCustomer))
     setIsLoading(false)
-  }, [currentUser?.id, isAdmin, isSalesOfficer, loadStaffUsers, salesOfficerFilter, searchTerm, statusFilter, typeFilter])
+  }, [currentUser?.id, isAdmin, isSalesOfficer, loadStaffUsers, salesOfficerFilter, searchTerm, sortParams, statusFilter, typeFilter])
 
   useEffect(() => {
     loadCustomers()
@@ -267,8 +280,10 @@ export default function CustomerList() {
     })
   }
 
-  const exportCustomersCsv = () => {
-    const customersToExport = filteredCustomers.filter((customer) => selectedCustomerIds.includes(customer.id))
+  const exportCustomers = (onlySelected = false) => {
+    const customersToExport = onlySelected
+      ? filteredCustomers.filter((customer) => selectedCustomerIds.includes(customer.id))
+      : filteredCustomers
     const rows = [
       ['Customer', 'Category', 'Contact Person', 'Location', 'Sales Officer', 'Last Order', 'Last Visit', 'Outstanding', 'Status'],
       ...customersToExport.map((customer) => [
@@ -283,15 +298,7 @@ export default function CustomerList() {
         customer.status,
       ]),
     ]
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'customers.csv'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    exportRowsToExcel('customers', rows)
   }
 
   const handleBulkDelete = async () => {
@@ -461,6 +468,7 @@ export default function CustomerList() {
                   <input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search customers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
                 </div>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportCustomers()}><Download className="size-4" aria-hidden="true" />Export</Button>
                 <RequirePermission module="customers" action="create">
                   <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" />Bulk Import</Button>
                   <Button onClick={() => handleOpenForm()} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Customer</Button>
@@ -490,7 +498,7 @@ export default function CustomerList() {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
           <p className="text-sm font-medium text-primary-900">{selectedCustomerIds.length} customer{selectedCustomerIds.length === 1 ? '' : 's'} selected</p>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={exportCustomersCsv}>
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportCustomers(true)}>
               <Download className="size-4" aria-hidden="true" />
               Download
             </Button>
@@ -542,14 +550,14 @@ export default function CustomerList() {
                       aria-label="Select all customers"
                     />
                   </th>
-                  <th className="min-w-52 whitespace-nowrap px-4 py-3">Customer</th>
-                  <th className="whitespace-nowrap px-4 py-3">Contact Person</th>
-                  <th className="whitespace-nowrap px-4 py-3">Location</th>
-                  <th className="whitespace-nowrap px-4 py-3">Sales Officer</th>
-                  <th className="whitespace-nowrap px-4 py-3">Last Order</th>
-                  <th className="whitespace-nowrap px-4 py-3">Last Visit</th>
-                  <th className="whitespace-nowrap px-4 py-3">Outstanding</th>
-                  <th className="whitespace-nowrap px-4 py-3">Status</th>
+                  <SortableHeaderCell label="Customer" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="min-w-52 whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Contact Person" sortKey="primary_contact_person" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Location" sortKey="city" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Sales Officer" sortKey="assigned_sales_officer_id" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Last Order" sortKey="last_order_date" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Last Visit" sortKey="last_visit_date" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Outstanding" sortKey="outstanding_balance" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
                   <th className="whitespace-nowrap px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>

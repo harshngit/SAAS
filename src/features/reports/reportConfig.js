@@ -376,7 +376,7 @@ export const REPORT_CONFIG = {
     category: 'sales',
     description: 'Customer payments received, by mode and reference.',
     supportsSearch: true,
-    resolveRowId: (row) => row.receipt_no || row.id || null,
+    resolveRowId: (row) => row.payment_id || row.receipt_no || row.id || null,
     filters: [
       { key: 'customer_id', type: 'entity', entity: 'customer', label: 'Customer' },
       { key: 'payment_mode', type: 'select', label: 'Payment Mode', options: PAYMENT_MODE_FILTER_OPTIONS },
@@ -406,7 +406,7 @@ export const REPORT_CONFIG = {
     category: 'purchases',
     description: 'Payments made to suppliers and their invoice allocation.',
     supportsSearch: true,
-    resolveRowId: (row) => row.payment_number || row.id || null,
+    resolveRowId: (row) => row.supplier_payment_id || row.payment_number || row.id || null,
     filters: [
       { key: 'supplier_id', type: 'entity', entity: 'supplier', label: 'Supplier' },
       { key: 'payment_mode', type: 'select', label: 'Payment Method', options: PAYMENT_MODE_FILTER_OPTIONS },
@@ -459,7 +459,7 @@ export const REPORT_CONFIG = {
     category: 'financial',
     description: 'Submitted business expenses, approvals and reimbursement.',
     supportsSearch: true,
-    resolveRowId: (row) => row.expense_ref || row.id || null,
+    resolveRowId: (row) => row.expense_id || row.expense_ref || row.id || null,
     filters: [
       { key: 'category', type: 'entity', entity: 'expenseCategory', label: 'Category' },
       { key: 'status', type: 'select', label: 'Status', options: EXPENSE_STATUS_OPTIONS },
@@ -548,7 +548,7 @@ export const REPORT_CONFIG = {
     category: 'sales',
     description: 'Customer returns and credit issued against sales.',
     supportsSearch: true,
-    resolveRowId: (row) => row.return_no || row.id || null,
+    resolveRowId: (row) => row.sales_return_id || row.return_no || row.id || null,
     filters: [
       { key: 'customer_id', type: 'entity', entity: 'customer', label: 'Customer' },
       { key: 'status', type: 'select', label: 'Status', options: SALES_RETURN_STATUS_OPTIONS },
@@ -575,7 +575,7 @@ export const REPORT_CONFIG = {
     category: 'purchases',
     description: 'Returns made to suppliers against purchases.',
     supportsSearch: true,
-    resolveRowId: (row) => row.return_no || row.id || null,
+    resolveRowId: (row) => row.purchase_return_id || row.return_no || row.id || null,
     filters: [
       { key: 'supplier_id', type: 'entity', entity: 'supplier', label: 'Supplier' },
       { key: 'status', type: 'select', label: 'Status', options: PURCHASE_RETURN_STATUS_OPTIONS },
@@ -688,7 +688,7 @@ export const REPORT_CONFIG = {
     category: 'inventory',
     description: 'Every stock-in / stock-out event across warehouses.',
     supportsSearch: true,
-    resolveRowId: (row) => row.reference || row.id || null,
+    resolveRowId: (row) => row.stock_movement_id || row.reference || row.id || null,
     filters: [
       { key: 'warehouse_id', type: 'entity', entity: 'warehouse', label: 'Warehouse' },
       { key: 'product_id', type: 'entity', entity: 'product', label: 'Product' },
@@ -770,11 +770,10 @@ export const REPORT_CONFIG = {
     // panel in favour of the single `as_of_date` filter below.
     noAsOfDate: true,
     supportsSearch: true,
-    // Lowest-confidence row_id of every report in this module: `particulars` is a free-text
-    // line label (e.g. "Accounts Receivable"), not a confirmed id field - it's a last-resort
-    // fallback here, tried only after real id-shaped candidates that may or may not exist on
-    // the real row. This report's true row shape was not independently verifiable.
-    resolveRowId: (row) => row.source_id || row.id || row.particulars || null,
+    // A statement line (Section/Particulars/Amount) is not an individually-exportable document -
+    // no confirmed id field exists for one, and row export isn't meaningful here the way it is
+    // for a real transaction row. Only the top-level full Export PDF/Excel applies.
+    supportsRowExport: false,
     filters: [
       { key: 'as_of_date', type: 'date', label: 'As Of Date' },
     ],
@@ -794,9 +793,9 @@ export const REPORT_CONFIG = {
     supportsSearch: true,
     requiredFilterKey: 'schedule',
     requiredFilterPrompt: 'Select a schedule to see its breakdown.',
-    // Same low-confidence caveat as balance-sheet above - this report's true row shape was not
-    // independently verifiable.
-    resolveRowId: (row) => row.source_id || row.id || row.particulars || null,
+    // Same reasoning as balance-sheet above - a statement line isn't an individually-exportable
+    // document.
+    supportsRowExport: false,
     filters: [
       // No confirmed schedule enum exists in the backend contract yet (unlike gst_classification/
       // invoice_type/section/line_item, which are all explicitly documented) - left as free text

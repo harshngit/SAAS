@@ -159,7 +159,11 @@ function buildCustomerRequestBody(payload) {
 
   const requestBody = {
     basic_information: {
-      customer_type: payload.customerType || payload.type || payload.category || '',
+      // customer_type (Individual/Business/...), industry, and customer_category are three
+      // genuinely separate backend fields (all sent below) - customer_type must NEVER fall back
+      // to payload.category, which is customer_category's own value under another name and
+      // would silently save the wrong field.
+      customer_type: payload.customerType || payload.type || '',
       customer_name: customerName,
       legal_business_name: (payload.legalBusinessName || payload.businessName || customerName || '').trim(),
       display_name: (payload.displayName || '').trim(),
@@ -412,6 +416,8 @@ export async function listCustomers(params = {}) {
     if (params.has_outstanding !== undefined && params.has_outstanding !== null) {
       queryParams.has_outstanding = params.has_outstanding
     }
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/customers', {
       headers: authHeader(),

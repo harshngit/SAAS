@@ -9,6 +9,7 @@ import {
   downloadBulkImportTemplate,
   importBulkFile,
 } from '../../api/bulkImport'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 
 const ACCEPTED_EXTENSION = '.xlsx'
 
@@ -19,22 +20,12 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
 }
 
-function downloadErrorReportCsv(moduleLabel, errors) {
-  const header = 'Row,Field,Error'
-  const rows = errors.map(({ row, field, error }) => {
-    const escape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`
-    return [row, escape(field), escape(error)].join(',')
-  })
-  const csv = [header, ...rows].join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `${moduleLabel.replace(/\s+/g, '_').toLowerCase()}_import_errors.csv`
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
+function downloadErrorReport(moduleLabel, errors) {
+  const rows = [
+    ['Row', 'Field', 'Error'],
+    ...errors.map(({ row, field, error }) => [row, field, error]),
+  ]
+  exportRowsToExcel(`${moduleLabel.replace(/\s+/g, '_').toLowerCase()}_import_errors`, rows)
 }
 
 // STEP flow: pick -> selected -> validating -> result
@@ -223,7 +214,7 @@ export default function BulkImportModal({ isOpen, onClose, moduleKey, onImported
                     </tbody>
                   </table>
                 </div>
-                <Button type="button" variant="outline" size="sm" className="mt-2 h-8 rounded-lg px-3" onClick={() => downloadErrorReportCsv(moduleConfig.label, result.errors)}>
+                <Button type="button" variant="outline" size="sm" className="mt-2 h-8 rounded-lg px-3" onClick={() => downloadErrorReport(moduleConfig.label, result.errors)}>
                   <Download className="size-3.5" aria-hidden="true" />
                   Download Error Report
                 </Button>

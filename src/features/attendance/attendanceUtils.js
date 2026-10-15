@@ -107,21 +107,3 @@ export function formatDateLabel(value) {
     weekday: new Intl.DateTimeFormat('en-IN', { weekday: 'short' }).format(date),
   }
 }
-
-export function toCsvValue(value) {
-  const text = String(value ?? '')
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
-}
-
-export function downloadCsv(filename, headers, rows) {
-  const lines = [headers.map(toCsvValue).join(','), ...rows.map((row) => row.map(toCsvValue).join(','))]
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
-}

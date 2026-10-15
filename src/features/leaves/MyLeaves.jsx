@@ -9,6 +9,8 @@ import Modal from '../../components/ui/Modal'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { LEAVE_TYPE_OPTIONS, calculateDaysCount, createLeave, deleteLeave, getMyLeaves } from '../../api/leaves'
 import { useToast } from '../../components/ui/toastContext'
@@ -94,6 +96,9 @@ export default function MyLeaves() {
   const [detailLeave, setDetailLeave] = useState(null)
   const [cancelTarget, setCancelTarget] = useState(null)
   const [isCancelling, setIsCancelling] = useState(false)
+  // A small, user-scoped list (getMyLeaves - no pagination) already loaded in full - sorting
+  // is done locally over the already-loaded array.
+  const { sortBy, sortOrder, toggleSort } = useSortState()
 
   // Demo data comes ONLY from the explicit DEMO_MODE switch (src/config/demoMode.js) - never
   // from "the real API returned zero requests". A brand-new employee's first real leave request
@@ -136,14 +141,32 @@ export default function MyLeaves() {
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
-  const filtered = useMemo(
-    () =>
-      leaves.filter((l) => {
-        if (filter !== 'all' && l.status !== filter) return false
-        return isWithinDateRange(l.startDate, dateFrom, dateTo)
-      }),
-    [leaves, filter, dateFrom, dateTo],
-  )
+  const filtered = useMemo(() => {
+    const base = leaves.filter((l) => {
+      if (filter !== 'all' && l.status !== filter) return false
+      return isWithinDateRange(l.startDate, dateFrom, dateTo)
+    })
+
+    if (!sortBy) return base
+
+    const accessors = {
+      leaveType: (l) => typeLabel(l.leaveType)?.toLowerCase() || '',
+      daysCount: (l) => Number(l.daysCount || calculateDaysCount(l.startDate, l.endDate)) || 0,
+      status: (l) => l.status || '',
+      createdAt: (l) => new Date(l.createdAt || 0).getTime(),
+    }
+    const accessor = accessors[sortBy]
+    if (!accessor) return base
+
+    const sorted = [...base].sort((a, b) => {
+      const valueA = accessor(a)
+      const valueB = accessor(b)
+      if (valueA < valueB) return -1
+      if (valueA > valueB) return 1
+      return 0
+    })
+    return sortOrder === 'desc' ? sorted.reverse() : sorted
+  }, [leaves, filter, dateFrom, dateTo, sortBy, sortOrder])
 
   const previewDays = calculateDaysCount(formData.startDate, formData.endDate)
   const overlaps = useMemo(() => {
@@ -282,12 +305,12 @@ export default function MyLeaves() {
               <table className="w-full min-w-4xl text-left text-sm">
                 <thead>
                   <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                    <th className="px-4 py-3">Leave Type</th>
+                    <SortableHeaderCell label="Leave Type" sortKey="leaveType" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-4 py-3" />
                     <th className="px-4 py-3">Date Range</th>
-                    <th className="px-4 py-3 text-right">Days</th>
+                    <SortableHeaderCell label="Days" sortKey="daysCount" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} align="right" className="px-4 py-3" />
                     <th className="px-4 py-3">Reason</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Requested On</th>
+                    <SortableHeaderCell label="Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-4 py-3" />
+                    <SortableHeaderCell label="Requested On" sortKey="createdAt" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-4 py-3" />
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>

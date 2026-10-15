@@ -9,6 +9,7 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { getExpiringBatches, getStockBoard, recordStockAdjustment } from '../../api/inventory'
 import { listProducts } from '../../api/products'
 import { getFileUrl } from '../../api/files'
@@ -85,8 +86,18 @@ const sortOptions = [
   { value: 'stock-desc', label: 'Stock (High to Low)' },
   { value: 'stock-asc', label: 'Stock (Low to High)' },
   { value: 'sku-asc', label: 'SKU (A-Z)' },
+  { value: 'sku-desc', label: 'SKU (Z-A)' },
   { value: 'recent', label: 'Recently Added' },
 ]
+
+// Column-header clicks (SortableHeaderCell) toggle between the asc/desc pair for the clicked
+// column, reusing this same sortBy string + sortItems() that the existing "Sort by" toolbar
+// dropdown already drives - one sort mechanism, two entry points, not a parallel system.
+const HEADER_SORT_KEYS = {
+  name: { asc: 'name-asc', desc: 'name-desc' },
+  stock: { asc: 'stock-asc', desc: 'stock-desc' },
+  sku: { asc: 'sku-asc', desc: 'sku-desc' },
+}
 
 function sortItems(items, sortBy) {
   const sorted = [...items]
@@ -100,6 +111,8 @@ function sortItems(items, sortBy) {
       return sorted.sort((a, b) => (a.total_stock || 0) - (b.total_stock || 0))
     case 'sku-asc':
       return sorted.sort((a, b) => (a.sku || '').localeCompare(b.sku || ''))
+    case 'sku-desc':
+      return sorted.sort((a, b) => (b.sku || '').localeCompare(a.sku || ''))
     case 'recent':
       return sorted.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
     case 'name-asc':
@@ -117,6 +130,16 @@ export default function StockBoard({ readOnly = false }) {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [sortBy, setSortBy] = useState('name-asc')
   const [searchTerm, setSearchTerm] = useState('')
+  const activeHeaderSortKey = Object.keys(HEADER_SORT_KEYS).find(
+    (key) => HEADER_SORT_KEYS[key].asc === sortBy || HEADER_SORT_KEYS[key].desc === sortBy,
+  ) || null
+  const activeHeaderSortOrder = sortBy.endsWith('-desc') ? 'desc' : 'asc'
+
+  const handleHeaderSort = (key) => {
+    const pair = HEADER_SORT_KEYS[key]
+    if (!pair) return
+    setSortBy((current) => (current === pair.asc ? pair.desc : pair.asc))
+  }
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [adjustingProduct, setAdjustingProduct] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -328,10 +351,10 @@ export default function StockBoard({ readOnly = false }) {
             <table className="listing-table w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                  <th className="whitespace-nowrap px-6 py-6">Product</th>
-                  <th className="whitespace-nowrap px-6 py-6">SKU</th>
+                  <SortableHeaderCell label="Product" sortKey="name" sortBy={activeHeaderSortKey} sortOrder={activeHeaderSortOrder} onSort={handleHeaderSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="SKU" sortKey="sku" sortBy={activeHeaderSortKey} sortOrder={activeHeaderSortOrder} onSort={handleHeaderSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Variants</th>
-                  <th className="whitespace-nowrap px-6 py-6">Current Stock</th>
+                  <SortableHeaderCell label="Current Stock" sortKey="stock" sortBy={activeHeaderSortKey} sortOrder={activeHeaderSortOrder} onSort={handleHeaderSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Status</th>
                   {!readOnly && <th className="whitespace-nowrap px-6 py-6 text-right">Action</th>}
                 </tr>

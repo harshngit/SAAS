@@ -23,9 +23,12 @@ import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import ActionMenu from '../../components/ui/ActionMenu'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { deleteOrganization, listSuperAdminOrganizations } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 
 const statusVariant = {
   Active: 'success',
@@ -110,9 +113,9 @@ function StatTile({ label, value, hint, icon: Icon }) {
   )
 }
 
-function exportOrganizationsCsv(rows) {
+function exportOrganizations(rows) {
   const headers = ['Organization', 'Admin Contact', 'Plan', 'MRR', 'Status', 'Upgrade Request', 'Created']
-  const csvRows = rows.map((row) => [
+  const dataRows = rows.map((row) => [
     row.name,
     row.adminName,
     row.plan,
@@ -121,16 +124,7 @@ function exportOrganizationsCsv(rows) {
     row.upgradeStatus,
     row.createdAtLabel,
   ])
-  const csv = [headers, ...csvRows]
-    .map((values) => values.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'organizations.csv'
-  link.click()
-  URL.revokeObjectURL(url)
+  exportRowsToExcel('organizations', [headers, ...dataRows])
 }
 
 export default function OrganizationsList() {
@@ -168,6 +162,12 @@ export default function OrganizationsList() {
 
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    setCurrentPage(1)
+  }
 
   // Single-row delete (reuses the same DELETE /superadmin/organizations/{id} OrganizationDetail.jsx
   // already calls) and bulk delete (no bulk-delete endpoint exists - this loops the same real
@@ -242,6 +242,7 @@ export default function OrganizationsList() {
       const result = await listSuperAdminOrganizations({
         status: statusFilter,
         upgrade_status: upgradeStatusFilter,
+        ...sortParams,
       })
 
       if (!isMounted) return
@@ -260,7 +261,7 @@ export default function OrganizationsList() {
     return () => {
       isMounted = false
     }
-  }, [statusFilter, upgradeStatusFilter])
+  }, [statusFilter, upgradeStatusFilter, sortParams])
 
   // Options are derived from whatever is actually loaded - never a guessed/hardcoded list - so a
   // plan or business type that doesn't currently exist on any organization never appears as a
@@ -425,7 +426,7 @@ export default function OrganizationsList() {
                   variant="outline"
                   size="sm"
                   className="h-9 rounded-xl px-3.5"
-              onClick={() => exportOrganizationsCsv(visibleOrganizations)}
+              onClick={() => exportOrganizations(visibleOrganizations)}
             >
               <Download className="size-4" aria-hidden="true" />
               Export
@@ -526,7 +527,7 @@ export default function OrganizationsList() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => exportOrganizationsCsv(organizations.filter((organization) => selectedIds.includes(organization.id)))}
+              onClick={() => exportOrganizations(organizations.filter((organization) => selectedIds.includes(organization.id)))}
             >
               <Download className="size-4" aria-hidden="true" />
               Export Selected
@@ -573,13 +574,13 @@ export default function OrganizationsList() {
                     aria-label="Select all organizations"
                   />
                 </th>
-                <th className="whitespace-nowrap px-6 py-6">Organization</th>
-                <th className="whitespace-nowrap px-6 py-6">Admin Contact</th>
+                <SortableHeaderCell label="Organization" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                <SortableHeaderCell label="Admin Contact" sortKey="email" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                 <th className="whitespace-nowrap px-6 py-6">Plan</th>
                 <th className="whitespace-nowrap px-6 py-6">MRR</th>
-                <th className="whitespace-nowrap px-6 py-6">Status</th>
-                <th className="whitespace-nowrap px-6 py-6">Upgrade</th>
-                <th className="whitespace-nowrap px-6 py-6">Created</th>
+                <SortableHeaderCell label="Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                <SortableHeaderCell label="Upgrade" sortKey="upgrade_status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                <SortableHeaderCell label="Created" sortKey="created_at" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                 <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
               </tr>
             </thead>
@@ -650,7 +651,7 @@ export default function OrganizationsList() {
                             {
                               label: 'Export row',
                               icon: Download,
-                              onClick: () => exportOrganizationsCsv([organization]),
+                              onClick: () => exportOrganizations([organization]),
                             },
                             {
                               label: 'Delete',

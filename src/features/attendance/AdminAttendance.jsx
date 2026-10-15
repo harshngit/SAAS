@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
@@ -25,8 +27,8 @@ import { listUsers } from '../../api/users'
 import { getFileUrl } from '../../api/files'
 import { roleLabels } from '../../auth/roles'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 import {
-  downloadCsv,
   formatDateLabel,
   formatTimeLabel,
   isCheckInOnTime,
@@ -83,6 +85,12 @@ export default function AdminAttendance() {
   const [selectedKeys, setSelectedKeys] = useState([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    setPage(1)
+  }
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
@@ -93,7 +101,7 @@ export default function AdminAttendance() {
     // scopes the fetch to the selected range instead of pulling the organization's entire
     // attendance history on every load.
     const [attendanceResult, usersResult] = await Promise.all([
-      getAttendance({ date_from: dateFrom || undefined, date_to: dateTo || undefined }),
+      getAttendance({ date_from: dateFrom || undefined, date_to: dateTo || undefined, ...sortParams }),
       listUsers(),
     ])
 
@@ -109,7 +117,7 @@ export default function AdminAttendance() {
   useEffect(() => {
     loadAttendance()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo])
+  }, [dateFrom, dateTo, sortParams])
 
   const rowsWithUser = useMemo(
     () =>
@@ -216,10 +224,9 @@ export default function AdminAttendance() {
       ? filteredRows.filter((row) => selectedKeys.includes(row.key))
       : filteredRows
 
-    downloadCsv(
-      'attendance.csv',
+    exportRowsToExcel('attendance', [
       ['Employee', 'Employee ID', 'Role', 'Date', 'Status', 'Check In', 'Check Out', 'Work Hours'],
-      rowsToExport.map((row) => [
+      ...rowsToExport.map((row) => [
         row.name,
         row.employeeId,
         roleLabels[row.role] || row.role,
@@ -229,7 +236,7 @@ export default function AdminAttendance() {
         formatTimeLabel(row.checkOut) || '-',
         workHoursLabel(row.checkIn, row.checkOut) || '-',
       ]),
-    )
+    ])
   }
 
   return (
@@ -381,10 +388,12 @@ export default function AdminAttendance() {
                     </th>
                     <th className="whitespace-nowrap px-4 py-3">Employee</th>
                     <th className="whitespace-nowrap px-4 py-3">Role</th>
-                    <th className="whitespace-nowrap px-4 py-3">Date</th>
+                    <SortableHeaderCell label="Date" sortKey="date" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                    {/* Status is frontend-derived (Present/Absent from checkIn presence), not a
+                        raw backend field - left non-sortable so the sort key never diverges. */}
                     <th className="whitespace-nowrap px-4 py-3">Status</th>
-                    <th className="whitespace-nowrap px-4 py-3">Check In</th>
-                    <th className="whitespace-nowrap px-4 py-3">Check Out</th>
+                    <SortableHeaderCell label="Check In" sortKey="office_check_in" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                    <SortableHeaderCell label="Check Out" sortKey="final_check_out" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
                     <th className="whitespace-nowrap px-4 py-3">Work Hours</th>
                     <th className="w-12 px-4 py-3" />
                   </tr>

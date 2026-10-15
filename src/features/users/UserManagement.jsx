@@ -1,4 +1,6 @@
 import ActionMenu from '../../components/ui/ActionMenu'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Banknote,
@@ -472,6 +474,12 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [pageSize, setPageSize] = useState('10')
   const [currentPage, setCurrentPage] = useState(1)
+  const { sortBy: staffSortBy, sortOrder: staffSortOrder, toggleSort: toggleStaffSort, sortParams: staffSortParams } = useSortState()
+
+  const handleStaffSort = (field) => {
+    toggleStaffSort(field)
+    setCurrentPage(1)
+  }
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
   const [listError, setListError] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -538,6 +546,7 @@ export default function UserManagement() {
     const usersResult = await listUsers({
       role_id: selectedRole?.id,
       search: searchTerm.trim(),
+      ...staffSortParams,
     })
 
     if (!isMountedRef.current || requestId !== staffRequestIdRef.current) {
@@ -553,7 +562,7 @@ export default function UserManagement() {
 
     setUsers((usersResult.users || []).map(normalizeApiUser))
     return usersResult
-  }, [activeRoleFilter, roles, searchTerm])
+  }, [activeRoleFilter, roles, searchTerm, staffSortParams])
 
   const handleOpenModal = () => {
     setFormError('')
@@ -1430,11 +1439,11 @@ export default function UserManagement() {
               <table className="listing-table w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                    <th className="whitespace-nowrap px-6 py-6">User</th>
-                    <th className="whitespace-nowrap px-6 py-6">Email</th>
+                    <SortableHeaderCell label="User" sortKey="name" sortBy={staffSortBy} sortOrder={staffSortOrder} onSort={handleStaffSort} className="whitespace-nowrap px-6 py-6" />
+                    <SortableHeaderCell label="Email" sortKey="email" sortBy={staffSortBy} sortOrder={staffSortOrder} onSort={handleStaffSort} className="whitespace-nowrap px-6 py-6" />
                     <th className="whitespace-nowrap px-6 py-6">Role</th>
-                    <th className="whitespace-nowrap px-6 py-6">Status</th>
-                    <th className="whitespace-nowrap px-6 py-6">Joined</th>
+                    <SortableHeaderCell label="Status" sortKey="is_active" sortBy={staffSortBy} sortOrder={staffSortOrder} onSort={handleStaffSort} className="whitespace-nowrap px-6 py-6" />
+                    <SortableHeaderCell label="Joined" sortKey="created_at" sortBy={staffSortBy} sortOrder={staffSortOrder} onSort={handleStaffSort} className="whitespace-nowrap px-6 py-6" />
                     <th className="whitespace-nowrap px-6 py-6 text-right">Action</th>
                   </tr>
                 </thead>

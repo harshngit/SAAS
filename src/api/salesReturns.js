@@ -215,6 +215,8 @@ export async function listSalesReturns(params = {}) {
     if (params.invoice_reference_id || params.invoiceReferenceId) {
       queryParams.invoice_reference_id = params.invoice_reference_id || params.invoiceReferenceId
     }
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/sales-returns', {
       headers: authHeader(),

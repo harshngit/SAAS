@@ -7,6 +7,8 @@ import Modal from '../../components/ui/Modal'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { checkIn, getMyAttendance } from '../../api/attendance'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { attendanceLifecycleLabel, durationLabel, normalizeAttendanceRecord } from './attendanceUtils'
@@ -172,10 +174,30 @@ export default function MyAttendance() {
   // The Date filter only narrows the History table below - todayRecord (which drives the
   // Check In/Out widget) always looks at the full set, so a Custom Range that excludes today
   // never breaks "already checked in today" detection.
-  const filteredRecords = useMemo(
-    () => records.filter((record) => isWithinDateRange(record.date, dateFrom, dateTo)),
-    [records, dateFrom, dateTo],
-  )
+  // A small, user-scoped list (getMyAttendance - full set loaded in one call) - sorting is done
+  // locally over the already-loaded array.
+  const { sortBy, sortOrder, toggleSort } = useSortState()
+  const filteredRecords = useMemo(() => {
+    const base = records.filter((record) => isWithinDateRange(record.date, dateFrom, dateTo))
+    if (!sortBy) return base
+
+    const accessors = {
+      date: (record) => record.date || '',
+      checkIn: (record) => record.checkIn || '',
+      checkOut: (record) => record.checkOut || '',
+    }
+    const accessor = accessors[sortBy]
+    if (!accessor) return base
+
+    const sorted = [...base].sort((a, b) => {
+      const valueA = accessor(a)
+      const valueB = accessor(b)
+      if (valueA < valueB) return -1
+      if (valueA > valueB) return 1
+      return 0
+    })
+    return sortOrder === 'desc' ? sorted.reverse() : sorted
+  }, [records, dateFrom, dateTo, sortBy, sortOrder])
 
   // Live "active duration" tick while checked in (once a minute - no need for seconds).
   useEffect(() => {
@@ -269,10 +291,12 @@ export default function MyAttendance() {
               <table className="w-full min-w-3xl text-left text-sm">
                 <thead>
                   <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                    <th className="px-4 py-3">Date</th>
+                    <SortableHeaderCell label="Date" sortKey="date" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-4 py-3" />
+                    {/* Status is frontend-derived (attendanceUtils.normalizeAttendanceRecord), not
+                        a raw backend field - left non-sortable so the sort key never diverges. */}
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Check In</th>
-                    <th className="px-4 py-3">Check Out</th>
+                    <SortableHeaderCell label="Check In" sortKey="checkIn" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-4 py-3" />
+                    <SortableHeaderCell label="Check Out" sortKey="checkOut" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-4 py-3" />
                     <th className="px-4 py-3">Duration</th>
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>

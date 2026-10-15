@@ -156,6 +156,8 @@ export async function listCashReconciliations(params = {}) {
     if (params.date_from) queryParams.date_from = params.date_from
     if (params.date_to) queryParams.date_to = params.date_to
     if (params.status) queryParams.status = params.status
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/cash-reconciliation', { params: queryParams })
     const rows = Array.isArray(data?.items) ? data.items : []

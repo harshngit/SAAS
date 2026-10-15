@@ -10,8 +10,11 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 import {
   createSupplier,
   deleteSupplier,
@@ -74,6 +77,12 @@ export default function SupplierList() {
   const [products, setProducts] = useState([])
 
   const [supplierCategoryOptions, setSupplierCategoryOptions] = useState([])
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    setPage(1)
+  }
 
   const loadSuppliers = useCallback(async () => {
     setIsLoading(true)
@@ -90,6 +99,7 @@ export default function SupplierList() {
       search: searchTerm.trim() || undefined,
       category: categoryFilter === 'all' ? undefined : categoryFilter,
       is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
+      ...sortParams,
     })
 
     if (!result.success) {
@@ -101,7 +111,7 @@ export default function SupplierList() {
 
     setSuppliers(result.suppliers.map((supplier) => normalizeApiSupplier(supplier)))
     setIsLoading(false)
-  }, [categoryFilter, searchTerm, statusFilter, useDemoSuppliers])
+  }, [categoryFilter, searchTerm, statusFilter, useDemoSuppliers, sortParams])
 
   const loadSupplierCategoryOptions = useCallback(async () => {
     if (DEMO_MODE) {
@@ -207,20 +217,12 @@ export default function SupplierList() {
     ? current.filter((id) => !visibleSuppliers.some((supplier) => supplier.id === id))
     : [...new Set([...current, ...visibleSuppliers.map((supplier) => supplier.id)])])
 
-  const exportSuppliersCsv = (onlySelected = false) => {
+  const exportSuppliers = (onlySelected = false) => {
     const rows = [
       ['Supplier', 'Category', 'Contact', 'City', 'Product Count', 'Total Purchases', 'Outstanding Payable', 'Status'],
       ...filteredSuppliers.filter((supplier) => !onlySelected || selectedIds.includes(supplier.id)).map((supplier) => [supplier.name, supplier.category, supplier.contactPerson, supplier.city, getProductCount(supplier), formatCurrency(supplier.totalPurchases), formatCurrency(supplier.outstandingPayable), formatSupplierStatus(supplier.status)]),
     ]
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'suppliers.csv'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    exportRowsToExcel('suppliers', rows)
   }
 
   const handleBulkDelete = async () => {
@@ -438,7 +440,7 @@ export default function SupplierList() {
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search suppliers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportSuppliersCsv()}><Download className="size-4" />Export</Button>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportSuppliers()}><Download className="size-4" />Export</Button>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" />Bulk Import</Button>
                 <Button onClick={() => handleOpenForm()} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Supplier</Button>
               </div>
@@ -457,7 +459,7 @@ export default function SupplierList() {
         </div>
       </Card>
 
-      {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} supplier{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportSuppliersCsv(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
+      {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} supplier{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportSuppliers(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto bg-surface px-0 py-0">
@@ -520,13 +522,13 @@ export default function SupplierList() {
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="w-14 px-6 py-6"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all suppliers" /></th>
-                  <th className="whitespace-nowrap px-6 py-6">Supplier</th>
+                  <SortableHeaderCell label="Supplier" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Contact</th>
-                  <th className="whitespace-nowrap px-6 py-6">City</th>
+                  <SortableHeaderCell label="City" sortKey="city" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Product Count</th>
-                  <th className="whitespace-nowrap px-6 py-6">Total Purchases</th>
-                  <th className="whitespace-nowrap px-6 py-6">Outstanding Payable</th>
-                  <th className="whitespace-nowrap px-6 py-6">Status</th>
+                  <SortableHeaderCell label="Total Purchases" sortKey="total_purchases" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Outstanding Payable" sortKey="outstanding_payable" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Status" sortKey="is_active" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>

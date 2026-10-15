@@ -9,8 +9,11 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { deleteQuotation, listQuotations } from '../../api/quotations'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import {
@@ -49,12 +52,18 @@ export default function QuotationList() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    setPage(1)
+  }
 
   const loadQuotations = useCallback(async () => {
     setIsLoading(true)
     setListError('')
 
-    const result = await listQuotations()
+    const result = await listQuotations(sortParams)
     // Demo rows (UI testing only) are appended locally - never sent to the backend,
     // and still shown even if the real list call fails.
     const demoRows = DEMO_QUOTATIONS_ENABLED ? demoQuotationsResolved() : []
@@ -68,7 +77,7 @@ export default function QuotationList() {
 
     setQuotations([...result.quotations, ...demoRows])
     setIsLoading(false)
-  }, [])
+  }, [sortParams])
 
   useEffect(() => {
     loadQuotations()
@@ -118,21 +127,13 @@ export default function QuotationList() {
       : [...new Set([...current, ...visibleQuotations.map((quotation) => quotation.id)])])
   }
 
-  const exportQuotationsCsv = (onlySelected = false) => {
+  const exportQuotations = (onlySelected = false) => {
     const quotationsToExport = onlySelected ? filteredQuotations.filter((quotation) => selectedIds.includes(quotation.id)) : filteredQuotations
     const rows = [
       ['Quotation', 'Customer / Prospect', 'Salesperson', 'Date', 'Valid Until', 'Amount', 'Status'],
       ...quotationsToExport.map((quotation) => [quotation.quotationNumber, quotation.customerName || quotation.leadName || '', quotation.salespersonName || '', formatDate(quotation.quotationDate), formatDate(quotation.validUntil), formatCurrency(quotation.total), formatQuotationStatus(deriveQuotationStatus(quotation))]),
     ]
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'quotations.csv'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    exportRowsToExcel('quotations', rows)
   }
 
   const dropQuotation = (id) => setQuotations((current) => current.filter((quotation) => quotation.id !== id))
@@ -193,7 +194,7 @@ export default function QuotationList() {
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search quotations..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" aria-hidden="true" />Filter</Button>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportQuotationsCsv()}><Download className="size-4" aria-hidden="true" />Export</Button>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportQuotations()}><Download className="size-4" aria-hidden="true" />Export</Button>
                 <Button type="button" size="sm" className="h-9 rounded-2xl px-3.5" onClick={() => navigate(`${basePath}/new`)}><Plus className="size-4" aria-hidden="true" />New Quotation</Button>
               </div>
             </div>
@@ -216,7 +217,7 @@ export default function QuotationList() {
       </Card>
 
       {selectedIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} quotation{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportQuotationsCsv(true)}><Download className="size-4" aria-hidden="true" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" aria-hidden="true" />Delete</Button></div></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} quotation{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportQuotations(true)}><Download className="size-4" aria-hidden="true" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" aria-hidden="true" />Delete</Button></div></div>
       )}
 
       <Card className="overflow-hidden p-0">
@@ -245,12 +246,14 @@ export default function QuotationList() {
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="w-14 px-6 py-6"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all quotations" /></th>
-                  <th className="whitespace-nowrap px-6 py-6">Quotation</th>
+                  <SortableHeaderCell label="Quotation" sortKey="quotation_number" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Customer / Prospect</th>
-                  <th className="whitespace-nowrap px-6 py-6">Salesperson</th>
-                  <th className="whitespace-nowrap px-6 py-6">Date</th>
-                  <th className="whitespace-nowrap px-6 py-6">Valid Until</th>
-                  <th className="whitespace-nowrap px-6 py-6">Amount</th>
+                  <SortableHeaderCell label="Salesperson" sortKey="salesperson_id" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Date" sortKey="quotation_date" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Valid Until" sortKey="valid_until" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Amount" sortKey="total" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  {/* Status is a frontend-derived value (deriveQuotationStatus), not a raw backend
+                      field - left non-sortable so the sort key never diverges from what's shown. */}
                   <th className="whitespace-nowrap px-6 py-6">Status</th>
                   <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>

@@ -7,6 +7,8 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { usePermission } from '../../auth/usePermission'
 import { listSalesReturns } from '../../api/salesReturns'
@@ -43,6 +45,7 @@ export default function SalesReturnList() {
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const filterTriggerRef = useRef(null)
   const filterCloseRef = useRef(null)
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
 
   useEffect(() => {
     if (!isFilterOpen) return
@@ -74,7 +77,7 @@ export default function SalesReturnList() {
     }
 
     const rawStatus = statusFilter === 'all' ? null : rawStatusForFilter(statusFilter)
-    const result = await listSalesReturns(rawStatus ? { status: rawStatus } : {})
+    const result = await listSalesReturns({ ...(rawStatus ? { status: rawStatus } : {}), ...sortParams })
 
     if (!result.success) {
       setSalesReturns([])
@@ -85,7 +88,7 @@ export default function SalesReturnList() {
 
     setSalesReturns(result.salesReturns)
     setIsLoading(false)
-  }, [statusFilter])
+  }, [statusFilter, sortParams])
 
   useEffect(() => {
     loadSalesReturns()
@@ -203,13 +206,13 @@ export default function SalesReturnList() {
             <table className="listing-table w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                  <th className="whitespace-nowrap px-6 py-6">Return</th>
-                  <th className="whitespace-nowrap px-6 py-6">Customer</th>
+                  <SortableHeaderCell label="Return" sortKey="return_number" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Customer" sortKey="customer_id" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Order / Invoice</th>
                   <th className="whitespace-nowrap px-6 py-6 text-right">Items</th>
                   <th className="whitespace-nowrap px-6 py-6 text-right">Return Qty</th>
-                  <th className="whitespace-nowrap px-6 py-6">Created</th>
-                  <th className="whitespace-nowrap px-6 py-6">Status</th>
+                  <SortableHeaderCell label="Created" sortKey="created_at" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">

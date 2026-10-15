@@ -541,6 +541,8 @@ export async function listProducts(params = {}) {
     if (params.category_id) queryParams.category_id = params.category_id
     if (params.is_active !== undefined && params.is_active !== null) queryParams.is_active = params.is_active
     if (params.barcode) queryParams.barcode = params.barcode
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/products', {
       headers: authHeader(),

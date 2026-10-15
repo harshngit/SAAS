@@ -9,9 +9,12 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { listCategories } from '../../api/categories'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 import { listSuppliers } from '../../api/suppliers'
 import { createProduct, deleteProduct, listProducts, updateProduct } from '../../api/products'
 import { getFileUrl } from '../../api/files'
@@ -80,6 +83,12 @@ export default function ProductList() {
   const [barcodeInput, setBarcodeInput] = useState('')
   const [isScanningBarcode, setIsScanningBarcode] = useState(false)
   const [barcodeError, setBarcodeError] = useState('')
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    setPage(1)
+  }
 
   const categoryFilterOptions = useMemo(
     () => [{ value: 'all', label: 'All categories' }, ...categoryOptions],
@@ -111,6 +120,7 @@ export default function ProductList() {
       search: searchTerm.trim() || undefined,
       category_id: categoryFilter === 'all' ? undefined : categoryFilter,
       is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
+      ...sortParams,
     })
 
     if (!result.success) {
@@ -122,7 +132,7 @@ export default function ProductList() {
 
     setProducts(result.products.map((product) => normalizeApiProduct(product)))
     setIsLoading(false)
-  }, [categoryFilter, searchTerm, statusFilter])
+  }, [categoryFilter, searchTerm, statusFilter, sortParams])
 
   useEffect(() => {
     loadProducts()
@@ -197,11 +207,9 @@ export default function ProductList() {
     ? current.filter((id) => !visibleProducts.some((product) => product.id === id))
     : [...new Set([...current, ...visibleProducts.map((product) => product.id)])])
 
-  const exportProductsCsv = (onlySelected = false) => {
+  const exportProducts = (onlySelected = false) => {
     const rows = [['Product', 'Brand', 'Category', 'Variants', 'Price', 'Status'], ...filteredProducts.filter((product) => !onlySelected || selectedIds.includes(product.id)).map((product) => [product.name, product.brand, product.categoryLabel || product.category, product.variants.length, formatCurrency(Number(product.price ?? product.variants?.[0]?.sellingPrice ?? 0)), product.status])]
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const link = document.createElement('a'); link.href = url; link.download = 'products.csv'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url)
+    exportRowsToExcel('products', rows)
   }
 
   const handleBulkDelete = async () => {
@@ -350,7 +358,7 @@ export default function ProductList() {
         <div className="border-b border-neutral-100 px-5 py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Products</h1><p className="mt-1 text-xs text-neutral-400">{filteredProducts.length} products in view</p></div>
-            <div className="flex flex-wrap items-center justify-end gap-2"><div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search products..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportProductsCsv()}><Download className="size-4" />Export</Button><Button onClick={handleAddProduct} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Product</Button></div>
+            <div className="flex flex-wrap items-center justify-end gap-2"><div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search products..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportProducts()}><Download className="size-4" />Export</Button><Button onClick={handleAddProduct} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Product</Button></div>
           </div>
         </div>
 
@@ -366,7 +374,7 @@ export default function ProductList() {
         </div>
       </Card>
 
-      {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} product{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportProductsCsv(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
+      {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} product{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportProducts(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto bg-surface px-0 py-0">
@@ -398,7 +406,14 @@ export default function ProductList() {
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                   <th className="w-14 px-6 py-6"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all products" /></th>
-                  <th className="whitespace-nowrap px-6 py-6">Product</th><th className="whitespace-nowrap px-6 py-6">Brand</th><th className="whitespace-nowrap px-6 py-6">Category</th><th className="whitespace-nowrap px-6 py-6">Preferred Supplier</th><th className="whitespace-nowrap px-6 py-6">Variants</th><th className="whitespace-nowrap px-6 py-6">Price</th><th className="whitespace-nowrap px-6 py-6">Status</th><th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
+                  <SortableHeaderCell label="Product" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Brand" sortKey="brand_id" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Category" sortKey="category_id" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <th className="whitespace-nowrap px-6 py-6">Preferred Supplier</th>
+                  <th className="whitespace-nowrap px-6 py-6">Variants</th>
+                  <SortableHeaderCell label="Price" sortKey="price" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Status" sortKey="is_active" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>

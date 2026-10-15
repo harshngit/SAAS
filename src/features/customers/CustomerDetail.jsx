@@ -992,6 +992,7 @@ export default function CustomerDetail() {
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
             <Field label="Business Type" value={formatLabel(customer.customerType)} />
             <Field label="Legal Business Name" value={customer.legalBusinessName} />
+            <Field label="Customer Category" value={formatLabel(customer.customerCategory)} />
             <Field label="Industry" value={formatLabel(customer.industry)} />
             <Field label="GST Number" value={customer.gstNumber} />
             <Field label="PAN / Registration No." value={customer.panBusinessRegistrationNo} />

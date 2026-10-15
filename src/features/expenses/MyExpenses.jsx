@@ -11,6 +11,8 @@ import Modal from '../../components/ui/Modal'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import {
   createExpense,
@@ -186,6 +188,7 @@ export default function MyExpenses() {
   const [detailExpense, setDetailExpense] = useState(null)
   const [cancelTarget, setCancelTarget] = useState(null)
   const [isCancelling, setIsCancelling] = useState(false)
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -205,7 +208,7 @@ export default function MyExpenses() {
 
     // Real mode: the API is the only source. An empty list is a truthful empty state; a
     // failure shows the real error - neither falls back to demo data.
-    const result = await listExpenses({ submitted_by: currentUser.id })
+    const result = await listExpenses({ submitted_by: currentUser.id, ...sortParams })
     if (!result.success) {
       setExpenses([])
       setListError(result.error)
@@ -214,7 +217,7 @@ export default function MyExpenses() {
     }
     setExpenses(result.expenses)
     setIsLoading(false)
-  }, [currentUser?.id])
+  }, [currentUser?.id, sortParams])
 
   useEffect(() => {
     load()
@@ -506,14 +509,16 @@ export default function MyExpenses() {
               <table className="listing-table w-full min-w-6xl text-left text-sm">
                 <thead>
                   <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                    <th className="px-6 py-6">Date</th>
-                    <th className="px-6 py-6">Category</th>
+                    <SortableHeaderCell label="Date" sortKey="expense_date" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
+                    <SortableHeaderCell label="Category" sortKey="category" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
                     <th className="px-6 py-6">Description</th>
-                    <th className="px-6 py-6 text-right">Amount</th>
-                    <th className="px-6 py-6">Payment Mode</th>
+                    <SortableHeaderCell label="Amount" sortKey="amount" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} align="right" className="px-6 py-6" />
+                    <SortableHeaderCell label="Payment Mode" sortKey="payment_mode" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
                     <th className="px-6 py-6">Receipt</th>
+                    {/* claimStatus() combines approval + payment status - not a single raw
+                        backend field, so this stays non-sortable to avoid a mismatched key. */}
                     <th className="px-6 py-6">Status</th>
-                    <th className="px-6 py-6">Submitted On</th>
+                    <SortableHeaderCell label="Submitted On" sortKey="created_at" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
                     <th className="px-6 py-6 text-right">Actions</th>
                   </tr>
                 </thead>

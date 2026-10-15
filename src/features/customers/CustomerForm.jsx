@@ -39,6 +39,9 @@ const fieldByDocumentType = Object.fromEntries(
 )
 
 const gstNumberPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
+// Same convention already used for phone validation at signup (src/auth/Register.jsx) - not a
+// new rule invented for Customers.
+const phonePattern = /^\+?[0-9][0-9\s-]{9,14}$/
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -212,7 +215,7 @@ const formSections = [
     { name: 'googleMapsLocation', label: 'Google Maps Location', description: 'Geo-location of customer.', type: 'Map Picker', required: true, input: 'map', placeholder: 'Click Pick, or paste a Google Maps link / coordinates' },
   ]),
   section('Business & Tax Information', [
-    { name: 'gstNumber', label: 'GSTIN / Tax ID', description: 'Tax registration number.', type: 'Text' },
+    { name: 'gstNumber', label: 'GSTIN / Tax ID', description: 'Tax registration number.', type: 'Text', placeholder: 'e.g. 27AAAAA0000A1Z5' },
     { name: 'panBusinessRegistrationNo', label: 'PAN / Business Registration No.', description: 'Business identification number.', type: 'Text' },
     { name: 'taxCategory', label: 'Tax Category', description: 'Registered, Unregistered, or Exempt.', type: 'Dropdown', input: 'select' },
     { name: 'currency', label: 'Currency', description: 'Preferred transaction currency.', type: 'Dropdown', input: 'select' },
@@ -277,7 +280,7 @@ const backendFieldToFormField = {
   credit_limit: 'creditLimit',
   gst_number: 'gstNumber',
   is_active: 'status',
-  category: 'customerType',
+  category: 'customerCategory',
   status: 'status',
   notes: 'notes',
   email: 'email',
@@ -313,7 +316,10 @@ function hydrateCustomer(formCustomer, isSalesOfficer, currentUser, salesOfficer
   const customerName = formCustomer?.customerName || formCustomer?.name || ''
   const billingAddress = formCustomer?.billingAddress || formCustomer?.billing_address || formCustomer?.address || ''
   const shippingAddress = formCustomer?.shippingAddress || formCustomer?.deliveryAddress || formCustomer?.delivery_address || ''
-  const customerType = formCustomer?.customerType || formCustomer?.type || formCustomer?.category || ''
+  // customerType, industry, and customerCategory are three separate fields - customerType must
+  // never fall back to formCustomer.category (customerCategory's own value), or an existing
+  // customer missing customer_type would display their Category in the Type dropdown instead.
+  const customerType = formCustomer?.customerType || formCustomer?.type || ''
   const mapsLatitude = formCustomer?.mapsLatitude ?? formCustomer?.maps_latitude
   const mapsLongitude = formCustomer?.mapsLongitude ?? formCustomer?.maps_longitude
   const gstNumber = formCustomer?.gstNumber || formCustomer?.gst_number || ''
@@ -963,6 +969,10 @@ export default function CustomerForm({
     if (!formData.status) nextErrors.status = 'Status is required.'
     if (!formData.primaryContactPerson.trim()) nextErrors.primaryContactPerson = 'Primary contact person is required.'
     if (!formData.mobileNumber.trim()) nextErrors.mobileNumber = 'Mobile number is required.'
+    else if (!phonePattern.test(formData.mobileNumber.trim())) nextErrors.mobileNumber = 'Enter a valid mobile number.'
+    if (formData.alternateMobileNumber.trim() && !phonePattern.test(formData.alternateMobileNumber.trim())) {
+      nextErrors.alternateMobileNumber = 'Enter a valid mobile number.'
+    }
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) nextErrors.email = 'Enter a valid email address.'
     if (formData.website && !/^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+([/?#].*)?$/i.test(formData.website.trim())) {
       nextErrors.website = 'Enter a valid website (e.g. www.example.com).'
@@ -971,7 +981,9 @@ export default function CustomerForm({
     if (!formData.billingAddress.trim()) nextErrors.billingAddress = 'Billing address is required.'
     if (!formData.googleMapsLocation.trim()) nextErrors.googleMapsLocation = 'Google Maps location is required.'
     if (!formData.assignedSalesOfficerId) nextErrors.assignedSalesOfficerId = 'Assign a sales representative.'
-    if (Number(formData.creditLimit) < 0) nextErrors.creditLimit = 'Credit limit cannot be negative.'
+    if (formData.creditLimit !== '' && !Number.isFinite(Number(formData.creditLimit))) nextErrors.creditLimit = 'Enter a valid amount.'
+    else if (Number(formData.creditLimit) < 0) nextErrors.creditLimit = 'Credit limit cannot be negative.'
+    else if (/e/i.test(String(formData.creditLimit))) nextErrors.creditLimit = 'Enter a plain number, not scientific notation.'
 
     setErrors(nextErrors)
 
@@ -1185,6 +1197,11 @@ export default function CustomerForm({
         {...commonProps}
         type={field.input === 'date' ? 'date' : field.input === 'number' ? 'number' : field.input === 'email' ? 'email' : field.input === 'url' ? 'url' : field.input === 'tel' ? 'tel' : 'text'}
         min={field.input === 'number' ? '0' : undefined}
+        step={field.input === 'number' ? '0.01' : undefined}
+        inputMode={field.input === 'number' ? 'decimal' : field.input === 'tel' ? 'tel' : undefined}
+        // Money/decimal fields: block the keystrokes that would otherwise let scientific
+        // notation ("1e5") or a leading minus sign through a native number input.
+        onKeyDown={field.input === 'number' ? (event) => { if (['e', 'E', '+', '-'].includes(event.key)) event.preventDefault() } : undefined}
         onChange={(event) => updateField(field.name, field.name === 'gstNumber' ? event.target.value.toUpperCase() : event.target.value)}
       />
     )

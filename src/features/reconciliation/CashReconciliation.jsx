@@ -9,6 +9,8 @@ import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import ActionMenu from '../../components/ui/ActionMenu'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
 import {
@@ -126,6 +128,12 @@ export default function CashReconciliation() {
   const [historyDateFrom, setHistoryDateFrom] = useState('')
   const [historyDateTo, setHistoryDateTo] = useState('')
   const [historyStatus, setHistoryStatus] = useState('')
+  const { sortBy: historySortBy, sortOrder: historySortOrder, toggleSort: toggleHistorySort, sortParams: historySortParams } = useSortState()
+
+  const handleHistorySort = (field) => {
+    toggleHistorySort(field)
+    setHistoryPage(1)
+  }
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const [historyError, setHistoryError] = useState('')
   const [detailRecord, setDetailRecord] = useState(null)
@@ -192,6 +200,7 @@ export default function CashReconciliation() {
       status: historyStatus || undefined,
       page: historyPage,
       page_size: 10,
+      ...historySortParams,
     })
     setIsLoadingHistory(false)
     if (!result.success) {
@@ -201,7 +210,7 @@ export default function CashReconciliation() {
     setHistory(result.reconciliations)
     setHistoryTotal(result.total)
     setHistoryTotalPages(result.totalPages || 1)
-  }, [historyDateFrom, historyDateTo, historyStatus, historyPage])
+  }, [historyDateFrom, historyDateTo, historyStatus, historyPage, historySortParams])
 
   useEffect(() => {
     loadForDate(date)
@@ -588,15 +597,15 @@ export default function CashReconciliation() {
               <table className="listing-table w-full min-w-4xl text-left text-sm">
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
-                    <th className="px-4 py-2.5">Date</th>
-                    <th className="px-4 py-2.5">Status</th>
-                    <th className="px-4 py-2.5 text-right">Expected Collections</th>
-                    <th className="px-4 py-2.5 text-right">Actual Collections</th>
-                    <th className="px-4 py-2.5 text-right">Collections Variance</th>
-                    <th className="px-4 py-2.5 text-right">Expected Closing Cash</th>
-                    <th className="px-4 py-2.5 text-right">Actual Cash</th>
-                    <th className="px-4 py-2.5 text-right">Cash Balance Variance</th>
-                    <th className="px-4 py-2.5">Closed At</th>
+                    <SortableHeaderCell label="Date" sortKey="reconciliation_date" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} className="px-4 py-2.5" />
+                    <SortableHeaderCell label="Status" sortKey="status" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} className="px-4 py-2.5" />
+                    <SortableHeaderCell label="Expected Collections" sortKey="total_expected_collections" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
+                    <SortableHeaderCell label="Actual Collections" sortKey="total_actual_collections" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
+                    <SortableHeaderCell label="Collections Variance" sortKey="collections_variance" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
+                    <SortableHeaderCell label="Expected Closing Cash" sortKey="expected_closing_cash" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
+                    <SortableHeaderCell label="Actual Cash" sortKey="actual_cash_on_hand" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
+                    <SortableHeaderCell label="Cash Balance Variance" sortKey="cash_balance_variance" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
+                    <SortableHeaderCell label="Closed At" sortKey="closed_at" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} className="px-4 py-2.5" />
                     <th className="px-4 py-2.5" />
                   </tr>
                 </thead>

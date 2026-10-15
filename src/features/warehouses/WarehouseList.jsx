@@ -22,8 +22,10 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 import StatCard from '../../components/ui/StatCard'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { safeNumber } from '../purchases/purchaseHelpers'
@@ -39,6 +41,11 @@ import {
   patchDemoWarehouse,
 } from './warehouseDemoData'
 import WarehouseForm from './WarehouseForm'
+
+const HEADER_SORT_KEYS = {
+  name: { asc: 'name-asc', desc: 'name-desc' },
+  stock: { asc: 'stock-asc', desc: 'stock-desc' },
+}
 
 const movementTypeOptions = [
   { value: 'adjustment', label: 'Stock Take Adjustment' },
@@ -100,7 +107,22 @@ export default function WarehouseList() {
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  // GET /warehouses has no sort_by/sort_order support (confirmed against the live backend
+  // contract) and this page already loads its full matching set in one call - sorting is done
+  // locally. `sortFilter` had no UI control wired to it before this change (always 'recent');
+  // column-header clicks are now its only driver.
   const [sortFilter, setSortFilter] = useState('recent')
+  const activeHeaderSortKey = Object.keys(HEADER_SORT_KEYS).find(
+    (key) => HEADER_SORT_KEYS[key].asc === sortFilter || HEADER_SORT_KEYS[key].desc === sortFilter,
+  ) || null
+  const activeHeaderSortOrder = sortFilter.endsWith('-desc') ? 'desc' : 'asc'
+
+  const handleHeaderSort = (key) => {
+    const pair = HEADER_SORT_KEYS[key]
+    if (!pair) return
+    setSortFilter((current) => (current === pair.asc ? pair.desc : pair.asc))
+    setPage(1)
+  }
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -202,8 +224,10 @@ export default function WarehouseList() {
     })
 
     return filtered.sort((left, right) => {
-      if (sortFilter === 'name') return String(left.name).localeCompare(String(right.name))
-      if (sortFilter === 'stock') return safeNumber(right.stockUnits) - safeNumber(left.stockUnits)
+      if (sortFilter === 'name-asc') return String(left.name).localeCompare(String(right.name))
+      if (sortFilter === 'name-desc') return String(right.name).localeCompare(String(left.name))
+      if (sortFilter === 'stock-asc') return safeNumber(left.stockUnits) - safeNumber(right.stockUnits)
+      if (sortFilter === 'stock-desc') return safeNumber(right.stockUnits) - safeNumber(left.stockUnits)
       return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()
     })
   }, [warehouses, search, statusFilter, sortFilter, dateFrom, dateTo])
@@ -219,11 +243,10 @@ export default function WarehouseList() {
     ? current.filter((id) => !visibleRows.some((warehouse) => warehouse.id === id))
     : [...new Set([...current, ...visibleRows.map((warehouse) => warehouse.id)])])
 
-  const exportWarehousesCsv = (onlySelected = false) => {
+  const exportWarehouses = (onlySelected = false) => {
     const rowsToExport = onlySelected ? rows.filter((warehouse) => selectedIds.includes(warehouse.id)) : rows
     const data = [['Warehouse', 'Code', 'Location', 'Manager', 'Products', 'Stock Units', 'Low Stock', 'Status'], ...rowsToExport.map((warehouse) => [warehouse.name, warehouse.code, [warehouse.city, warehouse.state].filter(Boolean).join(', '), warehouse.managerName, safeNumber(warehouse.productCount), safeNumber(warehouse.stockUnits), safeNumber(warehouse.lowStockCount), warehouse.isActive ? 'Active' : 'Inactive'])]
-    const csv = data.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); const link = document.createElement('a'); link.href = url; link.download = 'warehouses.csv'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url)
+    exportRowsToExcel('warehouses', data)
   }
 
   const handleBulkDelete = async () => {
@@ -317,12 +340,12 @@ export default function WarehouseList() {
     <div className="listing-page space-y-4">
       <Card className="overflow-hidden p-0">
         <div className="border-b border-neutral-100 px-5 py-5">
-          <div className="flex flex-col gap-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Warehouses</h1><p className="mt-1 text-xs text-neutral-400">{rows.length} warehouses in view</p></div><div className="flex flex-wrap items-center justify-end gap-2"><div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Search warehouses..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportWarehousesCsv()}><Download className="size-4" />Export</Button>{atWarehouseLimit && <span className="text-xs text-neutral-500">{maxWarehouses} warehouse limit reached - <Link to="/admin/plans" className="font-medium text-primary-600 hover:underline">View Plans</Link></span>}<Button type="button" onClick={() => openForm()} size="sm" className="h-9 rounded-2xl px-3.5" disabled={atWarehouseLimit} title={atWarehouseLimit ? `Your current plan allows ${maxWarehouses} warehouse(s).` : undefined}><Plus className="size-4" />Add Warehouse</Button></div></div></div>
+          <div className="flex flex-col gap-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Warehouses</h1><p className="mt-1 text-xs text-neutral-400">{rows.length} warehouses in view</p></div><div className="flex flex-wrap items-center justify-end gap-2"><div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Search warehouses..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportWarehouses()}><Download className="size-4" />Export</Button>{atWarehouseLimit && <span className="text-xs text-neutral-500">{maxWarehouses} warehouse limit reached - <Link to="/admin/plans" className="font-medium text-primary-600 hover:underline">View Plans</Link></span>}<Button type="button" onClick={() => openForm()} size="sm" className="h-9 rounded-2xl px-3.5" disabled={atWarehouseLimit} title={atWarehouseLimit ? `Your current plan allows ${maxWarehouses} warehouse(s).` : undefined}><Plus className="size-4" />Add Warehouse</Button></div></div></div>
           <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">{[{ label: 'Total Warehouses', value: stats.total, detail: `${stats.active} active`, icon: WarehouseIcon }, { label: 'Active Warehouses', value: stats.active, detail: 'currently active', icon: ClipboardList }, { label: 'Stock Units', value: stats.stockUnits, detail: `${stats.lowStock} low stock`, icon: Boxes }, { label: 'Low Stock Items', value: stats.lowStock, detail: 'needs attention', icon: PackageSearch }].map(({ label, value, detail, icon: Icon }, index) => <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>)}</div>
         </div>
       </Card>
       {adjustSuccess && <div className="rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-700">{adjustSuccess}</div>}
-      {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} warehouse{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportWarehousesCsv(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
+      {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} warehouse{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportWarehouses(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
       <Card className="overflow-hidden p-0">
 
         <div className="overflow-x-auto">
@@ -375,7 +398,14 @@ export default function WarehouseList() {
               <thead>
                   <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
                     <th className="w-14 px-6 py-6"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all warehouses" /></th>
-                    <th className="whitespace-nowrap px-6 py-6">Warehouse</th><th className="whitespace-nowrap px-6 py-6">Location</th><th className="whitespace-nowrap px-6 py-6">Manager / In-Charge</th><th className="whitespace-nowrap px-6 py-6">Products</th><th className="whitespace-nowrap px-6 py-6">Stock Units</th><th className="whitespace-nowrap px-6 py-6">Low Stock</th><th className="whitespace-nowrap px-6 py-6">Status</th><th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
+                    <SortableHeaderCell label="Warehouse" sortKey="name" sortBy={activeHeaderSortKey} sortOrder={activeHeaderSortOrder} onSort={handleHeaderSort} className="whitespace-nowrap px-6 py-6" />
+                    <th className="whitespace-nowrap px-6 py-6">Location</th>
+                    <th className="whitespace-nowrap px-6 py-6">Manager / In-Charge</th>
+                    <th className="whitespace-nowrap px-6 py-6">Products</th>
+                    <SortableHeaderCell label="Stock Units" sortKey="stock" sortBy={activeHeaderSortKey} sortOrder={activeHeaderSortOrder} onSort={handleHeaderSort} className="whitespace-nowrap px-6 py-6" />
+                    <th className="whitespace-nowrap px-6 py-6">Low Stock</th>
+                    <th className="whitespace-nowrap px-6 py-6">Status</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">

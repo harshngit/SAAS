@@ -106,6 +106,8 @@ export async function listSuppliers(params = {}) {
     if (params.search) queryParams.search = params.search
     if (params.category) queryParams.category = params.category
     if (params.is_active !== undefined && params.is_active !== null) queryParams.is_active = params.is_active
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/suppliers', {
       headers: authHeader(),

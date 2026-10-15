@@ -10,6 +10,8 @@ import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import { useSortState } from '../../hooks/useSortState'
 import { ROLES } from '../../auth/roles'
 import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, deleteLead, listLeads, updateLead } from '../../api/leads'
 import { listUsers } from '../../api/users'
@@ -18,6 +20,7 @@ import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { exportRowsToExcel } from '../../utils/exportToExcel'
 import { LeadEditForm } from './LeadForms'
 import ConvertLeadModal from './ConvertLeadModal'
 import { LEAD_STATUS_VARIANT, formatLeadStatus, getLastActivityLabel, getNextFollowUpSummary } from './leadActivity'
@@ -77,6 +80,12 @@ export default function LeadList() {
   const [deleteError, setDeleteError] = useState('')
 
   const [convertTarget, setConvertTarget] = useState(null)
+  const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
+
+  const handleSort = (field) => {
+    toggleSort(field)
+    setPage(1)
+  }
 
   // Earliest PENDING follow-up due date per lead id, keyed from one real GET
   // /follow-ups?status=pending call (never one request per lead) - see loadPendingFollowUps
@@ -88,7 +97,7 @@ export default function LeadList() {
     setIsLoading(true)
     setListError('')
 
-    const result = await listLeads(statusFilter !== 'all' ? { status: statusFilter } : {})
+    const result = await listLeads({ ...(statusFilter !== 'all' ? { status: statusFilter } : {}), ...sortParams })
 
     if (!result.success) {
       setLeads([])
@@ -99,7 +108,7 @@ export default function LeadList() {
 
     setLeads(result.leads)
     setIsLoading(false)
-  }, [statusFilter])
+  }, [statusFilter, sortParams])
 
   useEffect(() => {
     loadLeads()
@@ -266,15 +275,7 @@ export default function LeadList() {
         ]
       }),
     ]
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'leads.csv'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    exportRowsToExcel('leads', rows)
   }
 
   const handleBulkDelete = async () => {
@@ -434,13 +435,13 @@ export default function LeadList() {
                   <th className="w-10 px-6 py-6">
                     <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all leads" />
                   </th>
-                  <th className="min-w-52 whitespace-nowrap px-6 py-6">Lead</th>
+                  <SortableHeaderCell label="Lead" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="min-w-52 whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Contact</th>
-                  <th className="whitespace-nowrap px-6 py-6">Source</th>
-                  <th className="whitespace-nowrap px-6 py-6">Assigned To</th>
-                  <th className="whitespace-nowrap px-6 py-6">Status</th>
+                  <SortableHeaderCell label="Source" sortKey="lead_source" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Assigned To" sortKey="assigned_salesperson_id" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Status" sortKey="lead_status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Next Follow-up</th>
-                  <th className="whitespace-nowrap px-6 py-6">Created</th>
+                  <SortableHeaderCell label="Created" sortKey="created_at" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="w-16 whitespace-nowrap px-6 py-6 text-right">Actions</th>
                 </tr>
               </thead>
