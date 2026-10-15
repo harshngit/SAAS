@@ -407,7 +407,7 @@ export default function SalesOfficerDashboard() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold text-neutral-400">
                   <th className="whitespace-nowrap py-2 pr-3">Customer</th>
                   <th className="whitespace-nowrap py-2 pr-3">Purpose</th>
                   <th className="whitespace-nowrap py-2 pr-3">Date</th>
@@ -449,7 +449,7 @@ export default function SalesOfficerDashboard() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold text-neutral-400">
                   <th className="whitespace-nowrap py-2 pr-3">Order ID</th>
                   <th className="whitespace-nowrap py-2 pr-3">Customer</th>
                   <th className="whitespace-nowrap py-2 pr-3 text-right">Amount</th>

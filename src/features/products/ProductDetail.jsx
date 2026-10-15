@@ -520,7 +520,7 @@ export default function ProductDetail() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-3xl text-left text-sm">
             <thead>
-              <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+              <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                 <th className="whitespace-nowrap px-5 py-3" />
                 <th className="whitespace-nowrap px-5 py-3">Size</th>
                 <th className="whitespace-nowrap px-5 py-3">SKU</th>
@@ -578,7 +578,7 @@ export default function ProductDetail() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                   <th className="whitespace-nowrap px-5 py-3">Batch #</th>
                   <th className="whitespace-nowrap px-5 py-3">Warehouse</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Quantity</th>
@@ -611,7 +611,7 @@ export default function ProductDetail() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                   <th className="whitespace-nowrap px-5 py-3">Serial Number</th>
                   <th className="whitespace-nowrap px-5 py-3">Status</th>
                   <th className="whitespace-nowrap px-5 py-3">Sold At</th>

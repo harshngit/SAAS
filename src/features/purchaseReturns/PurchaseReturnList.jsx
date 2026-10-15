@@ -260,7 +260,7 @@ export default function PurchaseReturnList() {
           ) : (
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                <tr className="text-[0.68rem] font-semibold text-neutral-400">
                   <SortableHeaderCell label="Return" sortKey="return_number" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
                   <SortableHeaderCell label="Supplier" sortKey="supplier_id" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
                   <th className="whitespace-nowrap px-4 py-3">Purchase / GRN</th>

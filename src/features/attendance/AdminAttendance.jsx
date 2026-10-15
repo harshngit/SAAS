@@ -376,7 +376,7 @@ export default function AdminAttendance() {
             <>
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                  <tr className="text-[0.68rem] font-semibold text-neutral-400">
                     <th className="w-10 px-4 py-3">
                       <input
                         type="checkbox"

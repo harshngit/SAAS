@@ -540,7 +540,7 @@ export default function CustomerList() {
           ) : (
             <table className="listing-table w-full min-w-260 text-left text-2xs">
               <thead>
-                <tr className="border-b border-surface-border bg-surface-muted text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">
+                <tr className="border-b border-surface-border bg-surface-muted text-xs font-semibold text-fg-muted">
                   <th className="w-14 px-4 py-3">
                     <input
                       type="checkbox"

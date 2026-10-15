@@ -520,7 +520,7 @@ export default function SupplierList() {
             </div>
             <table className="listing-table hidden w-full min-w-[72rem] text-left text-sm md:table">
               <thead>
-                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
                   <th className="w-14 px-6 py-6"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all suppliers" /></th>
                   <SortableHeaderCell label="Supplier" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Contact</th>

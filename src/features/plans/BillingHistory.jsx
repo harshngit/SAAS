@@ -177,7 +177,7 @@ export default function BillingHistory() {
           <div className="overflow-x-auto rounded-xl border border-neutral-100">
             <table className="w-full min-w-[52rem] text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                   <th className="px-3.5 py-2.5">Date</th>
                   <th className="px-3.5 py-2.5">Plan</th>
                   <th className="px-3.5 py-2.5">Billing Cycle</th>

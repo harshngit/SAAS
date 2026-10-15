@@ -213,18 +213,18 @@ function SalesInvoicesPanel({ header }) {
             <div className="overflow-x-auto">
               <table className="listing-table w-full min-w-5xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Invoice No.</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Order #</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Customer</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Invoice Date</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Due Date</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Total</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Paid</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Due</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Payment Status</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Invoice Status</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Actions</th>
+                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold text-neutral-400">Invoice No.</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold text-neutral-400">Order #</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold text-neutral-400">Customer</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold text-neutral-400">Invoice Date</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold text-neutral-400">Due Date</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold text-neutral-400">Total</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold text-neutral-400">Paid</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold text-neutral-400">Due</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold text-neutral-400">Payment Status</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold text-neutral-400">Invoice Status</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-right text-[0.68rem] font-semibold text-neutral-400">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">

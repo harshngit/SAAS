@@ -290,7 +290,7 @@ export default function MyAttendance() {
             <div className="hidden overflow-x-auto sm:block">
               <table className="w-full min-w-3xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold text-neutral-400">
                     <SortableHeaderCell label="Date" sortKey="date" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-4 py-3" />
                     {/* Status is frontend-derived (attendanceUtils.normalizeAttendanceRecord), not
                         a raw backend field - left non-sortable so the sort key never diverges. */}

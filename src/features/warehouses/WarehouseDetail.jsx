@@ -426,7 +426,7 @@ export default function WarehouseDetail() {
                 <div className="hidden overflow-x-auto md:block">
                   <table className="w-full min-w-4xl text-left text-sm">
                     <thead>
-                      <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                      <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                         <th className="px-5 py-3">Product</th>
                         <th className="px-5 py-3">SKU</th>
                         <th className="px-5 py-3">Category</th>
@@ -469,7 +469,7 @@ export default function WarehouseDetail() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-4xl text-left text-sm">
                   <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                       <th className="px-5 py-3">Date</th>
                       <th className="px-5 py-3">Product</th>
                       <th className="px-5 py-3">Type</th>
@@ -522,7 +522,7 @@ export default function WarehouseDetail() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-4xl text-left text-sm">
                   <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                       <th className="px-5 py-3">Transfer #</th>
                       <th className="px-5 py-3">Date</th>
                       <th className="px-5 py-3">From</th>
@@ -644,7 +644,7 @@ function TransferDetailModal({ transferId, isDemo, fallback, productNameById = {
           <div className="overflow-x-auto rounded-xl border border-neutral-100">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.62rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.62rem] font-semibold text-neutral-400">
                   <th className="px-3 py-2">Product</th>
                   <th className="px-3 py-2 text-right">Quantity</th>
                 </tr>
@@ -784,7 +784,7 @@ function CreateTransferDrawer({ isOpen, isDemo, fromWarehouse, stock, destinatio
               <div className="overflow-x-auto rounded-xl border border-neutral-100">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.62rem] font-semibold uppercase tracking-widest text-neutral-400">
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.62rem] font-semibold text-neutral-400">
                       <th className="px-3 py-2">Product</th>
                       <th className="px-3 py-2 text-right">Available</th>
                       <th className="px-3 py-2 text-right">Transfer Qty</th>

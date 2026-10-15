@@ -304,7 +304,7 @@ export default function MyLeaves() {
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-4xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold text-neutral-400">
                     <SortableHeaderCell label="Leave Type" sortKey="leaveType" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-4 py-3" />
                     <th className="px-4 py-3">Date Range</th>
                     <SortableHeaderCell label="Days" sortKey="daysCount" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} align="right" className="px-4 py-3" />

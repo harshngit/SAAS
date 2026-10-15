@@ -1438,7 +1438,7 @@ export default function UserManagement() {
             <>
               <table className="listing-table w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
+                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
                     <SortableHeaderCell label="User" sortKey="name" sortBy={staffSortBy} sortOrder={staffSortOrder} onSort={handleStaffSort} className="whitespace-nowrap px-6 py-6" />
                     <SortableHeaderCell label="Email" sortKey="email" sortBy={staffSortBy} sortOrder={staffSortOrder} onSort={handleStaffSort} className="whitespace-nowrap px-6 py-6" />
                     <th className="whitespace-nowrap px-6 py-6">Role</th>

@@ -44,7 +44,7 @@ function ExpiringBatchesPanel() {
       <div className="max-h-56 overflow-y-auto px-5 py-3">
         <table className="listing-table w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
+            <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
               <th className="py-6 pr-4">Product</th>
               <th className="py-6 pr-4">Batch</th>
               <th className="py-6 pr-4">Warehouse</th>
@@ -350,7 +350,7 @@ export default function StockBoard({ readOnly = false }) {
           ) : (
             <table className="listing-table w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
                   <SortableHeaderCell label="Product" sortKey="name" sortBy={activeHeaderSortKey} sortOrder={activeHeaderSortOrder} onSort={handleHeaderSort} className="whitespace-nowrap px-6 py-6" />
                   <SortableHeaderCell label="SKU" sortKey="sku" sortBy={activeHeaderSortKey} sortOrder={activeHeaderSortOrder} onSort={handleHeaderSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Variants</th>

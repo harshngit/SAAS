@@ -284,15 +284,15 @@ export default function PurchaseInvoiceList() {
               {/* Desktop table */}
               <table className="listing-table hidden w-full min-w-6xl text-left text-sm md:table">
                 <thead>
-                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
+                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
                     <SortableHeaderCell label="Purchase #" sortKey="purchase_number" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400" />
                     <SortableHeaderCell label="Supplier" sortKey="supplier_id" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400" />
                     <SortableHeaderCell label="Purchase Date" sortKey="purchase_date" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400" />
                     <SortableHeaderCell label="Warehouse" sortKey="warehouse_id" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400" />
                     <SortableHeaderCell label="Grand Total" sortKey="total" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} align="right" className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400" />
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Receiving Status</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Payment Status</th>
-                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">Purchase Status</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold text-neutral-400">Receiving Status</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold text-neutral-400">Payment Status</th>
+                    <th className="whitespace-nowrap px-6 py-6 text-[0.68rem] font-semibold text-neutral-400">Purchase Status</th>
                     <th className="w-12 px-6 py-6" />
                   </tr>
                 </thead>

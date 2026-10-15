@@ -309,7 +309,7 @@ export default function UpgradeRequests() {
           ) : (
             <table className="listing-table w-full min-w-[72rem] text-left text-sm">
               <thead>
-                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
                   <SortableHeaderCell label="Organization" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Current Plan</th>
                   <th className="whitespace-nowrap px-6 py-6">Requested Plan</th>

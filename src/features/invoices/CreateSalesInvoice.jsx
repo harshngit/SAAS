@@ -290,7 +290,7 @@ function OrderInvoicePanel({ orderId }) {
         <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-100">
           <table className="w-full min-w-2xl text-left text-sm">
             <thead>
-              <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+              <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                 <th className="px-3.5 py-2.5">Product</th>
                 <th className="px-3.5 py-2.5 text-right">{isPickupOrder ? 'Collected Qty' : 'Delivered Qty'}</th>
                 <th className="px-3.5 py-2.5 text-right">Rate</th>
@@ -1022,7 +1022,7 @@ function CreateSalesInvoiceForm() {
               <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-100">
                 <table className="w-full min-w-3xl text-left text-sm">
                   <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                       <th className="px-3 py-2.5">Item</th>
                       <th className="px-3 py-2.5">Qty</th>
                       <th className="px-3 py-2.5">Rate</th>

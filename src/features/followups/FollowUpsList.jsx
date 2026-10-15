@@ -585,7 +585,7 @@ export default function FollowUpsList() {
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-205 text-left text-sm">
                       <thead>
-                        <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                        <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                           <th className="px-4 py-3">Follow-up</th>
                           <th className="px-4 py-3">Contact</th>
                           <th className="px-4 py-3">Type</th>

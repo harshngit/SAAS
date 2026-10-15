@@ -101,7 +101,7 @@ export default function ProfitLossStatement({ summary, reportType, requestParams
     <div className="overflow-x-auto rounded-xl border border-neutral-100">
       <table className="w-full min-w-[32rem] text-left text-sm">
         <thead>
-          <tr className="bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+          <tr className="bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
             <th className="px-4 py-2.5">Particulars</th>
             <th className="px-4 py-2.5 text-right">Amount</th>
           </tr>

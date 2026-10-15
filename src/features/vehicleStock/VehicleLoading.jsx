@@ -499,7 +499,7 @@ export default function VehicleLoading() {
                 <div className="overflow-x-auto p-4">
                   <table className="w-full min-w-lg text-left text-sm">
                     <thead>
-                      <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                      <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold text-neutral-400">
                         <th className="px-2 py-2">Product</th>
                         <th className="px-2 py-2 text-right">Remaining</th>
                         <th className="px-2 py-2 text-center">Load Qty</th>

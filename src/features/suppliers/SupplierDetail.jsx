@@ -957,7 +957,7 @@ export default function SupplierDetail() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead><tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400"><th className="px-5 py-3">Product</th><th className="px-5 py-3">SKU</th><th className="px-5 py-3">Category</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Action</th></tr></thead>
+                  <thead><tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400"><th className="px-5 py-3">Product</th><th className="px-5 py-3">SKU</th><th className="px-5 py-3">Category</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Action</th></tr></thead>
                   <tbody className="divide-y divide-neutral-50">
                     {supplierProducts.map((product) => (
                       <tr key={product.id} className="hover:bg-primary-50/35">
@@ -992,7 +992,7 @@ export default function SupplierDetail() {
             {purchasesError ? <div className="px-5 py-8 text-center text-sm text-red-600">{purchasesError}</div> : isLoadingPurchases ? <LoadingSpinner label="Loading purchase history..." /> : purchases.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-neutral-500">No purchases found for this supplier.</p>
             ) : (
-              <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead><tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400"><th className="px-5 py-3">Purchase #</th><th className="px-5 py-3">Date</th><th className="px-5 py-3">Warehouse</th><th className="px-5 py-3">Total</th><th className="px-5 py-3">Receiving Status</th><th className="px-5 py-3">Payment Status</th><th className="px-5 py-3 text-right">Action</th></tr></thead><tbody className="divide-y divide-neutral-50">{purchases.map((purchase) => <tr key={purchase.id} className="hover:bg-primary-50/35"><td className="px-5 py-3.5 font-medium text-neutral-900">{displayValue(purchase.purchaseNumber || purchase.invoiceNumber)}</td><td className="px-5 py-3.5 text-neutral-600">{formatDate(purchase.purchaseDate || purchase.invoiceDate)}</td><td className="px-5 py-3.5 text-neutral-600">{displayValue(purchase.warehouseId)}</td><td className="px-5 py-3.5 font-medium text-neutral-900">{formatCurrency(purchase.total)}</td><td className="px-5 py-3.5"><Badge variant="neutral">{displayValue(purchase.receivingStatus || purchase.purchaseStatus)}</Badge></td><td className="px-5 py-3.5"><Badge variant="neutral">{displayValue(purchase.paymentStatus)}</Badge></td><td className="px-5 py-3.5 text-right"><Button type="button" variant="ghost" size="sm" onClick={() => navigate('/admin/purchases')}><Eye className="size-4" aria-hidden="true" /> View Purchase</Button></td></tr>)}</tbody></table></div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead><tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400"><th className="px-5 py-3">Purchase #</th><th className="px-5 py-3">Date</th><th className="px-5 py-3">Warehouse</th><th className="px-5 py-3">Total</th><th className="px-5 py-3">Receiving Status</th><th className="px-5 py-3">Payment Status</th><th className="px-5 py-3 text-right">Action</th></tr></thead><tbody className="divide-y divide-neutral-50">{purchases.map((purchase) => <tr key={purchase.id} className="hover:bg-primary-50/35"><td className="px-5 py-3.5 font-medium text-neutral-900">{displayValue(purchase.purchaseNumber || purchase.invoiceNumber)}</td><td className="px-5 py-3.5 text-neutral-600">{formatDate(purchase.purchaseDate || purchase.invoiceDate)}</td><td className="px-5 py-3.5 text-neutral-600">{displayValue(purchase.warehouseId)}</td><td className="px-5 py-3.5 font-medium text-neutral-900">{formatCurrency(purchase.total)}</td><td className="px-5 py-3.5"><Badge variant="neutral">{displayValue(purchase.receivingStatus || purchase.purchaseStatus)}</Badge></td><td className="px-5 py-3.5"><Badge variant="neutral">{displayValue(purchase.paymentStatus)}</Badge></td><td className="px-5 py-3.5 text-right"><Button type="button" variant="ghost" size="sm" onClick={() => navigate('/admin/purchases')}><Eye className="size-4" aria-hidden="true" /> View Purchase</Button></td></tr>)}</tbody></table></div>
             )}
           </Card>
         </TabsContent>
@@ -1010,7 +1010,7 @@ export default function SupplierDetail() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-4xl text-left text-sm">
                   <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                       <th className="px-5 py-3">Supplier Invoice #</th>
                       <th className="px-5 py-3">Invoice Date</th>
                       <th className="px-5 py-3">Purchase #</th>
@@ -1089,7 +1089,7 @@ export default function SupplierDetail() {
             <div className="overflow-x-auto rounded-xl border border-neutral-100">
               <table className="w-full min-w-3xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                     <th className="whitespace-nowrap px-5 py-3">Payment #</th>
                     <th className="whitespace-nowrap px-5 py-3">Payment Date</th>
                     <th className="whitespace-nowrap px-5 py-3 text-right">Amount</th>

@@ -299,7 +299,7 @@ export default function OrganizationPlanAccess({ orgId }) {
           <div className="overflow-x-auto rounded-xl border border-neutral-100">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                   <th className="px-4 py-2.5">Feature</th>
                   <th className="px-4 py-2.5">Plan Default</th>
                   <th className="px-4 py-2.5">Override</th>
@@ -347,7 +347,7 @@ export default function OrganizationPlanAccess({ orgId }) {
         <div className="overflow-x-auto rounded-xl border border-neutral-100">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+              <tr className="bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                 <th className="px-4 py-2.5">Limit</th>
                 <th className="px-4 py-2.5">Plan Default</th>
                 <th className="px-4 py-2.5">Override</th>

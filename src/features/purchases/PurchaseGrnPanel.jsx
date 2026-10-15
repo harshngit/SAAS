@@ -452,7 +452,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
           <div className="overflow-x-auto">
             <table className="w-full min-w-4xl text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                   <th className="px-5 py-3">GRN #</th>
                   <th className="px-5 py-3">Receipt Date</th>
                   <th className="px-5 py-3">Warehouse</th>
@@ -475,7 +475,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
           <div className="overflow-x-auto">
             <table className="w-full min-w-4xl text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                   <th className="px-5 py-3">GRN #</th>
                   <th className="px-5 py-3">Received Date</th>
                   <th className="px-5 py-3">Warehouse</th>
@@ -559,7 +559,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
           <div className="overflow-x-auto rounded-xl border border-neutral-100">
             <table className="w-full min-w-4xl text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.66rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.66rem] font-semibold text-neutral-400">
                   <th className="px-3 py-2.5">Product</th>
                   <th className="px-3 py-2.5">SKU</th>
                   <th className="px-3 py-2.5 text-right">Ordered</th>
@@ -698,7 +698,7 @@ function GrnDetailBody({ grn, isDemo }) {
       <div className="overflow-x-auto rounded-xl border border-neutral-100">
         <table className="w-full min-w-4xl text-left text-sm">
           <thead>
-            <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.66rem] font-semibold uppercase tracking-widest text-neutral-400">
+            <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.66rem] font-semibold text-neutral-400">
               <th className="px-3 py-2.5">Product</th>
               <th className="px-3 py-2.5">SKU</th>
               <th className="px-3 py-2.5 text-right">Ordered</th>

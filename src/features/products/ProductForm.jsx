@@ -1190,7 +1190,7 @@ export default function ProductForm({
           <div className="max-h-[350px] overflow-auto rounded-xl border border-neutral-100 bg-surface shadow-(--shadow-xs)">
             <table className="w-full min-w-[56rem] text-left text-sm">
               <thead className="sticky top-0 z-10">
-                <tr className="border-b border-neutral-100 bg-neutral-50/95 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-neutral-100 bg-neutral-50/95 text-[0.68rem] font-semibold text-neutral-400">
                   <th className="w-full min-w-72 whitespace-nowrap px-4 py-3">Variant Name</th>
                   {inventoryFields.map((inventoryField) => (
                     <th key={inventoryField.key} className={`whitespace-nowrap px-3 py-3 ${inventoryField.width}`}>
@@ -1273,7 +1273,7 @@ export default function ProductForm({
             <div className="overflow-x-auto">
               <table className="w-full min-w-3xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold text-neutral-400">
                     <th className="px-5 py-3">Variant</th>
                     <th className="px-3 py-3">SKU</th>
                     <th className="px-3 py-3 text-center">Stock</th>

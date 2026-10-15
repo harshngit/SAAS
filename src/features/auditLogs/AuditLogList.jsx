@@ -354,7 +354,7 @@ export default function AuditLogList() {
           ) : (
             <table className="listing-table w-full min-w-[56rem] text-left text-sm">
               <thead>
-                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
                   <SortableHeaderCell label="Action" sortKey="title" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
                   <SortableHeaderCell label="Type" sortKey="type" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
                   <SortableHeaderCell label="By" sortKey="by" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />

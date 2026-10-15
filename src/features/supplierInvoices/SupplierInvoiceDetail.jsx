@@ -377,7 +377,7 @@ export default function SupplierInvoiceDetail() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-4xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                     <th className="px-5 py-3">Product</th>
                     <th className="px-5 py-3">SKU</th>
                     <th className="px-5 py-3 text-right">Ordered</th>
@@ -459,7 +459,7 @@ export default function SupplierInvoiceDetail() {
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-4xl text-left text-sm">
                       <thead>
-                        <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                        <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                           <th className="px-5 py-3">Product</th>
                           <th className="px-5 py-3 text-right">Ordered</th>
                           <th className="px-5 py-3 text-right">Received</th>
@@ -523,7 +523,7 @@ export default function SupplierInvoiceDetail() {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-3xl text-left text-sm">
                     <thead>
-                      <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                      <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                         <th className="px-5 py-3">Payment #</th>
                         <th className="px-5 py-3">Date</th>
                         <th className="px-5 py-3 text-right">Amount Allocated</th>
@@ -562,7 +562,7 @@ export default function SupplierInvoiceDetail() {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-3xl text-left text-sm">
                     <thead>
-                      <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                      <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                         <th className="px-5 py-3">Payment #</th>
                         <th className="px-5 py-3">Date</th>
                         <th className="px-5 py-3 text-right">Allocated Amount</th>

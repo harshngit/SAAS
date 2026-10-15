@@ -144,7 +144,7 @@ export default function RolesList() {
           ) : (
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                <tr className="text-[0.68rem] font-semibold text-neutral-400">
                   <th className="whitespace-nowrap px-4 py-3">Role</th>
                   <th className="whitespace-nowrap px-4 py-3">Workspace</th>
                   <th className="whitespace-nowrap px-4 py-3">Data Scope</th>

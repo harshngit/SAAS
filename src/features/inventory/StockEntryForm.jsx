@@ -117,7 +117,7 @@ export default function StockEntryForm({ isOpen, onClose, product, saving = fals
         <div className="overflow-x-auto rounded-xl border border-neutral-100">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="bg-neutral-50/80 text-[0.65rem] font-semibold uppercase tracking-widest text-neutral-400">
+              <tr className="bg-neutral-50/80 text-[0.65rem] font-semibold text-neutral-400">
                 <th className="whitespace-nowrap px-4 py-2.5">Variant</th>
                 <th className="whitespace-nowrap px-4 py-2.5">Available Stock</th>
                 <th className="whitespace-nowrap px-4 py-2.5">

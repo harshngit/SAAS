@@ -479,7 +479,7 @@ export default function SupplierInvoiceForm() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-4xl text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.66rem] font-semibold uppercase tracking-widest text-neutral-400">
+                <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.66rem] font-semibold text-neutral-400">
                   <th className="px-3 py-2.5">Product</th>
                   <th className="px-3 py-2.5">SKU</th>
                   <th className="px-3 py-2.5 text-right">Purchase Price</th>
@@ -568,7 +568,7 @@ export default function SupplierInvoiceForm() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-4xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-neutral-100 text-[0.66rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <tr className="border-b border-neutral-100 text-[0.66rem] font-semibold text-neutral-400">
                     <th className="py-2 pr-3">Product</th>
                     <th className="py-2 px-3 text-right">Ordered</th>
                     <th className="py-2 px-3 text-right">Received</th>

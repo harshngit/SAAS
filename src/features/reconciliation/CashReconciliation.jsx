@@ -435,7 +435,7 @@ export default function CashReconciliation() {
               <div className="overflow-x-auto rounded-xl border border-neutral-100">
                 <table className="w-full min-w-2xl text-left text-sm">
                   <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                       <th className="px-4 py-2.5">Payment Method</th>
                       <th className="px-4 py-2.5 text-right">Expected</th>
                       <th className="px-4 py-2.5 text-right">Actual</th>
@@ -596,7 +596,7 @@ export default function CashReconciliation() {
             <div className="overflow-x-auto rounded-xl border border-neutral-100">
               <table className="listing-table w-full min-w-4xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                     <SortableHeaderCell label="Date" sortKey="reconciliation_date" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} className="px-4 py-2.5" />
                     <SortableHeaderCell label="Status" sortKey="status" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} className="px-4 py-2.5" />
                     <SortableHeaderCell label="Expected Collections" sortKey="total_expected_collections" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
@@ -656,7 +656,7 @@ export default function CashReconciliation() {
               <div className="overflow-x-auto rounded-xl border border-neutral-100">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                       <th className="px-3.5 py-2">Method</th>
                       <th className="px-3.5 py-2 text-right">Expected</th>
                       <th className="px-3.5 py-2 text-right">Actual</th>

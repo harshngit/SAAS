@@ -119,7 +119,7 @@ function ReturnLines({ lines, editable, onChange, lineErrors }) {
       <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-6xl text-left text-sm">
           <thead>
-            <tr className="border-b border-neutral-100 text-[0.66rem] font-semibold uppercase tracking-widest text-neutral-400">
+            <tr className="border-b border-neutral-100 text-[0.66rem] font-semibold text-neutral-400">
               <th className="px-3 py-3">Product</th>
               <th className="px-3 py-3">SKU / Variant</th>
               <th className="px-3 py-3">UOM</th>
@@ -408,7 +408,7 @@ function PreviousReturns({ records, isLoading, limited, onView }) {
       <div className="overflow-x-auto">
         <table className="w-full min-w-4xl text-left text-sm">
           <thead>
-            <tr className="border-b border-neutral-100 text-[0.66rem] font-semibold uppercase tracking-widest text-neutral-400">
+            <tr className="border-b border-neutral-100 text-[0.66rem] font-semibold text-neutral-400">
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Vehicle</th>
               <th className="px-4 py-3 text-right">Products</th>

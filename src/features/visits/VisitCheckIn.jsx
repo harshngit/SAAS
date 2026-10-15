@@ -1013,7 +1013,7 @@ export default function VisitCheckIn() {
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-4xl text-left text-sm">
                   <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                       <th className="px-4 py-3">Visit</th>
                       <th className="px-4 py-3">When</th>
                       <th className="px-4 py-3">Type</th>

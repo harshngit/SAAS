@@ -364,7 +364,7 @@ export default function SalesReturnDetail() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-4xl text-left text-sm">
             <thead>
-              <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+              <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                 <th className="whitespace-nowrap px-5 py-3">Product</th>
                 <th className="whitespace-nowrap px-5 py-3 text-right">This Return</th>
                 <th className="whitespace-nowrap px-5 py-3 text-right">Received</th>

@@ -508,7 +508,7 @@ export default function MyExpenses() {
             <div className="hidden overflow-x-auto lg:block">
               <table className="listing-table w-full min-w-6xl text-left text-sm">
                 <thead>
-                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
+                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
                     <SortableHeaderCell label="Date" sortKey="expense_date" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
                     <SortableHeaderCell label="Category" sortKey="category" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
                     <th className="px-6 py-6">Description</th>

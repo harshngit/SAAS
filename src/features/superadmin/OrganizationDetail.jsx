@@ -567,7 +567,7 @@ export default function OrganizationDetail() {
           <div className="overflow-x-auto rounded-2xl border border-surface-border">
             <table className="w-full min-w-2xl text-left text-sm">
               <thead>
-                <tr className="border-b border-surface-border bg-surface-muted/80 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-fg-muted">
+                <tr className="border-b border-surface-border bg-surface-muted/80 text-[0.68rem] font-semibold text-fg-muted">
                   <th className="px-3.5 py-2.5">Date</th>
                   <th className="px-3.5 py-2.5">Plan</th>
                   <th className="px-3.5 py-2.5">Cycle</th>

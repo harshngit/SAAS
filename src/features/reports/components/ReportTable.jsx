@@ -117,7 +117,7 @@ export default function ReportTable({ columns, rows, getRowKey, sortable = false
     <div className="overflow-x-auto rounded-xl border border-neutral-100">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="bg-neutral-50/80 text-[0.68rem] font-semibold uppercase tracking-widest text-neutral-400">
+          <tr className="bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
             {columns.map((column) => {
               const isSortable = sortable && SORTABLE_TYPES.has(column.type)
               const isActive = sort.key === column.key

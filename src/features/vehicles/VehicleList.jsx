@@ -317,7 +317,7 @@ export default function VehicleList() {
               {/* Desktop table */}
               <table className="listing-table hidden w-full min-w-4xl text-left text-sm md:table">
                 <thead>
-                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
+                  <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
                     <th className="whitespace-nowrap px-6 py-6">Vehicle</th>
                     <SortableHeaderCell label="Vehicle Number" sortKey="vehicle_number" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
                     <SortableHeaderCell label="Type" sortKey="vehicle_type" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />

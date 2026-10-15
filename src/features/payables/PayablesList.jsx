@@ -346,7 +346,7 @@ export default function PayablesList() {
           ) : (
             <table className="listing-table w-full min-w-4xl text-left text-sm">
               <thead>
-                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-fg-muted">
+                <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
                   <SortableHeaderCell label="Supplier" sortKey="supplier_id" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <SortableHeaderCell label="Supplier Invoice #" sortKey="supplier_invoice_number" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <SortableHeaderCell label="Invoice Date" sortKey="invoice_date" sortBy={headerSortBy} sortOrder={headerSortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
