@@ -1,4 +1,4 @@
-import { ListOverview, ListHeader, ListSummary, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import { ListOverview, ListSummary, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AlertTriangle, CalendarClock, Eye, IndianRupee, Users, Wallet } from 'lucide-react'
@@ -77,14 +77,11 @@ export default function ReceivablesPayables() {
 
   return (
     <div className="listing-page space-y-4">
-      <ListOverview>
-      <ListHeader>
-        <div>
+      <div>
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Receivables</h1>
-        <p className="mt-1 text-xs text-neutral-400">Track outstanding customer invoices and overdue balances.</p>
-        </div>
-      </ListHeader>
+      </div>
 
+      <ListOverview>
       <ListSummary className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={IndianRupee} iconVariant="primary" label="Total Outstanding" value={formatCurrency(stats.totalOutstanding)} />
         <StatCard icon={AlertTriangle} iconVariant="danger" label="Overdue" value={formatCurrency(stats.overdueAmount)} />

@@ -1,5 +1,5 @@
 import ListFilterPanel from '../../components/ui/ListFilterPanel'
-import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, Edit, Eye, IndianRupee, PackageSearch, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
@@ -55,6 +55,7 @@ export default function PurchaseInvoiceList() {
   const basePath = isSalesPath ? '/sales/purchases' : '/admin/purchases'
 
   const [purchases, setPurchases] = useState([])
+  const [summaryPurchases, setSummaryPurchases] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
 
@@ -85,11 +86,13 @@ export default function PurchaseInvoiceList() {
     // appends demo rows to real results; empty demo mode is an intentional empty state.
     if (DEMO_MODE) {
       setPurchases(DEMO_PURCHASES_ENABLED ? demoPurchasesResolved() : [])
+      setSummaryPurchases(DEMO_PURCHASES_ENABLED ? demoPurchasesResolved() : [])
       setIsLoading(false)
       return
     }
 
-    const result = await listPurchases(sortParams)
+    const [result, summaryResult] = await Promise.all([listPurchases(sortParams), listPurchases()])
+    if (summaryResult.success) setSummaryPurchases(summaryResult.purchases)
     if (!result.success) {
       setPurchases([])
       setListError(result.error)
@@ -137,15 +140,15 @@ export default function PurchaseInvoiceList() {
   }, [purchases, search, supplierFilter, purchaseStatusFilter, receivingStatusFilter, paymentStatusFilter, sortFilter, headerSortBy])
 
   const stats = useMemo(() => {
-    const totalValue = purchases.reduce((sum, purchase) => sum + (purchase.total || 0), 0)
-    const outstanding = purchases.reduce((sum, purchase) => sum + derivePurchaseOutstanding(purchase), 0)
-    const pendingReceipts = purchases.filter((purchase) => {
+    const totalValue = summaryPurchases.reduce((sum, purchase) => sum + (purchase.total || 0), 0)
+    const outstanding = summaryPurchases.reduce((sum, purchase) => sum + derivePurchaseOutstanding(purchase), 0)
+    const pendingReceipts = summaryPurchases.filter((purchase) => {
       const status = derivePurchaseStatus(purchase).key
       const receiving = deriveReceivingStatus(purchase).key
       return (status === 'confirmed' || status === 'closed') && receiving !== 'fully_received'
     }).length
-    return { total: purchases.length, totalValue, outstanding, pendingReceipts }
-  }, [purchases])
+    return { total: summaryPurchases.length, totalValue, outstanding, pendingReceipts }
+  }, [summaryPurchases])
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return
@@ -154,6 +157,7 @@ export default function PurchaseInvoiceList() {
 
     if (isDemoPurchase(deleteTarget.id)) {
       setPurchases((current) => current.filter((purchase) => purchase.id !== deleteTarget.id))
+      setSummaryPurchases((current) => current.filter((purchase) => purchase.id !== deleteTarget.id))
       setIsDeleting(false)
       setDeleteTarget(null)
       return
@@ -174,37 +178,11 @@ export default function PurchaseInvoiceList() {
 
   return (
     <div className="listing-page space-y-4">
-      <ListOverview>
-      <ListHeader>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Purchases</h1>
-          <p className="mt-1 text-xs text-neutral-400">Track what you buy from suppliers, end to end.</p>
-        </div>
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-          <div className="relative w-full sm:w-60">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search Purchase # / Supplier / Reference"
-              className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-            />
-          </div>
-          <ListFilterPanel title="Filter Purchases">
-            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Purchase status" options={purchaseStatusFilterOptions} value={purchaseStatusFilter} onChange={(event) => setPurchaseStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Receiving status" options={receivingStatusFilterOptions} value={receivingStatusFilter} onChange={(event) => setReceivingStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Payment status" options={paymentStatusFilterOptions} value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Sort by" options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          </ListFilterPanel>
-          <Button type="button" onClick={() => navigate(`${basePath}/create`)}>
-          <Plus className="size-4" aria-hidden="true" />
-          Create Purchase
-        </Button>
-        </div>
-      </ListHeader>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Purchases</h1>
+      </div>
 
+      <ListOverview>
       <ListSummary className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={ClipboardList} iconVariant="primary" label="Total Purchases" value={stats.total} />
         <StatCard icon={IndianRupee} iconVariant="info" label="Total Purchase Value" value={formatCurrency(stats.totalValue)} />
@@ -214,6 +192,37 @@ export default function PurchaseInvoiceList() {
       </ListOverview>
 
       <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Purchases</h2>
+              <p className="mt-1 text-xs text-neutral-400">Track what you buy from suppliers, end to end.</p>
+            </div>
+            <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+              <div className="relative w-full sm:w-60">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search Purchase # / Supplier / Reference"
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+              </div>
+              <ListFilterPanel title="Filter Purchases">
+                <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Purchase status" options={purchaseStatusFilterOptions} value={purchaseStatusFilter} onChange={(event) => setPurchaseStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Receiving status" options={receivingStatusFilterOptions} value={receivingStatusFilter} onChange={(event) => setReceivingStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Payment status" options={paymentStatusFilterOptions} value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Sort by" options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              </ListFilterPanel>
+              <Button type="button" onClick={() => navigate(`${basePath}/create`)}>
+              <Plus className="size-4" aria-hidden="true" />
+              Create Purchase
+            </Button>
+            </div>
+          </div>
+        </div>
 
         <div className="overflow-x-auto">
           {listError ? (

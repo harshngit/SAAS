@@ -1,3 +1,4 @@
+import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -49,6 +50,11 @@ export default function SupplierList() {
   const { showToast } = useToast()
   const useDemoSuppliers = DEMO_MODE && !DEMO_EMPTY
   const [suppliers, setSuppliers] = useState([])
+  const [summarySuppliers, setSummarySuppliers] = useState([])
+  const updateSuppliers = (updater) => {
+    setSuppliers(updater)
+    setSummarySuppliers(updater)
+  }
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -91,16 +97,19 @@ export default function SupplierList() {
     // Explicit demo split: DEMO_MODE (true OR empty) never calls the real API.
     if (DEMO_MODE) {
       setSuppliers(useDemoSuppliers ? demoSuppliers : [])
+      setSummarySuppliers(useDemoSuppliers ? demoSuppliers : [])
       setIsLoading(false)
       return
     }
 
-    const result = await listSuppliers({
+    const [result, summaryResult] = await Promise.all([listSuppliers({
       search: searchTerm.trim() || undefined,
       category: categoryFilter === 'all' ? undefined : categoryFilter,
       is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
       ...sortParams,
-    })
+    }), loadSummaryRows(listSuppliers, 'suppliers')])
+
+    if (summaryResult.success) setSummarySuppliers(summaryResult.suppliers.map(normalizeApiSupplier))
 
     if (!result.success) {
       setSuppliers([])
@@ -200,11 +209,11 @@ export default function SupplierList() {
   }, [categoryFilter, searchTerm, sortFilter, statusFilter, suppliers, dateFrom, dateTo])
 
   const supplierSummary = useMemo(() => ({
-    total: filteredSuppliers.length,
-    active: filteredSuppliers.filter((supplier) => supplier.status === 'active').length,
-    inactive: filteredSuppliers.filter((supplier) => supplier.status !== 'active').length,
-    payable: filteredSuppliers.reduce((sum, supplier) => sum + Number(supplier.outstandingPayable || 0), 0),
-  }), [filteredSuppliers])
+    total: summarySuppliers.length,
+    active: summarySuppliers.filter((supplier) => supplier.status === 'active').length,
+    inactive: summarySuppliers.filter((supplier) => supplier.status !== 'active').length,
+    payable: summarySuppliers.reduce((sum, supplier) => sum + Number(supplier.outstandingPayable || 0), 0),
+  }), [summarySuppliers])
 
   const totalPages = Math.max(1, Math.ceil(filteredSuppliers.length / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
@@ -231,7 +240,7 @@ export default function SupplierList() {
     const results = await Promise.all(selectedIds.map((id) => DEMO_MODE ? Promise.resolve({ success: true }) : deleteSupplier(id)))
     const failed = results.find((result) => !result.success)
     if (failed) { setDeleteError(failed.error || 'Some suppliers could not be deleted.'); setIsDeleting(false); return }
-    setSuppliers((current) => current.filter((supplier) => !selectedIds.includes(supplier.id)))
+    updateSuppliers((current) => current.filter((supplier) => !selectedIds.includes(supplier.id)))
     setSelectedIds([])
     setIsDeleting(false)
   }
@@ -288,7 +297,7 @@ export default function SupplierList() {
         totalPaid: editingSupplier?.totalPaid || 0,
         outstandingPayable: editingSupplier?.outstandingPayable || supplierData.openingBalance || 0,
       }
-      setSuppliers((current) => editingSupplier
+      updateSuppliers((current) => editingSupplier
         ? current.map((supplier) => supplier.id === editingSupplier.id ? demoSupplier : supplier)
         : [demoSupplier, ...current])
       setIsSaving(false)
@@ -324,7 +333,7 @@ export default function SupplierList() {
     }
     const fallback = supplierFormFallback(supplierData, savedId)
 
-    setSuppliers((current) =>
+    updateSuppliers((current) =>
       editingSupplier
         ? current.map((supplier) =>
             supplier.id === editingSupplier.id ? normalizeApiSupplier(savedSupplier, fallback) : supplier,
@@ -359,7 +368,7 @@ export default function SupplierList() {
     setStatusError('')
 
     if (DEMO_MODE) {
-      setSuppliers((current) => current.map((supplier) => supplier.id === statusSupplier.id ? { ...supplier, status: nextIsActive ? 'active' : 'inactive' } : supplier))
+      updateSuppliers((current) => current.map((supplier) => supplier.id === statusSupplier.id ? { ...supplier, status: nextIsActive ? 'active' : 'inactive' } : supplier))
       setIsUpdatingStatus(false)
       setStatusSupplier(null)
       return
@@ -374,7 +383,7 @@ export default function SupplierList() {
       return
     }
 
-    setSuppliers((current) =>
+    updateSuppliers((current) =>
       current.map((supplier) =>
         supplier.id === statusSupplier.id ? normalizeApiSupplier(result.supplier, supplier) : supplier,
       ),
@@ -389,7 +398,7 @@ export default function SupplierList() {
     setDeleteError('')
 
     if (DEMO_MODE) {
-      setSuppliers((current) => current.filter((supplier) => supplier.id !== deleteTarget.id))
+      updateSuppliers((current) => current.filter((supplier) => supplier.id !== deleteTarget.id))
       setIsDeleting(false)
       setDeleteTarget(null)
       return
@@ -404,7 +413,7 @@ export default function SupplierList() {
       return
     }
 
-    setSuppliers((current) => current.filter((supplier) => supplier.id !== deleteTarget.id))
+    updateSuppliers((current) => current.filter((supplier) => supplier.id !== deleteTarget.id))
     setDeleteTarget(null)
   }
 
@@ -432,11 +441,30 @@ export default function SupplierList() {
 
   return (
     <div className="listing-page space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Suppliers</h1>
+      </div>
+
+      <Card className="overflow-hidden p-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Total Suppliers', value: supplierSummary.total, detail: `${supplierSummary.active} active`, icon: Users },
+            { label: 'Active Suppliers', value: supplierSummary.active, detail: 'currently active', icon: Power },
+            { label: 'Inactive Suppliers', value: supplierSummary.inactive, detail: 'needs review', icon: Users },
+            { label: 'Outstanding Payable', value: formatCurrency(supplierSummary.payable), detail: 'total balance', icon: Wallet },
+          ].map(({ label, value, detail, icon: Icon }, index) => (
+            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>
+          ))}
+        </div>
+      </Card>
+
+      {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} supplier{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportSuppliers(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
+
       <Card className="overflow-hidden p-0">
         <div className="border-b border-neutral-100 px-5 py-5">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Suppliers</h1><p className="mt-1 text-xs text-neutral-400">{filteredSuppliers.length} suppliers in view</p></div>
+              <div><h2 className="text-xl font-semibold tracking-tight text-neutral-900">Suppliers</h2><p className="mt-1 text-xs text-neutral-400">{filteredSuppliers.length} suppliers in view</p></div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search suppliers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button>
@@ -446,22 +474,7 @@ export default function SupplierList() {
               </div>
             </div>
           </div>
-          <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
-            {[
-              { label: 'Total Suppliers', value: supplierSummary.total, detail: `${supplierSummary.active} active`, icon: Users },
-              { label: 'Active Suppliers', value: supplierSummary.active, detail: 'currently active', icon: Power },
-              { label: 'Inactive Suppliers', value: supplierSummary.inactive, detail: 'needs review', icon: Users },
-              { label: 'Outstanding Payable', value: formatCurrency(supplierSummary.payable), detail: 'total balance', icon: Wallet },
-            ].map(({ label, value, detail, icon: Icon }, index) => (
-              <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>
-            ))}
-          </div>
         </div>
-      </Card>
-
-      {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} supplier{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportSuppliers(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
-
-      <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">

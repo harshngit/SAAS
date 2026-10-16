@@ -61,6 +61,12 @@ export function normalizeApiProduct(product, fallback = {}) {
     hsnSacCode: product.hsn_code || fallback.hsnSacCode || '',
     gstVatRate: product.tax_rate ?? fallback.gstVatRate ?? '',
     taxInclusive: Boolean(product.pricing?.tax_inclusive ?? product.tax_inclusive ?? fallback.taxInclusive ?? false),
+    // Backend keeps these under `pricing` for a product record, but `price` (bare, top-level) is
+    // what list/detail views and the save payload use as the selling price - fall back to it so
+    // a product saved before `pricing` existed, or missing the nested object for any reason,
+    // still hydrates a non-empty Selling Price in the edit form.
+    purchasePrice: product.pricing?.purchase_price ?? fallback.purchasePrice ?? '',
+    sellingPrice: product.pricing?.selling_price ?? product.price ?? fallback.sellingPrice ?? '',
     mrp: product.pricing?.mrp ?? fallback.mrp ?? '',
     wholesalePrice: product.pricing?.wholesale_price ?? fallback.wholesalePrice ?? '',
     dealerPrice: product.pricing?.dealer_price ?? fallback.dealerPrice ?? '',

@@ -1,3 +1,4 @@
+import { loadSummaryRows } from '../../utils/listSummary'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -131,6 +132,7 @@ export default function OrganizationsList() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [organizations, setOrganizations] = useState([])
+  const [summaryOrganizations, setSummaryOrganizations] = useState([])
   const [isLoadingOrganizations, setIsLoadingOrganizations] = useState(false)
   const [listError, setListError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -239,13 +241,14 @@ export default function OrganizationsList() {
       setIsLoadingOrganizations(true)
       setListError('')
 
-      const result = await listSuperAdminOrganizations({
+      const [result, summaryResult] = await Promise.all([listSuperAdminOrganizations({
         status: statusFilter,
         upgrade_status: upgradeStatusFilter,
         ...sortParams,
-      })
+      }), loadSummaryRows(listSuperAdminOrganizations, 'organizations')])
 
       if (!isMounted) return
+      if (summaryResult.success) setSummaryOrganizations(summaryResult.organizations.map(normalizeOrganization))
       setIsLoadingOrganizations(false)
 
       if (!result.success) {
@@ -313,12 +316,12 @@ export default function OrganizationsList() {
 
   const stats = useMemo(
     () => ({
-      total: dateFilteredOrganizations.length,
-      active: dateFilteredOrganizations.filter((organization) => organization.status === 'Active').length,
-      trial: dateFilteredOrganizations.filter((organization) => organization.status === 'Trial').length,
-      mrr: dateFilteredOrganizations.reduce((total, organization) => total + organization.mrr, 0),
+      total: summaryOrganizations.length,
+      active: summaryOrganizations.filter((organization) => organization.status === 'Active').length,
+      trial: summaryOrganizations.filter((organization) => organization.status === 'Trial').length,
+      mrr: summaryOrganizations.reduce((total, organization) => total + organization.mrr, 0),
     }),
-    [dateFilteredOrganizations],
+    [summaryOrganizations],
   )
 
   const allVisibleSelected = visibleOrganizations.length > 0 && visibleOrganizations.every((organization) => selectedIds.includes(organization.id))
@@ -370,6 +373,7 @@ export default function OrganizationsList() {
 
     if (deletedIds.length > 0) {
       setOrganizations((current) => current.filter((organization) => !deletedIds.includes(organization.id)))
+      setSummaryOrganizations((current) => current.filter((organization) => !deletedIds.includes(organization.id)))
       setSelectedIds((current) => current.filter((id) => !deletedIds.includes(id)))
     }
 
@@ -391,67 +395,28 @@ export default function OrganizationsList() {
 
   return (
     <div className="listing-page space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Organizations</h1>
+      </div>
+
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-neutral-100 px-5 py-5">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Organizations</h1>
-                <p className="mt-1 text-xs text-neutral-400">{visibleOrganizations.length} organizations in view</p>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <div className="relative w-full sm:w-60">
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search organizations..."
-                    className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-              />
-            </div>
-                <Button
-              type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9 rounded-xl px-3.5"
-              onClick={openFilters}
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Total Organizations', value: stats.total, hint: 'all organizations', icon: Copy },
+            { label: 'Active', value: stats.active, hint: 'currently active', icon: CheckCircle2 },
+            { label: 'Trial', value: stats.trial, hint: 'trial accounts', icon: Timer },
+            { label: 'MRR Estimate', value: formatCurrency(stats.mrr), hint: 'current total', icon: IndianRupee },
+          ].map((stat, index) => (
+            <div
+              key={stat.label}
+              className={`${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''} border-neutral-100`}
             >
-              <SlidersHorizontal className="size-4" aria-hidden="true" />
-              Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-                </Button>
-                <Button
-              type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9 rounded-xl px-3.5"
-              onClick={() => exportOrganizations(visibleOrganizations)}
-            >
-              <Download className="size-4" aria-hidden="true" />
-              Export
-                </Button>
-              </div>
+              <StatTile {...stat} />
             </div>
-          </div>
-
-          <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
-            {[
-              { label: 'Total Organizations', value: stats.total, hint: 'all organizations', icon: Copy },
-              { label: 'Active', value: stats.active, hint: 'currently active', icon: CheckCircle2 },
-              { label: 'Trial', value: stats.trial, hint: 'trial accounts', icon: Timer },
-              { label: 'MRR Estimate', value: formatCurrency(stats.mrr), hint: 'current total', icon: IndianRupee },
-            ].map((stat, index) => (
-              <div
-                key={stat.label}
-                className={`${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''} border-neutral-100`}
-              >
-                <StatTile {...stat} />
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
       </Card>
+
 
       {showFilters && createPortal(
         <div className="fixed inset-0 z-[100] flex justify-end bg-slate-950/35 backdrop-blur-[2px]" onClick={() => setShowFilters(false)}>
@@ -549,6 +514,47 @@ export default function OrganizationsList() {
       )}
 
       <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Organizations</h2>
+              <p className="mt-1 text-xs text-neutral-400">{visibleOrganizations.length} organizations in view</p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="relative w-full sm:w-60">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search organizations..."
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-xl px-3.5"
+                onClick={openFilters}
+              >
+                <SlidersHorizontal className="size-4" aria-hidden="true" />
+                Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-xl px-3.5"
+                onClick={() => exportOrganizations(visibleOrganizations)}
+              >
+                <Download className="size-4" aria-hidden="true" />
+                Export
+              </Button>
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {isLoadingOrganizations ? (
             <LoadingSpinner label="Loading organizations..." />

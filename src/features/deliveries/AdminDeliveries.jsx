@@ -1,4 +1,4 @@
-import { ListOverview, ListHeader, ListSummary, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import { ListOverview, ListSummary, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Ban, Truck, CheckCircle2, Clock, XCircle, RotateCw } from 'lucide-react'
@@ -82,14 +82,11 @@ export default function AdminDeliveries() {
 
   return (
     <div className="listing-page space-y-4">
-      <ListOverview>
-      <ListHeader>
-        <div>
+      <div>
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Deliveries</h1>
-        <p className="mt-1 text-xs text-neutral-400">Track every delivery across your organization</p>
-        </div>
-      </ListHeader>
+      </div>
 
+      <ListOverview>
       <ListSummary className="grid-cols-2 lg:grid-cols-5">
         <StatCard icon={Truck} label="Total Deliveries" value={stats.total} iconVariant="primary" />
         <StatCard icon={CheckCircle2} label="Delivered" value={stats.delivered} iconVariant="success" />

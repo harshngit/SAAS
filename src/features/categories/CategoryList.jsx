@@ -302,7 +302,7 @@ export default function CategoryList() {
     setIsLoading(true)
     setListError('')
 
-    const result = await listCategories({ search: searchTerm.trim() || undefined })
+    const result = await listCategories()
 
     if (!result.success) {
       setCategories([])
@@ -313,7 +313,7 @@ export default function CategoryList() {
 
     setCategories(result.categories.map(normalizeCategory))
     setIsLoading(false)
-  }, [searchTerm])
+  }, [])
 
   useEffect(() => {
     loadCategories()
@@ -463,8 +463,25 @@ export default function CategoryList() {
 
   return (
     <div className="listing-page space-y-4">
-      <Card className="p-0">
-        <div className="px-5 py-5">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Categories</h1>
+      </div>
+
+      <Card className="overflow-hidden p-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Total Categories', value: categories.length, detail: `${categories.filter((category) => category.image).length} with image`, icon: Tags },
+            { label: 'With Image', value: categories.filter((category) => category.image).length, detail: 'catalog visuals', icon: ImageIcon },
+            { label: 'Top-level', value: categories.filter((category) => !category.parentId).length, detail: 'parent categories', icon: CalendarPlus },
+            { label: 'Subcategories', value: categories.filter((category) => category.parentId).length, detail: 'nested categories', icon: CalendarClock },
+          ].map(({ label, value, detail, icon: Icon }, index) => (
+            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Categories</h2>
@@ -560,19 +577,6 @@ export default function CategoryList() {
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 overflow-hidden rounded-b-2xl border-t border-neutral-100 lg:grid-cols-4">
-          {[
-            { label: 'Total Categories', value: categories.length, detail: `${categories.filter((category) => category.image).length} with image`, icon: Tags },
-            { label: 'With Image', value: categories.filter((category) => category.image).length, detail: 'catalog visuals', icon: ImageIcon },
-            { label: 'Top-level', value: categories.filter((category) => !category.parentId).length, detail: 'parent categories', icon: CalendarPlus },
-            { label: 'Subcategories', value: categories.filter((category) => category.parentId).length, detail: 'nested categories', icon: CalendarClock },
-          ].map(({ label, value, detail, icon: Icon }, index) => (
-            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>
-          ))}
-        </div>
-      </Card>
-
-      <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
@@ -617,8 +621,24 @@ export default function CategoryList() {
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {visibleCategories.map((category) => (
-                  <tr key={category.id} className="bg-surface transition-colors hover:bg-primary-50/30">
-                    <td className="px-6 py-5">
+                  <tr
+                    key={category.id}
+                    tabIndex={0}
+                    aria-label={`View details for ${category.name}`}
+                    onClick={(event) => {
+                      if (event.target.closest('button, input, a, select, textarea, [role="menu"], [role="menuitem"]')) return
+                      handleViewDetails(category)
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        handleViewDetails(category)
+                      }
+                    }}
+                    className="cursor-pointer bg-surface transition-colors hover:bg-primary-50/30 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
+                  >
+                    <td className="px-6 py-5" onClick={(event) => event.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedIds.includes(category.id)}
@@ -656,7 +676,7 @@ export default function CategoryList() {
                     <td className="max-w-xl px-6 py-5 text-neutral-600">
                       <span className="line-clamp-2">{category.description || '-'}</span>
                     </td>
-                    <td className="px-6 py-5 text-right">
+                    <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
                       <ActionMenu
                         items={[
                           { label: 'View Details', icon: Eye, onClick: () => handleViewDetails(category) },

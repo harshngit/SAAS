@@ -1,6 +1,5 @@
 import ListFilterPanel from '../../components/ui/ListFilterPanel'
 import { ListDataTable as DataTable } from '../../components/ui/ListPresentation'
-import { createPortal } from 'react-dom'
 import ActionMenu from '../../components/ui/ActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, BadgeCheck, Ban, Eye, HandCoins, Search, Wallet } from 'lucide-react'
@@ -52,7 +51,6 @@ export default function CollectionReconciliation() {
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-  const [searchHost, setSearchHost] = useState(null)
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const hasExtraFilters = partnerFilter !== 'all' || datePreset !== 'all'
 
@@ -161,32 +159,13 @@ export default function CollectionReconciliation() {
 
   return (
     <div className="listing-page space-y-4">
-      <Card className="overflow-hidden p-0">
-        <div className="px-5 py-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Collection Reconciliation</h1>
-              <p className="mt-1 text-xs text-neutral-400">Review driver collections before they are posted as customer payments.</p>
-            </div>
-            {!unavailable && (
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <div ref={setSearchHost} className={isLoading ? 'hidden' : 'hidden w-60 md:block'} />
-                <ListFilterPanel title="Filter Collections">
-                  <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                  <Select label="Delivery Partner" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date
-                    <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-                  </div>
-                  {hasExtraFilters && (
-                    <button type="button" onClick={() => { setPartnerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
-                  )}
-                </ListFilterPanel>
-              </div>
-            )}
-          </div>
-        </div>
-        {!unavailable && (
-          <div className="grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Collection Reconciliation</h1>
+      </div>
+
+      {!unavailable && (
+        <Card className="overflow-hidden p-0">
+          <div className="grid grid-cols-2 lg:grid-cols-4">
             {[
               { label: 'Recorded Collections', value: String(stats.recordedCount), detail: 'awaiting reconciliation', icon: HandCoins },
               { label: 'Recorded Amount', value: formatCurrency(stats.recordedAmount), detail: 'amount awaiting reconciliation', icon: Wallet },
@@ -203,8 +182,8 @@ export default function CollectionReconciliation() {
               </div>
             ))}
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {unavailable ? (
         <Card>
@@ -222,8 +201,20 @@ export default function CollectionReconciliation() {
       ) : (
         <>
           <Card className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:m-5">
-            <div className={isLoading ? 'px-5 py-4' : 'px-5 py-4 md:hidden'}>
+            <div className={isLoading ? 'flex items-center justify-between gap-3 px-5 py-4' : 'flex items-center justify-between gap-3 px-5 py-4 md:hidden'}>
               <h3 className="text-base font-semibold tracking-tight text-neutral-900">Collections</h3>
+              {!isLoading && (
+                <ListFilterPanel title="Filter Collections">
+                  <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+                  <Select label="Delivery Partner" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date
+                    <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+                  </div>
+                  {hasExtraFilters && (
+                    <button type="button" onClick={() => { setPartnerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                  )}
+                </ListFilterPanel>
+              )}
             </div>
             {loadError && !unavailable && (
               <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>
@@ -238,19 +229,29 @@ export default function CollectionReconciliation() {
                   <DataTable
                     key={`${statusFilter}-${partnerFilter}-${datePreset}-${customFrom}-${customTo}`}
                     renderToolbar={({ search, onSearchChange, resultCount }) => (
-                      <>
-                        <div className="flex items-center gap-2 px-5 py-3">
+                      <div className="flex flex-col gap-3 border-b border-neutral-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-2">
                           <h3 className="text-base font-semibold tracking-tight text-neutral-900">Collections</h3>
                           <span className="text-xs text-neutral-400" aria-live="polite">{resultCount} {resultCount === 1 ? 'result' : 'results'}</span>
                         </div>
-                        {searchHost && createPortal(
-                          <div className="relative">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <div className="relative w-full sm:w-60">
                             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
                             <input type="search" value={search} onChange={onSearchChange} placeholder="Search collections..." aria-label="Search collections"
                               className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
-                          </div>, searchHost,
-                        )}
-                      </>
+                          </div>
+                          <ListFilterPanel title="Filter Collections">
+                            <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+                            <Select label="Delivery Partner" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+                            <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date
+                              <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+                            </div>
+                            {hasExtraFilters && (
+                              <button type="button" onClick={() => { setPartnerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                            )}
+                          </ListFilterPanel>
+                        </div>
+                      </div>
                     )}
                     columns={[
                       { key: 'collectionNumber', header: 'Collection #', sortable: true },

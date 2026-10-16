@@ -232,7 +232,12 @@ function toVariationPayload(variant, includeId = false) {
     reorder_quantity: inventory.reorderQuantity,
   }
 
-  if (includeId && variant.id) {
+  // A variant added via "Add Variant" in this editing session (ProductForm's makeEmptyVariant)
+  // gets a client-side-only id (crypto.randomUUID()) purely to key it in the list - the backend
+  // never issued it, so sending it back as `id` makes PATCH look for a variant that doesn't
+  // exist ("variant id not found or does not belong to this product"). Only forward `id` for a
+  // variant hydrateProduct marked as genuinely pre-existing (isNew === false).
+  if (includeId && variant.id && variant.isNew === false) {
     variation.id = variant.id
   }
 
@@ -536,6 +541,7 @@ export async function deleteProductsBulk(productIds) {
 export async function listProducts(params = {}) {
   try {
     const queryParams = { page_size: params.page_size || 100 }
+    if (params.page !== undefined) queryParams.page = params.page
 
     if (params.search) queryParams.search = params.search
     if (params.category_id) queryParams.category_id = params.category_id

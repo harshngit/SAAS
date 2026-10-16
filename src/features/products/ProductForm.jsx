@@ -57,6 +57,10 @@ function makeEmptyVariant(overrides = {}) {
     inventory: { ...emptyVariantInventory },
     ...overrides,
     id: overrides.id || makeVariantId(),
+    // True unless a caller explicitly says otherwise (hydrateProduct passes false for variants
+    // that already exist on the backend) - a variant with no real backend id yet is new by
+    // default, and toVariationPayload uses this to decide whether its id is safe to send back.
+    isNew: overrides.isNew ?? true,
   }
 }
 
@@ -352,14 +356,20 @@ function hydrateProduct(product) {
     images: product?.images || [],
     status: product?.statusValue || product?.status || 'active',
     variants: product?.variants?.length
-      ? product.variants.map((variant, index) => ({
-        ...makeEmptyVariant(),
-        ...variant,
-        id: variant.id || variant.variantId || variant.variant_id || `${product?.id || productCode || 'product'}-${index + 1}`,
-        sellingPrice: variant.sellingPrice ?? variant.price ?? '',
-        mrp: variant.mrp ?? '',
-        inventory: normalizeVariantInventory(variant, index === 0 ? product?.openingStock : ''),
-      }))
+      ? product.variants.map((variant, index) => {
+        const backendId = variant.id || variant.variantId || variant.variant_id || ''
+        return {
+          ...makeEmptyVariant(),
+          ...variant,
+          id: backendId || `${product?.id || productCode || 'product'}-${index + 1}`,
+          sellingPrice: variant.sellingPrice ?? variant.price ?? '',
+          mrp: variant.mrp ?? '',
+          inventory: normalizeVariantInventory(variant, index === 0 ? product?.openingStock : ''),
+          // Only a real backend-issued id is safe to send back on save (toVariationPayload) -
+          // the fallback id above is just a stable React key, never a real variant identity.
+          isNew: !backendId,
+        }
+      })
       : [],
   }
 }

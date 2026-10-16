@@ -102,6 +102,7 @@ export async function createSupplier(payload) {
 export async function listSuppliers(params = {}) {
   try {
     const queryParams = { page_size: params.page_size || 100 }
+    if (params.page !== undefined) queryParams.page = params.page
 
     if (params.search) queryParams.search = params.search
     if (params.category) queryParams.category = params.category

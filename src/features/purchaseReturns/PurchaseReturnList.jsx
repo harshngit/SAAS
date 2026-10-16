@@ -153,7 +153,9 @@ export default function PurchaseReturnList() {
   const returns = PURCHASE_RETURNS_DEMO_ENABLED ? demoReturns : realReturns
 
   const stats = useMemo(() => {
-    if (!PURCHASE_RETURNS_DEMO_ENABLED && realStats) return realStats
+    if (!PURCHASE_RETURNS_DEMO_ENABLED) {
+      return realStats || { total: '—', draft: '—', inProgress: '—', completed: '—' }
+    }
     const by = (key) => returns.filter((pr) => prStatusMeta(pr.status).key === key).length
     return {
       total: returns.length,
@@ -184,6 +186,10 @@ export default function PurchaseReturnList() {
 
   return (
     <div className="space-y-5">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Purchase Returns</h1>
+      </div>
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={RotateCcw} iconVariant="primary" label="Total Returns" value={String(stats.total)} />
         <StatCard icon={PackageX} iconVariant="neutral" label="Draft" value={String(stats.draft)} />
@@ -194,6 +200,8 @@ export default function PurchaseReturnList() {
       <Card className="p-0">
         <div className="border-b border-neutral-100 px-4 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Purchase Returns</h2>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative sm:w-72">
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
@@ -232,6 +240,7 @@ export default function PurchaseReturnList() {
                 New Return
               </Button>
             )}
+            </div>
           </div>
         </div>
 

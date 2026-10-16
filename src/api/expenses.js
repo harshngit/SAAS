@@ -128,6 +128,7 @@ export async function getExpenseCategories() {
 export async function listExpenses(params = {}) {
   try {
     const queryParams = { page_size: params.page_size || 100 }
+    if (params.page !== undefined) queryParams.page = params.page
     if (params.category) queryParams.category = params.category
     if (params.status) queryParams.status = toExpenseStatusParam(params.status)
     if (params.submitted_by) queryParams.submitted_by = params.submitted_by

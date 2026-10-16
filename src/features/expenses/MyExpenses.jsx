@@ -1,4 +1,5 @@
-import { ListOverview, ListHeader, ListStatCard, ListSummary } from '../../components/ui/ListPresentation'
+import { loadSummaryRows } from '../../utils/listSummary'
+import { ListOverview, ListStatCard, ListSummary } from '../../components/ui/ListPresentation'
 import ActionMenu from '../../components/ui/ActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Eye, FileText, Plus, Upload } from 'lucide-react'
@@ -168,6 +169,7 @@ export default function MyExpenses() {
 
   const demo = DEMO_EXPENSES_ENABLED
   const [expenses, setExpenses] = useState([])
+  const [summaryExpenses, setSummaryExpenses] = useState([])
   const [categories, setCategories] = useState([])
   const [categoryNotice, setCategoryNotice] = useState('') // real mode: categories unavailable / error
   const [isLoading, setIsLoading] = useState(true)
@@ -197,6 +199,7 @@ export default function MyExpenses() {
     // Explicit demo mode (VITE_DEMO_DATA=true): local fixtures only, no API call.
     if (DEMO_EXPENSES_ENABLED) {
       setExpenses(demoExpensesResolved())
+      setSummaryExpenses(demoExpensesResolved())
       setIsLoading(false)
       return
     }
@@ -208,7 +211,11 @@ export default function MyExpenses() {
 
     // Real mode: the API is the only source. An empty list is a truthful empty state; a
     // failure shows the real error - neither falls back to demo data.
-    const result = await listExpenses({ submitted_by: currentUser.id, ...sortParams })
+    const [result, summaryResult] = await Promise.all([
+      listExpenses({ submitted_by: currentUser.id, ...sortParams }),
+      loadSummaryRows(listExpenses, 'expenses', { submitted_by: currentUser.id }),
+    ])
+    if (summaryResult.success) setSummaryExpenses(summaryResult.expenses)
     if (!result.success) {
       setExpenses([])
       setListError(result.error)
@@ -249,12 +256,12 @@ export default function MyExpenses() {
 
   const counts = useMemo(
     () => ({
-      pending: expenses.filter((e) => e.approvalStatus === 'Pending').length,
-      approved: expenses.filter((e) => e.approvalStatus === 'Approved').length,
-      rejected: expenses.filter((e) => e.approvalStatus === 'Rejected').length,
-      total: expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
+      pending: summaryExpenses.filter((e) => e.approvalStatus === 'Pending').length,
+      approved: summaryExpenses.filter((e) => e.approvalStatus === 'Approved').length,
+      rejected: summaryExpenses.filter((e) => e.approvalStatus === 'Rejected').length,
+      total: summaryExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
     }),
-    [expenses],
+    [summaryExpenses],
   )
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
@@ -333,6 +340,7 @@ export default function MyExpenses() {
         showToast({ title: 'Expense submitted (demo)', message: 'Your claim is now pending approval.' })
       }
       setExpenses(demoExpensesResolved())
+      setSummaryExpenses(demoExpensesResolved())
       setIsSubmitting(false)
       setShowForm(false)
       setEditTarget(null)
@@ -415,6 +423,7 @@ export default function MyExpenses() {
     if (demo) {
       simulateDemoCancelExpense(cancelTarget.id)
       setExpenses(demoExpensesResolved())
+      setSummaryExpenses(demoExpensesResolved())
       setIsCancelling(false)
       setCancelTarget(null)
       showToast({ title: 'Claim cancelled (demo)', message: 'The expense claim was withdrawn.' })
@@ -428,29 +437,19 @@ export default function MyExpenses() {
       return
     }
     setExpenses((current) => current.filter((e) => e.id !== cancelTarget.id))
+    setSummaryExpenses((current) => current.filter((e) => e.id !== cancelTarget.id))
     setCancelTarget(null)
     showToast({ title: 'Claim cancelled', message: 'The expense claim was withdrawn.' })
   }
 
   return (
     <div className="listing-page space-y-4">
-      <ListOverview>
-      <ListHeader>
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Expenses</h1>
-            {demo && <Badge variant="warning">Demo data</Badge>}
-          </div>
-          <p className="mt-1 text-xs text-neutral-400">Track and submit your business expenses.</p>
-        </div>
-        {canCreate && (
-          <Button onClick={openForm}>
-            <Plus className="size-4" aria-hidden="true" />
-            Add Expense
-          </Button>
-        )}
-      </ListHeader>
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Expenses</h1>
+        {demo && <Badge variant="warning">Demo data</Badge>}
+      </div>
 
+      <ListOverview>
       <ListSummary className="grid-cols-2 lg:grid-cols-4">
         {[
           ['Pending Claims', counts.pending],
@@ -463,30 +462,40 @@ export default function MyExpenses() {
       </ListSummary>
       </ListOverview>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilter(f.key)}
-            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-              filter === f.key ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-        <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search category or description..."
-          className="ml-auto h-9 w-full sm:w-60 rounded-xl border border-neutral-100 bg-surface px-3.5 text-xs text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none"
-        />
-      </div>
-
       <Card className="p-0" bodyClassName="p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Expenses</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setFilter(f.key)}
+                  className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                    filter === f.key ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+              <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search category or description..."
+                className="h-9 w-full sm:w-60 rounded-xl border border-neutral-100 bg-surface px-3.5 text-xs text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none"
+              />
+              {canCreate && (
+                <Button onClick={openForm}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  Add Expense
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
         {isLoading ? (
           <div className="p-6"><LoadingSpinner label="Loading your expense claims..." /></div>
         ) : listError ? (

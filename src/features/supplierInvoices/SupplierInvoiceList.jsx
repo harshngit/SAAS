@@ -1,5 +1,5 @@
 import ListFilterPanel from '../../components/ui/ListFilterPanel'
-import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarClock, ClipboardList, Eye, IndianRupee, Pencil, Plus, Search } from 'lucide-react'
@@ -11,6 +11,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
+import { useSummaryRows } from '../../hooks/useSummaryRows'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { formatCurrency } from '../../utils/format'
@@ -122,6 +123,7 @@ export default function SupplierInvoiceList() {
   const [realTotal, setRealTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(!DEMO_MODE)
   const [loadError, setLoadError] = useState('')
+  const { rows: summaryInvoices, error: summaryError } = useSummaryRows(listSupplierInvoices, 'invoices', !DEMO_MODE)
 
   const load = useCallback(async () => {
     if (DEMO_MODE) return
@@ -230,89 +232,96 @@ export default function SupplierInvoiceList() {
   }, [rows, search, supplierFilter, lifecycleFilter, verificationFilter, paymentStatusFilter, sortFilter, dateFrom, dateTo, headerSortBy])
 
   const stats = useMemo(() => {
-    const totalValue = rows.reduce((sum, row) => sum + safeNumber(row.grandTotal), 0)
-    const outstanding = rows.reduce((sum, row) => sum + safeNumber(row.outstanding), 0)
+    if (!DEMO_MODE && !summaryInvoices) return null
+    const source = DEMO_MODE ? rows : summaryInvoices.map((invoice) => toRow(invoice, false))
+    const totalValue = source.reduce((sum, row) => sum + safeNumber(row.grandTotal), 0)
+    const outstanding = source.reduce((sum, row) => sum + safeNumber(row.outstanding), 0)
     const now = Date.now()
-    const overdue = rows.filter(
+    const overdue = source.filter(
       (row) =>
         row.lifecycle?.key !== 'cancelled' &&
         safeNumber(row.outstanding) > 0 &&
         row.dueDate &&
         new Date(row.dueDate).getTime() < now,
     ).length
-    return { total: rows.length, totalValue, outstanding, overdue }
-  }, [rows])
+    return { total: source.length, totalValue, outstanding, overdue }
+  }, [rows, summaryInvoices])
 
   const lifecycleFilterOptions = DEMO_MODE ? INVOICE_STATUS_OPTIONS : LIFECYCLE_FILTER_OPTIONS
 
   return (
     <div className="listing-page space-y-4">
-      <ListOverview>
-      <ListHeader>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Supplier Invoices</h1>
-          <p className="mt-1 text-xs text-neutral-400">What your suppliers billed you — distinct from Purchases and Goods Receipts.</p>
-        </div>
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-          <div className="relative w-full sm:w-60">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => { setSearch(event.target.value); if (!DEMO_MODE) setPage(1) }}
-              placeholder="Search Invoice # / Supplier / Purchase #"
-              className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-            />
-          </div>
-          <ListFilterPanel title="Filter Supplier Invoices">
-            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Invoice status"
-            options={[{ value: 'all', label: 'All Statuses' }, ...lifecycleFilterOptions]}
-            value={lifecycleFilter}
-            onChange={(event) => { setLifecycleFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
-            className="w-full"
-            triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
-          />
-          <Select label="Verification"
-            options={[{ value: 'all', label: 'All Verification' }, ...VERIFICATION_FILTER_OPTIONS]}
-            value={verificationFilter}
-            onChange={(event) => { setVerificationFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
-            className="w-full"
-            triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
-          />
-          <Select label="Payment status"
-            options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]}
-            value={paymentStatusFilter}
-            onChange={(event) => { setPaymentStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
-            className="w-full"
-            triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
-          />
-          <Select label="Sort by" options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
-            <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
-            {!DEMO_MODE && <span className="text-xs font-normal text-neutral-400">Date filtering is unavailable in live mode because the backend does not support date parameters.</span>}
-          </div>
-          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setLifecycleFilter('all'); setVerificationFilter('all'); setPaymentStatusFilter('all'); setSortFilter('recent'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
-          </ListFilterPanel>
-          {canCreate && (
-          <Button type="button" onClick={() => navigate(`${basePath}/new`)}>
-            <Plus className="size-4" aria-hidden="true" />
-            Add Supplier Invoice
-          </Button>
-        )}
-        </div>
-      </ListHeader>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Supplier Invoices</h1>
+      </div>
 
+      <ListOverview>
       <ListSummary className="grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={ClipboardList} iconVariant="primary" label="Total Supplier Invoices" value={DEMO_MODE ? stats.total : realTotal} />
-        <StatCard icon={IndianRupee} iconVariant="info" label={DEMO_MODE ? 'Total Invoice Value' : 'Total Invoice Value (this page)'} value={formatCurrency(stats.totalValue)} />
-        <StatCard icon={IndianRupee} iconVariant="warning" label={DEMO_MODE ? 'Outstanding Payable' : 'Outstanding Payable (this page)'} value={formatCurrency(stats.outstanding)} />
-        <StatCard icon={CalendarClock} iconVariant="danger" label={DEMO_MODE ? 'Overdue Invoices' : 'Overdue Invoices (this page)'} value={stats.overdue} />
+        <StatCard icon={ClipboardList} iconVariant="primary" label="Total Supplier Invoices" value={stats?.total ?? '—'} />
+        <StatCard icon={IndianRupee} iconVariant="info" label="Total Invoice Value" value={stats ? formatCurrency(stats.totalValue) : '—'} />
+        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={stats ? formatCurrency(stats.outstanding) : '—'} />
+        <StatCard icon={CalendarClock} iconVariant="danger" label="Overdue Invoices" value={stats?.overdue ?? '—'} />
       </ListSummary>
       </ListOverview>
+      {summaryError && <p role="status" className="text-sm text-red-600">Summary: {summaryError}</p>}
 
       <Card className="overflow-hidden p-0">
-
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Supplier Invoices</h2>
+              <p className="mt-1 text-xs text-neutral-400">What your suppliers billed you — distinct from Purchases and Goods Receipts.</p>
+            </div>
+            <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+              <div className="relative w-full sm:w-60">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) => { setSearch(event.target.value); if (!DEMO_MODE) setPage(1) }}
+                  placeholder="Search Invoice # / Supplier / Purchase #"
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+              </div>
+              <ListFilterPanel title="Filter Supplier Invoices">
+                <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Invoice status"
+                options={[{ value: 'all', label: 'All Statuses' }, ...lifecycleFilterOptions]}
+                value={lifecycleFilter}
+                onChange={(event) => { setLifecycleFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
+                className="w-full"
+                triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
+              />
+              <Select label="Verification"
+                options={[{ value: 'all', label: 'All Verification' }, ...VERIFICATION_FILTER_OPTIONS]}
+                value={verificationFilter}
+                onChange={(event) => { setVerificationFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
+                className="w-full"
+                triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
+              />
+              <Select label="Payment status"
+                options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]}
+                value={paymentStatusFilter}
+                onChange={(event) => { setPaymentStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
+                className="w-full"
+                triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
+              />
+              <Select label="Sort by" options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
+                <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
+                {!DEMO_MODE && <span className="text-xs font-normal text-neutral-400">Date filtering is unavailable in live mode because the backend does not support date parameters.</span>}
+              </div>
+              <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setLifecycleFilter('all'); setVerificationFilter('all'); setPaymentStatusFilter('all'); setSortFilter('recent'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
+              </ListFilterPanel>
+              {canCreate && (
+              <Button type="button" onClick={() => navigate(`${basePath}/new`)}>
+                <Plus className="size-4" aria-hidden="true" />
+                Add Supplier Invoice
+              </Button>
+            )}
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           {isLoading ? (
             <div className="p-8"><LoadingSpinner label="Loading supplier invoices..." /></div>

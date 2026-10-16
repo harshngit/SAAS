@@ -240,15 +240,8 @@ export default function MyLeaves() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Leaves</h1>
-          <p className="mt-1 text-sm text-neutral-500">View and manage your leave requests.</p>
-        </div>
-        <Button onClick={openForm}>
-          <Plus className="size-4" aria-hidden="true" />
-          Apply Leave
-        </Button>
+      <div>
+        <h1 className="text-2xl font-semibold text-neutral-900">Leaves</h1>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -264,25 +257,34 @@ export default function MyLeaves() {
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setFilter(f.key)}
-              className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                filter === f.key ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
-      </div>
-
       <Card className="p-0" bodyClassName="p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Leaves</h2>
+              <p className="mt-1 text-xs text-neutral-400">View and manage your leave requests.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setFilter(f.key)}
+                  className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                    filter === f.key ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+              <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
+              <Button onClick={openForm}>
+                <Plus className="size-4" aria-hidden="true" />
+                Apply Leave
+              </Button>
+            </div>
+          </div>
+        </div>
         {isLoading ? (
           <div className="p-6"><LoadingSpinner label="Loading your leave requests..." /></div>
         ) : listError ? (

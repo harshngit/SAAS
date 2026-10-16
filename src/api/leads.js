@@ -221,6 +221,7 @@ export async function listLeads(params = {}) {
     // now returns a paginated { items, total, page, page_size, total_pages } wrapper, default
     // page_size 10, not the bare array / limit-offset shape this was originally written against).
     const queryParams = { page_size: params.page_size || 100 }
+    if (params.page !== undefined) queryParams.page = params.page
     if (params.status) queryParams.status = params.status
     if (params.search) queryParams.search = params.search
     if (params.leadSource || params.lead_source) queryParams.lead_source = params.leadSource || params.lead_source

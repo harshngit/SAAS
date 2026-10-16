@@ -1,3 +1,4 @@
+import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, Copy, Download, Eye, Pencil, Plus, RotateCw, Search, SlidersHorizontal, Target, Trash2, X } from 'lucide-react'
@@ -37,6 +38,11 @@ export default function QuotationList() {
   const isSalesOfficer = window.location.pathname.startsWith('/sales')
   const basePath = isSalesOfficer ? '/sales/quotations' : '/admin/quotations'
   const [quotations, setQuotations] = useState([])
+  const [summaryQuotations, setSummaryQuotations] = useState([])
+  const updateQuotations = (updater) => {
+    setQuotations(updater)
+    setSummaryQuotations(updater)
+  }
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -63,13 +69,18 @@ export default function QuotationList() {
     setIsLoading(true)
     setListError('')
 
-    const result = await listQuotations(sortParams)
+    const [result, summaryResult] = await Promise.all([
+      listQuotations(sortParams),
+      loadSummaryRows(listQuotations, 'quotations'),
+    ])
     // Demo rows (UI testing only) are appended locally - never sent to the backend,
     // and still shown even if the real list call fails.
     const demoRows = DEMO_QUOTATIONS_ENABLED ? demoQuotationsResolved() : []
+    if (summaryResult.success) setSummaryQuotations([...summaryResult.quotations, ...demoRows])
 
     if (!result.success) {
       setQuotations(demoRows)
+      if (!summaryResult.success) setSummaryQuotations((current) => current.length ? current : demoRows)
       setListError(demoRows.length ? '' : result.error)
       setIsLoading(false)
       return
@@ -108,11 +119,11 @@ export default function QuotationList() {
   }, [quotations, searchTerm, statusFilter, salespersonFilter, dateFrom, dateTo])
 
   const quotationSummary = useMemo(() => ({
-    total: filteredQuotations.length,
-    sent: filteredQuotations.filter((quotation) => deriveQuotationStatus(quotation) === 'sent').length,
-    accepted: filteredQuotations.filter((quotation) => deriveQuotationStatus(quotation) === 'accepted').length,
-    value: filteredQuotations.reduce((sum, quotation) => sum + Number(quotation.total || 0), 0),
-  }), [filteredQuotations])
+    total: summaryQuotations.length,
+    sent: summaryQuotations.filter((quotation) => deriveQuotationStatus(quotation) === 'sent').length,
+    accepted: summaryQuotations.filter((quotation) => deriveQuotationStatus(quotation) === 'accepted').length,
+    value: summaryQuotations.reduce((sum, quotation) => sum + Number(quotation.total || 0), 0),
+  }), [summaryQuotations])
 
   const totalPages = Math.max(1, Math.ceil(filteredQuotations.length / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
@@ -136,7 +147,7 @@ export default function QuotationList() {
     exportRowsToExcel('quotations', rows)
   }
 
-  const dropQuotation = (id) => setQuotations((current) => current.filter((quotation) => quotation.id !== id))
+  const dropQuotation = (id) => updateQuotations((current) => current.filter((quotation) => quotation.id !== id))
 
   const handleDeleteQuotation = async () => {
     if (!deleteTarget) return
@@ -179,40 +190,31 @@ export default function QuotationList() {
       return
     }
 
-    setQuotations((current) => current.filter((quotation) => !selectedIds.includes(quotation.id)))
+    updateQuotations((current) => current.filter((quotation) => !selectedIds.includes(quotation.id)))
     setSelectedIds([])
     setIsDeleting(false)
   }
 
   return (
     <div className="listing-page space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Quotations</h1>
+      </div>
+
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-neutral-100 px-5 py-5">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Quotations</h1><p className="mt-1 text-xs text-neutral-400">{filteredQuotations.length} quotations in view</p></div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search quotations..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" aria-hidden="true" />Filter</Button>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportQuotations()}><Download className="size-4" aria-hidden="true" />Export</Button>
-                <Button type="button" size="sm" className="h-9 rounded-2xl px-3.5" onClick={() => navigate(`${basePath}/new`)}><Plus className="size-4" aria-hidden="true" />New Quotation</Button>
-              </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Total Quotations', value: quotationSummary.total, detail: 'all quotations', icon: Copy },
+            { label: 'Sent', value: quotationSummary.sent, detail: 'awaiting response', icon: Eye },
+            { label: 'Accepted', value: quotationSummary.accepted, detail: 'converted quotations', icon: Target },
+            { label: 'Quotation Value', value: formatCurrency(quotationSummary.value), detail: 'current total', icon: Pencil },
+          ].map(({ label, value, detail, icon: Icon }, index) => (
+            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
+              <div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div>
+              <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
+              <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
             </div>
-          </div>
-          <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
-            {[
-              { label: 'Total Quotations', value: quotationSummary.total, detail: 'all quotations', icon: Copy },
-              { label: 'Sent', value: quotationSummary.sent, detail: 'awaiting response', icon: Eye },
-              { label: 'Accepted', value: quotationSummary.accepted, detail: 'converted quotations', icon: Target },
-              { label: 'Quotation Value', value: formatCurrency(quotationSummary.value), detail: 'current total', icon: Pencil },
-            ].map(({ label, value, detail, icon: Icon }, index) => (
-              <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
-                <div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div>
-                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
-                <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
       </Card>
 
@@ -221,6 +223,19 @@ export default function QuotationList() {
       )}
 
       <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div><h2 className="text-xl font-semibold tracking-tight text-neutral-900">Quotations</h2><p className="mt-1 text-xs text-neutral-400">{filteredQuotations.length} quotations in view</p></div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search quotations..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" aria-hidden="true" />Filter</Button>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportQuotations()}><Download className="size-4" aria-hidden="true" />Export</Button>
+                <Button type="button" size="sm" className="h-9 rounded-2xl px-3.5" onClick={() => navigate(`${basePath}/new`)}><Plus className="size-4" aria-hidden="true" />New Quotation</Button>
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">

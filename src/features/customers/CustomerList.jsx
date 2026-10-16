@@ -1,3 +1,4 @@
+import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -113,6 +114,12 @@ export default function CustomerList() {
   const basePath = isAdmin ? '/admin/customers' : '/sales/customers'
 
   const [customers, setCustomers] = useState([])
+  // Table queries may be filtered; cards always use the same role-scoped baseline.
+  const [summaryCustomers, setSummaryCustomers] = useState([])
+  const updateCustomers = (updater) => {
+    setCustomers(updater)
+    setSummaryCustomers(updater)
+  }
   const [staffUsers, setStaffUsers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
@@ -198,10 +205,13 @@ export default function CustomerList() {
       ...sortParams,
     }
 
-    const [customerResult] = await Promise.all([
+    const [customerResult, summaryResult] = await Promise.all([
       listCustomers(queryParams),
+      loadSummaryRows(listCustomers, 'customers', isSalesOfficer ? { assigned_sales_officer_id: currentUser?.id } : {}),
       loadStaffUsers(),
     ])
+
+    if (summaryResult.success) setSummaryCustomers(summaryResult.customers.map(normalizeCustomer))
 
     if (!customerResult.success) {
       setCustomers([])
@@ -249,11 +259,11 @@ export default function CustomerList() {
   }, [currentUser?.id, customers, isAdmin, isSalesOfficer, salesOfficerFilter, searchTerm, statusFilter, typeFilter, dateFrom, dateTo])
 
   const customerSummary = useMemo(() => ({
-    total: filteredCustomers.length,
-    active: filteredCustomers.filter((customer) => customer.status === 'active').length,
-    inactive: filteredCustomers.filter((customer) => customer.status === 'inactive').length,
-    outstanding: filteredCustomers.reduce((sum, customer) => sum + Number(customer.outstandingBalance || 0), 0),
-  }), [filteredCustomers])
+    total: summaryCustomers.length,
+    active: summaryCustomers.filter((customer) => customer.status === 'active').length,
+    inactive: summaryCustomers.filter((customer) => customer.status === 'inactive').length,
+    outstanding: summaryCustomers.reduce((sum, customer) => sum + Number(customer.outstandingBalance || 0), 0),
+  }), [summaryCustomers])
 
   const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
@@ -314,7 +324,7 @@ export default function CustomerList() {
       return
     }
 
-    setCustomers((current) => current.filter((customer) => !selectedCustomerIds.includes(customer.id)))
+    updateCustomers((current) => current.filter((customer) => !selectedCustomerIds.includes(customer.id)))
     setSelectedCustomerIds([])
     setIsDeleting(false)
   }
@@ -382,7 +392,7 @@ export default function CustomerList() {
         return
       }
 
-      setCustomers((current) =>
+      updateCustomers((current) =>
         current.map((customer) =>
           customer.id === editingCustomer.id
             ? normalizeCustomer({
@@ -406,7 +416,7 @@ export default function CustomerList() {
       return
     }
 
-    setCustomers((current) => [
+    updateCustomers((current) => [
       normalizeCustomer({
         ...customerData,
         ...createResult.customer,
@@ -432,7 +442,7 @@ export default function CustomerList() {
       return
     }
 
-    setCustomers((current) => current.filter((customer) => customer.id !== deleteCustomer.id))
+    updateCustomers((current) => current.filter((customer) => customer.id !== deleteCustomer.id))
     setIsDeleting(false)
     setDeleteCustomer(null)
   }
@@ -454,43 +464,24 @@ export default function CustomerList() {
 
   return (
     <div className="listing-page space-y-4">
-      <Card className="overflow-hidden p-0">
-        <div className="border-b border-neutral-100 px-5 py-5">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Customers</h1>
-                <p className="mt-1 text-xs text-neutral-400">{filteredCustomers.length} customers in view</p>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <div className="relative w-full sm:w-60">
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                  <input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search customers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
-                </div>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportCustomers()}><Download className="size-4" aria-hidden="true" />Export</Button>
-                <RequirePermission module="customers" action="create">
-                  <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" />Bulk Import</Button>
-                  <Button onClick={() => handleOpenForm()} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Customer</Button>
-                </RequirePermission>
-              </div>
-            </div>
-          </div>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Customers</h1>
+      </div>
 
-          <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
-            {[
-              { label: 'Total Customers', value: customerSummary.total, detail: `${customerSummary.active} active`, icon: Users },
-              { label: 'Active Customers', value: customerSummary.active, detail: 'currently active', icon: UserCheck },
-              { label: 'Inactive Customers', value: customerSummary.inactive, detail: 'needs follow-up', icon: UserX },
-              { label: 'Outstanding', value: formatCurrency(customerSummary.outstanding), detail: 'total balance', icon: Wallet },
-            ].map(({ label, value, detail, icon: Icon }, index) => (
-              <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
-                <div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div>
-                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
-                <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
-              </div>
-            ))}
-          </div>
+      <Card className="overflow-hidden p-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Total Customers', value: customerSummary.total, detail: `${customerSummary.active} active`, icon: Users },
+            { label: 'Active Customers', value: customerSummary.active, detail: 'currently active', icon: UserCheck },
+            { label: 'Inactive Customers', value: customerSummary.inactive, detail: 'needs follow-up', icon: UserX },
+            { label: 'Outstanding', value: formatCurrency(customerSummary.outstanding), detail: 'total balance', icon: Wallet },
+          ].map(({ label, value, detail, icon: Icon }, index) => (
+            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
+              <div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div>
+              <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
+              <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
+            </div>
+          ))}
         </div>
       </Card>
 
@@ -511,6 +502,28 @@ export default function CustomerList() {
       )}
 
       <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Customers</h2>
+                <p className="mt-1 text-xs text-neutral-400">{filteredCustomers.length} customers in view</p>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="relative w-full sm:w-60">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                  <input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search customers..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
+                </div>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportCustomers()}><Download className="size-4" aria-hidden="true" />Export</Button>
+                <RequirePermission module="customers" action="create">
+                  <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" />Bulk Import</Button>
+                  <Button onClick={() => handleOpenForm()} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Customer</Button>
+                </RequirePermission>
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">

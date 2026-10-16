@@ -1,4 +1,4 @@
-import { ListOverview, ListHeader, ListSummary, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import { ListOverview, ListSummary, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Receipt, Clock, CheckCircle2, XCircle, Check, Wallet, Eye, HelpCircle } from 'lucide-react'
 import Card from '../../components/ui/Card'
@@ -198,14 +198,11 @@ export default function AdminExpenses() {
 
   return (
     <div className="listing-page space-y-4">
-      <ListOverview>
-      <ListHeader>
-        <div>
+      <div>
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Expenses</h1>
-        <p className="mt-1 text-xs text-neutral-400">Review and manage organization expenses.</p>
-        </div>
-      </ListHeader>
+      </div>
 
+      <ListOverview>
       <ListSummary className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Receipt} label="Total Expenses" value={formatCurrency(stats.totalAmount)} iconVariant="primary" />
         <StatCard icon={Clock} label="Pending Review" value={stats.pending.length} iconVariant="warning" />

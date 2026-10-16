@@ -1,3 +1,4 @@
+import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -52,6 +53,11 @@ function ProductThumbnail({ src, alt }) {
 export default function ProductList() {
   const navigate = useNavigate()
   const [products, setProducts] = useState([])
+  const [summaryProducts, setSummaryProducts] = useState([])
+  const updateProducts = (updater) => {
+    setProducts(updater)
+    setSummaryProducts(updater)
+  }
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -116,12 +122,14 @@ export default function ProductList() {
     setIsLoading(true)
     setListError('')
 
-    const result = await listProducts({
+    const [result, summaryResult] = await Promise.all([listProducts({
       search: searchTerm.trim() || undefined,
       category_id: categoryFilter === 'all' ? undefined : categoryFilter,
       is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
       ...sortParams,
-    })
+    }), loadSummaryRows(listProducts, 'products')])
+
+    if (summaryResult.success) setSummaryProducts(summaryResult.products.map(normalizeApiProduct))
 
     if (!result.success) {
       setProducts([])
@@ -190,11 +198,11 @@ export default function ProductList() {
   }, [categoryFilter, products, searchTerm, sortFilter, statusFilter, dateFrom, dateTo])
 
   const productSummary = useMemo(() => ({
-    total: filteredProducts.length,
-    active: filteredProducts.filter((product) => product.status === 'active').length,
-    inactive: filteredProducts.filter((product) => product.status !== 'active').length,
-    value: filteredProducts.reduce((sum, product) => sum + Number(product.price ?? product.variants?.[0]?.sellingPrice ?? 0), 0),
-  }), [filteredProducts])
+    total: summaryProducts.length,
+    active: summaryProducts.filter((product) => product.status === 'active').length,
+    inactive: summaryProducts.filter((product) => product.status !== 'active').length,
+    value: summaryProducts.reduce((sum, product) => sum + Number(product.price ?? product.variants?.[0]?.sellingPrice ?? 0), 0),
+  }), [summaryProducts])
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
@@ -218,7 +226,7 @@ export default function ProductList() {
     const results = await Promise.all(selectedIds.map((id) => deleteProduct(id)))
     const failed = results.find((result) => !result.success)
     if (failed) { setDeleteError(failed.error || 'Some products could not be deleted.'); setIsDeleting(false); return }
-    setProducts((current) => current.filter((product) => !selectedIds.includes(product.id))); setSelectedIds([]); setIsDeleting(false)
+    updateProducts((current) => current.filter((product) => !selectedIds.includes(product.id))); setSelectedIds([]); setIsDeleting(false)
   }
 
   const handleAddProduct = () => {
@@ -250,7 +258,7 @@ export default function ProductList() {
       return
     }
 
-    setProducts((current) => current.filter((product) => product.id !== deleteTarget.id))
+    updateProducts((current) => current.filter((product) => product.id !== deleteTarget.id))
     setDeleteTarget(null)
   }
 
@@ -271,7 +279,7 @@ export default function ProductList() {
       return
     }
 
-    setProducts((current) =>
+    updateProducts((current) =>
       editingProduct
         ? current.map((product) =>
             product.id === editingProduct.id ? normalizeApiProduct(result.product, productData) : product,
@@ -324,7 +332,7 @@ export default function ProductList() {
       return
     }
 
-    setProducts((current) =>
+    updateProducts((current) =>
       current.map((product) =>
         product.id === statusProduct.id ? normalizeApiProduct(result.product, product) : product,
       ),
@@ -354,15 +362,12 @@ export default function ProductList() {
 
   return (
     <div className="listing-page space-y-4">
-      <Card className="overflow-hidden p-0">
-        <div className="border-b border-neutral-100 px-5 py-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Products</h1><p className="mt-1 text-xs text-neutral-400">{filteredProducts.length} products in view</p></div>
-            <div className="flex flex-wrap items-center justify-end gap-2"><div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search products..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportProducts()}><Download className="size-4" />Export</Button><Button onClick={handleAddProduct} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Product</Button></div>
-          </div>
-        </div>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Products</h1>
+      </div>
 
-        <div className="grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
+      <Card className="overflow-hidden p-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4">
           {[
             { label: 'Total Products', value: productSummary.total, detail: `${productSummary.active} active`, icon: Package },
             { label: 'Active Products', value: productSummary.active, detail: 'currently active', icon: Power },
@@ -377,6 +382,12 @@ export default function ProductList() {
       {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} product{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportProducts(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
 
       <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div><h2 className="text-xl font-semibold tracking-tight text-neutral-900">Products</h2><p className="mt-1 text-xs text-neutral-400">{filteredProducts.length} products in view</p></div>
+            <div className="flex flex-wrap items-center justify-end gap-2"><div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search products..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportProducts()}><Download className="size-4" />Export</Button><Button onClick={handleAddProduct} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Product</Button></div>
+          </div>
+        </div>
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">

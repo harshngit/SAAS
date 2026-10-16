@@ -13,7 +13,7 @@ import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { usePermission } from '../../auth/usePermission'
 import { listSalesReturns } from '../../api/salesReturns'
 import { SALES_RETURNS_DEMO_ENABLED, getDemoSalesReturns } from './salesReturnDemoData'
-import { SR_STATUS_FILTERS, rawStatusForFilter, srStatusMeta, totalReturnQty } from './salesReturnHelpers'
+import { SR_STATUS_FILTERS, srStatusMeta, totalReturnQty } from './salesReturnHelpers'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { uniqueOptions } from '../../utils/filterOptions'
@@ -76,8 +76,8 @@ export default function SalesReturnList() {
       return
     }
 
-    const rawStatus = statusFilter === 'all' ? null : rawStatusForFilter(statusFilter)
-    const result = await listSalesReturns({ ...(rawStatus ? { status: rawStatus } : {}), ...sortParams })
+    // Status is applied only to table rows below, so cards retain every status bucket.
+    const result = await listSalesReturns(sortParams)
 
     if (!result.success) {
       setSalesReturns([])
@@ -88,7 +88,7 @@ export default function SalesReturnList() {
 
     setSalesReturns(result.salesReturns)
     setIsLoading(false)
-  }, [statusFilter, sortParams])
+  }, [sortParams])
 
   useEffect(() => {
     loadSalesReturns()
@@ -120,11 +120,37 @@ export default function SalesReturnList() {
   return (
     <div className="listing-page space-y-4">
 
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Sales Returns</h1>
+      </div>
+
+      <Card className="overflow-hidden p-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Total Returns', value: stats.total, detail: 'recorded returns', icon: RotateCcw },
+            { label: 'Pending', value: stats.pending, detail: 'pending returns', icon: Clock },
+            { label: 'Received', value: stats.received, detail: 'received returns', icon: PackageCheck },
+            { label: 'Completed', value: stats.completed, detail: 'completed returns', icon: CheckCircle2 },
+          ].map(({ label, value, detail, icon: Icon }, index) => (
+            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-xs font-medium text-fg-muted">{label}</p>
+                <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted">
+                  <Icon className="size-4" aria-hidden="true" />
+                </span>
+              </div>
+              <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
+              <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       <Card className="overflow-hidden p-0">
         <div className="border-b border-neutral-100 px-5 py-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Sales Returns</h1>
+              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Sales Returns</h2>
               <p className="mt-1 text-xs text-neutral-400">{filteredSalesReturns.length} returns in view</p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -150,25 +176,6 @@ export default function SalesReturnList() {
                 </Button>
               )}
             </div>
-          </div>
-          <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
-            {[
-              { label: 'Total Returns', value: stats.total, detail: 'recorded returns', icon: RotateCcw },
-              { label: 'Pending', value: stats.pending, detail: 'pending returns', icon: Clock },
-              { label: 'Received', value: stats.received, detail: 'received returns', icon: PackageCheck },
-              { label: 'Completed', value: stats.completed, detail: 'completed returns', icon: CheckCircle2 },
-            ].map(({ label, value, detail, icon: Icon }, index) => (
-              <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs font-medium text-fg-muted">{label}</p>
-                  <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted">
-                    <Icon className="size-4" aria-hidden="true" />
-                  </span>
-                </div>
-                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
-                <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
-              </div>
-            ))}
           </div>
         </div>
       </Card>

@@ -407,6 +407,7 @@ export async function listCustomers(params = {}) {
     // full result set (same model it used before this endpoint started paginating), so this
     // keeps that working rather than silently truncating to the backend's own default of 10.
     const queryParams = { page_size: params.page_size || 100 }
+    if (params.page !== undefined) queryParams.page = params.page
 
     if (params.search) queryParams.search = params.search
     if (params.category) queryParams.category = params.category

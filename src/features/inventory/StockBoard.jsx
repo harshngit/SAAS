@@ -1,4 +1,4 @@
-import { ListHeader, ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -185,10 +185,7 @@ export default function StockBoard({ readOnly = false }) {
     setListError('')
 
     const [result, productsResult] = await Promise.all([
-      getStockBoard({
-        search: searchTerm.trim() || undefined,
-        category_id: categoryFilter === 'all' ? undefined : categoryFilter,
-      }),
+      getStockBoard(),
       // The stock board endpoint doesn't return created_at - pull it from /products so
       // "Recently Added" sorting reflects a real timestamp instead of guessing from row order.
       listProducts(),
@@ -226,7 +223,7 @@ export default function StockBoard({ readOnly = false }) {
       }),
     )
     setIsLoading(false)
-  }, [categoryFilter, searchTerm])
+  }, [])
 
   useEffect(() => {
     loadStock()
@@ -244,6 +241,10 @@ export default function StockBoard({ readOnly = false }) {
 
   const filteredItems = useMemo(() => {
     const filtered = items.filter((item) => {
+      const query = searchTerm.trim().toLowerCase()
+      if (query && ![item.name, item.brand, item.sku, item.barcode, item.product_type]
+        .filter(Boolean).some((value) => String(value).toLowerCase().includes(query))) return false
+      if (categoryFilter !== 'all' && (item.category_id || item.product_type) !== categoryFilter) return false
       if (statusFilter === 'active') return item.is_active
       if (statusFilter === 'inactive') return !item.is_active
       if (statusFilter === 'out') return (item.total_stock || 0) <= 0
@@ -251,7 +252,7 @@ export default function StockBoard({ readOnly = false }) {
     })
 
     return sortItems(filtered, sortBy)
-  }, [items, statusFilter, sortBy])
+  }, [items, searchTerm, categoryFilter, statusFilter, sortBy])
 
   const handleOpenEntryForm = (item) => {
     setAdjustingProduct(item)
@@ -302,27 +303,11 @@ export default function StockBoard({ readOnly = false }) {
   return (
     <div className="listing-page space-y-4">
 
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Inventory</h1>
+      </div>
+
       <ListOverview>
-        <ListHeader>
-          <div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Inventory</h1></div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-60">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search products, brands, SKU"
-                aria-label="Search products, brands, SKU"
-                className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-              />
-            </div>
-            <Button ref={filterTriggerRef} type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)} aria-haspopup="dialog" aria-expanded={isFilterOpen} aria-controls="inventory-filter-panel">
-              <SlidersHorizontal className="size-4" aria-hidden="true" />
-              Filter
-            </Button>
-          </div>
-        </ListHeader>
         <ListSummary className="grid-cols-2  lg:grid-cols-4">
         <StatCard icon={Boxes} iconVariant="primary" label="Tracked Products" value={stats.totalProducts} />
         <StatCard icon={Package} iconVariant="info" label="Total Stock Units" value={stats.totalStock.toLocaleString()} />
@@ -334,6 +319,28 @@ export default function StockBoard({ readOnly = false }) {
       {!readOnly && <ExpiringBatchesPanel />}
 
       <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div><h2 className="text-xl font-semibold tracking-tight text-neutral-900">Inventory</h2></div>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <div className="relative w-full sm:w-60">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search products, brands, SKU"
+                  aria-label="Search products, brands, SKU"
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+              </div>
+              <Button ref={filterTriggerRef} type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)} aria-haspopup="dialog" aria-expanded={isFilterOpen} aria-controls="inventory-filter-panel">
+                <SlidersHorizontal className="size-4" aria-hidden="true" />
+                Filter
+              </Button>
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">

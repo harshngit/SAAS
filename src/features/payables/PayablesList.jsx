@@ -1,5 +1,5 @@
 import ListFilterPanel from '../../components/ui/ListFilterPanel'
-import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import ListActionMenu from '../../components/ui/ListActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -87,8 +87,7 @@ export default function PayablesList() {
     if (DEMO_MODE) return
     setIsLoading(true)
     setLoadError('')
-    const [listResult, summaryResult] = await Promise.all([
-      listAccountsPayable({
+    const listResult = await listAccountsPayable({
         supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined,
         payment_status: paymentStatusFilter,
         ageing_bucket: ageingFilter,
@@ -96,25 +95,30 @@ export default function PayablesList() {
         page,
         page_size: PAGE_SIZE,
         ...sortParams,
-      }),
-      getAccountsPayableSummary({ supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined }),
-    ])
+      })
     setIsLoading(false)
     if (!listResult.success) {
       setRealPayables([])
       setRealTotal(0)
-      setRealSummary(null)
       setLoadError(listResult.error)
       return
     }
     setRealPayables(listResult.payables)
     setRealTotal(listResult.total)
-    setRealSummary(summaryResult.success ? summaryResult.summary : null)
   }, [ageingFilter, page, paymentStatusFilter, search, supplierFilter, sortParams])
 
   useEffect(() => {
     loadReal()
-  }, [loadReal])
+  }, [loadReal, refresh])
+
+  useEffect(() => {
+    if (DEMO_MODE) return undefined
+    let active = true
+    getAccountsPayableSummary().then((result) => {
+      if (active && result.success) setRealSummary(result.summary)
+    })
+    return () => { active = false }
+  }, [refresh])
 
   useEffect(() => {
     if (DEMO_MODE) return undefined
@@ -220,7 +224,7 @@ export default function PayablesList() {
     })
   }, [rows, search, supplierFilter, paymentStatusFilter, dueFilter, ageingFilter, sortFilter, dateFrom, dateTo, headerSortBy])
 
-  // Header metrics: real -> ALWAYS the backend summary (reflects all matching payables, not the
+  // Header metrics: real -> ALWAYS the unfiltered backend summary (all payables, not the
   // visible page). Demo -> derived from the demo store.
   const stats = useMemo(() => {
     if (!DEMO_MODE) {
@@ -260,39 +264,11 @@ export default function PayablesList() {
 
   return (
     <div className="listing-page space-y-4">
-      <ListOverview>
-      <ListHeader>
-        <div className="min-w-0 flex-1">
+      <div>
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Accounts Payable</h1>
-        <p className="mt-1 text-xs text-neutral-400">What you still owe each supplier, derived from recorded supplier invoices. Read-only.</p>
-        </div>
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-          <div className="relative w-full sm:w-60">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => { setSearch(event.target.value); if (!DEMO_MODE) setPage(1) }}
-              placeholder="Search Supplier / Supplier Invoice #"
-              className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-            />
-          </div>
-          <ListFilterPanel title="Filter Accounts Payable">
-            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Payment status" options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]} value={paymentStatusFilter} onChange={(event) => { setPaymentStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          {DEMO_MODE && <Select label="Due date" options={DUE_FILTER_OPTIONS} value={dueFilter} onChange={(event) => setDueFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />}
-          <Select label="Ageing" options={ageingFilterOptions} value={ageingFilter} onChange={(event) => { setAgeingFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Sort by" options={PAYABLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
-            <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
-            {!DEMO_MODE && <span className="text-xs font-normal text-neutral-400">Date filtering is unavailable in live mode because the backend does not support date parameters.</span>}
-          </div>
-          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setPaymentStatusFilter('all'); setDueFilter('all'); setAgeingFilter('all'); setSortFilter('recent'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
-          </ListFilterPanel>
+      </div>
 
-        </div>
-      </ListHeader>
-
+      <ListOverview>
       <ListSummary className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={IndianRupee} iconVariant="warning" label="Total Payable" value={formatCurrency(stats.totalOutstanding)} />
         {DEMO_MODE ? (
@@ -330,7 +306,38 @@ export default function PayablesList() {
       )}
 
       <Card className="overflow-hidden p-0">
-
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Accounts Payable</h2>
+              <p className="mt-1 text-xs text-neutral-400">What you still owe each supplier, derived from recorded supplier invoices. Read-only.</p>
+            </div>
+            <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+              <div className="relative w-full sm:w-60">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) => { setSearch(event.target.value); if (!DEMO_MODE) setPage(1) }}
+                  placeholder="Search Supplier / Supplier Invoice #"
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+              </div>
+              <ListFilterPanel title="Filter Accounts Payable">
+                <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Payment status" options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]} value={paymentStatusFilter} onChange={(event) => { setPaymentStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              {DEMO_MODE && <Select label="Due date" options={DUE_FILTER_OPTIONS} value={dueFilter} onChange={(event) => setDueFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />}
+              <Select label="Ageing" options={ageingFilterOptions} value={ageingFilter} onChange={(event) => { setAgeingFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Sort by" options={PAYABLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
+                <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
+                {!DEMO_MODE && <span className="text-xs font-normal text-neutral-400">Date filtering is unavailable in live mode because the backend does not support date parameters.</span>}
+              </div>
+              <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setPaymentStatusFilter('all'); setDueFilter('all'); setAgeingFilter('all'); setSortFilter('recent'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
+              </ListFilterPanel>
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           {isLoading ? (
             <div className="p-8"><LoadingSpinner label="Loading accounts payable..." /></div>

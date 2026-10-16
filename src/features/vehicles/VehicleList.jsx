@@ -1,5 +1,5 @@
 import ListFilterPanel from '../../components/ui/ListFilterPanel'
-import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CarFront, CheckCircle2, Edit, Eye, Plus, RotateCw, Search, Trash2, Truck } from 'lucide-react'
@@ -225,39 +225,11 @@ export default function VehicleList() {
 
   return (
     <div className="listing-page space-y-4">
-      <ListOverview>
-      <ListHeader>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Vehicles</h1>
-          <p className="mt-1 text-xs text-neutral-400">Your delivery fleet — who each vehicle is assigned to and whether it can be used.</p>
-        </div>
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-          <div className="relative w-full sm:w-60">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search Vehicle / Number / Delivery Partner"
-              className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-            />
-          </div>
-          <ListFilterPanel title="Filter Vehicles">
-            <Select label="Status" options={VEHICLE_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Availability" options={AVAILABILITY_FILTER_OPTIONS} value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Vehicle type" options={VEHICLE_TYPE_FILTER_OPTIONS} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Sort by" options={VEHICLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Created
-            <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-          </div>
-          </ListFilterPanel>
-          <Button type="button" onClick={() => openForm()}>
-          <Plus className="size-4" aria-hidden="true" />
-          Add Vehicle
-        </Button>
-        </div>
-      </ListHeader>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Vehicles</h1>
+      </div>
 
+      <ListOverview>
       <ListSummary className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Truck} iconVariant="primary" label="Total Vehicles" value={stats.total} />
         <StatCard icon={CheckCircle2} iconVariant="success" label="Active Vehicles" value={stats.active} />
@@ -267,6 +239,39 @@ export default function VehicleList() {
       </ListOverview>
 
       <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Vehicles</h2>
+              <p className="mt-1 text-xs text-neutral-400">Your delivery fleet — who each vehicle is assigned to and whether it can be used.</p>
+            </div>
+            <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+              <div className="relative w-full sm:w-60">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search Vehicle / Number / Delivery Partner"
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+              </div>
+              <ListFilterPanel title="Filter Vehicles">
+                <Select label="Status" options={VEHICLE_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Availability" options={AVAILABILITY_FILTER_OPTIONS} value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Vehicle type" options={VEHICLE_TYPE_FILTER_OPTIONS} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Sort by" options={VEHICLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Created
+                <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+              </div>
+              </ListFilterPanel>
+              <Button type="button" onClick={() => openForm()}>
+              <Plus className="size-4" aria-hidden="true" />
+              Add Vehicle
+            </Button>
+            </div>
+          </div>
+        </div>
 
         <div className="overflow-x-auto">
           {listError ? (

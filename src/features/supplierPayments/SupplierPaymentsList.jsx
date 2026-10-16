@@ -1,5 +1,5 @@
 import ListFilterPanel from '../../components/ui/ListFilterPanel'
-import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarClock, IndianRupee, Plus, Search, Users, Wallet } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
@@ -10,6 +10,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
+import { useSummaryRows } from '../../hooks/useSummaryRows'
 import { formatCurrency } from '../../utils/format'
 import { usePermission } from '../../auth/usePermission'
 import { DEMO_MODE } from '../../config/demoMode'
@@ -116,6 +117,7 @@ export default function SupplierPaymentsList() {
   const [realTotal, setRealTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(!DEMO_MODE)
   const [loadError, setLoadError] = useState('')
+  const { rows: summaryPayments, error: summaryError } = useSummaryRows(listSupplierPayments, 'payments', !DEMO_MODE, refresh)
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
@@ -226,69 +228,75 @@ export default function SupplierPaymentsList() {
   // (the backend has no supplier-payment summary endpoint, so this is page-scoped and labelled).
   const stats = useMemo(() => {
     if (DEMO_MODE) return demoStats
-    const recorded = realPayments.filter((p) => p.status === 'recorded')
+    if (!summaryPayments) return null
+    const recorded = summaryPayments.filter((p) => p.status === 'recorded')
     return {
       total: recorded.reduce((sum, p) => sum + safeNumber(p.amount), 0),
       month: recorded.filter((p) => isSameMonth(p.paymentDate)).reduce((sum, p) => sum + safeNumber(p.amount), 0),
       suppliers: new Set(recorded.map((p) => p.supplierId)).size,
       recent: recorded.filter((p) => isWithinDays(p.paymentDate, 30)).length,
     }
-  }, [demoStats, realPayments])
+  }, [demoStats, summaryPayments])
 
   const bump = () => setRefresh((value) => value + 1)
   const totalPages = DEMO_MODE ? 1 : Math.max(1, Math.ceil(realTotal / PAGE_SIZE))
 
   return (
     <div className="listing-page space-y-4">
-      <ListOverview>
-      <ListHeader>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Supplier Payments</h1>
-          <p className="mt-1 text-xs text-neutral-400">When, how much, and against which invoices each supplier was paid.</p>
-        </div>
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-          <div className="relative w-full sm:w-60">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value)
-                if (!DEMO_MODE) setPage(1)
-              }}
-              placeholder="Search Payment # / Supplier / Reference"
-              className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-            />
-          </div>
-          <ListFilterPanel title="Filter Supplier Payments">
-            <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Payment mode" options={[{ value: 'all', label: 'All Modes' }, ...PAYMENT_MODE_OPTIONS]} value={modeFilter} onChange={(event) => { setModeFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Status" options={PAYMENT_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Date
-            <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
-          </div>
-          <Select label="Sort by" options={PAYMENT_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setModeFilter('all'); setStatusFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSortFilter('recent'); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
-          </ListFilterPanel>
-          {canCreate && (
-          <Button type="button" onClick={() => setRecordOpen(true)}>
-            <Plus className="size-4" aria-hidden="true" />
-            Create Payment
-          </Button>
-        )}
-        </div>
-      </ListHeader>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Supplier Payments</h1>
+      </div>
 
+      <ListOverview>
       <ListSummary className="grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={IndianRupee} iconVariant="primary" label={DEMO_MODE ? 'Total Paid' : 'Paid (this page)'} value={formatCurrency(stats.total)} />
-        <StatCard icon={Wallet} iconVariant="success" label={DEMO_MODE ? 'Payments This Month' : 'Payments This Month (this page)'} value={formatCurrency(stats.month)} />
-        <StatCard icon={Users} iconVariant="info" label={DEMO_MODE ? 'Suppliers Paid' : 'Suppliers Paid (this page)'} value={stats.suppliers} />
-        <StatCard icon={CalendarClock} iconVariant="warning" label={DEMO_MODE ? 'Recent Payments' : 'Recent Payments (this page)'} value={stats.recent} />
+        <StatCard icon={IndianRupee} iconVariant="primary" label="Total Paid" value={stats ? formatCurrency(stats.total) : '—'} />
+        <StatCard icon={Wallet} iconVariant="success" label="Payments This Month" value={stats ? formatCurrency(stats.month) : '—'} />
+        <StatCard icon={Users} iconVariant="info" label="Suppliers Paid" value={stats?.suppliers ?? '—'} />
+        <StatCard icon={CalendarClock} iconVariant="warning" label="Recent Payments" value={stats?.recent ?? '—'} />
       </ListSummary>
       </ListOverview>
+      {summaryError && <p role="status" className="text-sm text-red-600">Summary: {summaryError}</p>}
 
       <Card className="overflow-hidden p-0">
-
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Supplier Payments</h2>
+              <p className="mt-1 text-xs text-neutral-400">When, how much, and against which invoices each supplier was paid.</p>
+            </div>
+            <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+              <div className="relative w-full sm:w-60">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value)
+                    if (!DEMO_MODE) setPage(1)
+                  }}
+                  placeholder="Search Payment # / Supplier / Reference"
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+              </div>
+              <ListFilterPanel title="Filter Supplier Payments">
+                <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Payment mode" options={[{ value: 'all', label: 'All Modes' }, ...PAYMENT_MODE_OPTIONS]} value={modeFilter} onChange={(event) => { setModeFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Select label="Status" options={PAYMENT_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Date
+                <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
+              </div>
+              <Select label="Sort by" options={PAYMENT_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setModeFilter('all'); setStatusFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSortFilter('recent'); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
+              </ListFilterPanel>
+              {canCreate && (
+              <Button type="button" onClick={() => setRecordOpen(true)}>
+                <Plus className="size-4" aria-hidden="true" />
+                Create Payment
+              </Button>
+            )}
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           {isLoading ? (
             <div className="p-8"><LoadingSpinner label="Loading supplier payments..." /></div>

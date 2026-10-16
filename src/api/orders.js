@@ -303,6 +303,7 @@ function normalizeOrder(order) {
 export async function listOrders(params = {}) {
   try {
     const queryParams = { page_size: params.page_size || 100 }
+    if (params.page !== undefined) queryParams.page = params.page
     if (params.status) queryParams.status = params.status
     if (params.fulfilment_status) queryParams.fulfilment_status = params.fulfilment_status
     if (params.customer_id) queryParams.customer_id = params.customer_id

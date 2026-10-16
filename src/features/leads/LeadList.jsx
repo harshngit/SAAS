@@ -1,3 +1,4 @@
+import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Activity, ArrowRightCircle, ChevronLeft, ChevronRight, Download, Edit, Eye, Globe2, Plus, RotateCw, Search, SlidersHorizontal, Target, Trash2, TrendingUp, X } from 'lucide-react'
@@ -57,6 +58,11 @@ export default function LeadList() {
   const leadBasePath = isSalesOfficer ? '/sales/leads' : '/admin/leads'
 
   const [leads, setLeads] = useState([])
+  const [summaryLeads, setSummaryLeads] = useState([])
+  const updateLeads = (updater) => {
+    setLeads(updater)
+    setSummaryLeads(updater)
+  }
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [salespeople, setSalespeople] = useState([])
@@ -97,7 +103,12 @@ export default function LeadList() {
     setIsLoading(true)
     setListError('')
 
-    const result = await listLeads({ ...(statusFilter !== 'all' ? { status: statusFilter } : {}), ...sortParams })
+    const [result, summaryResult] = await Promise.all([
+      listLeads({ ...(statusFilter !== 'all' ? { status: statusFilter } : {}), ...sortParams }),
+      loadSummaryRows(listLeads, 'leads'),
+    ])
+
+    if (summaryResult.success) setSummaryLeads(summaryResult.leads)
 
     if (!result.success) {
       setLeads([])
@@ -220,18 +231,18 @@ export default function LeadList() {
   }, [leads, searchTerm, sourceFilter, teamFilter, dateFrom, dateTo])
 
   const leadSummary = useMemo(() => {
-    const closedLeads = leads.filter((lead) => ['won', 'lost'].includes(lead.leadStatus))
-    const wonLeads = leads.filter((lead) => lead.leadStatus === 'won')
-    const pipelineValue = leads.reduce((sum, lead) => sum + Number(lead.value ?? lead.estimatedValue ?? lead.amount ?? 0), 0)
+    const closedLeads = summaryLeads.filter((lead) => ['won', 'lost'].includes(lead.leadStatus))
+    const wonLeads = summaryLeads.filter((lead) => lead.leadStatus === 'won')
+    const pipelineValue = summaryLeads.reduce((sum, lead) => sum + Number(lead.value ?? lead.estimatedValue ?? lead.amount ?? 0), 0)
     return {
-      total: filteredLeads.length,
+      total: summaryLeads.length,
       pipelineValue,
-      sources: new Set(filteredLeads.map((lead) => lead.leadSource).filter(Boolean)).size,
+      sources: new Set(summaryLeads.map((lead) => lead.leadSource).filter(Boolean)).size,
       conversion: closedLeads.length ? Math.round((wonLeads.length / closedLeads.length) * 100) : 0,
-      newLeads: leads.filter((lead) => lead.leadStatus === 'new').length,
+      newLeads: summaryLeads.filter((lead) => lead.leadStatus === 'new').length,
       wonLeads: wonLeads.length,
     }
-  }, [filteredLeads, leads])
+  }, [summaryLeads])
 
   const totalPages = Math.max(1, Math.ceil(filteredLeads.length / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
@@ -292,7 +303,7 @@ export default function LeadList() {
       return
     }
 
-    setLeads((current) => current.filter((lead) => !selectedIds.includes(lead.id)))
+    updateLeads((current) => current.filter((lead) => !selectedIds.includes(lead.id)))
     setSelectedIds([])
     setIsDeleting(false)
   }
@@ -328,7 +339,7 @@ export default function LeadList() {
       return
     }
 
-    setLeads((current) => current.filter((lead) => lead.id !== deleteTarget.id))
+    updateLeads((current) => current.filter((lead) => lead.id !== deleteTarget.id))
     setSelectedIds((current) => current.filter((id) => id !== deleteTarget.id))
     setDeleteTarget(null)
     setIsDeleting(false)
@@ -341,12 +352,54 @@ export default function LeadList() {
 
   return (
     <div className="listing-page space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Leads</h1>
+      </div>
+
+      <Card className="overflow-hidden p-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Total Leads', value: leadSummary.total, detail: `${leadSummary.newLeads} new`, icon: Activity },
+            { label: 'Pipeline Value', value: formatCurrency(leadSummary.pipelineValue), detail: `${leadSummary.wonLeads} won`, icon: TrendingUp },
+            { label: 'Sources', value: leadSummary.sources, detail: 'active channels', icon: Globe2 },
+            { label: 'Conversion', value: `${leadSummary.conversion}%`, detail: 'won from closed leads', icon: Target },
+          ].map(({ label, value, detail, icon: Icon }, index) => (
+            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-xs font-medium text-fg-muted">{label}</p>
+                <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted">
+                  <Icon className="size-4" aria-hidden="true" />
+                </span>
+              </div>
+              <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
+              <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
+          <p className="text-sm font-medium text-primary-900">{selectedIds.length} lead{selectedIds.length === 1 ? '' : 's'} selected</p>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportCsv(true)}>
+              <Download className="size-4" aria-hidden="true" />
+              Download
+            </Button>
+            <Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}>
+              <Trash2 className="size-4" aria-hidden="true" />
+              Delete
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card className="overflow-hidden p-0">
         <div className="border-b border-neutral-100 px-5 py-5">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-              <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Leads</h1>
+              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Leads</h2>
               <p className="mt-1 text-xs text-neutral-400">{filteredLeads.length} leads in view</p>
               </div>
 
@@ -376,47 +429,7 @@ export default function LeadList() {
               </div>
             </div>
           </div>
-
-          <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
-            {[
-              { label: 'Total Leads', value: leadSummary.total, detail: `${leadSummary.newLeads} new`, icon: Activity },
-              { label: 'Pipeline Value', value: formatCurrency(leadSummary.pipelineValue), detail: `${leadSummary.wonLeads} won`, icon: TrendingUp },
-              { label: 'Sources', value: leadSummary.sources, detail: 'active channels', icon: Globe2 },
-              { label: 'Conversion', value: `${leadSummary.conversion}%`, detail: 'won from closed leads', icon: Target },
-            ].map(({ label, value, detail, icon: Icon }, index) => (
-              <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs font-medium text-fg-muted">{label}</p>
-                  <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted">
-                    <Icon className="size-4" aria-hidden="true" />
-                  </span>
-                </div>
-                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
-                <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
-              </div>
-            ))}
-          </div>
         </div>
-
-      </Card>
-
-      {selectedIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
-          <p className="text-sm font-medium text-primary-900">{selectedIds.length} lead{selectedIds.length === 1 ? '' : 's'} selected</p>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportCsv(true)}>
-              <Download className="size-4" aria-hidden="true" />
-              Download
-            </Button>
-            <Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}>
-              <Trash2 className="size-4" aria-hidden="true" />
-              Delete
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-10 text-center">

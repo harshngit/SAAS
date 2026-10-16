@@ -1,3 +1,4 @@
+import { loadSummaryRows } from '../../utils/listSummary'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -74,6 +75,7 @@ export default function UpgradeRequests() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('pending')
   const [requests, setRequests] = useState([])
+  const [summaryRequests, setSummaryRequests] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [listError, setListError] = useState('')
   const [actionError, setActionError] = useState('')
@@ -95,7 +97,13 @@ export default function UpgradeRequests() {
     setIsLoading(true)
     setListError('')
 
-    const result = await listSuperAdminOrganizations({ upgrade_status: activeTab, ...sortParams })
+    const [result, summaryResult] = await Promise.all([
+      listSuperAdminOrganizations({ upgrade_status: activeTab, ...sortParams }),
+      loadSummaryRows(listSuperAdminOrganizations, 'organizations'),
+    ])
+    if (summaryResult.success) {
+      setSummaryRequests(summaryResult.organizations.filter((organization) => organization.upgrade_status && organization.upgrade_status !== 'none'))
+    }
 
     setIsLoading(false)
 
@@ -174,60 +182,33 @@ export default function UpgradeRequests() {
   }, [dateFilteredRequests, searchTerm])
 
   const requestSummary = useMemo(() => ({
-    total: dateFilteredRequests.length,
-    pending: dateFilteredRequests.filter((organization) => organization.upgrade_status === 'pending').length,
-    approved: dateFilteredRequests.filter((organization) => organization.upgrade_status === 'approved').length,
-    rejected: dateFilteredRequests.filter((organization) => organization.upgrade_status === 'rejected').length,
-  }), [dateFilteredRequests])
+    total: summaryRequests.length,
+    pending: summaryRequests.filter((organization) => organization.upgrade_status === 'pending').length,
+    approved: summaryRequests.filter((organization) => organization.upgrade_status === 'approved').length,
+    rejected: summaryRequests.filter((organization) => organization.upgrade_status === 'rejected').length,
+  }), [summaryRequests])
 
   return (
     <div className="listing-page space-y-4">
-      <Card className="overflow-hidden p-0">
-        <div className="border-b border-neutral-100 px-5 py-5">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Upgrade Requests</h1>
-                <p className="mt-1 text-xs text-neutral-400">{visibleRequests.length} requests in view</p>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <div className="relative w-full sm:w-60">
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                  <input
-                    type="search"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search requests..."
-                    className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                  />
-                </div>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen((open) => !open)}>
-                  <SlidersHorizontal className="size-4" aria-hidden="true" />
-                  Filter
-                </Button>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportUpgradeRequests(visibleRequests)}>
-                  <Download className="size-4" aria-hidden="true" />
-                  Export
-                </Button>
-              </div>
-            </div>
-          </div>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Upgrade Requests</h1>
+      </div>
 
-          <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
-            {[
-              { label: 'Total Requests', value: requestSummary.total, detail: 'all requests', icon: Copy },
-              { label: 'Pending', value: requestSummary.pending, detail: 'awaiting review', icon: Clock },
-              { label: 'Approved', value: requestSummary.approved, detail: 'accepted upgrades', icon: CheckCircle2 },
-              { label: 'Rejected', value: requestSummary.rejected, detail: 'declined requests', icon: XCircle },
-            ].map((stat, index) => (
-              <div
-                key={stat.label}
-                className={`border-neutral-100 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}
-              >
-                <StatTile {...stat} />
-              </div>
-            ))}
-          </div>
+      <Card className="overflow-hidden p-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Total Requests', value: requestSummary.total, detail: 'all requests', icon: Copy },
+            { label: 'Pending', value: requestSummary.pending, detail: 'awaiting review', icon: Clock },
+            { label: 'Approved', value: requestSummary.approved, detail: 'accepted upgrades', icon: CheckCircle2 },
+            { label: 'Rejected', value: requestSummary.rejected, detail: 'declined requests', icon: XCircle },
+          ].map((stat, index) => (
+            <div
+              key={stat.label}
+              className={`border-neutral-100 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}
+            >
+              <StatTile {...stat} />
+            </div>
+          ))}
         </div>
       </Card>
 
@@ -296,6 +277,34 @@ export default function UpgradeRequests() {
       )}
 
       <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Upgrade Requests</h2>
+              <p className="mt-1 text-xs text-neutral-400">{visibleRequests.length} requests in view</p>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="relative w-full sm:w-60">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search requests..."
+                  className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                />
+              </div>
+              <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen((open) => !open)}>
+                <SlidersHorizontal className="size-4" aria-hidden="true" />
+                Filter
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportUpgradeRequests(visibleRequests)}>
+                <Download className="size-4" aria-hidden="true" />
+                Export
+              </Button>
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center"><p className="text-sm text-red-600">{listError}</p></div>

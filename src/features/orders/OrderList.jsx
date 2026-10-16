@@ -1,3 +1,4 @@
+import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -65,6 +66,11 @@ export default function OrderList() {
   const quotationsBasePath = isSalesPath ? '/sales/quotations' : '/admin/quotations'
 
   const [orders, setOrders] = useState([])
+  const [summaryOrders, setSummaryOrders] = useState([])
+  const updateOrders = (updater) => {
+    setOrders(updater)
+    setSummaryOrders(updater)
+  }
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [deliveryPartners, setDeliveryPartners] = useState([])
@@ -96,11 +102,16 @@ export default function OrderList() {
     setIsLoading(true)
     setListError('')
 
-    const result = await listOrders(sortParams)
+    const [result, summaryResult] = await Promise.all([
+      listOrders(sortParams),
+      loadSummaryRows(listOrders, 'orders'),
+    ])
     const demoRows = DEMO_ORDERS_ENABLED ? demoOrdersResolved() : []
+    if (summaryResult.success) setSummaryOrders([...summaryResult.orders, ...demoRows])
 
     if (!result.success) {
       setOrders(demoRows)
+      if (!summaryResult.success) setSummaryOrders((current) => current.length ? current : demoRows)
       setListError(demoRows.length ? '' : result.error)
       setIsLoading(false)
       return
@@ -148,13 +159,13 @@ export default function OrderList() {
 
   const stats = useMemo(
     () => ({
-      total: orders.length,
-      draft: orders.filter((o) => o.status === 'draft').length,
-      confirmed: orders.filter((o) => o.status === 'confirmed').length,
-      cancelled: orders.filter((o) => o.status === 'cancelled').length,
-      value: orders.filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + o.total, 0),
+      total: summaryOrders.length,
+      draft: summaryOrders.filter((o) => o.status === 'draft').length,
+      confirmed: summaryOrders.filter((o) => o.status === 'confirmed').length,
+      cancelled: summaryOrders.filter((o) => o.status === 'cancelled').length,
+      value: summaryOrders.filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + o.total, 0),
     }),
-    [orders],
+    [summaryOrders],
   )
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / Number(pageSize)))
@@ -200,7 +211,7 @@ export default function OrderList() {
     setIsDeleting(true)
     setDeleteError('')
     if (isDemoOrder(deleteTarget.id)) {
-      setOrders((current) => current.filter((item) => item.id !== deleteTarget.id))
+      updateOrders((current) => current.filter((item) => item.id !== deleteTarget.id))
       setDeleteTarget(null)
       setIsDeleting(false)
       return
@@ -211,33 +222,23 @@ export default function OrderList() {
       setIsDeleting(false)
       return
     }
-    setOrders((current) => current.filter((item) => item.id !== deleteTarget.id))
+    updateOrders((current) => current.filter((item) => item.id !== deleteTarget.id))
     setDeleteTarget(null)
     setIsDeleting(false)
   }
 
   return (
     <div className="listing-page space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Orders</h1>
+      </div>
+
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-neutral-100 px-5 py-5">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Orders</h1><p className="mt-1 text-xs text-neutral-400">{filteredOrders.length} orders in view</p></div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search orders..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" aria-hidden="true" />Filter</Button>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportOrders()}><Download className="size-4" aria-hidden="true" />Export</Button>
-                <RequirePermission module="sales_orders" action="create"><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" aria-hidden="true" />Bulk Import</Button></RequirePermission>
-                <RequirePermission module="sales_orders" action="create"><Button size="sm" onClick={() => navigate(`${basePath}/create`)} className="h-9 rounded-2xl px-3.5"><Plus className="size-4" aria-hidden="true" />New Order</Button></RequirePermission>
-              </div>
-            </div>
-          </div>
-          <div className="-mx-5 -mb-5 mt-5 grid grid-cols-2 border-t border-neutral-100 lg:grid-cols-4">
-            <OrderSummaryCard index={0} label="Total Orders" value={stats.total} detail={`${stats.confirmed} confirmed`} />
-            <OrderSummaryCard index={1} label="Draft Orders" value={stats.draft} detail="needs attention" />
-            <OrderSummaryCard index={2} label="Confirmed Orders" value={stats.confirmed} detail={`${stats.cancelled} cancelled`} />
-            <OrderSummaryCard index={3} label="Order Value" value={formatCurrency(stats.value)} detail="current total" />
-          </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          <OrderSummaryCard index={0} label="Total Orders" value={stats.total} detail={`${stats.confirmed} confirmed`} />
+          <OrderSummaryCard index={1} label="Draft Orders" value={stats.draft} detail="needs attention" />
+          <OrderSummaryCard index={2} label="Confirmed Orders" value={stats.confirmed} detail={`${stats.cancelled} cancelled`} />
+          <OrderSummaryCard index={3} label="Order Value" value={formatCurrency(stats.value)} detail="current total" />
         </div>
       </Card>
 
@@ -252,6 +253,20 @@ export default function OrderList() {
       )}
 
       <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-5 py-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div><h2 className="text-xl font-semibold tracking-tight text-neutral-900">Orders</h2><p className="mt-1 text-xs text-neutral-400">{filteredOrders.length} orders in view</p></div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search orders..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" aria-hidden="true" />Filter</Button>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportOrders()}><Download className="size-4" aria-hidden="true" />Export</Button>
+                <RequirePermission module="sales_orders" action="create"><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" aria-hidden="true" />Bulk Import</Button></RequirePermission>
+                <RequirePermission module="sales_orders" action="create"><Button size="sm" onClick={() => navigate(`${basePath}/create`)} className="h-9 rounded-2xl px-3.5"><Plus className="size-4" aria-hidden="true" />New Order</Button></RequirePermission>
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
