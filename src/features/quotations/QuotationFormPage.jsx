@@ -1,3 +1,5 @@
+import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
+import { loadSummaryRows } from '../../utils/listSummary'
 import { useEffect, useMemo, useState } from 'react'
 import { FileText, Info, UserPlus } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -110,7 +112,7 @@ export default function QuotationFormPage() {
       const [customersResult, leadsResult, productsResult, usersResult] = await Promise.all([
         listCustomers(),
         listLeads(),
-        listProducts(),
+        loadSummaryRows(listProducts, 'products'),
         isSalesOfficer ? Promise.resolve({ success: true, users: [] }) : listUsers(),
       ])
       if (!isMounted) return
@@ -262,26 +264,35 @@ export default function QuotationFormPage() {
 
   // Product picker adapters - the picker speaks the Create Order item shape
   // (productId / quantity / unitPrice); everything else is filled from the product.
-  const setPickerQuantity = (product, nextQuantity) => {
+  const setPickerQuantity = (product, nextQuantity, variantId = '') => {
     const qty = Math.max(0, Math.floor(Number(nextQuantity) || 0))
+    const selection = selectedProductValues(product, variantId)
+    const key = itemKey({ productId: product.id, variantId: variantId || selection?.variantId || '' })
+    if (qty === 0) {
+      setFormData((current) => ({ ...current, items: current.items.filter((item) => itemKey(item) !== key) }))
+      setErrors((current) => ({ ...current, items: '' }))
+      return
+    }
+    if (!selection) { setErrors((current) => ({ ...current, items: 'Select a variant first.' })); return }
     setFormData((current) => {
-      const index = current.items.findIndex((item) => item.productId === product.id)
-      if (qty === 0) return { ...current, items: current.items.filter((item) => item.productId !== product.id) }
+      const index = current.items.findIndex((item) => itemKey(item) === key)
       if (index >= 0) {
         return { ...current, items: current.items.map((item, i) => (i === index ? { ...item, quantity: String(qty) } : item)) }
       }
       return {
         ...current,
         items: [
-          ...current.items,
+          ...current.items.filter((item) => item.productId !== product.id || productVariants(product).some((variant) => variant.id === item.variantId)),
           {
             productId: product.id,
-            variantId: '',
+            variantId: selection.variantId,
+            variantName: selection.variantName,
+            variantCode: selection.variantCode,
             productName: product.name,
-            sku: product.sku || '',
+            sku: selection.sku,
             uom: product.sales_unit || product.uom || 'unit',
             quantity: String(qty),
-            unitPrice: String(product.price ?? ''),
+            unitPrice: String(selection.unitPrice ?? ''),
             discount: '',
             taxRate: String(product.tax_rate ?? ''),
           },
@@ -294,11 +305,12 @@ export default function QuotationFormPage() {
   const updateItemField = (productId, field, value) => {
     setFormData((current) => ({
       ...current,
-      items: current.items.map((item) => (item.productId === productId ? { ...item, [field]: value } : item)),
+      items: current.items.map((item) => (itemKey(item) === productId ? { ...item, [field]: value } : item)),
     }))
   }
 
   const roundItemOnBlur = (productId, field, { min = 0 } = {}) => (event) => {
+    if (String(event.target.value ?? '').trim() === '') return
     const rounded = Math.round(Number(event.target.value))
     updateItemField(productId, field, String(Number.isFinite(rounded) ? Math.max(rounded, min) : min))
   }
@@ -318,12 +330,14 @@ export default function QuotationFormPage() {
 
     if (formData.items.length === 0) {
       nextErrors.items = 'Add at least one product to this quotation.'
-    } else if (formData.items.some((item) => !Number(item.quantity) || Number(item.quantity) <= 0 || item.unitPrice === '' || Number(item.unitPrice) < 0)) {
+    } else if (formData.items.some((item) => !Number(item.quantity) || Number(item.quantity) <= 0 || item.unitPrice === '' || item.unitPrice == null || !Number.isFinite(Number(item.unitPrice)) || Number(item.unitPrice) < 0)) {
       nextErrors.items = 'Every product needs a quantity and a unit price.'
     } else if (formData.items.some((item) => quantityStepForUom(item.uom) === 1 && !Number.isInteger(Number(item.quantity)))) {
       nextErrors.items = 'Quantity must be a whole number for this unit.'
     }
 
+    const variantError = validateVariantItems(formData.items, products)
+    if (variantError) nextErrors.items = variantError
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -530,6 +544,7 @@ export default function QuotationFormPage() {
           <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
             <div>
               <ProductPickerList
+              enforceVariantStock={false}
                 products={products}
                 orderItems={formData.items}
                 isLoading={isLoadingOptions}

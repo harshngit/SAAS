@@ -1,3 +1,5 @@
+import { variantMargin } from '../../utils/productVariants'
+import { listCategories } from '../../api/categories'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -34,7 +36,7 @@ import {
   updateProduct,
 } from '../../api/products'
 import { formatCurrency } from '../../utils/format'
-import { normalizeApiProduct } from './productUtils'
+import { formatVariantCurrency, normalizeApiProduct } from './productUtils'
 import ProductForm from './ProductForm'
 
 function formatDateLabel(value) {
@@ -128,11 +130,12 @@ export default function ProductDetail() {
       setIsLoading(true)
       setLoadError('')
 
-      const [result, batchesResult, serialsResult, attachmentsResult] = await Promise.all([
+      const [result, batchesResult, serialsResult, attachmentsResult, categoriesResult] = await Promise.all([
         getProduct(id),
         getProductBatches(id),
         getProductSerials(id),
         listProductAttachments(id),
+        listCategories(),
       ])
 
       if (!isMounted) return
@@ -150,7 +153,12 @@ export default function ProductDetail() {
         return
       }
 
-      setProduct(normalizeApiProduct(result.product))
+      const normalized = normalizeApiProduct(result.product)
+      if (categoriesResult.success) {
+        normalized.categoryLabel = categoriesResult.categories.find((category) => category.id === normalized.categoryId)?.name || normalized.categoryLabel
+        normalized.subCategory = categoriesResult.categories.find((category) => category.id === normalized.subCategoryId)?.name || normalized.subCategory
+      }
+      setProduct(normalized)
     }
 
     loadProduct()
@@ -177,26 +185,14 @@ export default function ProductDetail() {
     )
   }
 
-  const sellingPrices = product.variants.map((variant) => variant.sellingPrice)
-  const purchasePrices = product.variants.map((variant) => variant.purchasePrice)
-  const priceRange =
-    sellingPrices.length === 0
-      ? formatCurrency(0)
-      : Math.min(...sellingPrices) === Math.max(...sellingPrices)
-        ? formatCurrency(sellingPrices[0])
-        : `${formatCurrency(Math.min(...sellingPrices))} – ${formatCurrency(Math.max(...sellingPrices))}`
-  const avgGst = product.variants.length
-    ? Math.round(product.variants.reduce((sum, variant) => sum + variant.gstRate, 0) / product.variants.length)
-    : 0
-  const avgMargin =
-    product.variants.length && purchasePrices.some(Boolean)
-      ? Math.round(
-          product.variants.reduce((sum, variant, _, arr) => {
-            const margin = variant.sellingPrice ? ((variant.sellingPrice - variant.purchasePrice) / variant.sellingPrice) * 100 : 0
-            return sum + margin / arr.length
-          }, 0),
-        )
-      : 0
+  const sellingPrices = product.variants.length
+    ? product.variants.map((variant) => variant.sellingPrice).filter((value) => value !== '' && value != null).map(Number)
+    : product.sellingPrice !== '' && product.sellingPrice != null ? [Number(product.sellingPrice)] : []
+  const priceRange = !sellingPrices.length ? '—' : Math.min(...sellingPrices) === Math.max(...sellingPrices)
+    ? formatCurrency(sellingPrices[0]) : `${formatCurrency(Math.min(...sellingPrices))} - ${formatCurrency(Math.max(...sellingPrices))}`
+  const avgGst = product.gstVatRate === '' ? null : Number(product.gstVatRate)
+  const margins = product.variants.length ? product.variants.map(variantMargin).filter((value) => value != null) : [variantMargin(product)].filter((value) => value != null)
+  const avgMargin = margins.length ? Math.round(margins.reduce((sum, value) => sum + value, 0) / margins.length) : null
 
   const handleSaveProduct = async (productData) => {
     setIsSaving(true)
@@ -364,8 +360,8 @@ export default function ProductDetail() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard icon={Boxes} iconVariant="primary" label="Variants" value={product.variants.length} />
         <StatCard icon={IndianRupee} iconVariant="success" label="Selling Price" value={priceRange} />
-        <StatCard icon={Percent} iconVariant="info" label="Avg. GST Rate" value={`${avgGst}%`} />
-        <StatCard icon={Percent} iconVariant="warning" label="Avg. Margin" value={`${avgMargin}%`} />
+        <StatCard icon={Percent} iconVariant="info" label="Avg. GST Rate" value={avgGst == null ? '—' : `${avgGst}%`} />
+        <StatCard icon={Percent} iconVariant="warning" label="Avg. Margin" value={avgMargin == null ? '—' : `${avgMargin}%`} />
         <StatCard icon={Package} iconVariant="neutral" label="Total Stock" value={product.totalStock} />
       </div>
 
@@ -414,8 +410,9 @@ export default function ProductDetail() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Classification</p>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <Field label="Lifecycle Status" value={statusLabel[product.statusValue] || statusLabel[product.status]} />
-              <Field label="Product Type" value={product.productType} />
+              <Field label="Category" value={product.categoryLabel} />
               <Field label="Sub Category" value={product.subCategory} />
+              <Field label="Product Type" value={product.productType} />
               <Field label="Manufacturer" value={product.manufacturer} />
               <Field label="Model Number" value={product.modelNumber} />
               <Field label="Short Name" value={product.shortName} />
@@ -522,22 +519,20 @@ export default function ProductDetail() {
             <thead>
               <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
                 <th className="whitespace-nowrap px-5 py-3" />
-                <th className="whitespace-nowrap px-5 py-3">Size</th>
+                <th className="whitespace-nowrap px-5 py-3">Variant Code</th>
+                <th className="whitespace-nowrap px-5 py-3">Variant</th>
                 <th className="whitespace-nowrap px-5 py-3">SKU</th>
-                <th className="whitespace-nowrap px-5 py-3">HSN/SAC</th>
-                <th className="whitespace-nowrap px-5 py-3">Unit</th>
-                <th className="whitespace-nowrap px-5 py-3 text-right">GST</th>
-                <th className="whitespace-nowrap px-5 py-3 text-right">Purchase</th>
-                <th className="whitespace-nowrap px-5 py-3 text-right">Selling</th>
+                <th className="whitespace-nowrap px-5 py-3 text-right">Purchase Price</th>
+                <th className="whitespace-nowrap px-5 py-3 text-right">Selling Price</th>
+                <th className="whitespace-nowrap px-5 py-3 text-right">MRP</th>
                 <th className="whitespace-nowrap px-5 py-3 text-right">Stock</th>
                 <th className="whitespace-nowrap px-5 py-3 text-right">Margin</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-50">
               {product.variants.map((variant, index) => {
-                const margin = variant.sellingPrice
-                  ? Math.round(((variant.sellingPrice - variant.purchasePrice) / variant.sellingPrice) * 100)
-                  : 0
+                const margin = variantMargin(variant)
+                const money = (value) => formatVariantCurrency(value, variant.currency)
 
                 return (
                   <tr key={`${product.id}-${index}`} className="transition-colors hover:bg-primary-50/35">
@@ -550,21 +545,16 @@ export default function ProductDetail() {
                         </div>
                       )}
                     </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-neutral-500">{variant.variantCode || '—'}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 font-medium text-neutral-800">{variant.size}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-neutral-500">{variant.sku}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-neutral-500">{variant.hsn}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-neutral-500">{variant.unit}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-500">{variant.gstRate}%</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-neutral-500">{variant.sku || '—'}</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{money(variant.purchasePrice)}</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">{money(variant.sellingPrice)}</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{money(variant.mrp)}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">
-                      {formatCurrency(variant.purchasePrice)}
+                      {variant.inventory?.openingStock === '' ? '—' : variant.inventory?.openingStock ?? '—'}
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">
-                      {formatCurrency(variant.sellingPrice)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">
-                      {variant.inventory?.openingStock ?? variant.inventory ?? 0}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-500">{margin}%</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-500">{margin == null ? '—' : `${Math.round(margin)}%`}</td>
                   </tr>
                 )
               })}

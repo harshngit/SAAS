@@ -1,3 +1,5 @@
+import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
+import { loadSummaryRows } from '../../utils/listSummary'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -154,7 +156,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       // Delivery-partner list for the Home Delivery picker (create flow, both roles).
       const needsPartners = !restrictToVehicleStock && !isEditMode
       const [productsResult, customersResult, warehousesResult, partnersResult] = await Promise.all([
-        listProducts(),
+        loadSummaryRows(listProducts, 'products'),
         listCustomers(),
         listWarehouses(),
         needsPartners ? listDeliveryPartners() : Promise.resolve({ success: false }),
@@ -210,6 +212,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               : 0
         return {
           productId: item.productId,
+          variantId: item.variantId || '',
           unitPrice: Number(item.unitPrice) || 0,
           taxRate: Number(item.taxRate) || 0,
           quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
@@ -383,18 +386,26 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
   // The product picker sets a quantity directly (Amazon-style stepper). 0 removes the line;
   // a first non-zero value creates it carrying the product's price / tax defaults.
-  const setPickerQuantity = (product, nextQuantity) => {
+  const setPickerQuantity = (product, nextQuantity, variantId = '') => {
     const quantity = Math.max(0, Math.floor(Number(nextQuantity) || 0))
+    const selection = selectedProductValues(product, variantId)
+    const key = itemKey({ productId: product.id, variantId: variantId || selection?.variantId || '' })
+    // Removing a saved line must still work if its variant has since been removed.
+    if (quantity === 0) {
+      setOrderItems((current) => current.filter((item) => itemKey(item) !== key))
+      setErrors((current) => ({ ...current, items: '' }))
+      return
+    }
+    if (!selection) { setErrors((current) => ({ ...current, items: 'Select a variant first.' })); return }
+    if (selection.variantId && selection.stock != null && quantity > selection.stock) {
+      setErrors((current) => ({ ...current, items: `${product.name}: only ${selection.stock} available for this variant.` })); return
+    }
     setOrderItems((current) => {
-      const existingIndex = current.findIndex((item) => item.productId === product.id)
-      if (quantity === 0) return current.filter((item) => item.productId !== product.id)
-      if (existingIndex >= 0) {
-        return current.map((item, index) => (index === existingIndex ? { ...item, quantity } : item))
-      }
-      return [
-        ...current,
-        { productId: product.id, unitPrice: product.price || 0, taxRate: product.tax_rate || 0, quantity, discountPercent: 0 },
-      ]
+      const existing = current.find((item) => itemKey(item) === key)
+      if (existing) return current.map((item) => itemKey(item) === key ? { ...item, quantity } : item)
+      const resolved = current.filter((item) => item.productId !== product.id || productVariants(product).some((variant) => variant.id === item.variantId))
+      return [...resolved, { productId: product.id, variantId: selection.variantId, unitPrice: selection.unitPrice ?? '',
+        taxRate: product.tax_rate || 0, quantity, discountPercent: 0 }]
     })
     setErrors((current) => ({ ...current, items: '' }))
   }
@@ -409,6 +420,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   // land in the wrong place). Blur-time rounding still guarantees nothing but a whole number is
   // ever kept in state past the point the field is submitted.
   const roundToWholeNumberOnBlur = (productId, field, { min = 0, max } = {}) => (event) => {
+    if (String(event.target.value ?? '').trim() === '') return
     const rounded = Math.round(Number(event.target.value))
     const safe = Number.isFinite(rounded) ? rounded : min
     const clamped = max !== undefined ? Math.min(Math.max(safe, min), max) : Math.max(safe, min)
@@ -417,7 +429,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
   const updateOrderItem = (productId, field, value) => {
     setOrderItems((current) =>
-      current.map((item) => (item.productId === productId ? { ...item, [field]: value } : item)),
+      current.map((item) => (itemKey(item) === productId ? { ...item, [field]: value } : item)),
     )
     setErrors((current) => ({ ...current, items: '' }))
   }
@@ -468,6 +480,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     } else if (orderItems.some((item) => !Number.isInteger(Number(item.quantity)))) {
       nextErrors.items = 'Quantity must be a whole number.'
     }
+    const variantError = validateVariantItems(orderItems, availableProducts, { enforceStock: true })
+    if (variantError) nextErrors.items = variantError
+    if (orderItems.some((item) => item.unitPrice === '' || item.unitPrice == null || !Number.isFinite(Number(item.unitPrice)) || Number(item.unitPrice) < 0)) {
+      nextErrors.items = 'Every product needs a valid unit price.'
+    }
     if (!paymentMethod) nextErrors.paymentMethod = 'Select a payment type.'
 
     if (!restrictToVehicleStock) {
@@ -503,6 +520,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   }
 
   const submitOrder = async () => {
+    if (!validateForm()) return
     setIsSubmitting(true)
     setSubmitError('')
     setStockShortages(null)
@@ -513,6 +531,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
         : undefined
     const itemsPayload = orderItems.map((item) => ({
       productId: item.productId,
+      variantId: item.variantId || undefined,
       quantity: Number(item.quantity) || 0,
       unitPrice: Number(item.unitPrice) || 0,
       taxRate: Number(item.taxRate) || 0,
@@ -531,7 +550,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
         return {
           id: `i${index + 1}`,
           productId: item.productId,
-          variantId: '',
+          variantId: item.variantId || '',
           productName: product?.name || 'Item',
           quantity: qty,
           orderedQuantity: qty,
@@ -1311,6 +1330,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     orderItems.map((item) => {
                       const product = availableProducts.find((p) => p.id === item.productId)
                       if (!product) return null
+                      const selection = selectedProductValues(product, item.variantId)
                       const quantity = Number(item.quantity) || 0
                       const unitPrice = Number(item.unitPrice) || 0
                       const discountPercent = Math.min(Math.max(Number(item.discountPercent) || 0, 0), 100)
@@ -1326,7 +1346,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                           '',
                       )
                       return (
-                        <tr key={item.productId}>
+                        <tr key={itemKey(item)}>
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2.5">
                               {productImage ? (
@@ -1338,7 +1358,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               )}
                               <div className="min-w-0">
                                 <p className="truncate font-medium text-neutral-900">{product.name}</p>
-                                <p className="truncate text-[0.7rem] text-neutral-400">SKU: {product.sku || '—'}</p>
+                                {selection?.variantName && <p className="text-xs text-neutral-500">{selection.variantName}{selection.variantCode ? ` / ${selection.variantCode}` : ''}</p>}
+                                <p className="truncate text-[0.7rem] text-neutral-400">SKU: {selection?.sku || '—'}</p>
                               </div>
                             </div>
                           </td>
@@ -1350,7 +1371,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                             <div className="mx-auto flex w-fit items-center rounded-lg border border-neutral-200 p-0.5 text-neutral-500">
                               <button
                                 type="button"
-                                onClick={() => setPickerQuantity(product, quantity - 1)}
+                                onClick={() => setPickerQuantity(product, quantity - 1, item.variantId)}
                                 disabled={quantity <= 1}
                                 className="flex size-6 items-center justify-center rounded-md transition-colors hover:bg-neutral-50 disabled:opacity-30"
                                 aria-label={`Reduce ${product.name}`}
@@ -1359,14 +1380,14 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               </button>
                               <input
                                 value={quantity}
-                                onChange={(event) => setPickerQuantity(product, event.target.value)}
+                                onChange={(event) => setPickerQuantity(product, event.target.value, item.variantId)}
                                 inputMode="numeric"
                                 className="w-9 min-w-0 bg-transparent text-center text-xs font-semibold text-neutral-900 focus:outline-none"
                                 aria-label={`${product.name} quantity`}
                               />
                               <button
                                 type="button"
-                                onClick={() => setPickerQuantity(product, quantity + 1)}
+                                onClick={() => setPickerQuantity(product, quantity + 1, item.variantId)}
                                 className="flex size-6 items-center justify-center rounded-md transition-colors hover:bg-neutral-50"
                                 aria-label={`Add ${product.name}`}
                               >
@@ -1378,7 +1399,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                           <td className="px-3 py-2.5 text-right">
                             <button
                               type="button"
-                              onClick={() => setPickerQuantity(product, 0)}
+                              onClick={() => setPickerQuantity(product, 0, item.variantId)}
                               className="rounded-lg p-1.5 text-red-600 transition-colors hover:bg-red-50"
                               aria-label={`Remove ${product.name}`}
                             >

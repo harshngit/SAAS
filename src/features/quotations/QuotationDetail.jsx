@@ -1,3 +1,5 @@
+import { itemKey, productVariants } from '../../utils/productVariants'
+import { getProduct } from '../../api/products'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -92,6 +94,7 @@ export default function QuotationDetail() {
   const isDemo = isDemoQuotation(id)
 
   const [quotation, setQuotation] = useState(null)
+  const [productMeta, setProductMeta] = useState({})
   const [meta, setMetaState] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -108,6 +111,17 @@ export default function QuotationDetail() {
   const [isConverting, setIsConverting] = useState(false)
   const [convertError, setConvertError] = useState('')
   const [convertLeadOpen, setConvertLeadOpen] = useState(false)
+
+  useEffect(() => {
+    if (isDemo || !quotation?.items?.length) return undefined
+    let active = true
+    const productIds = [...new Set(quotation.items.map((item) => item.productId).filter(Boolean))]
+    Promise.all(productIds.map(getProduct)).then((results) => {
+      if (!active) return
+      setProductMeta(Object.fromEntries(results.filter((result) => result.success).map(({ product }) => [product.id, productVariants(product)])))
+    })
+    return () => { active = false }
+  }, [quotation?.items, isDemo])
 
   const loadQuotation = async () => {
     setIsLoading(true)
@@ -460,9 +474,11 @@ export default function QuotationDetail() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-50">
-              {quotation.items.map((item) => (
-                <tr key={item.id} className="transition-colors hover:bg-primary-50/35">
-                  <td className="px-5 py-3.5"><p className="font-medium text-neutral-800">{item.productName}</p></td>
+              {quotation.items.map((item) => {
+                const variant = productMeta[item.productId]?.find((entry) => entry.id === item.variantId)
+                return (
+                <tr key={item.id || itemKey(item)} className="transition-colors hover:bg-primary-50/35">
+                  <td className="px-5 py-3.5"><p className="font-medium text-neutral-800">{item.productName}</p>{item.variantId && <p className="mt-1 text-xs text-neutral-500">{variant?.size || 'Variant unavailable'}{variant?.variantCode ? ` / ${variant.variantCode}` : ''} · SKU: {variant?.sku || '—'}</p>}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.quantity}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{item.uom || '—'}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{formatCurrency(item.unitPrice)}</td>
@@ -470,7 +486,7 @@ export default function QuotationDetail() {
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.taxRate ? `${item.taxRate}%` : '—'}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

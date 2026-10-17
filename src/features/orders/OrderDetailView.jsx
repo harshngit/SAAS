@@ -1,3 +1,4 @@
+import { itemKey } from '../../utils/productVariants'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, CreditCard, FileText, Info, Link2, Mail, MapPin, MoreVertical, Package, Phone, Plus, Search, Send, Tags, Truck, UserRound, Warehouse } from 'lucide-react'
@@ -34,7 +35,16 @@ export default function OrderDetailView({ order, creator, delivery, progress, ti
   const mapsHref = address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : ''
   const sourceNode = source.isQuotation ? <button className="od-link" onClick={onQuotation}>{order.quotationNumber || 'Quotation'}</button> : 'Direct'
   const paymentBadge = order.paymentStatus ? <Badge variant={PAYMENT_STATUS_VARIANT[order.paymentStatus] || 'neutral'}>{formatPaymentStatus(order.paymentStatus)}</Badge> : null
-  const filteredItems = order.items.filter((item) => `${item.productName} ${item.sku || productMeta[item.productId]?.sku || ''}`.toLowerCase().includes(search.toLowerCase()))
+  const metadataFor = (item) => {
+    const meta = productMeta[item.productId] || {}
+    const variant = item.variantId ? meta.variants?.[item.variantId] : null
+    return { ...meta, sku: item.variantId ? variant?.sku || '' : item.sku || meta.sku || '',
+      variantName: item.variantId ? variant?.size || 'Variant unavailable' : '', variantCode: variant?.variantCode || '' }
+  }
+  const filteredItems = order.items.filter((item) => {
+    const meta = metadataFor(item)
+    return `${item.productName} ${meta.sku} ${meta.variantName} ${meta.variantCode}`.toLowerCase().includes(search.toLowerCase())
+  })
   const completed = progress.length > 0 && progress.every((step) => step.status === 'done')
   const progressLabels = ['Order Confirmed', 'Stock Reserved', 'Delivery Assigned', 'Picking', 'Vehicle Loaded', 'In Transit', 'Delivered']
   const displayProgress = progressLabels.map((label) => {
@@ -97,10 +107,10 @@ export default function OrderDetailView({ order, creator, delivery, progress, ti
     )}
     <div className="od-columns"><div className="od-main">
       <Panel title={`Ordered Products (${order.items.length} ${order.items.length === 1 ? 'item' : 'items'})`} className="od-products-card" extra={<label className="od-search"><Search size={13} /><input aria-label="Search products" placeholder="Search products..." value={search} onChange={(event) => setSearch(event.target.value)} /></label>}><div className="od-table-scroll"><table className="od-products"><thead><tr>{['#', 'Product', 'SKU', 'Unit Price', 'Ordered', 'Reserved', 'Delivered', 'Invoiced', 'Remaining', 'Discount', 'Tax', 'Line Total'].map((label) => <th key={label}>{label}</th>)}</tr></thead><tbody>{filteredItems.map((item) => {
-        const meta = productMeta[item.productId] || {}
+        const meta = metadataFor(item)
         const image = meta.image || getFileUrl(item.productImage || '')
-        const sku = item.sku || meta.sku || ''
-        return <tr key={item.id || item.productId}><td>{order.items.indexOf(item) + 1}</td><td><div className="od-product"><div className="od-product-image"><Package size={22} />{image && <img src={image} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} />}</div><div><strong>{item.productName}</strong>{sku && <small>SKU: {sku}</small>}</div></div></td><td className="od-sku">{shown(sku)}</td><td><strong className="od-price">{formatCurrency(item.unitPrice)}</strong>{item.costPrice != null && <small>Cost: {formatCurrency(item.costPrice)}</small>}</td><td>{item.quantity}</td><td>{item.reservedQuantity}</td><td>{item.deliveredQuantity}</td><td>{invoicedByProduct[item.productId || item.id] || 0}</td><td>{item.remainingQuantity}</td><td>{item.discountPercent > 0 ? `${item.discountPercent}%` : '—'}</td><td>{item.taxRate != null ? `${item.taxRate}%` : '—'}</td><td><strong>{formatCurrency(item.lineTotal)}</strong></td></tr>
+        const sku = meta.sku
+        return <tr key={item.id || itemKey(item)}><td>{order.items.indexOf(item) + 1}</td><td><div className="od-product"><div className="od-product-image"><Package size={22} />{image && <img src={image} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} />}</div><div><strong>{item.productName}</strong>{meta.variantName && <small>{meta.variantName}{meta.variantCode ? ` / ${meta.variantCode}` : ''}</small>}{sku && <small>SKU: {sku}</small>}</div></div></td><td className="od-sku">{shown(sku)}</td><td><strong className="od-price">{formatCurrency(item.unitPrice)}</strong>{item.costPrice != null && <small>Cost: {formatCurrency(item.costPrice)}</small>}</td><td>{item.quantity}</td><td>{item.reservedQuantity}</td><td>{item.deliveredQuantity}</td><td>{invoicedByProduct[item.productId || item.id] || 0}</td><td>{item.remainingQuantity}</td><td>{item.discountPercent > 0 ? `${item.discountPercent}%` : '—'}</td><td>{item.taxRate != null ? `${item.taxRate}%` : '—'}</td><td><strong>{formatCurrency(item.lineTotal)}</strong></td></tr>
       })}</tbody></table>{!filteredItems.length && <p className="od-empty">No products found.</p>}</div></Panel>
       <Panel
         title="Delivery Summary"

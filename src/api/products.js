@@ -51,13 +51,12 @@ function authHeader() {
 
 function normalizeVariantInventory(variant = {}) {
   const inventory = variant.inventory && typeof variant.inventory === 'object' ? variant.inventory : {}
-
   return {
-    openingStock: Number(inventory.openingStock ?? variant.inventory ?? variant.stock) || 0,
-    minimumStockLevel: Number(inventory.minimumStockLevel ?? variant.minimumStockLevel ?? variant.minimum_stock_level) || 0,
-    maximumStockLevel: Number(inventory.maximumStockLevel ?? variant.maximumStockLevel ?? variant.maximum_stock_level) || 0,
-    reorderLevel: Number(inventory.reorderLevel ?? variant.reorderLevel ?? variant.reorder_level) || 0,
-    reorderQuantity: Number(inventory.reorderQuantity ?? variant.reorderQuantity ?? variant.reorder_quantity) || 0,
+    openingStock: inventory.openingStock ?? (typeof variant.inventory === 'number' ? variant.inventory : variant.stock) ?? '',
+    minimumStockLevel: inventory.minimumStockLevel ?? variant.minimumStockLevel ?? variant.minimum_stock_level ?? '',
+    maximumStockLevel: inventory.maximumStockLevel ?? variant.maximumStockLevel ?? variant.maximum_stock_level ?? '',
+    reorderLevel: inventory.reorderLevel ?? variant.reorderLevel ?? variant.reorder_level ?? '',
+    reorderQuantity: inventory.reorderQuantity ?? variant.reorderQuantity ?? variant.reorder_quantity ?? '',
   }
 }
 
@@ -125,6 +124,8 @@ const PRODUCT_FIELD_MAP = [
 // PRODUCT_FIELD_MAP - kept separate so a backend validation error on one of these (e.g.
 // "name", "category_id") can still be traced back to the form field that produced it.
 const PRODUCT_TOP_LEVEL_FIELD_MAP = [
+  ['variants', 'variations'],
+  ['sellingPrice', 'pricing'],
   ['name', 'name'],
   ['description', 'description'],
   ['sellingPrice', 'price'],
@@ -194,7 +195,7 @@ function applyProductFieldMap(requestBody, payload) {
 
     const coerced = coerceFieldValue(kind, value)
     if (coerced === undefined || coerced === null) return
-    requestBody[backendField] = coerced
+    requestBody[backendField] = backendField === 'sub_category_id' ? coerced || null : coerced
   })
 }
 
@@ -222,22 +223,29 @@ function toVariationPayload(variant, includeId = false) {
     width: Number(variant.width) || 0,
     height: Number(variant.height) || 0,
     weight: Number(variant.weight) || 0,
-    price: Number(variant.sellingPrice ?? variant.price) || 0,
-    mrp: Number(variant.mrp) || 0,
     image_url: variant.imageUrl || variant.image_url || null,
-    inventory: inventory.openingStock,
-    minimum_stock_level: inventory.minimumStockLevel,
-    maximum_stock_level: inventory.maximumStockLevel,
-    reorder_level: inventory.reorderLevel,
-    reorder_quantity: inventory.reorderQuantity,
   }
 
-  // A variant added via "Add Variant" in this editing session (ProductForm's makeEmptyVariant)
-  // gets a client-side-only id (crypto.randomUUID()) purely to key it in the list - the backend
-  // never issued it, so sending it back as `id` makes PATCH look for a variant that doesn't
-  // exist ("variant id not found or does not belong to this product"). Only forward `id` for a
-  // variant hydrateProduct marked as genuinely pre-existing (isNew === false).
-  if (includeId && variant.id && variant.isNew === false) {
+  for (const [field, key] of [['openingStock', 'inventory'], ['minimumStockLevel', 'minimum_stock_level'], ['maximumStockLevel', 'maximum_stock_level'], ['reorderLevel', 'reorder_level'], ['reorderQuantity', 'reorder_quantity']]) {
+    if (inventory[field] !== '' && inventory[field] != null) variation[key] = Number(inventory[field])
+  }
+
+  // Backend generates identifiers for new variants. Only persisted UUIDs return on edit.
+  variation.sku = variant.sku?.trim() || null
+  const pricing = {}
+  for (const [field, key] of [['purchasePrice', 'purchase_price'], ['sellingPrice', 'selling_price'], ['mrp', 'mrp'], ['wholesalePrice', 'wholesale_price'], ['dealerPrice', 'dealer_price'], ['discountPercent', 'discount_percent']]) {
+    const value = variant[field] ?? variant.pricing?.[key] ?? (field === 'sellingPrice' ? variant.price : undefined)
+    if (value !== '' && value != null) pricing[key] = Number(value)
+  }
+  if (variant.taxInclusive != null) pricing.tax_inclusive = Boolean(variant.taxInclusive)
+  else if (variant.pricing?.tax_inclusive != null) pricing.tax_inclusive = variant.pricing.tax_inclusive
+  const currency = variant.currency ?? variant.pricing?.currency
+  if (currency) pricing.currency = currency
+  if (Object.keys(pricing).length) variation.pricing = pricing
+  // Retain the documented legacy selling-price field without manufacturing missing prices.
+  if (pricing.selling_price !== undefined) variation.price = pricing.selling_price
+
+  if (includeId && variant.id && variant.isNew !== true) {
     variation.id = variant.id
   }
 
@@ -261,12 +269,12 @@ export async function createProduct(payload) {
       compliance_certificate: payload.complianceCertificate || payload.compliance_certificate || '',
       warranty_document: payload.warrantyDocument || payload.warranty_document || '',
       download_file: payload.downloadFile || payload.download_file || '',
-      product_type: payload.productType || payload.product_type || payload.category || '',
+      product_type: payload.productType ?? payload.product_type ?? '',
       vendor: payload.vendor || '',
       brand: payload.brand?.trim() || '',
-      sku: payload.sku || payload.variants?.[0]?.sku || '',
+      sku: payload.sku || '',
       category_id: payload.categoryId || payload.category_id || payload.category || '',
-      total_inventory: Number(payload.totalInventory ?? payload.total_inventory) || variations.reduce((sum, variant) => sum + variant.inventory, 0),
+      total_inventory: Number(payload.totalInventory ?? payload.total_inventory) || variations.reduce((sum, variant) => sum + Number(variant.inventory || 0), 0),
       pricing: buildPricingPayload(payload),
       variations,
     }
@@ -339,12 +347,12 @@ export async function updateProduct(productId, payload) {
     if (payload.downloadFile !== undefined || payload.download_file !== undefined) {
       requestBody.download_file = payload.downloadFile || payload.download_file || ''
     }
-    if (payload.productType !== undefined || payload.product_type !== undefined || payload.category !== undefined) {
-      requestBody.product_type = payload.productType || payload.product_type || payload.category || ''
+    if (payload.productType !== undefined || payload.product_type !== undefined) {
+      requestBody.product_type = payload.productType ?? payload.product_type ?? ''
     }
     if (payload.vendor !== undefined) requestBody.vendor = payload.vendor || ''
     if (payload.brand !== undefined) requestBody.brand = payload.brand?.trim() || ''
-    if (payload.sku !== undefined) requestBody.sku = payload.sku || payload.variants?.[0]?.sku || ''
+    if (payload.sku !== undefined) requestBody.sku = payload.sku || ''
     if (payload.categoryId !== undefined || payload.category_id !== undefined || payload.category !== undefined) {
       requestBody.category_id = payload.categoryId || payload.category_id || payload.category || ''
     }
@@ -357,8 +365,8 @@ export async function updateProduct(productId, payload) {
     if (payload.variants !== undefined) {
       requestBody.variations = payload.variants.map((variant) => toVariationPayload(variant, true))
 
-      if (requestBody.total_inventory === undefined) {
-        requestBody.total_inventory = requestBody.variations.reduce((sum, variant) => sum + variant.inventory, 0)
+      if (requestBody.total_inventory === undefined && requestBody.variations.every((variant) => variant.inventory !== undefined)) {
+        requestBody.total_inventory = requestBody.variations.reduce((sum, variant) => sum + Number(variant.inventory || 0), 0)
       }
     }
     // Only touch pricing when the caller actually sent pricing fields (e.g. a bare

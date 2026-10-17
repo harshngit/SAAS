@@ -1,3 +1,4 @@
+import { isUuidLike, readableClassification } from '../../utils/productVariants'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   BadgeInfo,
@@ -36,13 +37,6 @@ const emptyVariantInventory = {
   reorderQuantity: '',
 }
 
-function makeVariantId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-  return `variant-${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
-
 function makeEmptyVariant(overrides = {}) {
   return {
     size: '',
@@ -53,13 +47,16 @@ function makeEmptyVariant(overrides = {}) {
     purchasePrice: '',
     sellingPrice: '',
     mrp: '',
+    wholesalePrice: '',
+    dealerPrice: '',
+    discountPercent: '',
+    taxInclusive: null,
+    currency: '',
+    variantCode: '',
     imageUrl: '',
     inventory: { ...emptyVariantInventory },
     ...overrides,
-    id: overrides.id || makeVariantId(),
-    // True unless a caller explicitly says otherwise (hydrateProduct passes false for variants
-    // that already exist on the backend) - a variant with no real backend id yet is new by
-    // default, and toVariationPayload uses this to decide whether its id is safe to send back.
+    id: overrides.id || '',
     isNew: overrides.isNew ?? true,
   }
 }
@@ -203,6 +200,7 @@ function section(title, fields) {
 }
 
 function findSectionForErrorField(sections, fieldName) {
+  if (fieldName === 'subCategoryId') fieldName = 'subCategory'
   if (fieldName.startsWith('variantInventory.')) {
     return sections.find((sectionItem) => sectionItem.id === 'variants-attributes')
   }
@@ -217,7 +215,6 @@ const productSections = [
     { name: 'barcode', label: 'Barcode' },
     { name: 'name', label: 'Product Name', required: true, maxLength: 150 },
     { name: 'shortName', label: 'Short Name' },
-    { name: 'productType', label: 'Product Type', input: 'select' },
     // Catalog hierarchy (Supplier -> Brand -> Category -> Subcategory): each field's options
     // narrow to its parent's associations once the parent is chosen - see the cascading-options
     // effects below. Order here matches that dependency chain.
@@ -225,6 +222,7 @@ const productSections = [
     { name: 'brand', label: 'Brand', input: 'select' },
     { name: 'category', label: 'Category', input: 'select', required: true },
     { name: 'subCategory', label: 'Sub Category', input: 'select' },
+    { name: 'productType', label: 'Product Type', input: 'select', maxLength: 100 },
     { name: 'manufacturer', label: 'Manufacturer', input: 'select' },
     { name: 'modelNumber', label: 'Model Number' },
     { name: 'status', label: 'Product Status', input: 'select', required: true },
@@ -314,7 +312,7 @@ function normalizeVariantInventory(variant = {}, fallbackOpeningStock = '') {
   return {
     ...emptyVariantInventory,
     ...inventory,
-    openingStock: inventory.openingStock ?? variant.inventory ?? variant.stock ?? fallbackOpeningStock ?? '',
+    openingStock: inventory.openingStock ?? (typeof variant.inventory !== 'object' ? variant.inventory : undefined) ?? variant.stock ?? fallbackOpeningStock ?? '',
     minimumStockLevel: inventory.minimumStockLevel ?? variant.minimumStockLevel ?? variant.minimum_stock_level ?? '',
     maximumStockLevel: inventory.maximumStockLevel ?? variant.maximumStockLevel ?? variant.maximum_stock_level ?? '',
     reorderLevel: inventory.reorderLevel ?? variant.reorderLevel ?? variant.reorder_level ?? '',
@@ -333,8 +331,7 @@ function getVariantInventoryNumber(variant, field) {
 
 function hydrateProduct(product) {
   const firstVariant = product?.variants?.[0] || {}
-  const productCode = product?.productCode || product?.sku || firstVariant.sku || ''
-  const firstVariantInventory = normalizeVariantInventory(firstVariant)
+  const productCode = product?.productCode || product?.sku || ''
 
   return {
     ...emptyForm,
@@ -345,28 +342,28 @@ function hydrateProduct(product) {
     productCode,
     category: String(product?.category_id || product?.categoryId || product?.category || ''),
     categoryId: String(product?.category_id || product?.categoryId || ''),
-    productType: product?.productType || product?.category || '',
-    purchasePrice: product?.purchasePrice ?? firstVariant.purchasePrice ?? '',
-    sellingPrice: product?.sellingPrice ?? firstVariant.sellingPrice ?? '',
+    productType: readableClassification(product?.productType),
+    purchasePrice: product?.purchasePrice ?? '',
+    sellingPrice: product?.sellingPrice ?? '',
     unitOfMeasure: product?.unitOfMeasure || firstVariant.unit || 'Piece',
-    openingStock: product?.openingStock ?? firstVariantInventory.openingStock ?? '',
+    openingStock: product?.openingStock ?? '',
     hsnSacCode: product?.hsnSacCode || firstVariant.hsn || '',
     gstVatRate: product?.gstVatRate ?? firstVariant.gstRate ?? '',
     coverImage: product?.coverImage || '',
     images: product?.images || [],
     status: product?.statusValue || product?.status || 'active',
     variants: product?.variants?.length
-      ? product.variants.map((variant, index) => {
+      ? product.variants.map((variant) => {
         const backendId = variant.id || variant.variantId || variant.variant_id || ''
         return {
           ...makeEmptyVariant(),
           ...variant,
-          id: backendId || `${product?.id || productCode || 'product'}-${index + 1}`,
+          id: backendId,
           sellingPrice: variant.sellingPrice ?? variant.price ?? '',
           mrp: variant.mrp ?? '',
-          inventory: normalizeVariantInventory(variant, index === 0 ? product?.openingStock : ''),
+          inventory: normalizeVariantInventory(variant),
           // Only a real backend-issued id is safe to send back on save (toVariationPayload) -
-          // the fallback id above is just a stable React key, never a real variant identity.
+          // New rows are keyed by their position in the form, never by a fabricated UUID.
           isNew: !backendId,
         }
       })
@@ -488,7 +485,7 @@ export default function ProductForm({
       ).map((value) => ({ value, label: value }))
 
     return {
-      productType: collect(catalogProducts.map((item) => item.productType || item.categoryLabel || item.category)),
+      productType: collect(catalogProducts.map((item) => readableClassification(item.productType))),
       subCategory: collect(catalogProducts.map((item) => item.subCategory)),
       brand: collect(catalogProducts.map((item) => item.brand)),
       manufacturer: collect(catalogProducts.map((item) => item.manufacturer)),
@@ -601,6 +598,7 @@ export default function ProductForm({
   )
   const brandCategoryOptions = useMemo(
     () => brandCategoryLinks
+      .filter((link) => categoryOptions.some((option) => option.value === String(link.categoryId)))
       .map((link) => ({
         value: String(link.categoryId),
         label: link.categoryName || categoryOptions.find((option) => option.value === String(link.categoryId))?.label || '',
@@ -621,7 +619,6 @@ export default function ProductForm({
   const effectiveCategoryOptions = formData.brandId
     ? withCurrentOption(brandCategoryOptions, formData.categoryId, categoryOptions)
     : categoryOptions
-  const categoryFieldDisabled = !formData.brandId && !formData.categoryId
 
   const subCategoryOptions = useMemo(
     () => subCategoryOptionsAll.filter((option) => option.parentId === formData.category),
@@ -715,19 +712,29 @@ export default function ProductForm({
     if (formData.name.trim().length > 150) nextErrors.name = 'Product name must be 150 characters or fewer.'
     if (!formData.productCode.trim()) nextErrors.productCode = 'Product code / SKU is required.'
     if (!formData.category) nextErrors.category = 'Category is required.'
+    if (isUuidLike(formData.productType)) nextErrors.productType = 'Enter a Product Type name, not a category ID.'
+    if (formData.subCategoryId && !subCategoryOptions.some((option) => option.value === formData.subCategoryId)) nextErrors.subCategory = 'Select a sub category belonging to this category.'
     if (!formData.status) nextErrors.status = 'Status is required.'
     if (Number(formData.purchasePrice) < 0) nextErrors.purchasePrice = 'Purchase price cannot be negative.'
-    if (!formData.purchasePrice && formData.purchasePrice !== 0) nextErrors.purchasePrice = 'Purchase price is required.'
+    if (!formData.variants.length && !formData.purchasePrice && formData.purchasePrice !== 0) nextErrors.purchasePrice = 'Purchase price is required.'
     if (Number(formData.sellingPrice) < 0) nextErrors.sellingPrice = 'Selling price cannot be negative.'
-    if (!formData.sellingPrice && formData.sellingPrice !== 0) nextErrors.sellingPrice = 'Selling price is required.'
+    if (!formData.variants.length && !formData.sellingPrice && formData.sellingPrice !== 0) nextErrors.sellingPrice = 'Selling price is required.'
     if (formData.inventoryTracking && !formData.unitOfMeasure) nextErrors.unitOfMeasure = 'UOM is required for inventory-managed products.'
     formData.variants.forEach((variant, index) => {
-      const inventory = normalizeVariantInventory(variant, index === 0 ? formData.openingStock : '')
+      const inventory = normalizeVariantInventory(variant)
       const variantLabel = getVariantName(variant, index)
+      if (!variant.size.trim()) nextErrors.variants = 'Every variant needs a name.'
+      if (variant.isNew && (variant.sellingPrice === '' || variant.sellingPrice == null)) nextErrors.variants = `${variantLabel}: enter a selling price.`
+      for (const field of ['purchasePrice', 'sellingPrice', 'mrp', 'wholesalePrice', 'dealerPrice', 'discountPercent']) {
+        const value = variant[field]
+        if (value !== '' && value != null && (!Number.isFinite(Number(value)) || Number(value) < 0 || (field === 'discountPercent' && Number(value) > 100))) {
+          nextErrors.variants = `${variantLabel}: enter valid pricing (discount must be 0-100%).`
+        }
+      }
 
       Object.entries(inventory).forEach(([field, value]) => {
         if (value !== '' && Number(value) < 0) {
-          nextErrors[`variantInventory.${variant.id}.${field}`] = `${variantLabel}: stock values cannot be negative.`
+          nextErrors[`variantInventory.${variant.id || index}.${field}`] = `${variantLabel}: stock values cannot be negative.`
         }
       })
 
@@ -736,7 +743,7 @@ export default function ProductForm({
         && inventory.maximumStockLevel !== ''
         && Number(inventory.minimumStockLevel) > Number(inventory.maximumStockLevel)
       ) {
-        nextErrors[`variantInventory.${variant.id}.minimumStockLevel`] = `${variantLabel}: Min must be less than or equal to Max.`
+        nextErrors[`variantInventory.${variant.id || index}.minimumStockLevel`] = `${variantLabel}: Min must be less than or equal to Max.`
       }
     })
 
@@ -817,18 +824,9 @@ export default function ProductForm({
 
     return {
       ...nextData,
-      variants: variants.map((variant, index) => ({
-        ...makeEmptyVariant(),
+      variants: variants.map((variant) => ({
         ...variant,
-        id: variant.id || makeVariantId(),
-        size: variant.size || variant.name || `Variant ${index + 1}`,
-        sku: variant.sku || (index === 0 ? nextData.productCode : `${nextData.productCode}-${index + 1}`),
-        hsn: variant.hsn || nextData.hsnSacCode,
-        unit: variant.unit || nextData.unitOfMeasure,
-        gstRate: variant.gstRate || nextData.gstVatRate,
-        purchasePrice: variant.purchasePrice || nextData.purchasePrice,
-        sellingPrice: variant.sellingPrice || nextData.sellingPrice,
-        inventory: normalizeVariantInventory(variant, index === 0 ? nextData.openingStock : ''),
+        inventory: normalizeVariantInventory(variant),
       })),
     }
   }
@@ -864,28 +862,25 @@ export default function ProductForm({
       brand: syncedData.brand,
       category: syncedData.category,
       categoryId: syncedData.categoryId || syncedData.category,
-      productType: syncedData.productType || syncedData.category,
+      productType: syncedData.productType.trim(),
       price: Number(syncedData.sellingPrice) || 0,
-      totalInventory: totalVariantInventory || Number(syncedData.openingStock) || 0,
+      totalInventory: syncedData.variants.length ? (syncedData.variants.every((variant) => variant.inventory.openingStock !== '') ? totalVariantInventory : undefined) : Number(syncedData.openingStock) || 0,
       isActive: syncedData.status === 'active',
       variants: syncedData.variants.map((variant) => ({
         ...variant,
-        size: variant.size || syncedData.unitOfMeasure || 'Default',
-        sku: variant.sku || syncedData.productCode,
+        size: variant.size.trim(),
+        sku: variant.sku.trim(),
         hsn: variant.hsn || syncedData.hsnSacCode,
         unit: variant.unit || syncedData.unitOfMeasure,
         gstRate: Number(variant.gstRate) || 0,
-        purchasePrice: Number(variant.purchasePrice) || 0,
-        sellingPrice: Number(variant.sellingPrice) || 0,
-        mrp: Number(variant.mrp) || 0,
         inventory: {
           ...emptyVariantInventory,
           ...variant.inventory,
-          openingStock: getVariantInventoryNumber(variant, 'openingStock'),
-          minimumStockLevel: getVariantInventoryNumber(variant, 'minimumStockLevel'),
-          maximumStockLevel: getVariantInventoryNumber(variant, 'maximumStockLevel'),
-          reorderLevel: getVariantInventoryNumber(variant, 'reorderLevel'),
-          reorderQuantity: getVariantInventoryNumber(variant, 'reorderQuantity'),
+          openingStock: variant.inventory.openingStock,
+          minimumStockLevel: variant.inventory.minimumStockLevel,
+          maximumStockLevel: variant.inventory.maximumStockLevel,
+          reorderLevel: variant.inventory.reorderLevel,
+          reorderQuantity: variant.inventory.reorderQuantity,
         },
       })),
     })
@@ -917,11 +912,11 @@ export default function ProductForm({
     }))
   }
 
-  const updateVariantInventory = (variantId, field, value) => {
+  const updateVariantInventory = (variantIndex, field, value) => {
     setFormData((current) => ({
       ...current,
-      variants: current.variants.map((variant) => (
-        variant.id === variantId
+      variants: current.variants.map((variant, index) => (
+        index === variantIndex
           ? {
             ...variant,
             inventory: {
@@ -934,7 +929,7 @@ export default function ProductForm({
     }))
     setErrors((current) => ({
       ...current,
-      [`variantInventory.${variantId}.${field}`]: '',
+      [`variantInventory.${formData.variants[variantIndex]?.id || variantIndex}.${field}`]: '',
     }))
   }
 
@@ -949,8 +944,6 @@ export default function ProductForm({
           unit: current.unitOfMeasure,
           hsn: current.hsnSacCode,
           gstRate: current.gstVatRate,
-          purchasePrice: current.purchasePrice,
-          sellingPrice: current.sellingPrice,
         },
       ],
     }))
@@ -971,7 +964,7 @@ export default function ProductForm({
       value: formData[field.name] ?? '',
       onChange: (event) => updateField(field.name, event.target.value),
       error: errors[field.name],
-      required: field.required,
+      required: field.required && !(formData.variants.length && ['purchasePrice', 'sellingPrice'].includes(field.name)),
       maxLength: field.maxLength,
       placeholder: field.placeholder,
     }
@@ -987,14 +980,14 @@ export default function ProductForm({
             placeholder={
               formData.brandId
                 ? (isLoadingBrandCategories ? 'Loading categories…' : `Type or select ${field.label.toLowerCase()}`)
-                : (formData.categoryId ? `Type or select ${field.label.toLowerCase()}` : 'Select a brand first')
+                : 'Select a category'
             }
-            disabled={categoryFieldDisabled}
             onChange={(event) => {
               setFormData((current) => ({
                 ...current,
                 category: event.target.value,
                 categoryId: event.target.value,
+                categoryLabel: effectiveCategoryOptions.find((option) => option.value === event.target.value)?.label || '',
                 subCategory: '',
                 subCategoryId: '',
               }))
@@ -1025,6 +1018,7 @@ export default function ProductForm({
             triggerClassName="w-full max-w-full"
             options={subCategoryOptions}
             value={formData.subCategoryId}
+            error={errors.subCategory}
             onChange={(event) => {
               const option = subCategoryOptions.find((opt) => opt.value === event.target.value)
               setFormData((current) => ({ ...current, subCategoryId: event.target.value, subCategory: option?.label || '' }))
@@ -1211,14 +1205,14 @@ export default function ProductForm({
               </thead>
               <tbody className="divide-y divide-neutral-50">
                 {formData.variants.map((variant, index) => {
-                  const inventory = normalizeVariantInventory(variant, index === 0 ? formData.openingStock : '')
+                  const inventory = normalizeVariantInventory(variant)
                   const variantName = getVariantName(variant, index)
 
                   return (
-                    <tr key={variant.id} className="transition-colors hover:bg-primary-50/35">
+                    <tr key={variant.id || index} className="transition-colors hover:bg-primary-50/35">
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-neutral-800">{variantName}</td>
                       {inventoryFields.map((inventoryField) => {
-                        const errorKey = `variantInventory.${variant.id}.${inventoryField.key}`
+                        const errorKey = `variantInventory.${variant.id || index}.${inventoryField.key}`
                         return (
                           <td key={inventoryField.key} className="px-3 py-2.5">
                             <input
@@ -1226,7 +1220,7 @@ export default function ProductForm({
                               min="0"
                               step="1"
                               value={inventory[inventoryField.key] ?? ''}
-                              onChange={(event) => updateVariantInventory(variant.id, inventoryField.key, event.target.value)}
+                              onChange={(event) => updateVariantInventory(index, inventoryField.key, event.target.value)}
                               aria-label={`${variantName} ${inventoryField.label}`}
                               className={`h-9 ${inventoryField.width} rounded-lg border bg-neutral-50 px-2.5 text-sm text-neutral-900 transition-all focus:bg-surface focus:outline-none focus:ring-4 ${
                                 errors[errorKey]
@@ -1284,21 +1278,29 @@ export default function ProductForm({
               <table className="w-full min-w-3xl text-left text-sm">
                 <thead>
                   <tr className="border-b border-neutral-100 text-[0.68rem] font-semibold text-neutral-400">
+                    <th className="px-5 py-3">Variant Code</th>
                     <th className="px-5 py-3">Variant</th>
                     <th className="px-3 py-3">SKU</th>
                     <th className="px-3 py-3 text-center">Stock</th>
-                    <th className="px-3 py-3">Selling Price (₹)</th>
-                    <th className="px-3 py-3">MRP (₹)</th>
+                    <th className="px-3 py-3">Purchase Price</th>
+                    <th className="px-3 py-3">Selling Price</th>
+                    <th className="px-3 py-3">MRP</th>
+                    <th className="px-3 py-3">Wholesale Price</th>
+                    <th className="px-3 py-3">Dealer Price</th>
+                    <th className="px-3 py-3">Discount %</th>
+                    <th className="px-3 py-3">Tax Inclusive</th>
+                    <th className="px-3 py-3">Currency</th>
                     <th className="w-10 px-3 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {formData.variants.map((variant, index) => {
-                    const variantInventory = normalizeVariantInventory(variant, index === 0 ? formData.openingStock : '')
+                    const variantInventory = normalizeVariantInventory(variant)
                     const isUploadingImage = Boolean(uploadingFields[`variantImage-${index}`])
 
                     return (
-                      <tr key={variant.id}>
+                      <tr key={variant.id || index}>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-neutral-500">{variant.variantCode || 'Generated on save'}</td>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
                             <label className="group relative flex size-10 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
@@ -1367,25 +1369,26 @@ export default function ProductForm({
                             className="h-9 w-20 rounded-lg border border-neutral-200 bg-surface px-2.5 text-center text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                           />
                         </td>
+                        {['purchasePrice', 'sellingPrice', 'mrp', 'wholesalePrice', 'dealerPrice', 'discountPercent'].map((pricingField) => (
+                          <td key={pricingField} className="px-3 py-3.5">
+                            <input type="number" min="0" max={pricingField === 'discountPercent' ? 100 : undefined} step="any"
+                              value={variant[pricingField] ?? ''} aria-label={`${getVariantName(variant, index)} ${pricingField}`}
+                              onChange={(event) => updateVariant(index, pricingField, event.target.value)}
+                              className="h-9 w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25" />
+                          </td>
+                        ))}
                         <td className="px-3 py-3.5">
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={variant.sellingPrice}
-                            onChange={(event) => updateVariant(index, 'sellingPrice', event.target.value)}
-                            className="h-9 w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
-                          />
+                          <select value={variant.taxInclusive == null ? '' : String(variant.taxInclusive)}
+                            aria-label={`${getVariantName(variant, index)} tax inclusive`}
+                            onChange={(event) => updateVariant(index, 'taxInclusive', event.target.value === '' ? null : event.target.value === 'true')}
+                            className="h-9 rounded-lg border border-neutral-200 bg-surface px-2 text-sm">
+                            <option value="">—</option><option value="true">Yes</option><option value="false">No</option>
+                          </select>
                         </td>
                         <td className="px-3 py-3.5">
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={variant.mrp}
-                            onChange={(event) => updateVariant(index, 'mrp', event.target.value)}
-                            className="h-9 w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
-                          />
+                          <input value={variant.currency} aria-label={`${getVariantName(variant, index)} currency`}
+                            onChange={(event) => updateVariant(index, 'currency', event.target.value)}
+                            className="h-9 w-20 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm" />
                         </td>
                         <td className="px-3 py-3.5 text-right">
                           <button

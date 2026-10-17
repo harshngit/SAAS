@@ -1,15 +1,14 @@
+import { normalizeProductVariant, readableClassification } from '../../utils/productVariants'
 import { formatCurrency } from '../../utils/format'
 import { getFileUrl } from '../../api/files'
 
-function normalizeVariantInventory(variant = {}) {
-  const inventory = variant.inventory && typeof variant.inventory === 'object' ? variant.inventory : {}
-
-  return {
-    openingStock: Number(inventory.openingStock ?? variant.inventory ?? variant.stock) || 0,
-    minimumStockLevel: Number(inventory.minimumStockLevel ?? variant.minimumStockLevel ?? variant.minimum_stock_level) || 0,
-    maximumStockLevel: Number(inventory.maximumStockLevel ?? variant.maximumStockLevel ?? variant.maximum_stock_level) || 0,
-    reorderLevel: Number(inventory.reorderLevel ?? variant.reorderLevel ?? variant.reorder_level) || 0,
-    reorderQuantity: Number(inventory.reorderQuantity ?? variant.reorderQuantity ?? variant.reorder_quantity) || 0,
+export function formatVariantCurrency(value, currency) {
+  if (value === '' || value == null) return '—'
+  if (!currency) return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(Number(value))
+  try {
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 2 }).format(Number(value))
+  } catch {
+    return `${value} ${currency}`
   }
 }
 
@@ -19,14 +18,13 @@ function toCommaString(value, fallbackValue = '') {
 }
 
 export function normalizeApiProduct(product, fallback = {}) {
-  const sourceVariants = product.variations?.length ? product.variations : fallback.variants || []
+  const sourceVariants = Array.isArray(product.variations) ? product.variations : fallback.variants || []
   const categoryLabel =
     product.category?.name ||
     product.category_name ||
     product.categoryName ||
-    product.product_type ||
     fallback.categoryLabel ||
-    fallback.category ||
+    readableClassification(fallback.category) ||
     ''
 
   return {
@@ -38,17 +36,17 @@ export function normalizeApiProduct(product, fallback = {}) {
     name: product.name || fallback.name,
     brand: product.brand_ref?.name || product.brand || fallback.brand || '',
     manufacturer: product.manufacturer || fallback.manufacturer || '',
-    sku: product.sku || fallback.sku || fallback.variants?.[0]?.sku || '',
+    sku: product.sku ?? fallback.sku ?? '',
     price: product.price ?? fallback.price ?? 0,
     categoryId: product.category_id || fallback.categoryId || fallback.category_id || fallback.category || '',
-    category: categoryLabel || product.category_id || '',
-    categoryLabel,
-    productType: product.product_type || fallback.productType || '',
+    category: readableClassification(categoryLabel),
+    categoryLabel: readableClassification(categoryLabel),
+    productType: readableClassification(product.product_type !== undefined ? product.product_type : fallback.productType),
     barcode: product.barcode || fallback.barcode || '',
     shortName: product.short_name || fallback.shortName || '',
     modelNumber: product.model_number || fallback.modelNumber || '',
-    subCategory: product.subcategory?.name || product.sub_category || fallback.subCategory || '',
-    subCategoryId: product.sub_category_id || fallback.subCategoryId || '',
+    subCategory: product.sub_category_id === null || product.sub_category_id === '' ? '' : readableClassification(product.subcategory?.name || product.sub_category || fallback.subCategory || ''),
+    subCategoryId: product.sub_category_id !== undefined ? product.sub_category_id || '' : fallback.subCategoryId || '',
     brandId: product.brand_id || fallback.brandId || '',
     supplierName: product.supplier?.name || fallback.supplierName || '',
     suppliers: Array.isArray(product.suppliers)
@@ -121,31 +119,8 @@ export function normalizeApiProduct(product, fallback = {}) {
     totalStock: product.total_stock ?? fallback.totalStock ?? 0,
     batchTracking: Boolean(product.batch_tracking ?? fallback.batchTracking ?? false),
     serialNumberTracking: Boolean(product.serial_number_tracking ?? fallback.serialNumberTracking ?? false),
-    variants: sourceVariants.map((variant, index) => {
-      const fallbackVariant = fallback.variants?.find((item) => item.id && item.id === (variant.id || variant.variantId || variant.variant_id)) || fallback.variants?.[index] || {}
-      const fallbackInventory = normalizeVariantInventory(fallbackVariant)
-      const mergedInventory = variant.inventory && typeof variant.inventory === 'object'
-        ? { ...fallbackInventory, ...variant.inventory }
-        : { ...fallbackInventory, openingStock: variant.inventory ?? variant.stock ?? fallbackInventory.openingStock }
-      const inventory = normalizeVariantInventory({
-        ...fallbackVariant,
-        ...variant,
-        inventory: mergedInventory,
-      })
-
-      return {
-        id: variant.id || variant.variantId || variant.variant_id || fallbackVariant.id,
-        size: variant.name || variant.size || '',
-        sku: variant.sku || product.sku || fallback.sku || '',
-        hsn: variant.hsn || '',
-        unit: variant.unit || 'Bottle',
-        gstRate: variant.gstRate || 0,
-        purchasePrice: variant.purchasePrice || 0,
-        sellingPrice: Number(variant.price ?? variant.sellingPrice) || 0,
-        imageUrl: variant.image_url || variant.imageUrl || fallbackVariant.imageUrl || '',
-        inventory,
-      }
-    }),
+    variants: sourceVariants.map(normalizeProductVariant),
+    hasVariants: product.has_variants ?? (sourceVariants.length > 0),
   }
 }
 
@@ -154,7 +129,8 @@ export function priceRange(variants) {
     return formatCurrency(0)
   }
 
-  const prices = variants.map((variant) => variant.sellingPrice)
+  const prices = variants.map((variant) => variant.sellingPrice).filter((price) => price !== '' && price != null).map(Number)
+  if (!prices.length) return '—'
   const min = Math.min(...prices)
   const max = Math.max(...prices)
   return min === max ? formatCurrency(min) : `${formatCurrency(min)} - ${formatCurrency(max)}`

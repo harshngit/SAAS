@@ -210,7 +210,7 @@ function normalizeOrderItem(item) {
     productName: item.product_name || item.name || '',
     // Order items usually carry no image / SKU - OrderDetail backfills from the product catalogue,
     // but read them here too in case the backend nests the product.
-    sku: item.product_sku || item.sku || item.product?.sku || '',
+    sku: item.variant_id ? '' : item.product_sku || item.sku || item.product?.sku || '',
     productImage:
       item.product_image || item.product?.cover_image || item.product?.image_url || item.cover_image || '',
     quantity,

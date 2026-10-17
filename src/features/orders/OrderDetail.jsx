@@ -1,3 +1,4 @@
+import { productVariants } from '../../utils/productVariants'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
@@ -47,7 +48,7 @@ import {
 } from '../collections/collectionHelpers'
 import { listVehicles } from '../../api/vehicles'
 import { listWarehouses } from '../../api/warehouses'
-import { listProducts } from '../../api/products'
+import { getProduct } from '../../api/products'
 import { getFileUrl } from '../../api/files'
 import { getUser, listAssignableStaff } from '../../api/users'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
@@ -189,10 +190,11 @@ export default function OrderDetail() {
   useEffect(() => {
     if (isDemo || !order?.items?.length) return
     let active = true
-    listProducts().then((result) => {
-      if (!active || !result.success) return
+    const productIds = [...new Set(order.items.map((item) => item.productId).filter(Boolean))]
+    Promise.all(productIds.map(getProduct)).then((results) => {
+      if (!active) return
       const map = {}
-      result.products.forEach((product) => {
+      results.filter((result) => result.success).forEach(({ product }) => {
         map[product.id] = {
           image: getFileUrl(
             product.cover_image ||
@@ -202,6 +204,7 @@ export default function OrderDetail() {
               '',
           ),
           sku: product.sku || '',
+          variants: Object.fromEntries(productVariants(product).map((variant) => [variant.id, variant])),
         }
       })
       setProductMeta(map)
@@ -209,8 +212,7 @@ export default function OrderDetail() {
     return () => {
       active = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDemo, order?.id])
+  }, [isDemo, order?.items])
 
   // Sales Returns raised against this order (via its invoices). Read-only cross-link (§20).
   useEffect(() => {
