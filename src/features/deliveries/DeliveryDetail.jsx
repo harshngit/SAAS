@@ -395,7 +395,7 @@ export default function DeliveryDetail() {
   if (isLoading) {
     return (
       <Card>
-        <LoadingSpinner label="Loading delivery..." />
+        <LoadingSpinner variant="detail" layout="order" columns={8} label="Loading delivery..." />
       </Card>
     )
   }
@@ -1486,7 +1486,7 @@ export default function DeliveryDetail() {
               <label className="text-sm font-medium text-neutral-700">Proof of Delivery Photos (optional)</label>
               <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 px-3.5 py-4 text-sm text-neutral-500 hover:border-primary-300 hover:bg-primary-50/40">
                 {isUploadingPod ? (
-                  <LoadingSpinner />
+                  <LoadingSpinner variant="form" fields={4} sections={1} />
                 ) : (
                   <>
                     <Camera className="size-4" aria-hidden="true" />

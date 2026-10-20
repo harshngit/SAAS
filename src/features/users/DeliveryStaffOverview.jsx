@@ -152,7 +152,7 @@ export function DeliveryStaffOverviewPanels({
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="Assigned Deliveries" action={<button type="button" onClick={onViewDeliveries} className="text-sm font-medium text-primary-700 hover:underline">View All Deliveries →</button>}>
           {isLoadingOverview ? (
-            <LoadingSpinner label="Loading deliveries..." />
+            <LoadingSpinner variant="list" rows={4} label="Loading deliveries..." />
           ) : (overview?.assigned_deliveries || []).length === 0 ? (
             <EmptyPanelState message="No deliveries linked to this staff member yet." />
           ) : (
@@ -168,7 +168,7 @@ export function DeliveryStaffOverviewPanels({
         </Panel>
         <Panel title="Delivery Summary">
           {isLoadingOverview ? (
-            <LoadingSpinner label="Loading summary..." />
+            <LoadingSpinner variant="stats" count={4} label="Loading summary..." />
           ) : overview?.summary && Object.keys(overview.summary).length > 0 ? (
             <div className="grid grid-cols-2 gap-3">
               {DELIVERY_SUMMARY_FIELDS.filter((field) => overview.summary[field.key] !== undefined).map((field) => (
@@ -191,7 +191,7 @@ export function DeliveryStaffOverviewPanels({
       <div className="grid grid-cols-1 gap-4">
         <Panel title="Vehicle">
           {isLoadingOverview ? (
-            <LoadingSpinner label="Loading vehicle..." />
+            <LoadingSpinner variant="fields" count={4} label="Loading vehicle..." />
           ) : !overview?.vehicle ? (
             <EmptyPanelState message="No vehicle assigned or active loading session." />
           ) : (

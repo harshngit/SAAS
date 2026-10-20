@@ -464,7 +464,7 @@ export default function PurchaseInvoiceDetail() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading purchase..." />
+    return <LoadingSpinner variant="detail" layout="order" columns={8} label="Loading purchase..." />
   }
 
   if (loadError || !purchase) {

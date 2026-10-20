@@ -132,7 +132,7 @@ export default function ConvertLeadModal({
           </div>
         </div>
       ) : isLoadingLead ? (
-        <LoadingSpinner label="Loading lead..." />
+        <LoadingSpinner variant="form" fields={6} sections={1} label="Loading lead..." />
       ) : loadError ? (
         <p className="py-6 text-center text-sm text-red-600">{loadError}</p>
       ) : lead ? (

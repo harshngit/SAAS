@@ -1,4 +1,5 @@
 import { ArrowUp, ArrowDown } from 'lucide-react'
+import { SkeletonValue } from './Skeleton'
 
 const iconVariantClasses = {
   primary: 'bg-linear-to-br from-primary-500 to-primary-700 text-white shadow-[0_4px_10px_-3px_rgb(0_9_42/0.45)]',
@@ -9,7 +10,7 @@ const iconVariantClasses = {
   neutral: 'bg-neutral-100 text-neutral-600',
 }
 
-export default function StatCard({ icon: Icon, label, value, iconVariant = 'primary', delta, actions, className = '' }) {
+export default function StatCard({ icon: Icon, label, value, iconVariant = 'primary', delta, actions, className = '', loading = false }) {
   return (
     <div
       className={`group rounded-2xl border border-neutral-100 bg-surface/95 p-5 shadow-(--shadow-card) transition-all duration-200 hover:-translate-y-0.5 hover:shadow-(--shadow-card-hover) ${className}`}
@@ -25,19 +26,19 @@ export default function StatCard({ icon: Icon, label, value, iconVariant = 'prim
           {actions}
         </div>
       </div>
-      <p className="mt-4 font-(--font-display) text-2xl font-semibold tracking-tight text-neutral-900">{value}</p>
+      <p className="mt-4 font-(--font-display) text-2xl font-semibold tracking-tight text-neutral-900"><SkeletonValue loading={loading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
       {delta && (
         <p
           className={`mt-2 flex items-center gap-1 text-xs font-semibold ${
             delta.positive ? 'text-green-600' : 'text-red-600'
           }`}
         >
-          {delta.trend === 'up' ? (
+          <SkeletonValue loading={loading} className="h-3 w-28">{delta.trend === 'up' ? (
             <ArrowUp className="size-3" aria-hidden="true" />
           ) : (
             <ArrowDown className="size-3" aria-hidden="true" />
           )}
-          {delta.label}
+          {delta.label}</SkeletonValue>
         </p>
       )}
     </div>

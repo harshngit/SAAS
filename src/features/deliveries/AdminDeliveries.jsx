@@ -87,7 +87,7 @@ export default function AdminDeliveries() {
       </div>
 
       <ListOverview>
-      <ListSummary className="grid-cols-2 lg:grid-cols-5">
+      <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-5">
         <StatCard icon={Truck} label="Total Deliveries" value={stats.total} iconVariant="primary" />
         <StatCard icon={CheckCircle2} label="Delivered" value={stats.delivered} iconVariant="success" />
         <StatCard icon={Clock} label="In Progress" value={stats.inProgress} iconVariant="warning" />

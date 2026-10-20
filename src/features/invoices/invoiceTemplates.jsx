@@ -1,4 +1,4 @@
-import { QrCode } from 'lucide-react'
+import { useState } from 'react'
 import { normalizeOrganizationBranding } from '../../api/organizations'
 import { getFileUrl } from '../../api/files'
 import { resolveActiveColumns } from './invoiceColumns'
@@ -309,24 +309,30 @@ function SummaryTotals({ data, showDiscount, showTax, primaryColor, style, total
   return <div className="ml-auto w-full max-w-56">{block}</div>
 }
 
+function PaymentQrBlock({ url, thermal = false }) {
+  const [failedUrl, setFailedUrl] = useState(null)
+  const hasImage = Boolean(url) && failedUrl !== url
+  return (
+    <div className={`flex flex-col items-center gap-2 py-2 ${thermal ? '' : 'w-fit max-w-full'}`}>
+      <p className="text-center font-medium text-neutral-700">Scan to pay via UPI</p>
+      {hasImage ? (
+        <div className="shrink-0 border border-neutral-200 bg-white p-2" style={{ width: thermal ? '28mm' : '34mm', maxWidth: '100%', aspectRatio: '1' }}>
+          <img src={url} alt="Payment QR code" className="size-full object-contain" onError={() => setFailedUrl(url)} />
+        </div>
+      ) : (
+        <p className="text-center text-neutral-500">Payment QR unavailable</p>
+      )}
+    </div>
+  )
+}
+
 function InvoiceFooter({ company, data, payment, footer, style }) {
   return (
     <div className="space-y-1.5 border-t border-neutral-200 pt-3" style={{ fontSize: style.body }}>
       {payment.showBankDetails && data.bank?.name && (
         <p className="text-neutral-500">Bank: {data.bank.name} | A/c {data.bank.account} | IFSC {data.bank.ifsc}</p>
       )}
-      {payment.showUpiQr && (
-        <div className="flex items-center gap-2">
-          <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
-            {company.qrCodeUrl ? (
-              <img src={company.qrCodeUrl} alt="Payment QR code" className="size-full object-contain" onError={(event) => { event.currentTarget.style.display = 'none' }} />
-            ) : (
-              <QrCode className="size-4 text-neutral-400" />
-            )}
-          </div>
-          <p className="text-neutral-500">Scan to pay via UPI</p>
-        </div>
-      )}
+      {payment.showUpiQr && <PaymentQrBlock url={company.qrCodeUrl} />}
       {footer.showTerms && footer.terms && (
         <p className="text-neutral-500"><span className="font-semibold text-neutral-700">Terms: </span>{footer.terms}</p>
       )}
@@ -553,7 +559,7 @@ export function ThermalPreview(props) {
   // it silently produced `undefined` every time regardless of what was actually passed in,
   // meaning Bold/Extra Lines never actually reached the rendered receipt.
   const { thermalPresetId, thermalBoldText, thermalExtraLines } = props
-  const { primaryColor, data = sampleInvoice, businessDetails, itemTable, footer, typography } = withDefaults(props)
+  const { primaryColor, data = sampleInvoice, businessDetails, itemTable, paymentDetails, footer, typography } = withDefaults(props)
   const { company, items } = data
   const { layout: thermalLayout = 'standard', variant: thermalVariant, showExtras } = findThermalPreset(thermalPresetId)
   const style = resolveTemplateStyle('thermal', typography)
@@ -614,6 +620,7 @@ export function ThermalPreview(props) {
         {data.taxTotal ? <div className="flex justify-between"><span>Tax</span><span>{money(data.taxTotal)}</span></div> : null}
         <div className="flex justify-between font-bold" style={emphasizeTotal ? { color: primaryColor } : undefined}><span>TOTAL</span><span>{money(data.total)}</span></div>
       </div>
+      {paymentDetails.showUpiQr && <PaymentQrBlock url={company.qrCodeUrl} thermal />}
       {footer.showSignature && (
         <div className={`flex flex-col items-center gap-0.5 ${dividerClass} pt-1.5`}>
           {footer.showStamp && company.stampSealUrl && (

@@ -156,7 +156,7 @@ export default function PurchaseInvoices() {
         </Card>
       ) : isLoading ? (
         <Card>
-          <LoadingSpinner label="Loading purchase invoices..." />
+          <LoadingSpinner variant="table" columns={columns} label="Loading purchase invoices..." />
         </Card>
       ) : (
         <Card title="Purchase Invoices" className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:mx-5 [&>p]:mx-5 [&>p]:mb-5">

@@ -291,7 +291,7 @@ export default function PlatformAnalytics() {
   if (isLoading) {
     return (
       <Card>
-        <LoadingSpinner label="Loading platform analytics..." />
+        <LoadingSpinner variant="dashboard" layout="analytics" label="Loading platform analytics..." />
       </Card>
     )
   }

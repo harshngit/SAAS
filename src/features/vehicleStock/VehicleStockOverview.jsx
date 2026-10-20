@@ -406,7 +406,7 @@ export default function VehicleStockOverview() {
 
       {isLoading ? (
         <Card>
-          <LoadingSpinner label="Loading vehicle stock..." />
+          <LoadingSpinner variant="vehicle-stock" count={2} label="Loading vehicle stock..." />
         </Card>
       ) : error ? (
         <Card>

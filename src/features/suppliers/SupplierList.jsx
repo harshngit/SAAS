@@ -1,3 +1,4 @@
+import { SkeletonValue } from '../../components/ui/Skeleton'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -419,9 +420,7 @@ export default function SupplierList() {
 
   if (isPreparingEdit) {
     return (
-      <div className="p-10">
-        <LoadingSpinner label="Loading supplier products..." />
-      </div>
+      <LoadingSpinner variant="form" fields={6} sections={2} label="Loading supplier products..." />
     )
   }
 
@@ -453,7 +452,7 @@ export default function SupplierList() {
             { label: 'Inactive Suppliers', value: supplierSummary.inactive, detail: 'needs review', icon: Users },
             { label: 'Outstanding Payable', value: formatCurrency(supplierSummary.payable), detail: 'total balance', icon: Wallet },
           ].map(({ label, value, detail, icon: Icon }, index) => (
-            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>
+            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p><p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={isLoading} className="h-3 w-28">{detail}</SkeletonValue></p></div>
           ))}
         </div>
       </Card>
@@ -485,7 +484,7 @@ export default function SupplierList() {
               </Button>
             </div>
           ) : isLoading ? (
-            <LoadingSpinner label="Loading suppliers..." />
+            <LoadingSpinner variant="table" minWidth="min-w-[72rem]" columns={["", "Supplier", "Contact", "City", "Product Count", "Total Purchases", "Outstanding Payable", "Status", "Actions"]} checkboxColumn={0} avatarColumn={1} label="Loading suppliers..." />
           ) : suppliers.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-sm font-medium text-neutral-900">

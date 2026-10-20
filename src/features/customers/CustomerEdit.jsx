@@ -119,7 +119,7 @@ export default function CustomerEdit() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading customer edit form..." />
+    return <LoadingSpinner variant="form" fields={8} sections={3} label="Loading customer edit form..." />
   }
 
   if (!customer) {

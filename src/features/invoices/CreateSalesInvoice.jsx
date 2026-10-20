@@ -230,7 +230,7 @@ function OrderInvoicePanel({ orderId }) {
   }
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading order..." />
+    return <LoadingSpinner variant="form" sidebar fields={4} sections={2} label="Loading order..." />
   }
 
   if (loadError || !order) {
@@ -518,7 +518,7 @@ function FromOrderFlow({ onBack }) {
 
       {customerId && (
         isLoadingOrders ? (
-          <LoadingSpinner label="Loading orders..." />
+          <LoadingSpinner variant="list" rows={3} label="Loading orders..." />
         ) : orders.length === 0 ? (
           <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
             {selectedCustomer?.name || 'This customer'} has no orders yet.

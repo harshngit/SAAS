@@ -191,10 +191,10 @@ export default function PurchaseReturnList() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={RotateCcw} iconVariant="primary" label="Total Returns" value={String(stats.total)} />
-        <StatCard icon={PackageX} iconVariant="neutral" label="Draft" value={String(stats.draft)} />
-        <StatCard icon={Truck} iconVariant="warning" label="In Progress" value={String(stats.inProgress)} />
-        <StatCard icon={CheckCircle2} iconVariant="success" label="Completed" value={String(stats.completed)} />
+        <StatCard loading={isLoading} icon={RotateCcw} iconVariant="primary" label="Total Returns" value={String(stats.total)} />
+        <StatCard loading={isLoading} icon={PackageX} iconVariant="neutral" label="Draft" value={String(stats.draft)} />
+        <StatCard loading={isLoading} icon={Truck} iconVariant="warning" label="In Progress" value={String(stats.inProgress)} />
+        <StatCard loading={isLoading} icon={CheckCircle2} iconVariant="success" label="Completed" value={String(stats.completed)} />
       </div>
 
       <Card className="p-0">
@@ -247,7 +247,7 @@ export default function PurchaseReturnList() {
         <div className="overflow-x-auto bg-neutral-50/35 py-4">
           {isLoading ? (
             <div className="py-10">
-              <LoadingSpinner label="Loading purchase returns..." />
+              <LoadingSpinner variant="table" columns={["Return", "Supplier", "Purchase / GRN", "Items", "Return Qty", "Return Date", "Status"]} label="Loading purchase returns..." />
             </div>
           ) : loadError ? (
             <div className="py-8 text-center">

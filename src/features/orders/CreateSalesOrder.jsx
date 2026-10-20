@@ -81,13 +81,12 @@ function SectionBadge({ number }) {
 // The customer's delivery address, tolerant of both the camelCase (single-customer GET) and
 // snake_case (customer list) shapes - the list endpoint returns `delivery_address`.
 const resolveCustomerAddress = (customer) =>
-  customer?.deliveryAddress ||
-  customer?.delivery_address ||
-  customer?.shippingAddress ||
-  customer?.shipping_address ||
-  customer?.billingAddress ||
-  customer?.billing_address ||
-  ''
+  [customer?.deliveryAddress, customer?.delivery_address,
+    customer?.shippingAddress, customer?.shipping_address,
+    customer?.address_information?.shipping_address,
+    customer?.billingAddress, customer?.billing_address,
+    customer?.address_information?.billing_address]
+    .find((address) => typeof address === 'string' && address.trim())?.trim() || ''
 
 export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const navigate = useNavigate()
@@ -340,6 +339,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     () => customerRecords.find((customer) => customer.id === selectedCustomerId) || null,
     [customerRecords, selectedCustomerId],
   )
+  const savedCustomerAddress = resolveCustomerAddress(selectedCustomer)
 
   // Customer profile photo — same file-id resolution chain the Customers list uses.
   const customerPhotoUrl = useMemo(
@@ -355,9 +355,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     [selectedCustomer],
   )
 
-  // Auto-fill the delivery address from the selected customer (still editable). Picking or
-  // switching the customer clears the field first (see the customer <Select> onChange), so
-  // this refills it from whichever customer is now selected.
+  // Also hydrate the address when the customer arrives through prefill or async loading.
+  // Customer selection fills it synchronously; preserve any existing order/manual address.
   useEffect(() => {
     if (!selectedCustomer) return
     setDeliveryAddress((current) => current || resolveCustomerAddress(selectedCustomer))
@@ -695,7 +694,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const outstandingBalance = Number(
     selectedCustomer?.outstandingBalance ?? selectedCustomer?.outstanding_balance ?? 0,
   )
-  const customerDefaultAddress = resolveCustomerAddress(selectedCustomer)
 
   // Preview (Takeaway) checkout maths - all frontend. Previous balance comes from the
   // customer's existing outstanding balance if the API already returned it, else ₹0.
@@ -789,9 +787,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   options={customerOptions}
                   value={selectedCustomerId}
                   onChange={(event) => {
-                    setSelectedCustomerId(event.target.value)
-                    // Clear so the effect refills the address from the newly chosen customer.
-                    setDeliveryAddress('')
+                    const customerId = event.target.value
+                    if (customerId === selectedCustomerId) return
+                    setSelectedCustomerId(customerId)
+                    setDeliveryAddress(resolveCustomerAddress(customerRecords.find((customer) => customer.id === customerId)))
                     setErrors((current) => ({ ...current, customer: '', deliveryAddress: '' }))
                   }}
                   placeholder={
@@ -1026,16 +1025,28 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 {deliveryType === 'delivery_boy' && (
                   <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium text-neutral-700">
-                        Delivery Address <span className="text-red-500">*</span>
-                      </label>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label htmlFor="order-delivery-address" className="text-sm font-medium text-neutral-700">
+                          Delivery Address <span className="text-red-500">*</span>
+                        </label>
+                        {savedCustomerAddress && deliveryAddress.trim() !== savedCustomerAddress && (
+                          <button type="button" className="text-xs font-medium text-primary-600 hover:underline"
+                            onClick={() => {
+                              setDeliveryAddress(savedCustomerAddress)
+                              setErrors((current) => ({ ...current, deliveryAddress: '' }))
+                            }}>
+                            Use saved customer address
+                          </button>
+                        )}
+                      </div>
                       <textarea
+                        id="order-delivery-address"
                         value={deliveryAddress}
                         onChange={(event) => {
                           setDeliveryAddress(event.target.value)
                           setErrors((current) => ({ ...current, deliveryAddress: '' }))
                         }}
-                        placeholder={customerDefaultAddress || 'Delivery address'}
+                        placeholder="Enter delivery address"
                         disabled={!selectedCustomer}
                         maxLength={500}
                         className={`h-24 resize-none rounded-xl border bg-neutral-50 p-3 text-sm text-neutral-900 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12 disabled:opacity-60 ${
@@ -1045,7 +1056,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       {errors.deliveryAddress ? (
                         <p className="text-xs text-red-600">{errors.deliveryAddress}</p>
                       ) : (
-                        <p className="text-xs text-neutral-400">Auto-filled from the customer — edit if the delivery goes elsewhere.</p>
+                        <p className="text-xs text-neutral-400">{savedCustomerAddress
+                          ? 'Your customer’s saved address is filled by default. You can edit it for this order.'
+                          : 'No saved customer address. Enter the delivery address for this order.'}</p>
                       )}
                     </div>
 
@@ -1177,9 +1190,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <span className="shrink-0 text-sm text-neutral-600">Address</span>
                     <span
                       className="line-clamp-2 min-w-0 text-right text-sm font-medium text-neutral-900"
-                      title={deliveryAddress || customerDefaultAddress || ''}
+                      title={deliveryAddress.trim()}
                     >
-                      {deliveryAddress || customerDefaultAddress || '—'}
+                      {deliveryAddress.trim() || '—'}
                     </span>
                   </div>
                 )}
@@ -1296,8 +1309,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               )}
               <div className="min-w-0">
                 <p className="truncate text-[0.8rem] font-semibold text-neutral-900">{selectedCustomer?.name || '—'}</p>
-                {(deliveryAddress || customerDefaultAddress) && (
-                  <p className="mt-0.5 text-[0.72rem] text-neutral-500">{deliveryAddress || customerDefaultAddress}</p>
+                {deliveryAddress.trim() && (
+                  <p className="mt-0.5 text-[0.72rem] text-neutral-500">{deliveryAddress.trim()}</p>
                 )}
               </div>
             </div>

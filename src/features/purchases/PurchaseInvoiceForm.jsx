@@ -381,7 +381,7 @@ export default function PurchaseInvoiceForm() {
   }
 
   if (isLoadingPurchase) {
-    return <LoadingSpinner label="Loading purchase..." />
+    return <LoadingSpinner variant="form" sidebar fields={6} sections={2} label="Loading purchase..." />
   }
 
   if (loadError) {
@@ -477,7 +477,7 @@ export default function PurchaseInvoiceForm() {
         {formState.supplierId && (
           <Card title="Supplier Snapshot" subtitle="Read-only - pulled from the supplier's master record.">
             {isLoadingSnapshot ? (
-              <LoadingSpinner label="Loading supplier details..." />
+              <LoadingSpinner variant="form" fields={4} sections={1} label="Loading supplier details..." />
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <ReadOnlyField label="Contact Person" value={supplierSnapshot?.contactPerson} />

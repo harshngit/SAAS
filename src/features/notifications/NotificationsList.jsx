@@ -123,7 +123,7 @@ export default function NotificationsList() {
           </div>
         </Card>
       ) : isLoading ? (
-        <Card><LoadingSpinner label="Loading notifications..." /></Card>
+        <Card><LoadingSpinner variant="activity" rows={6} label="Loading notifications..." /></Card>
       ) : notifications.length === 0 ? (
         <Card>
           <EmptyState icon={Bell} title="No notifications" description="You're all caught up." />

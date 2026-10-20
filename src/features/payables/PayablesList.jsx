@@ -269,7 +269,7 @@ export default function PayablesList() {
       </div>
 
       <ListOverview>
-      <ListSummary className="grid-cols-2 lg:grid-cols-4">
+      <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={IndianRupee} iconVariant="warning" label="Total Payable" value={formatCurrency(stats.totalOutstanding)} />
         {DEMO_MODE ? (
           <>
@@ -340,7 +340,7 @@ export default function PayablesList() {
         </div>
         <div className="overflow-x-auto">
           {isLoading ? (
-            <div className="p-8"><LoadingSpinner label="Loading accounts payable..." /></div>
+            <LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["Supplier", "Supplier Invoice #", "Invoice Date", "Due Date", "Total", "Paid", "Outstanding", "Payment", "Ageing", "Action"]} label="Loading accounts payable..." />
           ) : loadError ? (
             <div className="p-8 text-center">
               <p className="text-sm text-red-600">{loadError}</p>

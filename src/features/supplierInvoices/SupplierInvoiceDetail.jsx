@@ -174,7 +174,7 @@ export default function SupplierInvoiceDetail() {
     setInvoice(result.invoice)
   }
 
-  if (isLoading) return <LoadingSpinner label="Loading supplier invoice..." />
+  if (isLoading) return <LoadingSpinner variant="detail" layout="invoice" columns={7} label="Loading supplier invoice..." />
 
   if (loadError || !invoice) {
     return (

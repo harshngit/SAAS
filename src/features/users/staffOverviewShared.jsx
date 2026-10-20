@@ -126,7 +126,7 @@ export function EmptyPanelState({ message, note }) {
 
 export function RecentActivityPanel({ isLoading, activity, emptyMessage, emptyNote }) {
   if (isLoading) {
-    return <LoadingSpinner label="Loading recent activity..." />
+    return <LoadingSpinner variant="activity" rows={4} label="Loading recent activity..." />
   }
 
   if (!activity || activity.length === 0) {
@@ -154,7 +154,7 @@ export function CurrentLocationPanel({ isLoading, location }) {
   const label = describeLocation(location)
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading location..." />
+    return <LoadingSpinner variant="map" label="Loading location..." />
   }
 
   if (!label) {

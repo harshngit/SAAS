@@ -248,7 +248,7 @@ export default function SupplierPaymentsList() {
       </div>
 
       <ListOverview>
-      <ListSummary className="grid-cols-2 lg:grid-cols-4">
+      <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={IndianRupee} iconVariant="primary" label="Total Paid" value={stats ? formatCurrency(stats.total) : '—'} />
         <StatCard icon={Wallet} iconVariant="success" label="Payments This Month" value={stats ? formatCurrency(stats.month) : '—'} />
         <StatCard icon={Users} iconVariant="info" label="Suppliers Paid" value={stats?.suppliers ?? '—'} />
@@ -299,7 +299,7 @@ export default function SupplierPaymentsList() {
         </div>
         <div className="overflow-x-auto">
           {isLoading ? (
-            <div className="p-8"><LoadingSpinner label="Loading supplier payments..." /></div>
+            <LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["Payment #", "Supplier", "Payment Date", "Amount", "Allocated", "Unallocated", "Method", "Status", ""]} label="Loading supplier payments..." />
           ) : loadError ? (
             <div className="p-8 text-center">
               <p className="text-sm text-red-600">{loadError}</p>

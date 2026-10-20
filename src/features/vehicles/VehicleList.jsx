@@ -230,7 +230,7 @@ export default function VehicleList() {
       </div>
 
       <ListOverview>
-      <ListSummary className="grid-cols-2 lg:grid-cols-4">
+      <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Truck} iconVariant="primary" label="Total Vehicles" value={stats.total} />
         <StatCard icon={CheckCircle2} iconVariant="success" label="Active Vehicles" value={stats.active} />
         <StatCard icon={CarFront} iconVariant="info" label="Assigned Vehicles" value={stats.assigned} />
@@ -283,7 +283,7 @@ export default function VehicleList() {
               </Button>
             </div>
           ) : isLoading ? (
-            <div className="p-10"><LoadingSpinner label="Loading vehicles..." /></div>
+            <LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["Vehicle", "Vehicle Number", "Type", "Capacity", "Assigned To", "Status", "Availability", ""]} label="Loading vehicles..." />
           ) : vehicles.length === 0 ? (
             <div className="p-10 text-center">
               <p className="text-sm font-medium text-neutral-900">No vehicles yet</p>

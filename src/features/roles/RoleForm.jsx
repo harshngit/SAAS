@@ -65,7 +65,7 @@ export default function RoleForm() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading role details..." />
+    return <LoadingSpinner variant="form" fields={4} sections={2} label="Loading role details..." />
   }
 
   if (loadError) {

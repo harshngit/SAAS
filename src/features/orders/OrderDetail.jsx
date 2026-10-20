@@ -392,7 +392,7 @@ export default function OrderDetail() {
   if (isLoading) {
     return (
       <Card>
-        <LoadingSpinner label="Loading order..." />
+        <LoadingSpinner variant="detail" layout="order" columns={11} label="Loading order..." />
       </Card>
     )
   }
@@ -862,9 +862,7 @@ export default function OrderDetail() {
   const paymentHistory = (<>
       <Card title="Payment History" className="p-0" bodyClassName="p-0">
         {isLoadingOrderPayments ? (
-          <div className="p-5">
-            <LoadingSpinner label="Loading payment history..." />
-          </div>
+          <LoadingSpinner variant="table" minWidth="min-w-2xl" columns={["Payment Date", "Amount", "Payment Method", "Collected By", "Collector Role", "Status"]} label="Loading payment history..." />
         ) : orderPaymentsError ? (
           <div className="p-5 text-center">
             <p className="text-sm text-red-600">{orderPaymentsError}</p>

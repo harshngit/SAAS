@@ -400,7 +400,7 @@ export default function SupplierInvoiceForm() {
     navigate(`${basePath}/${result.invoice.id}`)
   }
 
-  if (isLoading) return <LoadingSpinner label="Loading..." />
+  if (isLoading) return <LoadingSpinner variant="form" sidebar fields={6} sections={2} label="Loading..." />
 
   if (notFound) {
     return (

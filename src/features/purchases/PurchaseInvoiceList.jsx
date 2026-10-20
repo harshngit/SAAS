@@ -183,7 +183,7 @@ export default function PurchaseInvoiceList() {
       </div>
 
       <ListOverview>
-      <ListSummary className="grid-cols-2 lg:grid-cols-4">
+      <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={ClipboardList} iconVariant="primary" label="Total Purchases" value={stats.total} />
         <StatCard icon={IndianRupee} iconVariant="info" label="Total Purchase Value" value={formatCurrency(stats.totalValue)} />
         <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={formatCurrency(stats.outstanding)} />
@@ -234,9 +234,7 @@ export default function PurchaseInvoiceList() {
               </Button>
             </div>
           ) : isLoading ? (
-            <div className="p-10">
-              <LoadingSpinner label="Loading purchases..." />
-            </div>
+            <LoadingSpinner variant="table" minWidth="min-w-6xl" columns={["Purchase #", "Supplier", "Purchase Date", "Warehouse", "Grand Total", "Receiving Status", "Payment Status", "Purchase Status", ""]} label="Loading purchases..." />
           ) : purchases.length === 0 ? (
             <div className="p-10 text-center">
               <p className="text-sm font-medium text-neutral-900">No purchases yet</p>

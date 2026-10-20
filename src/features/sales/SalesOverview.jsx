@@ -382,7 +382,7 @@ export default function SalesOverview() {
           )}
 
           {isLoading ? (
-            <LoadingSpinner label="Loading sales overview…" />
+            <LoadingSpinner variant="report" columns={columns} stats={SUMMARY_CARDS.length} label="Loading sales overview…" />
           ) : loadError && !isDemoUnavailable ? (
             <EmptyState icon={PieChart} title="Couldn't load the sales overview" description={loadError} action={{ label: 'Try again', onClick: loadReport }} />
           ) : isDemoUnavailable ? (

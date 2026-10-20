@@ -1,3 +1,4 @@
+import { SkeletonValue } from '../../components/ui/Skeleton'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -53,8 +54,8 @@ function OrderSummaryCard({ label, value, detail, index }) {
         <p className="text-xs font-medium text-fg-muted">{label}</p>
         <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted" aria-hidden="true"><MoreHorizontal className="size-4" /></span>
       </div>
-      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
-      <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
+      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
+      <p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={isLoading} className="h-3 w-28">{detail}</SkeletonValue></p>
     </div>
   )
 }
@@ -277,7 +278,7 @@ export default function OrderList() {
               </Button>
             </div>
           ) : isLoading ? (
-            <LoadingSpinner label="Loading orders..." />
+            <LoadingSpinner variant="table" minWidth="min-w-7xl" columns={["", "Order #", "Customer", "Order Date", "Items", "Total", "Order Status", "Payment", "Fulfilment", "Delivery Status", "Delivery Partner", "Source", "Actions"]} checkboxColumn={0} label="Loading orders..." />
           ) : paginatedOrders.length === 0 ? (
             <EmptyState icon={ShoppingCart} title="No orders match these filters" description="Try a different tab, source, or delivery partner." />
           ) : (

@@ -111,7 +111,7 @@ export default function AttendanceDetail() {
   }, [records])
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading attendance history..." />
+    return <LoadingSpinner variant="detail" label="Loading attendance history..." />
   }
 
   if (records.length === 0 && !user) {

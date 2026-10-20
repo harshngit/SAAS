@@ -65,7 +65,7 @@ export default function StockDetail() {
   }, [productId])
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading stock details..." />
+    return <LoadingSpinner variant="detail" columns={7} label="Loading stock details..." />
   }
 
   if (!stock) {

@@ -365,7 +365,7 @@ export default function PurchaseReturnFormPage() {
   if (PURCHASE_RETURNS_DEMO_ENABLED && isLoadingDemoSource) {
     return (
       <Card>
-        <LoadingSpinner label="Loading purchases with received goods..." />
+        <LoadingSpinner variant="form" fields={4} sections={2} label="Loading purchases with received goods..." />
       </Card>
     )
   }
@@ -480,7 +480,7 @@ export default function PurchaseReturnFormPage() {
 
         {!PURCHASE_RETURNS_DEMO_ENABLED && purchaseId && isLoadingSelected && (
           <Card>
-            <LoadingSpinner label="Loading this purchase's items and return history…" />
+            <LoadingSpinner variant="table" minWidth="min-w-3xl" columns={["Product", "Received", "Already Returned", "Returnable", "Return Qty"]} label="Loading this purchase's items and return history…" />
           </Card>
         )}
 

@@ -409,7 +409,7 @@ export default function CashReconciliation() {
         }
       >
         {isLoading ? (
-          <LoadingSpinner label="Loading reconciliation…" />
+          <LoadingSpinner variant="table" minWidth="min-w-2xl" columns={["Payment Method", "Expected", "Actual", "Variance"]} label="Loading reconciliation…" />
         ) : loadError ? (
           <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>
         ) : hasNoActivity ? (
@@ -584,7 +584,7 @@ export default function CashReconciliation() {
         }
       >
         {isLoadingHistory ? (
-          <LoadingSpinner label="Loading history…" />
+          <LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["Date", "Status", "Expected Collections", "Actual Collections", "Collections Variance", "Expected Closing Cash", "Actual Cash", "Cash Balance Variance", "Closed At", ""]} label="Loading history…" />
         ) : historyError ? (
           <div className="m-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{historyError}</div>
         ) : history.length === 0 ? (

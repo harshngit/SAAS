@@ -304,7 +304,7 @@ export default function WarehouseDetail() {
   const handleReceive = (transfer) => runTransferAction(transfer, receiveDemoTransfer, receiveTransfer)
   const handleCancelTransfer = (transfer) => runTransferAction(transfer, cancelDemoTransfer, cancelTransfer)
 
-  if (isLoading) return <LoadingSpinner label="Loading warehouse..." />
+  if (isLoading) return <LoadingSpinner variant="detail" label="Loading warehouse..." />
 
   if (loadError || !warehouse) {
     return (
@@ -629,7 +629,7 @@ function TransferDetailModal({ transferId, isDemo, fallback, productNameById = {
   return (
     <Modal isOpen={Boolean(transferId)} onClose={onClose} title={transfer?.transferNumber || 'Transfer'} size="2xl">
       {!transfer ? (
-        <LoadingSpinner label="Loading transfer..." />
+        <LoadingSpinner variant="table" columns={["Product", "Quantity"]} label="Loading transfer..." />
       ) : (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">

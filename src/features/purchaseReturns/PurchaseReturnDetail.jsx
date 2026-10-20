@@ -93,7 +93,7 @@ export default function PurchaseReturnDetail() {
   if (isLoading) {
     return (
       <Card>
-        <LoadingSpinner label="Loading purchase return..." />
+        <LoadingSpinner variant="detail" layout="order" columns={7} label="Loading purchase return..." />
       </Card>
     )
   }

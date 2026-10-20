@@ -82,7 +82,7 @@ export default function ReceivablesPayables() {
       </div>
 
       <ListOverview>
-      <ListSummary className="grid-cols-2 lg:grid-cols-4">
+      <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={IndianRupee} iconVariant="primary" label="Total Outstanding" value={formatCurrency(stats.totalOutstanding)} />
         <StatCard icon={AlertTriangle} iconVariant="danger" label="Overdue" value={formatCurrency(stats.overdueAmount)} />
         <StatCard icon={CalendarClock} iconVariant="warning" label="Due Soon" value={formatCurrency(stats.dueSoonAmount)} />

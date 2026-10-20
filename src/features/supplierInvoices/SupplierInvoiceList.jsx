@@ -256,7 +256,7 @@ export default function SupplierInvoiceList() {
       </div>
 
       <ListOverview>
-      <ListSummary className="grid-cols-2 lg:grid-cols-4">
+      <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={ClipboardList} iconVariant="primary" label="Total Supplier Invoices" value={stats?.total ?? '—'} />
         <StatCard icon={IndianRupee} iconVariant="info" label="Total Invoice Value" value={stats ? formatCurrency(stats.totalValue) : '—'} />
         <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={stats ? formatCurrency(stats.outstanding) : '—'} />
@@ -324,7 +324,7 @@ export default function SupplierInvoiceList() {
         </div>
         <div className="overflow-x-auto">
           {isLoading ? (
-            <div className="p-8"><LoadingSpinner label="Loading supplier invoices..." /></div>
+            <LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["Supplier Invoice #", "Supplier", "Purchase", "Invoice Date", "Due Date", "Total", "Outstanding", "Status", "Verification", "Payment", ""]} label="Loading supplier invoices..." />
           ) : loadError ? (
             <div className="p-8 text-center">
               <p className="text-sm text-red-600">{loadError}</p>

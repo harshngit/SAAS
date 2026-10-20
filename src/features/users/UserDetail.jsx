@@ -507,7 +507,7 @@ export default function UserDetail() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading staff details..." />
+    return <LoadingSpinner variant="detail" label="Loading staff details..." />
   }
 
   if (error) {
@@ -884,7 +884,7 @@ export default function UserDetail() {
 
           {activeTab === 'customers' && (
             isLoadingCustomers ? (
-              <LoadingSpinner label="Loading customers..." />
+              <LoadingSpinner variant="table" minWidth="min-w-2xl" columns={["Customer", "City", "Phone", "Outstanding Balance"]} label="Loading customers..." />
             ) : assignedCustomers.length === 0 ? (
               <EmptyPanelState message="No customers assigned to this staff member yet." />
             ) : (
@@ -920,7 +920,7 @@ export default function UserDetail() {
           {activeTab === 'attendance' && (
             <div className="space-y-4">
               {isLoadingAttendance ? (
-                <LoadingSpinner label="Loading attendance..." />
+                <LoadingSpinner variant="table" columns={["Date", "Status", "Check In", "Check Out", "Hours"]} label="Loading attendance..." />
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

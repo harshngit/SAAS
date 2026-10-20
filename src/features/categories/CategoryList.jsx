@@ -1,3 +1,4 @@
+import { SkeletonValue } from '../../components/ui/Skeleton'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -475,7 +476,7 @@ export default function CategoryList() {
             { label: 'Top-level', value: categories.filter((category) => !category.parentId).length, detail: 'parent categories', icon: CalendarPlus },
             { label: 'Subcategories', value: categories.filter((category) => category.parentId).length, detail: 'nested categories', icon: CalendarClock },
           ].map(({ label, value, detail, icon: Icon }, index) => (
-            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>
+            <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p><p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={isLoading} className="h-3 w-28">{detail}</SkeletonValue></p></div>
           ))}
         </div>
       </Card>
@@ -587,7 +588,7 @@ export default function CategoryList() {
               </Button>
             </div>
           ) : isLoading ? (
-            <LoadingSpinner label="Loading categories..." />
+            <LoadingSpinner variant="table" minWidth="min-w-[64rem]" columns={["", "Category", "Parent", "Image", "Description", "Actions"]} checkboxColumn={0} avatarColumn={1} label="Loading categories..." />
           ) : categories.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-sm font-medium text-neutral-900">No categories yet</p>
@@ -766,7 +767,7 @@ export default function CategoryList() {
         className="max-w-xl overflow-hidden"
       >
         {isDetailsLoading ? (
-          <LoadingSpinner label="Loading category details..." />
+          <LoadingSpinner variant="fields" count={4} label="Loading category details..." />
         ) : (
           <div className="space-y-5">
             {detailsError && (

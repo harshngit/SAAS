@@ -141,7 +141,7 @@ export function SalesStaffOverviewPanels({
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="Order List" action={<button type="button" onClick={onViewOrders} className="text-sm font-medium text-primary-700 hover:underline">View All Orders →</button>}>
           {isLoadingOverview ? (
-            <LoadingSpinner label="Loading orders..." />
+            <LoadingSpinner variant="list" rows={4} label="Loading orders..." />
           ) : (overview?.recent_orders || []).length === 0 ? (
             <EmptyPanelState message="No orders linked to this staff member yet." />
           ) : (
@@ -161,7 +161,7 @@ export function SalesStaffOverviewPanels({
         </Panel>
         <Panel title="Assigned Customers" action={<button type="button" onClick={onViewCustomers} className="text-sm font-medium text-primary-700 hover:underline">View All Customers →</button>}>
           {isLoadingCustomers ? (
-            <LoadingSpinner label="Loading customers..." />
+            <LoadingSpinner variant="list" rows={4} label="Loading customers..." />
           ) : assignedCustomers.length === 0 ? (
             <EmptyPanelState message="No customers assigned yet." />
           ) : (

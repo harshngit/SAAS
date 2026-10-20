@@ -1,8 +1,11 @@
-function Skeleton({ className = '' }) {
+import { useEffect, useState } from 'react'
+
+function Skeleton({ className = '', style }) {
   return (
     <span
       aria-hidden="true"
-      className={`block animate-pulse rounded-full bg-surface-muted ${className}`}
+      style={style}
+      className={`block animate-pulse rounded-full bg-neutral-200/60 motion-reduce:animate-none ${className}`}
     />
   )
 }
@@ -18,6 +21,13 @@ function SkeletonText({ lines = 3, className = '' }) {
       ))}
     </div>
   )
+}
+
+// Keep previously loaded summary values visible during table-only refreshes.
+function SkeletonValue({ loading, children, className = '' }) {
+  const [hasLoaded, setHasLoaded] = useState(!loading)
+  useEffect(() => { if (!loading) setHasLoaded(true) }, [loading])
+  return loading && !hasLoaded ? <Skeleton className={className} /> : <>{children}</>
 }
 
 function SkeletonCard({ lines = 4, className = '' }) {
@@ -54,22 +64,24 @@ function PageSkeleton({ label, rows = 3, className = '' }) {
   )
 }
 
-function TableSkeleton({ columns = 5, rows = 6 }) {
+function TableSkeleton({ columns = 5, rows = 6, avatarColumn = -1, checkboxColumn = -1, cellClassName = 'px-4 py-3.5' }) {
+  const cells = Array.isArray(columns) ? columns : Array.from({ length: columns }, () => ({}))
   return (
     <>
       {Array.from({ length: rows }).map((_, rowIndex) => (
-        <tr key={rowIndex}>
-          {Array.from({ length: columns }).map((__, columnIndex) => (
-            <td key={columnIndex} className="px-4 py-3.5">
+        <tr key={rowIndex} aria-hidden="true">
+          {cells.map((column, columnIndex) => (
+            <td key={columnIndex} className={cellClassName}>
+              {columnIndex === avatarColumn ? <div className="flex items-center gap-3"><Skeleton className="size-10 shrink-0" /><div className="min-w-0 flex-1 space-y-2"><Skeleton className="h-3 w-28 max-w-full" /><Skeleton className="h-2.5 w-36 max-w-full" /></div></div> :
               <Skeleton
-                className={`h-3.5 ${
-                  columnIndex === 0
+                className={`${columnIndex === checkboxColumn ? 'size-4 rounded' : `h-3.5 ${
+                  column.align === 'right' ? 'ml-auto w-16' : columnIndex === 0
                     ? 'w-28'
-                    : columnIndex === columns - 1
+                    : columnIndex === cells.length - 1
                       ? 'w-10'
                       : 'w-20'
-                }`}
-              />
+                } max-w-full`}`}
+              />}
             </td>
           ))}
         </tr>
@@ -78,4 +90,4 @@ function TableSkeleton({ columns = 5, rows = 6 }) {
   )
 }
 
-export { Skeleton, SkeletonText, SkeletonCard, PageSkeleton, TableSkeleton }
+export { Skeleton, SkeletonValue, SkeletonText, SkeletonCard, PageSkeleton, TableSkeleton }

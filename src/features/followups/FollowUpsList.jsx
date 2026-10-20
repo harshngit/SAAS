@@ -560,7 +560,7 @@ export default function FollowUpsList() {
         </Card>
       ) : isLoading ? (
         <Card>
-          <LoadingSpinner label="Loading follow-ups..." />
+          <LoadingSpinner variant="table" minWidth="min-w-205" columns={["Follow-up", "Contact", "Type", "Due", "Priority", "Status", "Actions"]} label="Loading follow-ups..." />
         </Card>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>

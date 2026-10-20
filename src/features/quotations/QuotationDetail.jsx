@@ -159,7 +159,7 @@ export default function QuotationDetail() {
   if (isLoading) {
     return (
       <Card>
-        <LoadingSpinner label="Loading quotation..." />
+        <LoadingSpinner variant="detail" layout="invoice" columns={7} label="Loading quotation..." />
       </Card>
     )
   }

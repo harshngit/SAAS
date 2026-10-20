@@ -138,7 +138,7 @@ export default function RolesList() {
               </Button>
             </div>
           ) : isLoading ? (
-            <LoadingSpinner label="Loading roles..." />
+            <LoadingSpinner variant="table" columns={["Role", "Workspace", "Data Scope", "Users", "Status", "Action"]} label="Loading roles..." />
           ) : filteredRoles.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No roles found.</p>
           ) : (

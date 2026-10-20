@@ -183,7 +183,7 @@ export default function VehicleDetail() {
     reloadAll()
   }
 
-  if (isLoading) return <LoadingSpinner label="Loading vehicle..." />
+  if (isLoading) return <LoadingSpinner variant="detail" label="Loading vehicle..." />
 
   if (loadError || !vehicle) {
     return (

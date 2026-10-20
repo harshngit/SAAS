@@ -161,7 +161,7 @@ export default function SupplierPaymentQuickView({ paymentId, isOpen, onClose, o
         </div>
 
         {isLoading ? (
-          <div className="flex-1 p-8"><LoadingSpinner label="Loading payment..." /></div>
+          <div className="flex-1 p-8"><LoadingSpinner variant="payment" label="Loading payment..." /></div>
         ) : !payment ? (
           <div className="flex-1 px-6 py-10 text-center text-sm text-neutral-500">{error || 'Payment not found.'}</div>
         ) : mode === 'view' ? (

@@ -163,7 +163,7 @@ export default function BillingHistory() {
         </div>
 
         {isLoading ? (
-          <LoadingSpinner label="Loading billing history..." />
+          <LoadingSpinner variant="table" minWidth="min-w-[52rem]" columns={["Date", "Plan", "Billing Cycle", "Amount", "Status", "Payment ID", "Action"]} label="Loading billing history..." />
         ) : error ? (
           <div className="flex flex-col items-center gap-3 py-8 text-center">
             <p className="text-sm text-red-600">{error}</p>

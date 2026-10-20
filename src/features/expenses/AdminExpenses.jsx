@@ -203,7 +203,7 @@ export default function AdminExpenses() {
       </div>
 
       <ListOverview>
-      <ListSummary className="grid-cols-2 lg:grid-cols-4">
+      <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Receipt} label="Total Expenses" value={formatCurrency(stats.totalAmount)} iconVariant="primary" />
         <StatCard icon={Clock} label="Pending Review" value={stats.pending.length} iconVariant="warning" />
         <StatCard icon={CheckCircle2} label="Approved" value={stats.approved.length} iconVariant="success" />

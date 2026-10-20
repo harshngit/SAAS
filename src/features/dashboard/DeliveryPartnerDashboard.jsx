@@ -301,7 +301,7 @@ export default function DeliveryPartnerDashboard() {
   }, [currentUser?.id])
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading your dashboard..." />
+    return <LoadingSpinner variant="dashboard" layout="delivery" label="Loading your dashboard..." />
   }
 
   if (loadError) {

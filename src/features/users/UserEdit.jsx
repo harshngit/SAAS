@@ -595,7 +595,7 @@ export default function UserEdit() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading staff edit form..." />
+    return <LoadingSpinner variant="form" fields={8} sections={2} label="Loading staff edit form..." />
   }
 
   if (error && !user) {

@@ -1735,7 +1735,7 @@ function CompanyOverviewDashboard({
   if (isLoading) {
     return (
       <section className="pb-5">
-        <LoadingSpinner label="Loading company overview..." />
+        <LoadingSpinner variant="detail" label="Loading company overview..." />
       </section>
     );
   }

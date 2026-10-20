@@ -1411,7 +1411,7 @@ export default function UserManagement() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {isLoadingUsers ? (
-            <LoadingSpinner label="Loading staff..." />
+            <LoadingSpinner variant="table" columns={["User", "Email", "Role", "Status", "Joined", "Action"]} label="Loading staff..." />
           ) : listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>

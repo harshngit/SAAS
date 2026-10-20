@@ -130,7 +130,7 @@ export default function SalesReturnDetail() {
   if (isLoading) {
     return (
       <Card>
-        <LoadingSpinner label="Loading sales return..." />
+        <LoadingSpinner variant="detail" layout="order" columns={7} label="Loading sales return..." />
       </Card>
     )
   }

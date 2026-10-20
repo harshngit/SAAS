@@ -430,7 +430,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
         }
       >
         {!isDemo && isLoadingGrns ? (
-          <div className="p-5"><LoadingSpinner label="Loading goods receipts..." /></div>
+          <LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["GRN #", "Receipt Date", "Warehouse", "Accepted Qty", "Damaged Qty", "Rejected Qty", "Received By", "Status", "Action"]} label="Loading goods receipts..." />
         ) : !isDemo && listErr ? (
           <div className="p-5">
             <p className="text-sm text-red-600">{listErr}</p>
@@ -644,7 +644,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
       {/* GRN detail */}
       <Modal isOpen={Boolean(detailGrnId)} onClose={() => setDetailGrnId(null)} title={detailGrn?.grnNumber || 'Goods Receipt'} size="4xl">
         {isLoadingDetail ? (
-          <LoadingSpinner label="Loading goods receipt..." />
+          <LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["Product", "SKU", "Ordered", "Prev. Received", "Received", "Damaged", "Rejected", "Accepted", "Batch / Serial / Expiry"]} label="Loading goods receipt..." />
         ) : detailGrn ? (
           <GrnDetailBody grn={detailGrn} isDemo={isDemo} />
         ) : (

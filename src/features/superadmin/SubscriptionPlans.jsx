@@ -144,7 +144,7 @@ export default function SubscriptionPlans() {
 
       {isLoading ? (
         <Card>
-          <LoadingSpinner label="Loading plans…" />
+          <LoadingSpinner variant="cards" count={3} label="Loading plans…" />
         </Card>
       ) : plans.length === 0 ? (
         <Card>

@@ -149,7 +149,7 @@ export default function AccountantDashboard() {
   }, [loadDashboard])
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading accounts overview..." />
+    return <LoadingSpinner variant="dashboard" layout="accounts" label="Loading accounts overview..." />
   }
 
   if (loadError) {

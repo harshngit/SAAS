@@ -1,3 +1,4 @@
+import { SkeletonValue } from '../../components/ui/Skeleton'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -50,8 +51,8 @@ function StatTile({ label, value, detail, icon: Icon }) {
           <Icon className="size-4" aria-hidden="true" />
         </span>
       </div>
-      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
-      <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
+      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
+      <p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={isLoading} className="h-3 w-28">{detail}</SkeletonValue></p>
     </div>
   )
 }
@@ -309,7 +310,7 @@ export default function UpgradeRequests() {
           {listError ? (
             <div className="py-8 text-center"><p className="text-sm text-red-600">{listError}</p></div>
           ) : isLoading ? (
-            <LoadingSpinner label="Loading upgrade requests..." />
+            <LoadingSpinner variant="table" minWidth="min-w-[72rem]" columns={["Organization", "Current Plan", "Requested Plan", "Requested", "Contact", "Status", "Actions"]} label="Loading upgrade requests..." />
           ) : visibleRequests.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-sm font-medium text-neutral-900">No upgrade requests found</p>

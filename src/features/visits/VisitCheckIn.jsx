@@ -956,7 +956,7 @@ export default function VisitCheckIn() {
               </div>
             </Card>
           ) : isLoadingVisits ? (
-            <Card><LoadingSpinner label="Loading visits..." /></Card>
+            <Card><LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["Visit", "When", "Type", "Visit Status", "Outcome", "Follow-up", "Actions"]} label="Loading visits..." /></Card>
           ) : visits.length === 0 ? (
             <Card>
               <div className="flex flex-col items-center gap-2 p-8 text-center">

@@ -1,5 +1,9 @@
 import { ArrowDown, ArrowUp, Search } from 'lucide-react'
 import DataTable from './DataTable'
+import { createContext, useContext } from 'react'
+import { SkeletonValue } from './Skeleton'
+
+const SummaryLoadingContext = createContext(false)
 
 // Opt-in presentation for the list pages. Existing shared components and Leads
 // keep their current appearance and behavior.
@@ -13,10 +17,10 @@ export function ListHeader({ children }) {
   )
 }
 
-export function ListSummary({ children, className = '' }) {
+export function ListSummary({ children, className = '', loading = false }) {
   return (
     <div className={`grid gap-px overflow-hidden rounded-2xl border border-neutral-100 bg-neutral-100 shadow-(--shadow-card) [&>*]:min-w-0 [&>*]:bg-surface ${className}`}>
-      {children}
+      <SummaryLoadingContext.Provider value={loading}>{children}</SummaryLoadingContext.Provider>
     </div>
   )
 }
@@ -30,6 +34,7 @@ export function ListOverview({ children }) {
 }
 
 export function ListStatCard({ icon: Icon, label, value, delta, actions, className = '' }) {
+  const loading = useContext(SummaryLoadingContext)
   return (
     <div className={`h-full min-h-32 bg-surface px-5 py-4 lg:px-6 ${className}`}>
       <div className="flex items-start justify-between gap-3">
@@ -43,11 +48,10 @@ export function ListStatCard({ icon: Icon, label, value, delta, actions, classNa
           {actions}
         </div>
       </div>
-      <p className="mt-4 break-words font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
+      <p className="mt-4 break-words font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={loading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
       {delta && (
         <p className={`mt-2 flex items-center gap-1 text-xs font-medium ${delta.positive ? 'text-emerald-600' : 'text-red-600'}`}>
-          {delta.trend === 'up' ? <ArrowUp className="size-3" aria-hidden="true" /> : <ArrowDown className="size-3" aria-hidden="true" />}
-          {delta.label}
+          <SkeletonValue loading={loading} className="h-3 w-28">{delta.trend === 'up' ? <ArrowUp className="size-3" aria-hidden="true" /> : <ArrowDown className="size-3" aria-hidden="true" />}{delta.label}</SkeletonValue>
         </p>
       )}
     </div>

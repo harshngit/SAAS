@@ -205,9 +205,7 @@ function SalesInvoicesPanel({ header }) {
             </Button>
           </div>
         ) : isLoading ? (
-          <div className="p-10">
-            <LoadingSpinner label="Loading invoices..." />
-          </div>
+          <LoadingSpinner variant="table" minWidth="min-w-5xl" columns={["Invoice No.", "Order #", "Customer", "Invoice Date", "Due Date", "Total", "Paid", "Due", "Payment Status", "Invoice Status", "Actions"]} label="Loading invoices..." />
         ) : (
           <>
             <div className="overflow-x-auto">

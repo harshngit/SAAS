@@ -828,7 +828,7 @@ export default function LeadDetail() {
   if (isLoading) {
     return (
       <div className="rounded-2xl border border-neutral-100 bg-surface">
-        <LoadingSpinner label="Loading lead..." />
+        <LoadingSpinner variant="detail" label="Loading lead..." />
       </div>
     )
   }
@@ -960,7 +960,7 @@ export default function LeadDetail() {
       )}
 
       <Section title="Lead Journey" icon={Calendar}>
-        <div className="flex items-start justify-center overflow-x-auto px-1">
+        <div className="flex items-start justify-center overflow-x-auto pt-4">
           <LeadJourneyNode index={1} label="New" state={journeyState.isLost ? 'done' : journeyState.index > 0 ? 'done' : 'current'} />
           <LeadJourneyNode index={2} label="Contacted" state={journeyState.index > 1 ? 'done' : journeyState.index === 1 ? 'current' : 'pending'} />
           <LeadJourneyNode index={3} label="Qualified" state={journeyState.index > 2 ? 'done' : journeyState.index === 2 ? 'current' : 'pending'} />
@@ -1148,7 +1148,7 @@ export default function LeadDetail() {
             {followUpsError ? (
               <p className="py-6 text-center text-sm text-red-600">{followUpsError}</p>
             ) : isLoadingFollowUps && directFollowUps.length === 0 ? (
-              <LoadingSpinner label="Loading follow-ups..." />
+              <LoadingSpinner variant="activity" rows={3} label="Loading follow-ups..." />
             ) : allLeadFollowUps.length === 0 ? (
               <p className="py-6 text-center text-sm text-neutral-400">No follow-ups for this lead yet.</p>
             ) : (
@@ -1210,7 +1210,7 @@ export default function LeadDetail() {
                 <p className="text-sm text-red-600">{visitsError}</p>
               </div>
             ) : isLoadingVisits ? (
-              <LoadingSpinner label="Loading visits..." />
+              <LoadingSpinner variant="activity" rows={3} label="Loading visits..." />
             ) : visits.length === 0 ? (
               <p className="py-6 text-center text-sm text-neutral-400">No visits recorded for this lead yet.</p>
             ) : (

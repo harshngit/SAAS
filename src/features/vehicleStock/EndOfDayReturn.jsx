@@ -382,7 +382,7 @@ function ReturnDetailModal({ record, onClose }) {
 }
 
 function PreviousReturns({ records, isLoading, limited, onView }) {
-  if (isLoading) return <Card><LoadingSpinner label="Loading previous returns..." /></Card>
+  if (isLoading) return <Card><LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["Date", "Vehicle", "Products", "Expected", "Physical", "Good Return", "Damaged", "Variance", "Status", "Actions"]} label="Loading previous returns..." /></Card>
 
   const limitedNote = limited ? (
     <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-700">
@@ -825,7 +825,7 @@ export default function EndOfDayReturn() {
 
         <TabsContent value="today" className="space-y-5">
           {isLoading ? (
-            <Card><LoadingSpinner label="Loading active session..." /></Card>
+            <Card><LoadingSpinner variant="form" fields={6} sections={2} label="Loading active session..." /></Card>
           ) : loadError ? (
             <Card>
               <div className="py-8 text-center">

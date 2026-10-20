@@ -1,3 +1,4 @@
+import { SkeletonValue } from '../../components/ui/Skeleton'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -371,8 +372,8 @@ export default function LeadList() {
                   <Icon className="size-4" aria-hidden="true" />
                 </span>
               </div>
-              <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
-              <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
+              <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
+              <p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={isLoading} className="h-3 w-28">{detail}</SkeletonValue></p>
             </div>
           ))}
         </div>
@@ -440,7 +441,7 @@ export default function LeadList() {
               </Button>
             </div>
           ) : isLoading ? (
-            <LoadingSpinner label="Loading leads..." />
+            <LoadingSpinner variant="table" rows={8} minWidth="min-w-252" columns={["", "Lead", "Contact", "Source", "Assigned To", "Status", "Next Follow-up", "Created", "Actions"]} checkboxColumn={0} avatarColumn={1} label="Loading leads..." />
           ) : (
             <table className="listing-table w-full min-w-252 text-left text-sm">
               <thead>

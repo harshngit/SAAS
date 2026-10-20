@@ -1,3 +1,4 @@
+import { SkeletonValue } from '../../components/ui/Skeleton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
@@ -343,7 +344,7 @@ export default function WarehouseList() {
       </div>
 
       <Card className="overflow-hidden p-0">
-        <div className="grid grid-cols-2 lg:grid-cols-4">{[{ label: 'Total Warehouses', value: stats.total, detail: `${stats.active} active`, icon: WarehouseIcon }, { label: 'Active Warehouses', value: stats.active, detail: 'currently active', icon: ClipboardList }, { label: 'Stock Units', value: stats.stockUnits, detail: `${stats.lowStock} low stock`, icon: Boxes }, { label: 'Low Stock Items', value: stats.lowStock, detail: 'needs attention', icon: PackageSearch }].map(({ label, value, detail, icon: Icon }, index) => <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p><p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p></div>)}</div>
+        <div className="grid grid-cols-2 lg:grid-cols-4">{[{ label: 'Total Warehouses', value: stats.total, detail: `${stats.active} active`, icon: WarehouseIcon }, { label: 'Active Warehouses', value: stats.active, detail: 'currently active', icon: ClipboardList }, { label: 'Stock Units', value: stats.stockUnits, detail: `${stats.lowStock} low stock`, icon: Boxes }, { label: 'Low Stock Items', value: stats.lowStock, detail: 'needs attention', icon: PackageSearch }].map(({ label, value, detail, icon: Icon }, index) => <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}><div className="flex items-start justify-between gap-3"><p className="text-xs font-medium text-fg-muted">{label}</p><span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" /></span></div><p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p><p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={isLoading} className="h-3 w-28">{detail}</SkeletonValue></p></div>)}</div>
       </Card>
       {adjustSuccess && <div className="rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-700">{adjustSuccess}</div>}
       {selectedIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3"><p className="text-sm font-medium text-primary-900">{selectedIds.length} warehouse{selectedIds.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-surface px-3" onClick={() => exportWarehouses(true)}><Download className="size-4" />Download</Button><Button type="button" variant="danger" size="sm" className="h-8 rounded-lg px-3" loading={isDeleting} onClick={handleBulkDelete}><Trash2 className="size-4" />Delete</Button></div></div>}
@@ -362,7 +363,7 @@ export default function WarehouseList() {
               </Button>
             </div>
           ) : isLoading ? (
-            <div className="p-10"><LoadingSpinner label="Loading warehouses..." /></div>
+            <LoadingSpinner variant="table" minWidth="min-w-[72rem]" columns={["", "Warehouse", "Location", "Manager / In-Charge", "Products", "Stock Units", "Low Stock", "Status", "Actions"]} checkboxColumn={0} label="Loading warehouses..." />
           ) : warehouses.length === 0 ? (
             <div className="p-10 text-center">
               <p className="text-sm font-medium text-neutral-900">No warehouses yet</p>

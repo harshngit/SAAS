@@ -128,7 +128,7 @@ export default function DataTable({
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {loading ? (
-              <TableSkeleton columns={colSpan} rows={Math.min(pageSize, 8)} />
+              <TableSkeleton columns={actions ? [...columns, { key: '_actions', align: 'right' }] : columns} rows={Math.min(pageSize, 8)} />
             ) : paginated.length === 0 ? (
               <tr>
                 <td colSpan={colSpan}>

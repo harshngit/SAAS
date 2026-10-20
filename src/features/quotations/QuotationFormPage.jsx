@@ -407,7 +407,7 @@ export default function QuotationFormPage() {
   if (isLoadingSource) {
     return (
       <div className="rounded-2xl border border-neutral-100 bg-surface p-10">
-        <LoadingSpinner label="Loading quotation..." />
+        <LoadingSpinner variant="form" sidebar fields={6} sections={2} label="Loading quotation..." />
       </div>
     )
   }

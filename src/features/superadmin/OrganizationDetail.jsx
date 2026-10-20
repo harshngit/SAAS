@@ -312,7 +312,7 @@ export default function OrganizationDetail() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading organization..." />
+    return <LoadingSpinner variant="detail" label="Loading organization..." />
   }
 
   if (!organization) {
@@ -558,7 +558,7 @@ export default function OrganizationDetail() {
 
       <Card title="Payments" subtitle="Online subscription payments for this organization">
         {isLoadingPayments ? (
-          <LoadingSpinner label="Loading payments..." />
+          <LoadingSpinner variant="table" minWidth="min-w-2xl" columns={["Date", "Plan", "Cycle", "Amount", "Status", "Payment ID"]} label="Loading payments..." />
         ) : paymentsError ? (
           <p className="py-6 text-center text-sm text-red-600">{paymentsError}</p>
         ) : payments.length === 0 ? (

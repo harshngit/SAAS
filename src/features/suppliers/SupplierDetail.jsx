@@ -401,7 +401,7 @@ export default function SupplierDetail() {
   }, [useDemoSuppliers, supplierInvoices])
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading supplier details..." />
+    return <LoadingSpinner variant="detail" label="Loading supplier details..." />
   }
 
   if (!supplier) {
@@ -827,7 +827,7 @@ export default function SupplierDetail() {
             {DEMO_MODE ? (
               <p className="px-5 py-8 text-center text-sm text-neutral-500">Brand & category associations aren&apos;t available in demo mode.</p>
             ) : isLoadingBrands ? (
-              <LoadingSpinner label="Loading brands..." />
+              <LoadingSpinner variant="activity" rows={3} label="Loading brands..." />
             ) : supplierBrands.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-neutral-500">No brands are linked to this supplier yet.</p>
             ) : (
@@ -876,7 +876,7 @@ export default function SupplierDetail() {
                             </Button>
                           </div>
                           {loadingCategoriesBrandId === brand.id ? (
-                            <LoadingSpinner label="Loading categories..." />
+                            <LoadingSpinner variant="activity" rows={3} label="Loading categories..." />
                           ) : brandCategories.length === 0 ? (
                             <p className="py-2 text-sm text-neutral-400">No categories linked to this brand yet.</p>
                           ) : (
@@ -952,7 +952,7 @@ export default function SupplierDetail() {
                 ))}
               </div>
             )}
-            {isLoadingProducts ? <LoadingSpinner label="Loading supplier products..." /> : supplierProducts.length === 0 ? (
+            {isLoadingProducts ? <LoadingSpinner variant="table" minWidth="min-w-[720px]" columns={["Product", "SKU", "Category", "Status", "Action"]} label="Loading supplier products..." /> : supplierProducts.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-neutral-500">No products are currently linked to this supplier.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -989,7 +989,7 @@ export default function SupplierDetail() {
             className="p-0"
             bodyClassName="p-0"
           >
-            {purchasesError ? <div className="px-5 py-8 text-center text-sm text-red-600">{purchasesError}</div> : isLoadingPurchases ? <LoadingSpinner label="Loading purchase history..." /> : purchases.length === 0 ? (
+            {purchasesError ? <div className="px-5 py-8 text-center text-sm text-red-600">{purchasesError}</div> : isLoadingPurchases ? <LoadingSpinner variant="table" minWidth="min-w-[900px]" columns={["Purchase #", "Date", "Warehouse", "Total", "Receiving Status", "Payment Status", "Action"]} label="Loading purchase history..." /> : purchases.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-neutral-500">No purchases found for this supplier.</p>
             ) : (
               <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead><tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400"><th className="px-5 py-3">Purchase #</th><th className="px-5 py-3">Date</th><th className="px-5 py-3">Warehouse</th><th className="px-5 py-3">Total</th><th className="px-5 py-3">Receiving Status</th><th className="px-5 py-3">Payment Status</th><th className="px-5 py-3 text-right">Action</th></tr></thead><tbody className="divide-y divide-neutral-50">{purchases.map((purchase) => <tr key={purchase.id} className="hover:bg-primary-50/35"><td className="px-5 py-3.5 font-medium text-neutral-900">{displayValue(purchase.purchaseNumber || purchase.invoiceNumber)}</td><td className="px-5 py-3.5 text-neutral-600">{formatDate(purchase.purchaseDate || purchase.invoiceDate)}</td><td className="px-5 py-3.5 text-neutral-600">{displayValue(purchase.warehouseId)}</td><td className="px-5 py-3.5 font-medium text-neutral-900">{formatCurrency(purchase.total)}</td><td className="px-5 py-3.5"><Badge variant="neutral">{displayValue(purchase.receivingStatus || purchase.purchaseStatus)}</Badge></td><td className="px-5 py-3.5"><Badge variant="neutral">{displayValue(purchase.paymentStatus)}</Badge></td><td className="px-5 py-3.5 text-right"><Button type="button" variant="ghost" size="sm" onClick={() => navigate('/admin/purchases')}><Eye className="size-4" aria-hidden="true" /> View Purchase</Button></td></tr>)}</tbody></table></div>
@@ -1082,7 +1082,7 @@ export default function SupplierDetail() {
               </Button>
             </div>
           ) : isLoadingPayments ? (
-            <LoadingSpinner label="Loading payment history..." />
+            <LoadingSpinner variant="table" minWidth="min-w-3xl" columns={["Payment #", "Payment Date", "Amount", "Allocated", "Unallocated", "Method", "Status", "Action"]} label="Loading payment history..." />
           ) : payments.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No supplier payments recorded for this supplier yet.</p>
           ) : (

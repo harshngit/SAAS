@@ -421,7 +421,7 @@ export default function BrandList() {
               </Button>
             </div>
           ) : isLoading ? (
-            <LoadingSpinner label="Loading brands..." />
+            <LoadingSpinner variant="table" minWidth="min-w-[54rem]" columns={["", "Brand", "Description", "Products", "Status", "Actions"]} checkboxColumn={0} avatarColumn={1} label="Loading brands..." />
           ) : brands.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-sm font-medium text-neutral-900">No brands yet</p>

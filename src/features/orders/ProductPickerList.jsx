@@ -1,6 +1,6 @@
 import { itemKey, productVariants, readableClassification, selectedProductValues } from '../../utils/productVariants'
 import { useMemo, useState } from 'react'
-import { AlertTriangle, Minus, Package, Pencil, Plus, Search } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Minus, Package, Pencil, Plus, Search } from 'lucide-react'
 import { formatCurrency } from '../../utils/format'
 import { getFileUrl } from '../../api/files'
 import { formatVariantCurrency } from '../products/productUtils'
@@ -72,7 +72,7 @@ export default function ProductPickerList({
     if (variants.length <= 1 && !(!variants.length && product.has_variants)) return [{ product, variant: variants[0] || null }]
     const expanded = expandedProducts[product.id] ?? orderItems.some((item) => item.productId === product.id)
     const rows = [{ product, group: true, expanded, variants }]
-    if (expanded) rows.push(...variants.map((variant) => ({ product, variant })))
+    if (expanded) rows.push(...variants.map((variant) => ({ product, variant, grouped: true })))
     return rows
   })
 
@@ -119,14 +119,30 @@ export default function ProductPickerList({
         ) : filtered.length === 0 ? (
           <p className="rounded-2xl border border-neutral-100 px-3 py-6 text-center text-sm text-neutral-400">No products found.</p>
         ) : (
-          pickerRows.map(({ product, variant, group, expanded, variants }) => {
+          pickerRows.map(({ product, variant, group, expanded, variants, grouped }) => {
             if (group) return (
-              <div key={product.id} className="rounded-xl border border-neutral-100 bg-neutral-50 p-3">
-                <button type="button" className="w-full text-left" aria-expanded={Boolean(expanded)}
+              <div key={product.id} className="rounded-xl border border-neutral-100 bg-surface p-3">
+                <button type="button" className="flex w-full items-center gap-3 text-left" aria-expanded={Boolean(expanded)}
                   onClick={() => setExpandedProducts((current) => ({ ...current, [product.id]: !expanded }))}>
-                  <span className="block text-sm font-semibold text-neutral-900">{product.name}</span>
-                  <span className="text-xs text-neutral-500">{variants.length} variants{product.total_stock != null ? ` · ${product.total_stock} total stock` : ''} · Select variant</span>
+                  <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
+                    <Package className="size-5" aria-hidden="true" />
+                    {productImageUrl(product) && <img src={productImageUrl(product)} alt="" className="absolute inset-0 size-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none' }} />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-neutral-900">{product.name}</span>
+                      <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[0.65rem] font-semibold text-blue-600">{variants.length} variants</span>
+                    </span>
+                    <span className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                      <span className="text-neutral-400">SKU: {product.sku || '—'}</span>
+                      {product.total_stock != null && <span className="inline-flex items-center gap-1.5 text-emerald-600"><Package className="size-3.5" aria-hidden="true" />{product.total_stock} total stock</span>}
+                    </span>
+                  </span>
+                  <ChevronDown className={`size-4 shrink-0 text-neutral-500 transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
                 </button>
+                {expanded && variants.length > 0 && <div className="mt-3 hidden grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] gap-3 rounded-lg bg-neutral-50 px-2 py-2 text-[0.65rem] font-semibold text-neutral-600 md:grid" aria-hidden="true">
+                  <span>Variant</span><span>SKU</span><span>Price</span><span>Available Stock</span><span className="w-24 text-center">Quantity</span>
+                </div>}
                 {expanded && !variants.length && <p className="mt-2 text-xs text-amber-700">Select a variant first. No variants are available for this product.</p>}
               </div>
             )
@@ -148,12 +164,13 @@ export default function ProductPickerList({
             return (
               <div
                 key={key}
-                className={`flex items-center gap-3 rounded-2xl border p-3 transition-colors ${
+                className={`${grouped ? 'grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto]' : 'flex'} items-center gap-3 rounded-xl border p-3 transition-colors ${
                   isSelected
                     ? 'border-primary-600 bg-primary-50/50 ring-1 ring-primary-600'
                     : 'border-neutral-100 bg-surface hover:border-neutral-200'
                 }`}
               >
+                <div className={`flex min-w-0 items-center gap-3 ${grouped ? '' : 'flex-1'}`}>
                 <div className="relative size-14 shrink-0">
                   <span className="flex size-14 items-center justify-center rounded-xl bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
                     <Package className="size-5" aria-hidden="true" />
@@ -173,9 +190,10 @@ export default function ProductPickerList({
                 <div className="min-w-0 flex-1">
                   {/* Available quantity sits beside the product name, not on its own line. */}
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <p className="truncate text-sm font-medium text-neutral-900">{displayName}</p>
+                    <p className="text-sm font-medium text-neutral-900">{grouped ? variant.size || 'Unnamed variant' : displayName}</p>
+                    {variant && !grouped && <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[0.65rem] font-semibold text-blue-600">1 variant</span>}
                     <span
-                      className={`shrink-0 whitespace-nowrap text-[0.68rem] font-medium ${
+                      className={`${grouped ? 'md:hidden' : ''} shrink-0 whitespace-nowrap text-[0.68rem] font-medium ${
                         isOutOfStock
                           ? 'text-red-600'
                           : isLowStock
@@ -192,13 +210,13 @@ export default function ProductPickerList({
                           : `${isLowStock ? 'Low stock · ' : ''}${stock} ${unit}${isLowStock ? '' : ' available'}`}
                     </span>
                   </div>
-                  <p className="truncate text-[0.7rem] text-neutral-400">SKU: {(variant ? variant.sku : product.sku) || '—'}</p>
+                  <p className={`${grouped ? 'md:hidden' : ''} truncate text-[0.7rem] text-neutral-400`}>SKU: {(variant ? variant.sku : product.sku) || '—'}</p>
                   {variant?.variantCode && <p className="text-[0.7rem] text-neutral-400">{variant.variantCode}</p>}
                   {!canAdd && <p className="text-xs text-amber-700">Select a variant first.</p>}
                   {selection && selection.unitPrice == null && <p className="text-xs text-amber-700">Selling price unavailable. Enter a unit price.</p>}
                   {/* Base (catalogue) price - always shown under the name. The right column
                       holds the editable line price + stepper only once the row is selected. */}
-                  <p className="text-[0.7rem] font-bold text-neutral-900">
+                  <p className={`${grouped ? 'md:hidden' : ''} text-[0.7rem] font-bold text-neutral-900`}>
                     {selection?.unitPrice != null ? (variant ? formatVariantCurrency(selection.unitPrice, variant.currency) : formatCurrency(selection.unitPrice)) : '—'}
                     <span className="ml-1 font-normal text-neutral-400">/ {unit}</span>
                   </p>
@@ -209,6 +227,16 @@ export default function ProductPickerList({
                     </span>
                   )}
                 </div>
+                </div>
+
+                {grouped && <>
+                  <p className="hidden break-all text-[0.7rem] text-neutral-500 md:block">{variant.sku || '—'}</p>
+                  <p className="hidden text-xs font-semibold text-neutral-900 md:block">{selection?.unitPrice != null ? formatVariantCurrency(selection.unitPrice, variant.currency) : '—'}<span className="ml-1 text-[0.65rem] font-normal text-neutral-400">/ {unit}</span></p>
+                  <span className={`hidden items-center gap-1.5 text-[0.7rem] md:inline-flex ${isOutOfStock ? 'text-red-600' : isLowStock ? 'text-amber-600' : stock === null ? 'text-neutral-400' : 'text-emerald-600'}`}>
+                    <Package className="size-3.5 shrink-0" aria-hidden="true" />
+                    {isOutOfStock ? 'Out of stock' : stock === null ? 'Stock not tracked' : `${isLowStock ? 'Low stock · ' : ''}${stock} ${unit} available`}
+                  </span>
+                </>}
 
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   {isSelected && (

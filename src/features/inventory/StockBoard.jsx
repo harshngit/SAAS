@@ -308,7 +308,7 @@ export default function StockBoard({ readOnly = false }) {
       </div>
 
       <ListOverview>
-        <ListSummary className="grid-cols-2  lg:grid-cols-4">
+        <ListSummary loading={isLoading} className="grid-cols-2  lg:grid-cols-4">
         <StatCard icon={Boxes} iconVariant="primary" label="Tracked Products" value={stats.totalProducts} />
         <StatCard icon={Package} iconVariant="info" label="Total Stock Units" value={stats.totalStock.toLocaleString()} />
         <StatCard icon={XCircle} iconVariant="danger" label="Out of Stock" value={stats.outOfStock} />
@@ -351,7 +351,7 @@ export default function StockBoard({ readOnly = false }) {
               </Button>
             </div>
           ) : isLoading ? (
-            <LoadingSpinner label="Loading stock board..." />
+            <LoadingSpinner variant="table" columns={["Product", "SKU", "Variants", "Current Stock", "Status", "Action"]} label="Loading stock board..." />
           ) : filteredItems.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No stock items match these filters.</p>
           ) : (

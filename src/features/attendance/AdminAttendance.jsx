@@ -365,7 +365,7 @@ export default function AdminAttendance() {
 
         <div className="overflow-x-auto bg-neutral-50/35 py-4">
           {isLoading ? (
-            <LoadingSpinner label="Loading attendance..." />
+            <LoadingSpinner variant="table" columns={["", "Employee", "Role", "Date", "Status", "Check In", "Check Out", "Work Hours", ""]} checkboxColumn={0} label="Loading attendance..." />
           ) : filteredRows.length === 0 ? (
             <EmptyState
               icon={CalendarCheck}

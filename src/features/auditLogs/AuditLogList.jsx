@@ -336,9 +336,7 @@ export default function AuditLogList() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {isLoading ? (
-            <div className="p-6">
-              <LoadingSpinner label="Loading activity..." />
-            </div>
+            <LoadingSpinner variant="table" minWidth="min-w-[56rem]" columns={["Action", "Type", "By", "Date"]} label="Loading activity..." />
           ) : loadError ? (
             <div className="p-6 text-center">
               <p className="text-sm text-red-600">{loadError}</p>

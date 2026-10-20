@@ -162,7 +162,7 @@ export default function OrganizationPlanAccess({ orgId }) {
     await Promise.all([load(), loadStorageUsage()])
   }
 
-  if (isLoading) return <Card><LoadingSpinner label="Loading plan & access…" /></Card>
+  if (isLoading) return <Card><LoadingSpinner variant="form" fields={6} sections={2} label="Loading plan & access…" /></Card>
 
   if (!data) {
     return (
@@ -219,7 +219,7 @@ export default function OrganizationPlanAccess({ orgId }) {
         }
       >
         {isLoadingStorage ? (
-          <LoadingSpinner label="Loading storage usage…" />
+          <LoadingSpinner variant="stats" count={3} className="grid-cols-1 sm:grid-cols-3" label="Loading storage usage…" />
         ) : !storageUsage ? (
           <EmptyState title="Unable to load storage usage" description={storageError || 'Please try again.'} action={{ label: 'Retry', onClick: loadStorageUsage }} />
         ) : (

@@ -514,9 +514,7 @@ export default function InvoiceSettings() {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl border border-neutral-100 bg-surface p-10 shadow-(--shadow-card)">
-        <LoadingSpinner label="Loading invoice settings..." />
-      </div>
+      <LoadingSpinner variant="settings" preview label="Loading invoice settings..." />
     )
   }
 

@@ -253,7 +253,12 @@ test('shared picker renders variant codes/SKUs/stock and never labels parent SKU
   assert.match(html, /VAR-0001/)
   assert.match(html, /LED-M/)
   assert.match(html, /10 unit/)
-  assert.doesNotMatch(html, /PARENT-SKU|999|10000000-0000/)
+  // The parent SKU is now explicitly shown in the expandable product header.
+  // It must never leak into any variant's own SKU cell.
+  assert.match(html, /2 variants/)
+  assert.match(html, /SKU: PARENT-SKU/)
+  const variantRows = html.replace(/<button\b[^>]*aria-expanded="true"[\s\S]*?<\/button>/, '')
+  assert.doesNotMatch(variantRows, /PARENT-SKU|999|10000000-0000/)
   const missingSku = { ...product, variations: [{ ...product.variations[0], sku: null }] }
   const legacyHtml = renderToStaticMarkup(React.createElement(Picker, { products: [missingSku], orderItems: [], onSetQuantity() {}, onUpdateItem() {}, onRoundBlur() { return () => {} } }))
   assert.doesNotMatch(legacyHtml, /PARENT-SKU/)

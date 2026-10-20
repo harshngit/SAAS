@@ -612,7 +612,7 @@ export default function CustomerDetail() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading customer details..." />
+    return <LoadingSpinner variant="detail" label="Loading customer details..." />
   }
 
   if (!customer) {
@@ -1211,7 +1211,7 @@ export default function CustomerDetail() {
                 <Button type="button" variant="outline" size="sm" className="mt-3" onClick={loadPayments}>Retry</Button>
               </div>
             ) : isLoadingPayments ? (
-              <LoadingSpinner label="Loading payment history..." />
+              <LoadingSpinner variant="list" rows={3} label="Loading payment history..." />
             ) : payments.length === 0 ? (
               <p className="py-6 text-center text-sm text-neutral-400">No payments recorded for this customer yet.</p>
             ) : (
@@ -1288,7 +1288,7 @@ export default function CustomerDetail() {
                 <Button type="button" variant="outline" size="sm" className="mt-3" onClick={loadCollections}>Retry</Button>
               </div>
             ) : isLoadingCollections ? (
-              <LoadingSpinner label="Loading collection history..." />
+              <LoadingSpinner variant="table" minWidth="min-w-2xl" columns={["Date", "Amount", "Payment Method", "Source", "Collected By", "Role", "Status"]} label="Loading collection history..." />
             ) : collections.length === 0 ? (
               <p className="py-6 text-center text-sm text-neutral-400">No payment collections recorded for this customer yet.</p>
             ) : (
@@ -1334,7 +1334,7 @@ export default function CustomerDetail() {
         <Section title="Order History" icon={ShoppingBag}>
           <div>
             {isLoadingOrders ? (
-              <LoadingSpinner label="Loading orders..." />
+              <LoadingSpinner variant="table" minWidth="min-w-2xl" columns={["Order #", "Date", "Order Status", "Delivery Status", "Total"]} label="Loading orders..." />
             ) : customerOrders.length === 0 ? (
               <p className="py-6 text-center text-sm text-neutral-400">No orders recorded for this customer yet.</p>
             ) : (
@@ -1383,7 +1383,7 @@ export default function CustomerDetail() {
           </Section>
         ) : isLoadingVisits || !visitsLoaded ? (
           <Section title="Activities" icon={ClipboardList}>
-            <LoadingSpinner label="Loading activities..." />
+            <LoadingSpinner variant="activity" label="Loading activities..." />
           </Section>
         ) : (
           <div className="space-y-4">
@@ -1509,7 +1509,7 @@ export default function CustomerDetail() {
             <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => loadLedger()}>Retry</Button>
           </div>
         ) : isLoadingLedger ? (
-          <LoadingSpinner label="Loading account statement..." />
+          <LoadingSpinner variant="table" minWidth="min-w-2xl" columns={["Date", "Type", "Description", "Debit", "Credit", "Balance"]} label="Loading account statement..." />
         ) : !ledger ? null : (
           <div className="space-y-5">
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -1595,7 +1595,7 @@ export default function CustomerDetail() {
             <p className="text-sm text-red-600">{documentsError}</p>
           </div>
         ) : isLoadingDocuments ? (
-          <LoadingSpinner label="Loading documents..." />
+          <LoadingSpinner variant="cards" count={3} label="Loading documents..." />
         ) : documents.length === 0 ? (
           <p className="py-6 text-center text-sm text-neutral-400">No documents uploaded for this customer yet.</p>
         ) : (

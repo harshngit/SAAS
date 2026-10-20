@@ -607,7 +607,7 @@ export default function AdminDashboard() {
   }, [])
 
   if (isLoading && !dashboard) {
-    return <LoadingSpinner label="Loading dashboard..." />
+    return <LoadingSpinner variant="dashboard" layout="admin" label="Loading dashboard..." />
   }
 
   if (error && !dashboard) {

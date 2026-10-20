@@ -78,7 +78,7 @@ export default function GoogleRegister() {
   if (isLoadingInfo) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-neutral-50">
-        <LoadingSpinner label="Loading your Google account details..." />
+        <LoadingSpinner variant="form" fields={4} sections={1} label="Loading your Google account details..." />
       </div>
     )
   }

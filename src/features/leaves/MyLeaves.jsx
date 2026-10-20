@@ -1,3 +1,4 @@
+import { SkeletonValue } from '../../components/ui/Skeleton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CalendarDays, Eye, Plus } from 'lucide-react'
 import Card from '../../components/ui/Card'
@@ -251,7 +252,7 @@ export default function MyLeaves() {
           ['Rejected', counts.rejected],
         ].map(([label, value]) => (
           <div key={label} className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
-            <p className="text-2xl font-semibold text-neutral-900">{value}</p>
+            <p className="text-2xl font-semibold text-neutral-900"><SkeletonValue loading={isLoading} className="h-7 w-12 rounded-lg">{value}</SkeletonValue></p>
             <p className="mt-0.5 text-xs text-neutral-500">{label}</p>
           </div>
         ))}
@@ -286,7 +287,7 @@ export default function MyLeaves() {
           </div>
         </div>
         {isLoading ? (
-          <div className="p-6"><LoadingSpinner label="Loading your leave requests..." /></div>
+          <LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["Leave Type", "Date Range", "Days", "Reason", "Status", "Requested On", "Actions"]} label="Loading your leave requests..." />
         ) : listError ? (
           <div className="p-6 text-center">
             <p className="text-sm text-red-600">{listError}</p>

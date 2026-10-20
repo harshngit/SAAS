@@ -275,9 +275,7 @@ export default function InvoiceDetail() {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl border border-neutral-100 bg-surface p-10 shadow-(--shadow-card)">
-        <LoadingSpinner label="Loading invoice..." />
-      </div>
+      <LoadingSpinner variant="detail" layout="invoice" columns={7} label="Loading invoice..." />
     )
   }
 
@@ -671,7 +669,6 @@ export default function InvoiceDetail() {
             invoiceSettings={invoiceSettings}
             isRefreshing={isRefreshingPreview}
             onRefresh={handleRefreshPreview}
-            exportRef={previewExportRef}
           />
         </div>
       </div>

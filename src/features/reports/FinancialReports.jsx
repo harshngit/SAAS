@@ -561,7 +561,7 @@ export default function FinancialReports({
           {!isReportEntitled(reportType) ? (
             <PlanRestricted description={`${config?.label || 'This report'} is not included in your current plan.`} />
           ) : isLoading ? (
-            <LoadingSpinner label={`Loading ${config?.label || 'report'}…`} />
+            <LoadingSpinner variant="report" columns={columns} stats={config?.summaryCards?.length || 0} chart label={`Loading ${config?.label || 'report'}…`} />
           ) : loadError && !isDemoUnavailable ? (
             <EmptyState
               icon={FileSpreadsheet}

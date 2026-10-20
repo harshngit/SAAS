@@ -124,7 +124,7 @@ export default function ObjectFieldsSettings() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading field settings..." />
+    return <LoadingSpinner variant="settings" label="Loading field settings..." />
   }
 
   if (loadError) {

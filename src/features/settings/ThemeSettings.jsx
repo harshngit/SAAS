@@ -242,7 +242,7 @@ export default function ThemeSettings() {
   if (!draft) {
     return (
       <Card>
-        <LoadingSpinner label="Loading appearance settings..." />
+        <LoadingSpinner variant="settings" preview label="Loading appearance settings..." />
       </Card>
     )
   }

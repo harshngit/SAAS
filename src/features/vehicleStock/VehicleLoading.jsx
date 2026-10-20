@@ -347,7 +347,7 @@ export default function VehicleLoading() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading vehicle loading plan..." />
+    return <LoadingSpinner variant="form" fields={4} sections={2} label="Loading vehicle loading plan..." />
   }
 
   return (

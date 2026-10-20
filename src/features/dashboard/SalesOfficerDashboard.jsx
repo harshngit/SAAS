@@ -239,7 +239,7 @@ export default function SalesOfficerDashboard() {
   }, [])
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading your dashboard..." />
+    return <LoadingSpinner variant="dashboard" layout="sales" label="Loading your dashboard..." />
   }
 
   if (loadError) {

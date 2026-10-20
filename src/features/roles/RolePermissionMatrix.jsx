@@ -348,7 +348,7 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
 
         {isCatalogLoading ? (
           <div className="mt-3">
-            <LoadingSpinner label="Loading permission catalog..." />
+            <LoadingSpinner variant="table" minWidth="min-w-160" columns={["Module", "All", ...(catalogActions.length ? catalogActions.map((action) => action.label) : ["View", "Create", "Edit", "Delete"])]} label="Loading permission catalog..." />
           </div>
         ) : catalogError ? (
           <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{catalogError}</div>

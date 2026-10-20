@@ -270,7 +270,7 @@ export default function MyAttendance() {
         }
       >
         {isLoading ? (
-          <div className="p-6"><LoadingSpinner label="Loading attendance history..." /></div>
+          <LoadingSpinner variant="table" minWidth="min-w-3xl" columns={["Date", "Status", "Check In", "Check Out", "Duration", "Actions"]} label="Loading attendance history..." />
         ) : loadError ? (
           <div className="p-6 text-center">
             <p className="text-sm text-red-600">{loadError}</p>

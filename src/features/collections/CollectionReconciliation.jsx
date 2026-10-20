@@ -1,3 +1,4 @@
+import { SkeletonValue } from '../../components/ui/Skeleton'
 import ListFilterPanel from '../../components/ui/ListFilterPanel'
 import { ListDataTable as DataTable } from '../../components/ui/ListPresentation'
 import ActionMenu from '../../components/ui/ActionMenu'
@@ -177,8 +178,8 @@ export default function CollectionReconciliation() {
                   <p className="text-xs font-medium text-fg-muted">{label}</p>
                   <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" aria-hidden="true" /></span>
                 </div>
-                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
-                <p className="mt-2 text-xs font-medium text-emerald-600">{detail}</p>
+                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
+                <p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={isLoading} className="h-3 w-28">{detail}</SkeletonValue></p>
               </div>
             ))}
           </div>
@@ -221,7 +222,7 @@ export default function CollectionReconciliation() {
             )}
 
             {isLoading ? (
-              <LoadingSpinner label="Loading collections…" />
+              <LoadingSpinner variant="table" columns={["Collection #", "Delivery #", "Order #", "Customer", "Delivery Partner", "Amount", "Payment Mode", "Recorded At", "Status"]} label="Loading collections…" />
             ) : (
               <>
                 {/* Desktop / tablet: compact table */}

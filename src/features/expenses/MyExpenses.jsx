@@ -450,7 +450,7 @@ export default function MyExpenses() {
       </div>
 
       <ListOverview>
-      <ListSummary className="grid-cols-2 lg:grid-cols-4">
+      <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-4">
         {[
           ['Pending Claims', counts.pending],
           ['Approved Claims', counts.approved],
@@ -497,7 +497,7 @@ export default function MyExpenses() {
           </div>
         </div>
         {isLoading ? (
-          <div className="p-6"><LoadingSpinner label="Loading your expense claims..." /></div>
+          <LoadingSpinner variant="table" minWidth="min-w-6xl" columns={["Date", "Category", "Description", "Amount", "Payment Mode", "Receipt", "Status", "Submitted On", "Actions"]} label="Loading your expense claims..." />
         ) : listError ? (
           <div className="p-6 text-center">
             <p className="text-sm text-red-600">{listError}</p>

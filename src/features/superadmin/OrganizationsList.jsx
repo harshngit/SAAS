@@ -1,3 +1,4 @@
+import { SkeletonValue } from '../../components/ui/Skeleton'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -108,7 +109,7 @@ function StatTile({ label, value, hint, icon: Icon }) {
           <Icon className="size-4" aria-hidden="true" />
         </span>
       </div>
-      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
+      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
       <p className="mt-2 text-xs font-medium text-emerald-600">{hint}</p>
     </div>
   )
@@ -557,7 +558,7 @@ export default function OrganizationsList() {
         </div>
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {isLoadingOrganizations ? (
-            <LoadingSpinner label="Loading organizations..." />
+            <LoadingSpinner variant="table" minWidth="min-w-[72rem]" columns={["", "Organization", "Admin Contact", "Plan", "MRR", "Status", "Upgrade", "Created", "Actions"]} checkboxColumn={0} label="Loading organizations..." />
           ) : listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>

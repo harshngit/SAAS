@@ -126,7 +126,7 @@ export default function OnlinePayments() {
   if (isLoading) {
     return (
       <Card>
-        <LoadingSpinner label="Loading payment gateway settings..." />
+        <LoadingSpinner variant="settings" label="Loading payment gateway settings..." />
       </Card>
     )
   }

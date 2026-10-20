@@ -169,7 +169,7 @@ export default function ProductDetail() {
   }, [id])
 
   if (isLoading) {
-    return <LoadingSpinner label="Loading product details..." />
+    return <LoadingSpinner variant="detail" layout="product" label="Loading product details..." />
   }
 
   if (!product) {
