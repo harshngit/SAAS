@@ -1836,7 +1836,10 @@ function CompanyOverviewDashboard({
   const authorizedName = authorizedPersonBlock.name || companyData.ownerDirectorName || companyData.adminName;
   const authorizedEmail = authorizedPersonBlock.email || companyData.adminEmail || companyData.email;
   const authorizedMobile = authorizedPersonBlock.mobile || companyData.mobileNumber || companyData.phone;
-  const authorizedPhoto = authorizedPersonBlock.photo || companyData.profilePhotoUrl;
+  // /organizations/overview's real field is authorized_person.photo_url (not .photo) - and
+  // companyData.profilePhotoUrl itself is sourced only from organization.auth_person_photo_url
+  // (see buildCompanyDataFromProfile), never from the logged-in user's own profile photo.
+  const authorizedPhoto = authorizedPersonBlock.photo_url || authorizedPersonBlock.photoUrl || companyData.profilePhotoUrl;
   const authorizedIsComplete = authorizedPersonBlock.is_complete ?? Boolean(authorizedName && authorizedEmail);
 
   const storageLabel = storage.files != null
@@ -2513,11 +2516,12 @@ function buildCompanyDataFromProfile(user, organization) {
       user?.mobileNumber ||
       user?.phone ||
       "",
+    // Authorized Person photo is an organization-level concept, independent of the logged-in
+    // user's own profile photo - never fall back to user.profile_photo_url/profilePhotoUrl here,
+    // even when this org's authorized person happens to be the same person as the current user.
     profilePhotoUrl:
       organization?.auth_person_photo_url ||
       organization?.authPersonPhotoUrl ||
-      user?.profile_photo_url ||
-      user?.profilePhotoUrl ||
       "",
     digitalSignatureUrl:
       organization?.auth_person_signature_url ||

@@ -166,6 +166,10 @@ export async function listQuotations(params = {}) {
   try {
     const queryParams = { page_size: params.page_size || 100 }
     if (params.page !== undefined) queryParams.page = params.page
+    if (params.search) queryParams.search = params.search
+    if (params.status) queryParams.status = params.status
+    if (params.customer_id) queryParams.customer_id = params.customer_id
+    if (params.lead_id) queryParams.lead_id = params.lead_id
     if (params.sort_by) queryParams.sort_by = params.sort_by
     if (params.sort_order) queryParams.sort_order = params.sort_order
 

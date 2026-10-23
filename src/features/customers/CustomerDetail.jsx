@@ -11,7 +11,6 @@ import {
   CreditCard,
   FileText,
   Landmark,
-  Mail,
   MapPin,
   Pencil,
   Phone,
@@ -891,18 +890,17 @@ export default function CustomerDetail() {
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-lg font-semibold text-neutral-900">{customer.name}</p>
-              {customer.displayName && customer.displayName !== customer.name && (
-                <p className="text-sm text-neutral-500">Display Name: {customer.displayName}</p>
+              {/* Legal Business Name leads (the registered/company name), Customer Name follows
+                  as a secondary line only when it actually differs - a non-business individual
+                  customer has no legal business name, so falls back to showing just their name. */}
+              <p className="text-lg font-semibold text-neutral-900">{customer.legalBusinessName || customer.name}</p>
+              {customer.name && customer.name !== customer.legalBusinessName && (
+                <p className="text-sm text-neutral-500">{customer.name}</p>
               )}
               <p className="text-sm text-neutral-500">Customer ID: {customer.customerId || '-'}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Badge variant={customer.status === 'active' ? 'success' : 'danger'}>{customer.status === 'active' ? 'Active' : 'Inactive'}</Badge>
                 {customer.type && <Badge variant="primary">{customer.type}</Badge>}
-              </div>
-              <div className="mt-3 space-y-1 text-sm text-neutral-600">
-                {customer.phone && <p className="flex items-center gap-1.5"><Phone className="size-3.5 text-neutral-400" aria-hidden="true" />{customer.phone}</p>}
-                {customer.email && <p className="flex items-center gap-1.5"><Mail className="size-3.5 text-neutral-400" aria-hidden="true" />{customer.email}</p>}
               </div>
             </div>
           </div>
@@ -913,8 +911,14 @@ export default function CustomerDetail() {
             <TopInfoItem icon={CalendarCheck2} label="Credit Terms" value={customer.paymentTerms} />
             <TopInfoItem icon={CreditCard} label="Payment Type" value={formatLabel(customer.preferredPaymentMethod)} />
             <TopInfoItem icon={Calendar} label="Customer Since" value={formatDate(customer.customerSince)} />
-            <TopInfoItem icon={Calendar} label="Created On" value={formatDateTime(customer.createdAt)} />
-            <TopInfoItem icon={Calendar} label="Last Updated" value={formatDateTime(customer.updatedAt)} />
+            {/* Created + Updated merged into one item - 7 items in a 3-column grid orphaned
+                "Last Updated" alone on its own row with two empty cells beside it. 6 items fills
+                exactly 2 clean rows. */}
+            <TopInfoItem
+              icon={Calendar}
+              label="Created / Updated"
+              value={customer.createdAt || customer.updatedAt ? `${formatDate(customer.createdAt)} · ${formatDate(customer.updatedAt)}` : ''}
+            />
           </div>
         </div>
       </div>

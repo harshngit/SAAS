@@ -236,6 +236,12 @@ export function demoInvoicesResolved(params = {}) {
     const want = String(params.status).toLowerCase()
     list = list.filter((inv) => String(inv.paymentStatus).toLowerCase() === want)
   }
+  if (params.search) {
+    const term = String(params.search).toLowerCase()
+    list = list.filter(
+      (inv) => inv.invoiceNumber?.toLowerCase().includes(term) || inv.customerName?.toLowerCase().includes(term),
+    )
+  }
   return list.sort((a, b) => new Date(b.invoiceDate || 0) - new Date(a.invoiceDate || 0))
 }
 

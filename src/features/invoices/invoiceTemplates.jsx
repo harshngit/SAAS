@@ -77,15 +77,18 @@ export function buildInvoicePreviewData(invoice, org, invoiceSettings) {
   const company = org || {}
   const companyBranding = normalizeOrganizationBranding(org)
   const resolvedBranding = resolveInvoiceBranding(companyBranding, invoiceSettings?.branding)
+  const shippingAddress = (invoice.shippingAddress || '').trim()
 
   return {
     company: {
-      name: company.name || 'Your Company',
+      name: company.name || '—',
       address: company.registered_address || company.address || '',
       cityLine: [company.city, company.state, company.pin_code].filter(Boolean).join(', '),
       gstin: company.gst_number || '',
       phone: company.phone || company.contact_phone || '',
       email: company.email || company.contact_email || '',
+      website: company.website || '',
+      upiId: company.upi_id || '',
       pan: company.pan_number || company.gstin_pan || '',
       letterheadUrl: companyBranding.letterheadUrl,
       bannerUrl: companyBranding.bannerUrl,
@@ -102,12 +105,13 @@ export function buildInvoicePreviewData(invoice, org, invoiceSettings) {
     ewayBillNumber: invoice.ewayBillNumber || '',
     vehicleNumber: invoice.vehicleNumber || '',
     billTo: {
-      name: invoice.customerName || invoice.walkInName || 'Walk-in Customer',
+      name: invoice.customerName || invoice.walkInName || '—',
       address: invoice.billingAddress || '',
       cityLine: '',
       phone: invoice.customerPhone || invoice.walkInPhone || '',
       gstin: invoice.customerGstin || '',
     },
+    shipTo: shippingAddress ? { name: invoice.customerName || invoice.walkInName || '', address: shippingAddress } : null,
     items: (invoice.items || []).map((item) => ({
       name: item.productName,
       hsn: item.hsnCode,
@@ -125,7 +129,10 @@ export function buildInvoicePreviewData(invoice, org, invoiceSettings) {
       productImage: getFileUrl(item.productImage || ''),
     })),
     subtotal: invoice.subtotal,
+    discount: invoice.discount,
     taxTotal: invoice.tax,
+    additionalCharges: invoice.additionalCharges,
+    roundOff: invoice.roundOff,
     total: invoice.total,
     notes: invoice.notes || '',
     bank: {
@@ -209,7 +216,7 @@ function ItemTable({ items, columns, showProductImage, style, tableStyle = 'line
       case 'uom': return item.unit || '—'
       case 'rate': return money(item.rate)
       case 'mrp': return item.mrp != null && item.mrp !== '' ? money(item.mrp) : '—'
-      case 'discount': return item.discount ? `${item.discount}%` : '—'
+      case 'discount': return item.discount != null ? money(item.discount) : '—'
       case 'tax_rate': return item.taxRate ? `${item.taxRate}%` : '—'
       case 'tax_amount': return item.taxAmount != null ? money(item.taxAmount) : '—'
       case 'batch_number': return item.batchNumber || '—'
@@ -238,9 +245,11 @@ function ItemTable({ items, columns, showProductImage, style, tableStyle = 'line
         >
           {activeColumns.map((col) => (
             <div key={col.key} style={{ flexGrow: col.weight, flexBasis: 0 }} className={`min-w-0 ${cellPad} ${style.rowPad} ${alignClass[col.align]}`}>
-              {col.key === 'product' ? (
+              {col.key === 'product_image' ? (
+                item.productImage ? <img src={item.productImage} alt="" className="mx-auto size-6 object-contain" onError={(event) => { event.currentTarget.style.display = 'none' }} /> : <span>—</span>
+              ) : col.key === 'product' ? (
                 <span className={`flex min-w-0 items-center gap-1.5 ${justifyClass[col.align]}`}>
-                  {col.key === 'product' && showProductImage && item.productImage && (
+                  {showProductImage && !activeColumns.some((column) => column.key === 'product_image') && item.productImage && (
                     <img
                       src={item.productImage}
                       alt=""
@@ -251,7 +260,7 @@ function ItemTable({ items, columns, showProductImage, style, tableStyle = 'line
                   <span className="truncate">{item.name}</span>
                 </span>
               ) : (
-                <span className="truncate">{cellText(col, item)}</span>
+                <span className="block truncate">{cellText(col, item)}</span>
               )}
             </div>
           ))}
@@ -271,6 +280,8 @@ function SummaryTotals({ data, showDiscount, showTax, primaryColor, style, total
       <div className="flex justify-between"><span>Subtotal</span><span>{money(data.subtotal)}</span></div>
       {showDiscount && data.discount ? <div className="flex justify-between"><span>Discount</span><span>-{money(data.discount)}</span></div> : null}
       {showTax && data.taxTotal ? <div className="flex justify-between"><span>Tax</span><span>{money(data.taxTotal)}</span></div> : null}
+      {data.additionalCharges ? <div className="flex justify-between"><span>Additional Charges</span><span>{money(data.additionalCharges)}</span></div> : null}
+      {data.roundOff ? <div className="flex justify-between"><span>Round Off</span><span>{money(data.roundOff)}</span></div> : null}
     </>
   )
 
@@ -278,7 +289,10 @@ function SummaryTotals({ data, showDiscount, showTax, primaryColor, style, total
     return (
       <div className="flex flex-wrap items-center justify-end gap-4" style={{ fontSize: style.body }}>
         <span>Subtotal: {money(data.subtotal)}</span>
+        {showDiscount && data.discount ? <span>Discount: -{money(data.discount)}</span> : null}
         {showTax && data.taxTotal ? <span>Tax: {money(data.taxTotal)}</span> : null}
+        {data.additionalCharges ? <span>Additional Charges: {money(data.additionalCharges)}</span> : null}
+        {data.roundOff ? <span>Round Off: {money(data.roundOff)}</span> : null}
         <span className="rounded px-2 py-1 font-bold text-white" style={{ backgroundColor: primaryColor }}>Total: {money(data.total)}</span>
       </div>
     )
@@ -332,7 +346,7 @@ function InvoiceFooter({ company, data, payment, footer, style }) {
       {payment.showBankDetails && data.bank?.name && (
         <p className="text-neutral-500">Bank: {data.bank.name} | A/c {data.bank.account} | IFSC {data.bank.ifsc}</p>
       )}
-      {payment.showUpiQr && <PaymentQrBlock url={company.qrCodeUrl} />}
+      {payment.showUpiQr && (company.qrCodeUrl || company.upiId) && <div className="w-fit max-w-full">{company.qrCodeUrl && <PaymentQrBlock url={company.qrCodeUrl} />}{company.upiId && <p className="text-center text-neutral-500">UPI: {company.upiId}</p>}</div>}
       {footer.showTerms && footer.terms && (
         <p className="text-neutral-500"><span className="font-semibold text-neutral-700">Terms: </span>{footer.terms}</p>
       )}
@@ -401,11 +415,12 @@ function HeaderBlock({ preset, primaryColor, company, businessDetails, invoiceDe
         {businessDetails.showBusinessName && (
           <p className="font-bold" style={{ color: isOnColor ? undefined : primaryColor, fontSize: style.heading }}>{company.name}</p>
         )}
-        {businessDetails.showAddress && <p className={`mt-0.5 leading-4 ${isOnColor ? 'text-white/85' : 'text-neutral-500'}`}>{company.address}<br />{company.cityLine}</p>}
+        {businessDetails.showAddress && (company.address || company.cityLine) && <p className={`mt-0.5 leading-4 ${isOnColor ? 'text-white/85' : 'text-neutral-500'}`}>{company.address}<br />{company.cityLine}</p>}
         {businessDetails.showGstin && company.gstin && <p className={isOnColor ? 'text-white/85' : 'text-neutral-500'}>GSTIN: {company.gstin}</p>}
         {businessDetails.showPan && company.pan && <p className={isOnColor ? 'text-white/85' : 'text-neutral-500'}>PAN: {company.pan}</p>}
         {businessDetails.showPhone && company.phone && <p className={isOnColor ? 'text-white/85' : 'text-neutral-500'}>Ph: {company.phone}</p>}
         {businessDetails.showEmail && company.email && <p className={isOnColor ? 'text-white/85' : 'text-neutral-500'}>{company.email}</p>}
+        {company.website && <p className={isOnColor ? 'text-white/85' : 'text-neutral-500'}>{company.website}</p>}
       </div>
     </div>
   )
@@ -433,9 +448,16 @@ function HeaderBlock({ preset, primaryColor, company, businessDetails, invoiceDe
           <p className="mt-0.5 text-xs uppercase tracking-[0.2em] text-white/85">Tax Invoice</p>
         </div>
         <div className="flex items-start justify-between gap-3 border-b border-neutral-100 pb-2.5 text-neutral-500">
-          <div>
-            {businessDetails.showAddress && <p>{company.address}, {company.cityLine}</p>}
+          <div className="flex items-start gap-2.5">
+            {businessDetails.showLogo && company.logoUrl && <img src={company.logoUrl} alt="" className="size-9 shrink-0 object-contain" onError={(event) => { event.currentTarget.style.display = 'none' }} />}
+            <div>
+            {businessDetails.showAddress && <p>{[company.address, company.cityLine].filter(Boolean).join(', ')}</p>}
             {businessDetails.showGstin && company.gstin && <p>GSTIN: {company.gstin}</p>}
+            {businessDetails.showPan && company.pan && <p>PAN: {company.pan}</p>}
+            {businessDetails.showPhone && company.phone && <p>Ph: {company.phone}</p>}
+            {businessDetails.showEmail && company.email && <p>{company.email}</p>}
+            {company.website && <p>{company.website}</p>}
+            </div>
           </div>
           <div className="text-right">{metaRows}</div>
         </div>
@@ -470,15 +492,20 @@ function HeaderBlock({ preset, primaryColor, company, businessDetails, invoiceDe
   )
 }
 
-function PartyBlock({ primaryColor, partyDetails, billTo, accentHeading }) {
-  if (!partyDetails.showCustomerName && !partyDetails.showBillingAddress) return null
+function PartyBlock({ primaryColor, partyDetails, billTo, shipTo, accentHeading }) {
+  const showBillTo = partyDetails.showCustomerName || partyDetails.showBillingAddress || (partyDetails.showCustomerPhone && billTo.phone) || (partyDetails.showCustomerGstin && billTo.gstin)
+  const showShipTo = partyDetails.showShippingAddress && shipTo?.address
+  if (!showBillTo && !showShipTo) return null
   return (
-    <div>
+    <div className={showShipTo ? 'grid grid-cols-2 gap-4' : ''}>
+    {showBillTo && <div>
       <p className="font-semibold" style={accentHeading ? { color: primaryColor } : undefined}>Bill To</p>
       {partyDetails.showCustomerName && <p className="mt-0.5 font-medium text-neutral-800">{billTo.name}</p>}
-      {partyDetails.showBillingAddress && <p className="text-neutral-500">{billTo.address}, {billTo.cityLine}</p>}
+      {partyDetails.showBillingAddress && billTo.address && <p className="whitespace-pre-line text-neutral-500">{[billTo.address, billTo.cityLine].filter(Boolean).join(', ')}</p>}
       {partyDetails.showCustomerPhone && billTo.phone && <p className="text-neutral-500">Ph: {billTo.phone}</p>}
       {partyDetails.showCustomerGstin && billTo.gstin && <p className="text-neutral-500">GSTIN: {billTo.gstin}</p>}
+    </div>}
+    {showShipTo && <div><p className="font-semibold" style={accentHeading ? { color: primaryColor } : undefined}>Ship To</p>{partyDetails.showCustomerName && shipTo.name && <p className="mt-0.5 font-medium text-neutral-800">{shipTo.name}</p>}<p className="whitespace-pre-line text-neutral-500">{shipTo.address}</p></div>}
     </div>
   )
 }
@@ -489,7 +516,8 @@ function PartyBlock({ primaryColor, partyDetails, billTo, accentHeading }) {
 // thing the real backend PDF renderer also varies by actual `template` value. ----
 function RegularInvoiceDocument({ preset, ...props }) {
   const { primaryColor, data = sampleInvoice, businessDetails, invoiceDetails, partyDetails, itemTable, paymentDetails, footer, fields, typography } = withDefaults(props)
-  const { company, billTo, items } = data
+  const { company, billTo, shipTo, items } = data
+  const isSimple = props.format === 'simple'
   const style = resolveTemplateStyle(preset.baseTemplate, typography)
   const fontFamily = resolveFontFamily(typography)
   const accentHeading = preset.accent === 'bold'
@@ -504,7 +532,7 @@ function RegularInvoiceDocument({ preset, ...props }) {
         <img src={company.letterheadUrl} alt="" className="max-h-14 w-full rounded object-contain" onError={(event) => { event.currentTarget.style.display = 'none' }} />
       )}
       <HeaderBlock preset={preset} primaryColor={primaryColor} company={company} businessDetails={businessDetails} invoiceDetails={invoiceDetails} data={data} style={style} />
-      <PartyBlock primaryColor={accentHeading ? primaryColor : undefined} partyDetails={partyDetails} billTo={billTo} accentHeading={accentHeading} />
+      <PartyBlock primaryColor={accentHeading ? primaryColor : undefined} partyDetails={partyDetails} billTo={billTo} shipTo={shipTo} accentHeading={accentHeading} />
       <ItemTable
         items={items}
         columns={itemTable.columns}
@@ -516,13 +544,13 @@ function RegularInvoiceDocument({ preset, ...props }) {
       />
       <SummaryTotals
         data={data}
-        showDiscount={fields.show_discount}
-        showTax={fields.show_tax_amount}
+        showDiscount={!isSimple && fields.show_discount}
+        showTax={!isSimple && fields.show_tax_amount}
         primaryColor={primaryColor}
         style={style}
         totalsStyle={preset.totals}
       />
-      <InvoiceFooter company={company} data={data} payment={paymentDetails} footer={footer} style={style} />
+      {isSimple ? (data.notes && <p className="text-neutral-500"><span className="font-semibold">Note: </span>{data.notes}</p>) : <InvoiceFooter company={company} data={data} payment={paymentDetails} footer={footer} style={style} />}
     </div>
   )
 }

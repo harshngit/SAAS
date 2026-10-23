@@ -151,8 +151,10 @@ function normalizeInvoiceItem(item) {
   const discount = Number(item.discount) || 0
   const taxRate = Number(item.tax_rate) || 0
   const subtotal = quantity * unitPrice
-  const discounted = subtotal - subtotal * (discount / 100)
-  const fallbackLineTotal = discounted + discounted * (taxRate / 100)
+  // Invoice discounts are stored amounts; only tax_rate is a percentage.
+  const discounted = subtotal - discount
+  const taxAmount = item.tax ?? item.tax_amount ?? discounted * (taxRate / 100)
+  const fallbackLineTotal = discounted + Number(taxAmount)
 
   return {
     id: item.id,
@@ -164,7 +166,7 @@ function normalizeInvoiceItem(item) {
     unitPrice,
     discount,
     taxRate,
-    taxAmount: item.tax_amount ?? (fallbackLineTotal - discounted),
+    taxAmount,
     lineTotal: item.line_total ?? item.amount ?? fallbackLineTotal,
     unit: item.uom || item.unit || '',
     description: item.description || '',
@@ -204,7 +206,8 @@ function normalizeInvoice(invoice) {
     customerName: invoice.customer?.name || invoice.customer?.customer_name || invoice.walk_in_name || '',
     customerPhone: invoice.customer?.phone || invoice.customer?.mobile_number || invoice.walk_in_phone || '',
     customerEmail: invoice.customer?.email || '',
-    customerGstin: resolveCustomerGst(invoice.customer?.gst_number || invoice.customer?.gstin),
+    customerGstin: invoice.customer?.gst_number || invoice.customer?.gstin
+      ? resolveCustomerGst(invoice.customer.gst_number || invoice.customer.gstin) : '',
     walkInName: invoice.walk_in_name || '',
     walkInPhone: invoice.walk_in_phone || '',
     invoiceDate: invoice.invoice_date,
@@ -223,6 +226,7 @@ function normalizeInvoice(invoice) {
     isCreditNote: Boolean(invoice.is_credit_note),
     creditNoteReason: invoice.credit_note_reason || '',
     billingAddress: invoice.billing_address || '',
+    shippingAddress: invoice.customer?.shipping_address || invoice.customer?.delivery_address || '',
     salesType: invoice.sales_type || '',
     salesDate: invoice.sales_date || invoice.invoice_date,
     items,
@@ -246,6 +250,7 @@ export async function listInvoices(params = {}) {
     if (params.customer_id) queryParams.customer_id = params.customer_id
     if (params.status) queryParams.status = params.status
     if (params.order_id) queryParams.order_id = params.order_id
+    if (params.search) queryParams.search = params.search
 
     const { data } = await apiClient.get('/invoices', {
       headers: authHeader(),
@@ -353,15 +358,21 @@ export async function invoiceOrder(orderId, deliveryId) {
   }
 }
 
-export async function downloadInvoicePdf(invoiceId, invoiceNumber, format = 'detailed') {
+export async function downloadInvoicePdf(invoiceId, invoiceNumber, format = 'detailed', overrides = {}) {
   if (INVOICE_DEMO_ENABLED) {
     return { success: false, error: 'The server-generated PDF is unavailable in demo mode. Use Download PDF for the on-screen version.' }
   }
 
   try {
+    if (overrides.templateVariant && overrides.thermalLayout) {
+      return { success: false, error: 'Choose either a regular theme or a thermal layout for this download.' }
+    }
     const response = await apiClient.get(`/invoices/${invoiceId}/pdf`, {
       headers: authHeader(),
-      params: { format },
+      params: { format,
+        ...(overrides.templateVariant ? { template_variant: overrides.templateVariant } : {}),
+        ...(overrides.thermalLayout ? { thermal_layout: overrides.thermalLayout } : {}),
+      },
       responseType: 'blob',
     })
 
@@ -376,13 +387,31 @@ export async function downloadInvoicePdf(invoiceId, invoiceNumber, format = 'det
 
     return { success: true }
   } catch (error) {
-    const errorData = error.response?.data
+    let errorData = error.response?.data
+    // PDF requests return blobs even when the server sends a JSON 403/422 error.
+    if (typeof Blob !== 'undefined' && errorData instanceof Blob) {
+      const body = await errorData.text()
+      try { errorData = JSON.parse(body) } catch { errorData = body }
+    }
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to download invoice PDF. Please try again.',
     )
 
     return { success: false, error: message }
+  }
+}
+
+// GET /invoice-templates is readable by invoice-viewing staff as well as admins.
+// Keep the backend's stable IDs/selection intact; only /invoice-settings saves a choice.
+export async function getInvoiceTemplates() {
+  if (INVOICE_DEMO_ENABLED) return { success: false, error: 'Live theme catalog is unavailable in demo mode.' }
+  try {
+    const { data } = await apiClient.get('/invoice-templates', { headers: authHeader() })
+    return { success: true, catalog: data }
+  } catch (error) {
+    const data = error.response?.data
+    return { success: false, error: formatApiError(data?.detail || data, 'Unable to load the invoice theme catalog.') }
   }
 }
 

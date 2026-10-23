@@ -215,7 +215,7 @@ export default function SalesReturnList() {
               <thead>
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
                   <SortableHeaderCell label="Return" sortKey="return_number" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
-                  <SortableHeaderCell label="Customer" sortKey="customer_id" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Customer" sortKey="customer" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Order / Invoice</th>
                   <th className="whitespace-nowrap px-6 py-6 text-right">Items</th>
                   <th className="whitespace-nowrap px-6 py-6 text-right">Return Qty</th>

@@ -602,9 +602,9 @@ export default function CashReconciliation() {
                     <SortableHeaderCell label="Expected Collections" sortKey="total_expected_collections" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
                     <SortableHeaderCell label="Actual Collections" sortKey="total_actual_collections" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
                     <SortableHeaderCell label="Collections Variance" sortKey="collections_variance" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
-                    <SortableHeaderCell label="Expected Closing Cash" sortKey="expected_closing_cash" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
+                    <SortableHeaderCell label="Expected Closing Cash" sortKey="closing_cash" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
                     <SortableHeaderCell label="Actual Cash" sortKey="actual_cash_on_hand" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
-                    <SortableHeaderCell label="Cash Balance Variance" sortKey="cash_balance_variance" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
+                    <SortableHeaderCell label="Cash Balance Variance" sortKey="variance" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
                     <SortableHeaderCell label="Closed At" sortKey="closed_at" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} className="px-4 py-2.5" />
                     <th className="px-4 py-2.5" />
                   </tr>

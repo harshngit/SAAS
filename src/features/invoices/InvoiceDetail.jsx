@@ -20,18 +20,20 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
-import { downloadInvoicePdf, getInvoice, getInvoiceSettings } from '../../api/invoices'
+import Select from '../../components/ui/Select'
+import { downloadInvoicePdf, getInvoice, getInvoiceSettings, getInvoiceTemplates } from '../../api/invoices'
 import { listPaymentReceipts } from '../../api/paymentReceipts'
 import { getOrganizationSettings } from '../../api/organizations'
 import { usePermission } from '../../auth/usePermission'
 import { templateComponents, RegularThemePreview, ThermalPreview, money as formatPreviewMoney, buildInvoicePreviewData } from './invoiceTemplates'
-import { resolveRegularPresetId, thermalWidthPx } from './invoiceThemePresets'
+import { reconcileInvoiceThemeCatalog, resolveRegularPresetId, thermalWidthPx } from './invoiceThemePresets'
 import { INVOICE_DEMO_ENABLED } from './invoiceDemoData'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
 import InvoicePaymentLinks from './InvoicePaymentLinks'
 import { FINANCIAL_STATUS_VARIANT, financialStatus } from './invoiceHelpers'
 import { formatCurrency } from '../../utils/format'
 import { exportElementToPdf } from '../../utils/pdfExport'
+import { loadInvoicePreviewSources } from './invoicePreviewSources'
 
 function formatDateLabel(dateString) {
   if (!dateString) return '—'
@@ -64,12 +66,13 @@ const previewPaymentStatusClass = {
   Unpaid: 'bg-red-100 text-red-700',
 }
 
-function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshing, onRefresh }) {
+function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, themeSelection, isRefreshing, onRefresh }) {
   const [zoom, setZoom] = useState(100)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [previewFormat, setPreviewFormat] = useState('detailed')
 
   const previewData = buildInvoicePreviewData(invoice, orgSettings, invoiceSettings)
-  const template = invoiceSettings?.template || 'classic'
+  const template = invoiceSettings?.template || themeSelection?.template || 'classic'
   const isThermalTemplate = template === 'thermal'
   // Regular invoices render through the persisted `template_variant` preset (e.g. "GST Theme 3"),
   // not just the plain base `template` - RegularThemePreview + resolveRegularPresetId are the
@@ -77,12 +80,13 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
   // actually looks like the theme the org selected, falling back safely to the base template card
   // if `templateVariant` is unset or names a preset no longer in the catalog.
   const TemplateComponent = isThermalTemplate ? templateComponents.thermal : RegularThemePreview
-  const regularPresetId = resolveRegularPresetId(template, invoiceSettings?.templateVariant)
+  const regularPresetId = resolveRegularPresetId(template, themeSelection?.resolved_template_variant || invoiceSettings?.templateVariant)
   const primaryColor = invoiceSettings?.branding?.primaryColor || '#00092A'
   const templateLabel = template.charAt(0).toUpperCase() + template.slice(1)
 
   const templateProps = {
     presetId: regularPresetId,
+    format: previewFormat,
     primaryColor,
     data: previewData,
     businessDetails: invoiceSettings?.businessDetails,
@@ -93,7 +97,7 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
     footer: invoiceSettings?.footer,
     fields: invoiceSettings?.fields,
     typography: invoiceSettings?.typography,
-    thermalPresetId: invoiceSettings?.thermalPrint?.layout,
+    thermalPresetId: invoiceSettings?.thermalPrint?.layout || themeSelection?.thermal_layout,
     thermalBoldText: invoiceSettings?.thermalPrint?.boldText,
     thermalExtraLines: invoiceSettings?.thermalPrint?.extraLines,
   }
@@ -136,6 +140,7 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
             <p className="text-xs text-neutral-400">{templateLabel} template</p>
           </div>
           <div className="flex items-center gap-1">
+            {!isThermalTemplate && <Select className="w-32" triggerClassName="h-8 py-1.5" options={[{ value: 'detailed', label: 'Detailed' }, { value: 'simple', label: 'Simple' }]} value={previewFormat} onChange={(event) => setPreviewFormat(event.target.value)} />}
             <button
               type="button"
               onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP))}
@@ -177,7 +182,7 @@ function InvoicePreviewCard({ invoice, orgSettings, invoiceSettings, isRefreshin
         <div className="mt-4 overflow-auto rounded-xl border border-neutral-100 bg-neutral-50/60 p-4" style={{ maxHeight: '38rem' }}>
           <div
             className="mx-auto origin-top bg-surface p-5 text-xs text-neutral-600 shadow-(--shadow-xs)"
-            style={{ transform: `scale(${zoom / 100})`, width: '32rem' }}
+            style={{ transform: `scale(${zoom / 100})`, width: '640px' }}
           >
             {previewDocument}
           </div>
@@ -216,32 +221,57 @@ export default function InvoiceDetail() {
   const [orgSettings, setOrgSettings] = useState(null)
   const [invoiceSettings, setInvoiceSettings] = useState(null)
   const [isRefreshingPreview, setIsRefreshingPreview] = useState(false)
+  const [themeSelection, setThemeSelection] = useState(null)
+  const [previewWarnings, setPreviewWarnings] = useState([])
   const thermalExportRef = useRef(null)
   const detailedExportRef = useRef(null)
+  const invoiceRequest = useRef(0)
 
   const loadInvoice = async () => {
+    const requestId = ++invoiceRequest.current
     setIsLoading(true)
     setLoadError('')
 
-    const result = await getInvoice(invoiceNumber)
+    setIsRefreshingPreview(true)
+    const [result, orgResult, settingsResult, catalogResult] = await Promise.all([
+      getInvoice(invoiceNumber), getOrganizationSettings(), getInvoiceSettings(), getInvoiceTemplates(),
+    ])
+    if (requestId !== invoiceRequest.current) return
+    setOrgSettings(orgResult.success ? orgResult.organization : null)
+    setInvoiceSettings(settingsResult.success ? settingsResult.settings : null)
+    setThemeSelection(catalogResult.success ? catalogResult.catalog.selected : null)
 
     if (!result.success) {
       setLoadError(result.error)
       setIsLoading(false)
+      setIsRefreshingPreview(false)
       return
     }
 
-    setInvoice(result.invoice)
+    const sources = INVOICE_DEMO_ENABLED ? { invoice: result.invoice, warnings: [] }
+      : await loadInvoicePreviewSources(result.invoice, { includeMrp: settingsResult.settings?.itemTable?.columns?.includes('mrp') })
+    if (requestId !== invoiceRequest.current) return
+    setPreviewWarnings([
+      ...sources.warnings,
+      ...(sources.invoice.items.some((item) => item.mrpSource === 'current-product') ? ['MRP reflects current product data, not a billing-time snapshot.'] : []),
+      ...(catalogResult.success ? reconcileInvoiceThemeCatalog(catalogResult.catalog).issues : []),
+      ...(!orgResult.success ? ['Company settings could not be loaded for this preview.'] : []),
+      ...(!settingsResult.success ? ['Invoice settings could not be loaded; preview visibility/branding may differ from the PDF.'] : []),
+      ...(!catalogResult.success && !INVOICE_DEMO_ENABLED ? ['The live invoice theme catalog could not be verified.'] : []),
+    ])
+    setInvoice(sources.invoice)
     setIsLoading(false)
-    loadPayments(result.invoice.id)
+    setIsRefreshingPreview(false)
+    loadPayments(result.invoice.id, requestId)
   }
 
   // Actual payment records applied to this invoice (§9). A 403 / empty response just means
   // no ledger detail is available for this role - the aggregate paid amount is still shown.
-  const loadPayments = async (invoiceId) => {
+  const loadPayments = async (invoiceId, requestId) => {
     if (!invoiceId) return
     setPaymentsError('')
     const result = await listPaymentReceipts({ invoice_id: invoiceId })
+    if (requestId !== invoiceRequest.current) return
     if (!result.success) {
       setPayments([])
       setPaymentsError(result.error)
@@ -252,25 +282,14 @@ export default function InvoiceDetail() {
     )
   }
 
-  // Best-effort: the preview still works (just without company letterhead/branding details)
-  // if either of these fails or the current role can't reach organization-level settings.
-  const loadPreviewExtras = async () => {
-    setIsRefreshingPreview(true)
-    const [orgResult, invoiceSettingsResult] = await Promise.all([getOrganizationSettings(), getInvoiceSettings()])
-    if (orgResult.success) setOrgSettings(orgResult.organization)
-    if (invoiceSettingsResult.success) setInvoiceSettings(invoiceSettingsResult.settings)
-    setIsRefreshingPreview(false)
-  }
-
   useEffect(() => {
     loadInvoice()
-    loadPreviewExtras()
+    return () => { invoiceRequest.current += 1 }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoiceNumber])
 
   const handleRefreshPreview = () => {
     loadInvoice()
-    loadPreviewExtras()
   }
 
   if (isLoading) {
@@ -340,7 +359,9 @@ export default function InvoiceDetail() {
     setIsDownloading(true)
     setDownloadError('')
     try {
-      const result = await downloadInvoicePdf(invoice.id, invoice.invoiceNumber, format)
+      const result = await downloadInvoicePdf(invoice.id, invoice.invoiceNumber, format,
+        invoiceSettings?.template === 'thermal' || themeSelection?.template === 'thermal'
+          ? { templateVariant: themeSelection?.resolved_template_variant || detailedRegularPresetId } : {})
       if (!result.success) setDownloadError(result.error)
     } catch (error) {
       setDownloadError(error?.message || 'Unable to download invoice PDF. Please try again.')
@@ -406,6 +427,7 @@ export default function InvoiceDetail() {
       {downloadError && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{downloadError}</div>
       )}
+      {previewWarnings.length > 0 && <div role="status" className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">{previewWarnings.join(' ')}</div>}
 
       {/* Thermal export root: scoped to print only, sized + @page'd to the actual selected paper
           width so a thermal printer driver prints at real receipt size, not scaled-down A4. */}
@@ -598,7 +620,7 @@ export default function InvoiceDetail() {
                       <td className="px-3.5 py-2.5 text-neutral-800">{item.productName}</td>
                       <td className="px-3.5 py-2.5 text-neutral-500">{item.quantity}</td>
                       <td className="px-3.5 py-2.5 text-neutral-500">{formatCurrency(item.unitPrice)}</td>
-                      <td className="px-3.5 py-2.5 text-neutral-500">{item.discount ? `${item.discount}%` : '—'}</td>
+                      <td className="px-3.5 py-2.5 text-neutral-500">{item.discount != null ? formatCurrency(item.discount) : '—'}</td>
                       <td className="px-3.5 py-2.5 text-neutral-500">{item.taxRate ? `${item.taxRate}% GST` : '—'}</td>
                       <td className="px-3.5 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
                     </tr>
@@ -667,6 +689,7 @@ export default function InvoiceDetail() {
             invoice={invoice}
             orgSettings={orgSettings}
             invoiceSettings={invoiceSettings}
+            themeSelection={themeSelection}
             isRefreshing={isRefreshingPreview}
             onRefresh={handleRefreshPreview}
           />

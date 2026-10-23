@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { getInvoice, getInvoiceSettings } from '../../api/invoices'
+import { getInvoice, getInvoiceSettings, getInvoiceTemplates } from '../../api/invoices'
 import { getOrganizationSettings } from '../../api/organizations'
 import { useAuthStore } from '../../store/authStore'
 import { templateComponents, RegularThemePreview, buildInvoicePreviewData } from './invoiceTemplates'
 import { resolveRegularPresetId } from './invoiceThemePresets'
+import { loadInvoicePreviewSources } from './invoicePreviewSources'
 
 // NOTE (found while redesigning Invoice Settings): this page's original premise - "the backend
 // launches a headless browser against this route to render the PDF" - does not match the real
@@ -27,29 +28,8 @@ import { resolveRegularPresetId } from './invoiceThemePresets'
 //              Simple and Detailed independent colors without any settings-schema change here
 const paperWidthClass = { A4: 'w-[210mm]', A5: 'w-[148mm]', thermal: 'w-[80mm]' }
 
-// A short/quick-send invoice: header, who it's for, the item list, one total. None of the
-// GST/HSN/tax/bank/terms detail a formal Detailed invoice carries. Hardcoded for now rather than
-// org-configurable - the org's own invoiceSettings.fields (below) still fully drives the
-// Detailed format, unchanged. Once the backend adds a separate "simple" settings profile, swap
-// this constant for that profile's fields instead of removing the format param.
-const SIMPLE_FIELDS_PRESET = {
-  show_company_gstin: true,
-  show_customer_gstin: false,
-  show_billing_address: true,
-  show_shipping_address: false,
-  show_hsn_sac: false,
-  show_mrp: false,
-  show_discount: false,
-  show_tax_rate: false,
-  show_tax_amount: false,
-  show_batch_number: false,
-  show_expiry_date: false,
-  show_bank_details: false,
-  show_upi_qr: false,
-  show_terms: false,
-  show_signature: false,
-}
-
+// Regular simple/detailed visibility is centralized in RegularInvoiceDocument.
+// Both retain the firm's configured columns and financial totals.
 export default function InvoicePrintView() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
@@ -61,6 +41,7 @@ export default function InvoicePrintView() {
   const [invoice, setInvoice] = useState(null)
   const [orgSettings, setOrgSettings] = useState(null)
   const [invoiceSettings, setInvoiceSettings] = useState(null)
+  const [themeSelection, setThemeSelection] = useState(null)
   const [error, setError] = useState('')
   const [isReady, setIsReady] = useState(false)
 
@@ -77,10 +58,11 @@ export default function InvoicePrintView() {
     let cancelled = false
 
     async function load() {
-      const [invoiceResult, orgResult, settingsResult] = await Promise.all([
+      const [invoiceResult, orgResult, settingsResult, catalogResult] = await Promise.all([
         getInvoice(id),
         getOrganizationSettings(),
         getInvoiceSettings(),
+        getInvoiceTemplates(),
       ])
 
       if (cancelled) return
@@ -90,7 +72,10 @@ export default function InvoicePrintView() {
         return
       }
 
-      setInvoice(invoiceResult.invoice)
+      const sources = await loadInvoicePreviewSources(invoiceResult.invoice, { includeMrp: settingsResult.settings?.itemTable?.columns?.includes('mrp') })
+      if (cancelled) return
+      setInvoice(sources.invoice)
+      if (catalogResult.success) setThemeSelection(catalogResult.catalog.selected)
       if (orgResult.success) setOrgSettings(orgResult.organization)
       if (settingsResult.success) setInvoiceSettings(settingsResult.settings)
       setIsReady(true)
@@ -118,17 +103,17 @@ export default function InvoicePrintView() {
     )
   }
 
-  const template = templateOverride || invoiceSettings?.template || 'classic'
+  const template = templateOverride || invoiceSettings?.template || themeSelection?.template || 'classic'
   const isThermalTemplate = template === 'thermal'
   // Same preset-aware rendering as InvoiceDetail.jsx (see resolveRegularPresetId) - except an
   // explicit `?template=` override means the caller wants that exact base template, not whatever
   // theme preset the org has saved, so the persisted `template_variant` is only honored when
   // nothing in the URL overrides it.
   const TemplateComponent = isThermalTemplate ? templateComponents.thermal : RegularThemePreview
-  const regularPresetId = resolveRegularPresetId(template, templateOverride ? null : invoiceSettings?.templateVariant)
+  const regularPresetId = resolveRegularPresetId(template, templateOverride ? null : themeSelection?.resolved_template_variant || invoiceSettings?.templateVariant)
   const paperSize = invoiceSettings?.paperSize || 'A4'
   const previewData = buildInvoicePreviewData(invoice, orgSettings, invoiceSettings)
-  const fields = format === 'simple' ? SIMPLE_FIELDS_PRESET : invoiceSettings?.fields || {}
+  const fields = invoiceSettings?.fields || {}
   const primaryColor = (colorOverride && `#${colorOverride.replace(/^#/, '')}`) || invoiceSettings?.branding?.primaryColor || '#00092A'
   const isSimple = format === 'simple'
 
@@ -141,6 +126,7 @@ export default function InvoicePrintView() {
       <style>{'@page { size: ' + (paperSize === 'thermal' ? '80mm auto' : paperSize) + '; margin: 0; } body { margin: 0; }'}</style>
       <TemplateComponent
         presetId={regularPresetId}
+        format={format}
         data={previewData}
         primaryColor={primaryColor}
         fields={fields}

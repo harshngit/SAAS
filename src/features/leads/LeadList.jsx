@@ -452,7 +452,7 @@ export default function LeadList() {
                   <SortableHeaderCell label="Lead" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="min-w-52 whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Contact</th>
                   <SortableHeaderCell label="Source" sortKey="lead_source" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
-                  <SortableHeaderCell label="Assigned To" sortKey="assigned_salesperson_id" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Assigned To" sortKey="assigned_salesperson" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <SortableHeaderCell label="Status" sortKey="lead_status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Next Follow-up</th>
                   <SortableHeaderCell label="Created" sortKey="created_at" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />

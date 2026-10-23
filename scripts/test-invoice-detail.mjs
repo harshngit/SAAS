@@ -91,7 +91,8 @@ test('regular and thermal QR blocks show the saved image below its label and res
     const hidden = renderToStaticMarkup(React.createElement(Component, { data, paymentDetails: { showUpiQr: false } }))
     assert.doesNotMatch(hidden, /Scan to pay via UPI|alt="Payment QR code"/)
     const missing = renderToStaticMarkup(React.createElement(Component, { data: { ...data, company: { ...data.company, qrCodeUrl: '' } } }))
-    assert.match(missing, /Payment QR unavailable/)
+    if (Component === templates.ThermalPreview) assert.match(missing, /Payment QR unavailable/)
+    else assert.doesNotMatch(missing, /Scan to pay|Payment QR unavailable/)
     assert.doesNotMatch(missing, /alt="Payment QR code"/)
   }
 })

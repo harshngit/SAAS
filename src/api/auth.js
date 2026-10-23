@@ -1,5 +1,6 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient, API_BASE_URL, normalizeTokens } from './client'
+import { disablePushForLogout, syncPushToken } from '../push/pushService'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -60,6 +61,8 @@ export async function login({ email, password }) {
     if (!profileResult.success) {
       return profileResult
     }
+
+    syncPushToken() // fire-and-forget - never block/fail login on this
 
     return { success: true, ...profileResult }
   } catch (error) {
@@ -179,6 +182,10 @@ export async function getCurrentProfile() {
 export async function logout() {
   const { authTokens } = useAuthStore.getState()
 
+  // Must run BEFORE the server logout call, while the access token is still valid - wrapped
+  // internally so any failure here can never block the user from actually logging out.
+  await disablePushForLogout()
+
   try {
     if (authTokens?.refresh_token) {
       const { data } = await apiClient.post('/auth/logout', {
@@ -215,6 +222,7 @@ export async function exchangeGoogleCode(code) {
   try {
     const { data } = await apiClient.post('/auth/exchange', { code })
     useAuthStore.getState().setAuthenticatedSession(data)
+    syncPushToken() // fire-and-forget - never block/fail the Google sign-in callback on this
     return { success: true, ...data }
   } catch (error) {
     const errorData = error.response?.data

@@ -100,7 +100,7 @@ function normalizeOrganization(organization) {
   }
 }
 
-function StatTile({ label, value, hint, icon: Icon }) {
+function StatTile({ label, value, hint, icon: Icon, loading }) {
   return (
     <div className="min-h-32 border-neutral-100 px-5 py-4 lg:px-6">
       <div className="flex items-start justify-between gap-3">
@@ -109,7 +109,7 @@ function StatTile({ label, value, hint, icon: Icon }) {
           <Icon className="size-4" aria-hidden="true" />
         </span>
       </div>
-      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
+      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={loading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
       <p className="mt-2 text-xs font-medium text-emerald-600">{hint}</p>
     </div>
   )
@@ -412,7 +412,7 @@ export default function OrganizationsList() {
               key={stat.label}
               className={`${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''} border-neutral-100`}
             >
-              <StatTile {...stat} />
+              <StatTile {...stat} loading={isLoadingOrganizations} />
             </div>
           ))}
         </div>

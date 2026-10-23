@@ -567,9 +567,9 @@ export default function CustomerList() {
                   <SortableHeaderCell label="Customer" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="min-w-52 whitespace-nowrap px-4 py-3" />
                   <SortableHeaderCell label="Contact Person" sortKey="primary_contact_person" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
                   <SortableHeaderCell label="Location" sortKey="city" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
-                  <SortableHeaderCell label="Sales Officer" sortKey="assigned_sales_officer_id" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
-                  <SortableHeaderCell label="Last Order" sortKey="last_order_date" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
-                  <SortableHeaderCell label="Last Visit" sortKey="last_visit_date" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Sales Officer" sortKey="assigned_sales_officer" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Last Order" sortKey="last_order" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
+                  <SortableHeaderCell label="Last Visit" sortKey="last_visit" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
                   <SortableHeaderCell label="Outstanding" sortKey="outstanding_balance" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
                   <SortableHeaderCell label="Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
                   <th className="whitespace-nowrap px-4 py-3 text-right">Actions</th>

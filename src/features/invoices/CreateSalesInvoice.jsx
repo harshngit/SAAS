@@ -864,7 +864,8 @@ function CreateSalesInvoiceForm() {
         productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        discount: Number(item.discount) || 0,
+        // The UI accepts a percent; InvoiceItemIn.discount is a rupee amount.
+        discount: item.discountAmount,
         taxRate: Number(item.taxRate) || 0,
         batchNumber: item.product?.batch_tracking && item.batchNumber ? item.batchNumber : undefined,
         serialNumbers: item.product?.serial_number_tracking

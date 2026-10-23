@@ -90,8 +90,29 @@ export function presetForBaseTemplate(template) {
 // InvoiceSettings.jsx (which preset card to highlight) and InvoiceDetail.jsx/InvoicePrintView.jsx
 // (which preset to actually render for a real invoice) so this logic exists in exactly one place.
 export function resolveRegularPresetId(template, templateVariant) {
-  if (templateVariant && REGULAR_THEME_PRESETS.some((preset) => preset.id === templateVariant)) {
+  if (templateVariant && REGULAR_THEME_PRESETS.some((preset) => preset.id === templateVariant && (template === 'thermal' || preset.baseTemplate === template))) {
     return templateVariant
   }
   return presetForBaseTemplate(template).id
+}
+
+// Reconcile the authenticated backend catalog with the existing visual renderer.
+// Never rename IDs or silently replace frontend theme designs with new aliases.
+export function reconcileInvoiceThemeCatalog(catalog) {
+  const axes = ['header', 'table', 'totals', 'accent', 'density']
+  const issues = []
+  const regular = (catalog?.regular || []).flatMap((server) => {
+    const local = REGULAR_THEME_PRESETS.find((preset) => preset.id === server.id)
+    if (!local) { issues.push(`Unsupported regular theme: ${server.id}`); return [] }
+    if (server.base_template !== local.baseTemplate || axes.some((axis) => server[axis] !== local[axis])) issues.push(`Theme definition differs: ${server.id}`)
+    return [local]
+  })
+  const thermal = (catalog?.thermal || []).flatMap((server) => {
+    const local = THERMAL_THEME_PRESETS.find((preset) => preset.id === server.id)
+    if (!local) { issues.push(`Unsupported thermal theme: ${server.id}`); return [] }
+    if (local.layout !== server.layout || (local.variant ?? null) !== (server.variant ?? null) || Boolean(local.showExtras) !== Boolean(server.show_extras)) issues.push(`Theme definition differs: ${server.id}`)
+    return [local]
+  })
+  if (!regular.length || !thermal.length) issues.push('The backend theme catalog is incomplete.')
+  return { regular, thermal, issues }
 }

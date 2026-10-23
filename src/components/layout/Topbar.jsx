@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Bell, CheckCheck, ChevronDown, FileText, HelpCircle, LogOut, Search, ShieldCheck, UserCircle } from 'lucide-react'
+import { Bell, CheckCheck, ChevronDown, FileText, HelpCircle, LogOut, ShieldCheck, UserCircle } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { ROLES, roleLabels, roleMenus } from '../../auth/roles'
@@ -8,6 +8,8 @@ import { logout } from '../../api/auth'
 import { listNotifications, markAllNotificationsRead, markNotificationRead, getUnreadNotificationCount } from '../../api/notifications'
 import { resolveNotificationDestination } from '../../utils/notificationNavigation'
 import { Skeleton } from '../ui/Skeleton'
+import UniversalSearch from './UniversalSearch'
+import { getFileUrl } from '../../api/files'
 
 const NOTIFICATIONS_PANEL_WIDTH = 320
 const MENU_PANEL_WIDTH = 240
@@ -61,6 +63,7 @@ export default function Topbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [logoutError, setLogoutError] = useState('')
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [avatarPhotoFailed, setAvatarPhotoFailed] = useState(false)
   const menuTriggerRef = useRef(null)
   const menuPanelRef = useRef(null)
 
@@ -192,6 +195,13 @@ export default function Topbar() {
     .join('')
     .toUpperCase()
 
+  // Same fallback chain as the Profile page's own avatar (authStore spreads the raw /auth/me
+  // user as-is, so this is never a camelCase field it created itself) - keeps the header avatar
+  // in sync with whatever photo the user has actually uploaded via My Profile.
+  const rawProfilePhoto =
+    currentUser.profile_photo || currentUser.profilePhoto || currentUser.basic_information?.profile_photo
+  const avatarPhotoUrl = rawProfilePhoto ? getFileUrl(rawProfilePhoto) : ''
+
   const handleProfileSettings = () => {
     setIsMenuOpen(false)
     navigate('/profile')
@@ -239,15 +249,10 @@ export default function Topbar() {
 
       <div className={`${isSuperAdminDashboard ? 'w-full justify-end' : 'ml-auto'} flex min-w-0 items-center gap-3 sm:gap-5`}>
         {logoutError && <p className="hidden text-sm text-red-600 md:block">{logoutError}</p>}
-        <div className={`relative hidden min-w-0 md:block ${isSuperAdminDashboard ? 'mr-auto w-[min(34rem,44vw)]' : 'w-[min(34rem,42vw)]'}`}>
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-4.5 -translate-y-1/2 text-fg-muted" />
-          <input
-            type="search"
-            placeholder={isSuperAdminDashboard ? 'Search customers, jobs, quotes, organizations...' : 'Search customers, jobs, quotes...'}
-            className={`w-full rounded-xl border border-surface-border bg-(--input-bg) py-2.5 pl-11 text-sm text-fg shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 focus:ring-primary-500/10 ${isSuperAdminDashboard ? 'pr-20' : 'pr-4'}`}
-          />
-        
-        </div>
+        <UniversalSearch
+          className={`hidden md:block ${isSuperAdminDashboard ? 'mr-auto w-[min(34rem,44vw)]' : 'w-[min(34rem,42vw)]'}`}
+          placeholder={isSuperAdminDashboard ? 'Search customers, jobs, quotes, organizations...' : 'Search customers, jobs, quotes...'}
+        />
         <div className="relative">
           <button
             ref={notificationsTriggerRef}
@@ -332,8 +337,17 @@ export default function Topbar() {
             aria-expanded={isMenuOpen}
             className="app-topbar-user-button flex items-center gap-2 rounded-full bg-transparent py-1 pl-1 pr-1.5 transition-colors hover:bg-(--input-bg)"
           >
-            <div className="app-topbar-avatar flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary-500 to-primary-700 text-xs font-semibold text-white ring-2 ring-white">
-              {initials}
+            <div className="app-topbar-avatar relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-linear-to-br from-primary-500 to-primary-700 text-xs font-semibold text-white ring-2 ring-white">
+              {avatarPhotoUrl && !avatarPhotoFailed ? (
+                <img
+                  src={avatarPhotoUrl}
+                  alt={currentUser.name}
+                  className="absolute inset-0 size-full object-cover"
+                  onError={() => setAvatarPhotoFailed(true)}
+                />
+              ) : (
+                initials
+              )}
             </div>
             <div className="hidden pr-3 text-left sm:block">
               <p className="text-sm font-medium leading-tight text-fg">{currentUser.name}</p>

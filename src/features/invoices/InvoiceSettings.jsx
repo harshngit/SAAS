@@ -26,15 +26,16 @@ import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs'
 import { useToast } from '../../components/ui/toastContext'
-import { getInvoiceSettings, updateInvoiceSettings } from '../../api/invoices'
+import { getInvoiceSettings, getInvoiceTemplates, updateInvoiceSettings } from '../../api/invoices'
 import { uploadFile } from '../../api/files'
 import { getOrganizationSettings, normalizeOrganizationBranding } from '../../api/organizations'
 import { exportElementToPdf } from '../../utils/pdfExport'
-import { sampleInvoice, RegularThemePreview, ThermalThemePreview } from './invoiceTemplates'
+import { sampleInvoice, buildInvoicePreviewData, RegularThemePreview, ThermalThemePreview } from './invoiceTemplates'
 import {
   REGULAR_THEME_PRESETS,
   THERMAL_THEME_PRESETS,
   resolveRegularPresetId,
+  reconcileInvoiceThemeCatalog,
   findThermalPreset,
   findBaseThermalPresetForLayout,
   thermalWidthPx,
@@ -197,11 +198,12 @@ function ThemeCarousel({ children }) {
   )
 }
 
-function buildPreviewProps(settings, printMode, regularPresetId, previewData) {
+function buildPreviewProps(settings, printMode, regularPresetId, previewData, format = 'detailed') {
   const template = printMode === 'thermal' ? 'thermal' : settings.template
   return {
     template,
     presetId: regularPresetId,
+    format,
     primaryColor: settings.branding.primaryColor,
     data: previewData,
     businessDetails: settings.businessDetails,
@@ -310,7 +312,8 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
   // a string while the user is typing, so a half-typed value (e.g. "1" on the way to "120") never
   // gets clamped/overwritten mid-keystroke - only committed (clamped + applied) on blur/Enter.
   const [zoomDraft, setZoomDraft] = useState(null)
-  const previewProps = buildPreviewProps(settings, printMode, regularPresetId, previewData)
+  const [previewFormat, setPreviewFormat] = useState('detailed')
+  const previewProps = buildPreviewProps(settings, printMode, regularPresetId, previewData, previewFormat)
   const isThermal = printMode === 'thermal'
   // Rendered via a plain function call below (never `<TemplateComponent .../>`) - assigning an
   // inline arrow function to a variable and using it as a JSX tag would give React a brand-new
@@ -376,7 +379,7 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 px-4 py-3">
         <div>
           <p className="text-sm font-semibold text-neutral-900">Live Preview</p>
-          <p className="text-xs text-neutral-400">This is how your invoice will look. Updates instantly.</p>
+          <p className="text-xs text-neutral-400">Sample invoice with your company details. Updates instantly.</p>
         </div>
         <div className="flex items-center gap-2">
           <Select
@@ -389,6 +392,7 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
             value={printMode}
             onChange={(event) => setPrintMode(event.target.value)}
           />
+          {!isThermal && <Select className="w-32" triggerClassName="h-8 py-1.5" options={[{ value: 'detailed', label: 'Detailed' }, { value: 'simple', label: 'Simple' }]} value={previewFormat} onChange={(event) => setPreviewFormat(event.target.value)} />}
           <div className="flex items-center gap-0.5 rounded-lg border border-neutral-200 px-1">
             <button type="button" onClick={() => adjustZoom(-ZOOM_STEP)} aria-label="Zoom out" className="flex size-7 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100">
               <Minus className="size-3.5" aria-hidden="true" />
@@ -465,7 +469,10 @@ export default function InvoiceSettings() {
   // asset falls back to (see invoiceBranding.js). Loaded independently of invoice settings and
   // never blocks the page: `getOrganizationSettings` failing just means every asset falls back to
   // its empty state below, same as a fresh org with nothing uploaded yet (Part 10).
-  const [companyBranding, setCompanyBranding] = useState({})
+  const [organization, setOrganization] = useState(null)
+  const companyBranding = normalizeOrganizationBranding(organization)
+  const [catalogChoices, setCatalogChoices] = useState({ regular: REGULAR_THEME_PRESETS, thermal: THERMAL_THEME_PRESETS })
+  const [catalogError, setCatalogError] = useState('')
   const [uploadingAsset, setUploadingAsset] = useState('') // '' | 'logo' | 'signature' | 'stamp' | 'qr'
   // The specific regular-theme preset (e.g. "GST Theme 3") persists via the real
   // `settings.templateVariant` field now (backend's `template_variant`, alongside
@@ -497,7 +504,13 @@ export default function InvoiceSettings() {
     // unnecessarily if company branding fails to load") - a failure here just leaves
     // companyBranding at {}, so every asset control shows its empty state instead of erroring.
     getOrganizationSettings().then((result) => {
-      if (result.success) setCompanyBranding(normalizeOrganizationBranding(result.organization))
+      if (result.success) setOrganization(result.organization)
+    })
+    getInvoiceTemplates().then((result) => {
+      if (!result.success) { setCatalogError(`${result.error} Showing the built-in theme catalog.`); return }
+      const catalog = reconcileInvoiceThemeCatalog(result.catalog)
+      if (catalog.regular.length && catalog.thermal.length) setCatalogChoices(catalog)
+      setCatalogError(catalog.issues.join(' · '))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -529,18 +542,12 @@ export default function InvoiceSettings() {
   // One resolver, reused by the Live Preview here AND by InvoiceDetail.jsx/InvoicePrintView.jsx
   // for a real invoice (Part 8/20) - see invoiceBranding.js.
   const resolvedBranding = resolveInvoiceBranding(companyBranding, settings.branding)
-  // Part 7: the preview must combine sample invoice/company data with REAL branding assets, never
-  // let sampleInvoice's (branding-less) company object permanently control what's shown. Only the
-  // asset URLs are swapped in - name/address/GSTIN/etc. stay the existing sample data.
+  // Sample customer/items remain explicitly illustrative. Company, bank and branding values
+  // come from the same organization/settings sources as a real invoice preview.
   const previewData = {
     ...sampleInvoice,
-    company: {
-      ...sampleInvoice.company,
-      logoUrl: resolvedBranding.logo.url,
-      signatureUrl: resolvedBranding.signature.url,
-      stampSealUrl: resolvedBranding.stamp.url,
-      qrCodeUrl: resolvedBranding.qr.url,
-    },
+    company: buildInvoicePreviewData({ items: [] }, organization, settings).company,
+    bank: { name: organization?.bank_name || '', account: organization?.bank_account_details || '', ifsc: organization?.bank_ifsc || '' },
   }
 
   const toggleSection = (key) => setOpenSection((current) => (current === key ? '' : key))
@@ -647,6 +654,7 @@ export default function InvoiceSettings() {
 
   return (
     <div className="space-y-4">
+      {catalogError && <p role="status" className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">{catalogError}</p>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
@@ -695,7 +703,7 @@ export default function InvoiceSettings() {
         <div className="rounded-2xl border border-neutral-100 bg-surface px-4 shadow-(--shadow-card)">
           <SettingsSection title="1. Template & Theme" description="Layout and accent color" isOpen={openSection === 'theme'} onToggle={() => toggleSection('theme')}>
             <ThemeCarousel>
-              {REGULAR_THEME_PRESETS.map((preset) => (
+              {catalogChoices.regular.map((preset) => (
                 <button
                   key={preset.id}
                   type="button"
@@ -915,7 +923,7 @@ export default function InvoiceSettings() {
                   <p className="text-sm font-medium text-neutral-700">Thermal Theme</p>
                   <div className="mt-2">
                     <ThemeCarousel>
-                      {THERMAL_THEME_PRESETS.map((preset) => (
+                      {catalogChoices.thermal.map((preset) => (
                         <button
                           key={preset.id}
                           type="button"

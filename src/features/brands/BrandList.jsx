@@ -455,8 +455,12 @@ export default function BrandList() {
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {visibleBrands.map((brand) => (
-                  <tr key={brand.id} className="bg-surface transition-colors hover:bg-primary-50/30">
-                    <td className="px-6 py-5">
+                  <tr
+                    key={brand.id}
+                    onClick={() => openForm(brand)}
+                    className="cursor-pointer bg-surface transition-colors hover:bg-primary-50/30"
+                  >
+                    <td className="px-6 py-5" onClick={(event) => event.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedIds.includes(brand.id)}
@@ -480,10 +484,10 @@ export default function BrandList() {
                     <td className="px-6 py-5">
                       <Badge variant={brand.isActive ? 'success' : 'neutral'} dot>{brand.isActive ? 'Active' : 'Inactive'}</Badge>
                     </td>
-                    <td className="px-6 py-5 text-right">
+                    <td className="px-6 py-5 text-right" onClick={(event) => event.stopPropagation()}>
                       <ActionMenu
                         items={[
-                          { label: 'View Details', icon: Eye, onClick: () => setEditingBrand(brand) },
+                          { label: 'View Details', icon: Eye, onClick: () => openForm(brand) },
                           { label: 'Edit', icon: Edit, onClick: () => openForm(brand) },
                           {
                             label: 'Delete',

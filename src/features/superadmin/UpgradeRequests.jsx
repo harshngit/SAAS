@@ -42,7 +42,7 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
-function StatTile({ label, value, detail, icon: Icon }) {
+function StatTile({ label, value, detail, icon: Icon, loading }) {
   return (
     <div className="min-h-32 border-neutral-100 px-5 py-4 lg:px-6">
       <div className="flex items-start justify-between gap-3">
@@ -51,8 +51,8 @@ function StatTile({ label, value, detail, icon: Icon }) {
           <Icon className="size-4" aria-hidden="true" />
         </span>
       </div>
-      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
-      <p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={isLoading} className="h-3 w-28">{detail}</SkeletonValue></p>
+      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={loading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
+      <p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={loading} className="h-3 w-28">{detail}</SkeletonValue></p>
     </div>
   )
 }
@@ -207,7 +207,7 @@ export default function UpgradeRequests() {
               key={stat.label}
               className={`border-neutral-100 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}
             >
-              <StatTile {...stat} />
+              <StatTile {...stat} loading={isLoading} />
             </div>
           ))}
         </div>

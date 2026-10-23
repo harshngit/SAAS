@@ -47,15 +47,15 @@ const formatDate = (value) => {
   }
 }
 
-function OrderSummaryCard({ label, value, detail, index }) {
+function OrderSummaryCard({ label, value, detail, index, loading }) {
   return (
     <div className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-medium text-fg-muted">{label}</p>
         <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted" aria-hidden="true"><MoreHorizontal className="size-4" /></span>
       </div>
-      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
-      <p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={isLoading} className="h-3 w-28">{detail}</SkeletonValue></p>
+      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={loading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
+      <p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={loading} className="h-3 w-28">{detail}</SkeletonValue></p>
     </div>
   )
 }
@@ -236,10 +236,10 @@ export default function OrderList() {
 
       <Card className="overflow-hidden p-0">
         <div className="grid grid-cols-2 lg:grid-cols-4">
-          <OrderSummaryCard index={0} label="Total Orders" value={stats.total} detail={`${stats.confirmed} confirmed`} />
-          <OrderSummaryCard index={1} label="Draft Orders" value={stats.draft} detail="needs attention" />
-          <OrderSummaryCard index={2} label="Confirmed Orders" value={stats.confirmed} detail={`${stats.cancelled} cancelled`} />
-          <OrderSummaryCard index={3} label="Order Value" value={formatCurrency(stats.value)} detail="current total" />
+          <OrderSummaryCard index={0} label="Total Orders" value={stats.total} detail={`${stats.confirmed} confirmed`} loading={isLoading} />
+          <OrderSummaryCard index={1} label="Draft Orders" value={stats.draft} detail="needs attention" loading={isLoading} />
+          <OrderSummaryCard index={2} label="Confirmed Orders" value={stats.confirmed} detail={`${stats.cancelled} cancelled`} loading={isLoading} />
+          <OrderSummaryCard index={3} label="Order Value" value={formatCurrency(stats.value)} detail="current total" loading={isLoading} />
         </div>
       </Card>
 
@@ -287,12 +287,13 @@ export default function OrderList() {
                 <tr className="border-b border-surface-border bg-surface-muted text-[0.7rem] font-semibold text-fg-muted">
                   <th className="w-14 px-6 py-6"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" aria-label="Select all orders" /></th>
                   <SortableHeaderCell label="Order #" sortKey="order_number" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
-                  <SortableHeaderCell label="Customer" sortKey="customer_id" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Customer" sortKey="customer" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <SortableHeaderCell label="Order Date" sortKey="order_date" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Items</th>
                   <SortableHeaderCell label="Total" sortKey="total" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <SortableHeaderCell label="Order Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
-                  <SortableHeaderCell label="Payment" sortKey="payment_status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  {/* Not server-sortable - GET /orders has no payment-status sort_by field */}
+                  <SortableHeaderCell label="Payment" sortable={false} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6">Fulfilment</th>
                   <th className="whitespace-nowrap px-6 py-6">Delivery Status</th>
                   <th className="whitespace-nowrap px-6 py-6">Delivery Partner</th>
