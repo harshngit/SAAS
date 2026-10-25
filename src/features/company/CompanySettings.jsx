@@ -1,3 +1,5 @@
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
+import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
@@ -2638,6 +2640,7 @@ function buildOrganizationSettingsRequest(companyData) {
 }
 
 export default function CompanySettings() {
+  const { visible } = useFormFieldSettings('company')
   const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -2981,7 +2984,7 @@ export default function CompanySettings() {
 
     for (const sectionId of sectionsToValidate) {
       const missingRequiredFields = (sections[sectionId] || [])
-        .filter((field) => !String(getRequiredCompanyValue(field.key) || "").trim())
+        .filter((field) => visible(field.key) && !String(getRequiredCompanyValue(field.key) || "").trim())
         .map((field) => field.label);
 
       if (missingRequiredFields.length > 0) {
@@ -3604,23 +3607,23 @@ export default function CompanySettings() {
                   onToggle={() => toggleGeneralSection("basic")}
                 >
                   <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
+                    <ConfiguredField module="company" name="name"><Input
                       label="Company Name"
                       name="name"
                       value={companyData.name}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="legalName"><Input
                       label="Legal Name"
                       name="legalName"
                       value={companyData.legalName}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
-                    />
-                    <Select
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="businessType"><Select
                       label="Business Type"
                       name="businessType"
                       placeholder="Select business type"
@@ -3629,8 +3632,8 @@ export default function CompanySettings() {
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
-                    />
-                    <Select
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="industry"><Select
                       label="Industry"
                       name="industry"
                       placeholder="Select industry"
@@ -3639,8 +3642,8 @@ export default function CompanySettings() {
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
-                    />
-                    <Select
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="status"><Select
                       label="Status"
                       name="status"
                       placeholder="Select status"
@@ -3649,37 +3652,37 @@ export default function CompanySettings() {
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="dateOfIncorporation"><Input
                       label="Date of Incorporation"
                       name="dateOfIncorporation"
                       type="date"
                       value={companyData.dateOfIncorporation}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="cinRegistrationNumber"><Input
                       label="CIN/Registration Number"
                       name="cinRegistrationNumber"
                       value={companyData.cinRegistrationNumber}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="gstin"><Input
                       label="GSTIN/PAN"
                       name="gstin"
                       value={companyData.gstin}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="panNumber"><Input
                       label="PAN Number (if applicable)"
                       name="panNumber"
                       value={companyData.panNumber}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="companyDescription"><Input
                       className="md:col-span-2"
                       label="Company Description"
                       name="companyDescription"
@@ -3687,7 +3690,7 @@ export default function CompanySettings() {
                       value={companyData.companyDescription}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
+                    /></ConfiguredField>
                   </div>
                 </CompanySection>
 
@@ -3700,15 +3703,15 @@ export default function CompanySettings() {
                   onToggle={() => toggleGeneralSection("authorizedPerson")}
                 >
                   <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
+                    <ConfiguredField module="company" name="ownerDirectorName"><Input
                       label="Owner/Director Name"
                       name="ownerDirectorName"
                       value={companyData.ownerDirectorName}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
-                    />
-                    <Select
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="designation"><Select
                       label="Designation"
                       name="designation"
                       placeholder="Select designation"
@@ -3717,16 +3720,16 @@ export default function CompanySettings() {
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="mobileNumber"><Input
                       label="Mobile Number"
                       name="mobileNumber"
                       value={companyData.mobileNumber}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="adminEmail"><Input
                       label="Email"
                       name="adminEmail"
                       type="email"
@@ -3734,8 +3737,8 @@ export default function CompanySettings() {
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
-                    />
-                    <FileUploadField
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="profilePhotoUrl"><FileUploadField
                       label="Profile Picture"
                       name="profilePhotoUrl"
                       value={companyData.profilePhotoUrl}
@@ -3744,8 +3747,8 @@ export default function CompanySettings() {
                       disabled={!isActiveSectionEditing}
                       uploadLabel="Upload Photo"
                       {...getUploadFieldState("profilePhotoUrl")}
-                    />
-                    <FileUploadField
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="digitalSignatureUrl"><FileUploadField
                       label="Digital Signature"
                       name="digitalSignatureUrl"
                       value={companyData.digitalSignatureUrl}
@@ -3754,7 +3757,7 @@ export default function CompanySettings() {
                       disabled={!isActiveSectionEditing}
                       uploadLabel="Upload Signature"
                       {...getUploadFieldState("digitalSignatureUrl")}
-                    />
+                    /></ConfiguredField>
                   </div>
                 </CompanySection>
 
@@ -3767,29 +3770,29 @@ export default function CompanySettings() {
                   onToggle={() => toggleGeneralSection("contact")}
                 >
                   <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
+                    <ConfiguredField module="company" name="phone"><Input
                       label="Primary Mobile Number"
                       name="phone"
                       value={companyData.phone}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="alternateMobileNumber"><Input
                       label="Alternate Mobile Number"
                       name="alternateMobileNumber"
                       value={companyData.alternateMobileNumber}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="landlineNumber"><Input
                       label="Landline Number"
                       name="landlineNumber"
                       value={companyData.landlineNumber}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="email"><Input
                       label="Official Email Address"
                       name="email"
                       type="email"
@@ -3797,21 +3800,21 @@ export default function CompanySettings() {
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                       required
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="website"><Input
                       label="Website"
                       name="website"
                       value={companyData.website}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="customerSupportNumber"><Input
                       label="Customer Support Number"
                       name="customerSupportNumber"
                       value={companyData.customerSupportNumber}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
+                    /></ConfiguredField>
                   </div>
                 </CompanySection>
 
@@ -3825,7 +3828,7 @@ export default function CompanySettings() {
                 >
                   <div className="space-y-5">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
+                      <ConfiguredField module="company" name="registeredAddress"><div className="min-w-0 flex-1">
                         <Input
                           label="Registered Address"
                           name="registeredAddress"
@@ -3835,8 +3838,8 @@ export default function CompanySettings() {
                           disabled={!isActiveSectionEditing}
                           required
                         />
-                      </div>
-                      {isActiveSectionEditing && (
+                      </div></ConfiguredField>
+                      {isActiveSectionEditing && visible('registeredAddress') && (
                         <Button
                           type="button"
                           variant="outline"
@@ -3849,24 +3852,24 @@ export default function CompanySettings() {
                         </Button>
                       )}
                     </div>
-                    <Input
+                    <ConfiguredField module="company" name="branchOfficeAddresses"><Input
                       label="Branch/Office Address(es)"
                       name="branchOfficeAddresses"
                       as="textarea"
                       value={companyData.branchOfficeAddresses}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
+                    /></ConfiguredField>
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                      <Input
+                      <ConfiguredField module="company" name="city"><Input
                         label="City"
                         name="city"
                         value={companyData.city}
                         onChange={handleChange}
                         disabled={!isActiveSectionEditing}
                         required
-                      />
-                      <Select
+                      /></ConfiguredField>
+                      <ConfiguredField module="company" name="state"><Select
                         label="State"
                         name="state"
                         placeholder="Select state"
@@ -3875,10 +3878,10 @@ export default function CompanySettings() {
                         onChange={handleChange}
                         disabled={!isActiveSectionEditing}
                         required
-                      />
+                      /></ConfiguredField>
                     </div>
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                      <Select
+                      <ConfiguredField module="company" name="country"><Select
                         label="Country"
                         name="country"
                         placeholder="Select country"
@@ -3887,24 +3890,24 @@ export default function CompanySettings() {
                         onChange={handleChange}
                         disabled={!isActiveSectionEditing}
                         required
-                      />
-                      <Input
+                      /></ConfiguredField>
+                      <ConfiguredField module="company" name="pincode"><Input
                         label="PIN/ZIP Code"
                         name="pincode"
                         value={companyData.pincode}
                         onChange={handleChange}
                         disabled={!isActiveSectionEditing}
                         required
-                      />
+                      /></ConfiguredField>
                     </div>
-                    <CheckboxField
+                    <ConfiguredField module="company" name="billingAddressSameAsRegistered"><CheckboxField
                       label="Billing address same as registered address"
                       name="billingAddressSameAsRegistered"
                       checked={companyData.billingAddressSameAsRegistered}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="billingAddress"><Input
                       label="Billing Address"
                       name="billingAddress"
                       as="textarea"
@@ -3918,15 +3921,15 @@ export default function CompanySettings() {
                         !isActiveSectionEditing ||
                         companyData.billingAddressSameAsRegistered
                       }
-                    />
-                    <CheckboxField
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="shippingAddressSameAsBilling"><CheckboxField
                       label="Shipping/Warehouse address same as billing address"
                       name="shippingAddressSameAsBilling"
                       checked={companyData.shippingAddressSameAsBilling}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="shippingAddress"><Input
                       label="Shipping/Warehouse Address"
                       name="shippingAddress"
                       as="textarea"
@@ -3942,7 +3945,7 @@ export default function CompanySettings() {
                         !isActiveSectionEditing ||
                         companyData.shippingAddressSameAsBilling
                       }
-                    />
+                    /></ConfiguredField>
                   </div>
                 </CompanySection>
 
@@ -3955,7 +3958,7 @@ export default function CompanySettings() {
             ) : activeTab === "branding" ? (
               <section className="pb-5 pt-5" data-completion-section="branding-main">
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  <div className="space-y-3">
+                  <ConfiguredField module="company" name="logoUrl"><div className="space-y-3">
                     <FileUploadField
                       label="Company Logo"
                       name="logoUrl"
@@ -3983,8 +3986,8 @@ export default function CompanySettings() {
                         {logoUploadError}
                       </div>
                     )}
-                  </div>
-                  <FileUploadField
+                  </div></ConfiguredField>
+                  <ConfiguredField module="company" name="stampSealUrl"><FileUploadField
                     label="Company Stamp/Seal"
                     name="stampSealUrl"
                     value={companyData.stampSealUrl}
@@ -3992,8 +3995,8 @@ export default function CompanySettings() {
                     onRemove={handleRemoveFile}
                     disabled={!isActiveSectionEditing}
                     {...getUploadFieldState("stampSealUrl")}
-                  />
-                  <div className="space-y-3">
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="signatureUrl"><div className="space-y-3">
                     <FileUploadField
                       label="Authorized Signature"
                       name="signatureUrl"
@@ -4025,8 +4028,8 @@ export default function CompanySettings() {
                         {signatureUploadError}
                       </div>
                     )}
-                  </div>
-                  <FileUploadField
+                  </div></ConfiguredField>
+                  <ConfiguredField module="company" name="letterheadFile"><FileUploadField
                     label="Company Letterhead"
                     name="letterheadFile"
                     value={companyData.letterheadFile}
@@ -4035,8 +4038,8 @@ export default function CompanySettings() {
                     onRemove={handleRemoveFile}
                     disabled={!isActiveSectionEditing}
                     {...getUploadFieldState("letterheadFile")}
-                  />
-                  <FileUploadField
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="bannerUrl"><FileUploadField
                     label="Company Banner"
                     name="bannerUrl"
                     value={companyData.bannerUrl}
@@ -4044,7 +4047,7 @@ export default function CompanySettings() {
                     onRemove={handleRemoveFile}
                     disabled={!isActiveSectionEditing}
                     {...getUploadFieldState("bannerUrl")}
-                  />
+                  /></ConfiguredField>
                 </div>
               </section>
             ) : activeTab === "billings" ? (
@@ -4058,7 +4061,7 @@ export default function CompanySettings() {
                       Upload a QR code for receiving payments.
                     </p>
                   </div>
-                  <div>
+                  <ConfiguredField module="company" name="qrCodeUrl"><div>
                     <FileUploadField
                       label="Google Pay / PhonePe / Paytm QR Code"
                       name="qrCodeUrl"
@@ -4070,7 +4073,7 @@ export default function CompanySettings() {
                       required
                       {...getUploadFieldState("qrCodeUrl")}
                     />
-                  </div>
+                  </div></ConfiguredField>
                 </div>
 
                 <div data-completion-section="billings-upi">
@@ -4082,7 +4085,7 @@ export default function CompanySettings() {
                       Unified Payments Interface information.
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                  <ConfiguredField module="company" name="upiId"><div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <Input
                       label="UPI ID"
                       name="upiId"
@@ -4090,7 +4093,7 @@ export default function CompanySettings() {
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
                     />
-                  </div>
+                  </div></ConfiguredField>
                 </div>
 
                 <div className="border-t border-neutral-100 pt-5" data-completion-section="billings-bank-account">
@@ -4103,28 +4106,28 @@ export default function CompanySettings() {
                     </p>
                   </div>
                   <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
+                    <ConfiguredField module="company" name="bankAccountDetails"><Input
                       label="Bank Account Details"
                       name="bankAccountDetails"
                       value={companyData.bankAccountDetails}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="accountHolderName"><Input
                       label="Account Holder Name"
                       name="accountHolderName"
                       value={companyData.accountHolderName}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Input
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="ifscCode"><Input
                       label="IFSC Code"
                       name="ifscCode"
                       value={companyData.ifscCode}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
-                    <Select
+                    /></ConfiguredField>
+                    <ConfiguredField module="company" name="bankName"><Select
                       label="Bank Name"
                       name="bankName"
                       placeholder="Select bank"
@@ -4132,61 +4135,61 @@ export default function CompanySettings() {
                       options={bankOptions}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
-                    />
+                    /></ConfiguredField>
                   </div>
                 </div>
               </section>
             ) : activeTab === "online-presence" ? (
               <section className="pb-5 pt-5" data-completion-section="online-presence-main">
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <Input
+                  <ConfiguredField module="company" name="facebook"><Input
                     label="Facebook"
                     name="facebook"
                     value={companyData.facebook}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
-                  />
-                  <Input
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="instagram"><Input
                     label="Instagram"
                     name="instagram"
                     value={companyData.instagram}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
-                  />
-                  <Input
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="linkedin"><Input
                     label="LinkedIn"
                     name="linkedin"
                     value={companyData.linkedin}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
-                  />
-                  <Input
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="xTwitter"><Input
                     label="X (Twitter)"
                     name="xTwitter"
                     value={companyData.xTwitter}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
-                  />
-                  <Input
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="youtube"><Input
                     label="YouTube"
                     name="youtube"
                     value={companyData.youtube}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
-                  />
-                  <Input
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="whatsappBusinessNumber"><Input
                     label="WhatsApp Business Number"
                     name="whatsappBusinessNumber"
                     value={companyData.whatsappBusinessNumber}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
-                  />
+                  /></ConfiguredField>
                 </div>
               </section>
             ) : activeTab === "business-settings" ? (
               <section className="pb-5 pt-5" data-completion-section="business-settings-main">
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <Select
+                  <ConfiguredField module="company" name="financialYear"><Select
                     label="Financial Year"
                     name="financialYear"
                     placeholder="Select financial year"
@@ -4194,8 +4197,8 @@ export default function CompanySettings() {
                     options={financialYearOptions}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
-                  />
-                  <Select
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="currency"><Select
                     label="Currency"
                     name="currency"
                     placeholder="Select currency"
@@ -4204,8 +4207,8 @@ export default function CompanySettings() {
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
                     required
-                  />
-                  <Select
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="timeZone"><Select
                     label="Time Zone"
                     name="timeZone"
                     placeholder="Select time zone"
@@ -4214,8 +4217,8 @@ export default function CompanySettings() {
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
                     required
-                  />
-                  <Select
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="language"><Select
                     label="Language"
                     name="language"
                     placeholder="Select language"
@@ -4224,8 +4227,8 @@ export default function CompanySettings() {
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
                     required
-                  />
-                  <Select
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="taxConfiguration"><Select
                     label="Tax Configuration"
                     name="taxConfiguration"
                     placeholder="Select tax configuration"
@@ -4234,16 +4237,16 @@ export default function CompanySettings() {
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
                     required
-                  />
-                  <Input
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="invoicePrefix"><Input
                     label="Invoice Prefix"
                     name="invoicePrefix"
                     placeholder="e.g. INV"
                     value={companyData.invoicePrefix}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
-                  />
-                  <Input
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="invoiceSettings"><Input
                     className="md:col-span-2"
                     label="Invoice Settings"
                     name="invoiceSettings"
@@ -4252,13 +4255,13 @@ export default function CompanySettings() {
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
                     required
-                  />
+                  /></ConfiguredField>
                 </div>
               </section>
             ) : activeTab === "documents" ? (
               <section className="pb-5 pt-5" data-completion-section="documents-main">
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  <FileUploadField
+                  <ConfiguredField module="company" name="gstCertificateFile"><FileUploadField
                     label="GST Certificate"
                     name="gstCertificateFile"
                     value={companyData.gstCertificateFile}
@@ -4267,8 +4270,8 @@ export default function CompanySettings() {
                     onRemove={handleRemoveFile}
                     disabled={!isActiveSectionEditing}
                     {...getUploadFieldState("gstCertificateFile")}
-                  />
-                  <FileUploadField
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="panCardFile"><FileUploadField
                     label="PAN Card"
                     name="panCardFile"
                     value={companyData.panCardFile}
@@ -4277,8 +4280,8 @@ export default function CompanySettings() {
                     onRemove={handleRemoveFile}
                     disabled={!isActiveSectionEditing}
                     {...getUploadFieldState("panCardFile")}
-                  />
-                  <FileUploadField
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="incorporationCertificateFile"><FileUploadField
                     label="Certificate of Incorporation"
                     name="incorporationCertificateFile"
                     value={companyData.incorporationCertificateFile}
@@ -4287,8 +4290,8 @@ export default function CompanySettings() {
                     onRemove={handleRemoveFile}
                     disabled={!isActiveSectionEditing}
                     {...getUploadFieldState("incorporationCertificateFile")}
-                  />
-                  <FileUploadField
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="tradeLicenseFile"><FileUploadField
                     label="Trade License"
                     name="tradeLicenseFile"
                     value={companyData.tradeLicenseFile}
@@ -4297,8 +4300,8 @@ export default function CompanySettings() {
                     onRemove={handleRemoveFile}
                     disabled={!isActiveSectionEditing}
                     {...getUploadFieldState("tradeLicenseFile")}
-                  />
-                  <FileUploadField
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="msmeCertificateFile"><FileUploadField
                     label="MSME Certificate"
                     name="msmeCertificateFile"
                     value={companyData.msmeCertificateFile}
@@ -4307,8 +4310,8 @@ export default function CompanySettings() {
                     onRemove={handleRemoveFile}
                     disabled={!isActiveSectionEditing}
                     {...getUploadFieldState("msmeCertificateFile")}
-                  />
-                  <FileUploadField
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="fssaiLicenseFile"><FileUploadField
                     label="FSSAI License"
                     name="fssaiLicenseFile"
                     value={companyData.fssaiLicenseFile}
@@ -4317,8 +4320,8 @@ export default function CompanySettings() {
                     onRemove={handleRemoveFile}
                     disabled={!isActiveSectionEditing}
                     {...getUploadFieldState("fssaiLicenseFile")}
-                  />
-                  <FileUploadField
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="otherBusinessDocumentsFile"><FileUploadField
                     label="Other Business Documents"
                     name="otherBusinessDocumentsFile"
                     value={companyData.otherBusinessDocumentsFile}
@@ -4329,13 +4332,13 @@ export default function CompanySettings() {
                     uploadLabel="Upload Files"
                     multiple
                     {...getUploadFieldState("otherBusinessDocumentsFile")}
-                  />
+                  /></ConfiguredField>
                 </div>
               </section>
             ) : activeTab === "additional-info" ? (
               <section className="pb-5 pt-5" data-completion-section="additional-info-main">
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <Input
+                  <ConfiguredField module="company" name="numberOfEmployees"><Input
                     label="Number of Employees"
                     name="numberOfEmployees"
                     type="number"
@@ -4348,15 +4351,15 @@ export default function CompanySettings() {
                       setCompanyData((prev) => ({ ...prev, numberOfEmployees: Number.isFinite(rounded) ? String(Math.max(rounded, 0)) : '' }))
                     }}
                     disabled={!isActiveSectionEditing}
-                  />
-                  <Input
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="businessHours"><Input
                     label="Business Hours"
                     name="businessHours"
                     value={companyData.businessHours}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
-                  />
-                  <Input
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="companyMissionVision"><Input
                     className="md:col-span-2"
                     label="Company Mission/Vision"
                     name="companyMissionVision"
@@ -4364,8 +4367,8 @@ export default function CompanySettings() {
                     value={companyData.companyMissionVision}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
-                  />
-                  <Input
+                  /></ConfiguredField>
+                  <ConfiguredField module="company" name="notes"><Input
                     className="md:col-span-2"
                     label="Notes"
                     name="notes"
@@ -4373,7 +4376,7 @@ export default function CompanySettings() {
                     value={companyData.notes}
                     onChange={handleChange}
                     disabled={!isActiveSectionEditing}
-                  />
+                  /></ConfiguredField>
                 </div>
               </section>
             ) : activeTab === "change-password" ? (

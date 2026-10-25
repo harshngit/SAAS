@@ -1,3 +1,5 @@
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
+import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Info, Plus, Save, Trash2 } from 'lucide-react'
@@ -56,6 +58,7 @@ function ReadOnlyField({ label, value }) {
 }
 
 export default function PurchaseInvoiceForm() {
+  const { visible } = useFormFieldSettings('purchase')
   const navigate = useNavigate()
   const { showToast } = useToast()
   const { id } = useParams()
@@ -294,10 +297,10 @@ export default function PurchaseInvoiceForm() {
     event.preventDefault()
 
     if (!formState.supplierId) return setSubmitError('Select a supplier.')
-    if (!formState.purchaseType) return setSubmitError('Select a purchase type.')
-    if (!formState.purchaseDate) return setSubmitError('Select a purchase date.')
+    if (visible('purchaseType') && !formState.purchaseType) return setSubmitError('Select a purchase type.')
+    if (visible('purchaseDate') && !formState.purchaseDate) return setSubmitError('Select a purchase date.')
     if (!formState.invoiceNumber.trim()) return setSubmitError('Enter the supplier reference / invoice number.')
-    if (!isEditing && !formState.warehouseId) return setSubmitError('Select a warehouse.')
+    if (visible('warehouseId') && !isEditing && !formState.warehouseId) return setSubmitError('Select a warehouse.')
     const validItems = formState.items.filter((item) => item.productId && Number(item.quantity) > 0)
     if (validItems.length === 0) return setSubmitError('Add at least one item before saving.')
     if (validItems.some((item) => Number(item.purchasePrice) < 0 || Number(item.discount) < 0 || Number(item.tax) < 0)) {
@@ -426,7 +429,7 @@ export default function PurchaseInvoiceForm() {
             {isEditing ? (
               <ReadOnlyField label="Supplier" value={supplierSnapshot?.name || existingPurchase?.supplierName} />
             ) : (
-              <Select
+              <ConfiguredField module="purchase" name="supplierId"><Select
                 label="Supplier"
                 required
                 options={supplierOptions}
@@ -435,29 +438,29 @@ export default function PurchaseInvoiceForm() {
                 placeholder={isLoadingOptions ? 'Loading...' : 'Select supplier'}
                 disabled={isLoadingOptions}
                 searchable
-              />
+              /></ConfiguredField>
             )}
             {isEditing ? (
               <ReadOnlyField label="Purchase Type" value={formState.purchaseType} />
             ) : (
-              <Select label="Purchase Type" required options={PURCHASE_TYPE_OPTIONS} value={formState.purchaseType} onChange={(event) => updateField('purchaseType', event.target.value)} />
+              <ConfiguredField module="purchase" name="purchaseType"><Select label="Purchase Type" required options={PURCHASE_TYPE_OPTIONS} value={formState.purchaseType} onChange={(event) => updateField('purchaseType', event.target.value)} /></ConfiguredField>
             )}
             {isEditing ? (
               <ReadOnlyField label="Purchase Date" value={new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(formState.purchaseDate))} />
             ) : (
-              <Input label="Purchase Date" type="date" required value={formState.purchaseDate} onChange={(event) => updateField('purchaseDate', event.target.value)} />
+              <ConfiguredField module="purchase" name="purchaseDate"><Input label="Purchase Date" type="date" required value={formState.purchaseDate} onChange={(event) => updateField('purchaseDate', event.target.value)} /></ConfiguredField>
             )}
-            <Input
+            <ConfiguredField module="purchase" name="invoiceNumber"><Input
               label="Supplier Reference / Invoice Number"
               required
               value={formState.invoiceNumber}
               onChange={(event) => updateField('invoiceNumber', event.target.value)}
               placeholder="Supplier's own invoice / reference number"
-            />
+            /></ConfiguredField>
             {isEditing ? (
               <ReadOnlyField label="Warehouse" value={existingPurchase?.warehouseName || warehouseOptions.find((w) => w.value === formState.warehouseId)?.label} />
             ) : (
-              <Select
+              <ConfiguredField module="purchase" name="warehouseId"><Select
                 label="Warehouse"
                 required
                 options={warehouseOptions}
@@ -465,12 +468,12 @@ export default function PurchaseInvoiceForm() {
                 onChange={(event) => updateField('warehouseId', event.target.value)}
                 placeholder={isLoadingOptions ? 'Loading...' : 'Select warehouse'}
                 disabled={isLoadingOptions}
-              />
+              /></ConfiguredField>
             )}
             <ReadOnlyField label="Financial Year" value={financialYear} />
           </div>
           <div className="mt-4">
-            <Input as="textarea" label="Notes" value={formState.notes} onChange={(event) => updateField('notes', event.target.value)} />
+            <ConfiguredField module="purchase" name="notes"><Input as="textarea" label="Notes" value={formState.notes} onChange={(event) => updateField('notes', event.target.value)} /></ConfiguredField>
           </div>
         </Card>
 
@@ -595,14 +598,14 @@ export default function PurchaseInvoiceForm() {
                 <Input key={label} label={label} value="" disabled placeholder="Not available yet" />
               ))}
               <Input label="Round Off" value="" disabled placeholder="Not available yet" />
-              <Input
+              <ConfiguredField module="purchase" name="discount"><Input
                 label="Extra Discount (₹)"
                 type="number"
                 min="0"
                 step="1"
                 value={formState.discount}
                 onChange={(event) => updateField('discount', event.target.value)}
-              />
+              /></ConfiguredField>
             </div>
           </Card>
 

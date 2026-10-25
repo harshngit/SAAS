@@ -1,3 +1,5 @@
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
+import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
@@ -244,6 +246,7 @@ export default function SupplierForm({
   categoryOptions = [],
 }) {
   const [formData, setFormData] = useState(emptyForm)
+  const { visibleErrors } = useFormFieldSettings('supplier')
   const [errors, setErrors] = useState({})
   const [products, setProducts] = useState([])
   const [productSearch, setProductSearch] = useState('')
@@ -316,6 +319,7 @@ export default function SupplierForm({
     if (formData.openingBalance !== '' && Number(formData.openingBalance) < 0) nextErrors.openingBalance = 'Amount cannot be negative.'
     if (formData.creditLimit !== '' && Number(formData.creditLimit) < 0) nextErrors.creditLimit = 'Amount cannot be negative.'
 
+    for (const key of Object.keys(nextErrors)) { if (!visibleErrors(nextErrors)[key]) delete nextErrors[key] }
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -388,10 +392,10 @@ export default function SupplierForm({
         <div className="space-y-5">
           <FormSection number="1" icon={IdCard} title="Basic Information">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input label="Supplier Name" value={formData.name} onChange={(event) => updateField('name', event.target.value)} error={errors.name} required />
-              <Input label="Company Name" value={formData.companyName} onChange={(event) => updateField('companyName', event.target.value)} />
-              <Input label="Contact Person" value={formData.contactPerson} onChange={(event) => updateField('contactPerson', event.target.value)} error={errors.contactPerson} required />
-              <Select
+              <ConfiguredField module="supplier" name="name"><Input label="Supplier Name" value={formData.name} onChange={(event) => updateField('name', event.target.value)} error={errors.name} required /></ConfiguredField>
+              <ConfiguredField module="supplier" name="companyName"><Input label="Company Name" value={formData.companyName} onChange={(event) => updateField('companyName', event.target.value)} /></ConfiguredField>
+              <ConfiguredField module="supplier" name="contactPerson"><Input label="Contact Person" value={formData.contactPerson} onChange={(event) => updateField('contactPerson', event.target.value)} error={errors.contactPerson} required /></ConfiguredField>
+              <ConfiguredField module="supplier" name="supplierType"><Select
                 label="Supplier Type"
                 options={[...SUPPLIER_TYPE_OPTIONS, ...categoryOptions.filter((option) => !SUPPLIER_TYPE_OPTIONS.includes(option))].map((option) => ({ value: option, label: option }))}
                 value={formData.supplierType}
@@ -399,68 +403,68 @@ export default function SupplierForm({
                 placeholder="Select supplier type"
                 error={errors.supplierType}
                 required
-              />
-              <PhoneField value={formData.phone} onChange={(event) => updateField('phone', event.target.value)} error={errors.phone} />
-              <EmailField value={formData.email} onChange={(event) => updateField('email', event.target.value)} error={errors.email} />
-              <Select
+              /></ConfiguredField>
+              <ConfiguredField module="supplier" name="phone"><PhoneField value={formData.phone} onChange={(event) => updateField('phone', event.target.value)} error={errors.phone} /></ConfiguredField>
+              <ConfiguredField module="supplier" name="email"><EmailField value={formData.email} onChange={(event) => updateField('email', event.target.value)} error={errors.email} /></ConfiguredField>
+              <ConfiguredField module="supplier" name="status"><Select
                 label="Status"
                 options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
                 value={formData.status}
                 onChange={(event) => updateField('status', event.target.value)}
-              />
+              /></ConfiguredField>
             </div>
             <div className="mt-4">
-              <MultiToggleField
+              <ConfiguredField module="supplier" name="supplierCategories"><MultiToggleField
                 label="Supplier Category"
                 value={formData.supplierCategories}
                 options={SUPPLIER_CATEGORY_OPTIONS}
                 onChange={(value) => setFormData((current) => ({ ...current, supplierCategories: value }))}
                 helper="Business categories this supplier operates in - different from Supplier Type above."
-              />
+              /></ConfiguredField>
             </div>
           </FormSection>
 
           <FormSection number="2" icon={ShieldCheck} title="Tax & Location">
             <div className="space-y-4">
-              <SegmentedField
+              <ConfiguredField module="supplier" name="gstRegistered"><SegmentedField
                 label="GST Registered?"
                 value={formData.gstRegistered ? 'yes' : 'no'}
                 options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]}
                 onChange={(value) => setFormData((current) => ({ ...current, gstRegistered: value === 'yes', gstNumber: value === 'yes' ? current.gstNumber : '' }))}
-              />
+              /></ConfiguredField>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {formData.gstRegistered && (
-                  <Input label="GSTIN" value={formData.gstNumber} onChange={(event) => updateField('gstNumber', event.target.value.toUpperCase())} error={errors.gstNumber} required />
+                  <ConfiguredField module="supplier" name="gstNumber"><Input label="GSTIN" value={formData.gstNumber} onChange={(event) => updateField('gstNumber', event.target.value.toUpperCase())} error={errors.gstNumber} required /></ConfiguredField>
                 )}
-                <Input label="PAN" value={formData.pan} onChange={(event) => updateField('pan', event.target.value.toUpperCase())} />
+                <ConfiguredField module="supplier" name="pan"><Input label="PAN" value={formData.pan} onChange={(event) => updateField('pan', event.target.value.toUpperCase())} /></ConfiguredField>
               </div>
-              <Input label="Address" as="textarea" value={formData.address} onChange={(event) => updateField('address', event.target.value)} error={errors.address} required />
+              <ConfiguredField module="supplier" name="address"><Input label="Address" as="textarea" value={formData.address} onChange={(event) => updateField('address', event.target.value)} error={errors.address} required /></ConfiguredField>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <Input label="City" value={formData.city} onChange={(event) => updateField('city', event.target.value)} error={errors.city} required />
-                <Input label="State" value={formData.state} onChange={(event) => updateField('state', event.target.value)} />
-                <Input label="PIN Code" value={formData.pinCode} onChange={(event) => updateField('pinCode', event.target.value)} />
+                <ConfiguredField module="supplier" name="city"><Input label="City" value={formData.city} onChange={(event) => updateField('city', event.target.value)} error={errors.city} required /></ConfiguredField>
+                <ConfiguredField module="supplier" name="state"><Input label="State" value={formData.state} onChange={(event) => updateField('state', event.target.value)} /></ConfiguredField>
+                <ConfiguredField module="supplier" name="pinCode"><Input label="PIN Code" value={formData.pinCode} onChange={(event) => updateField('pinCode', event.target.value)} /></ConfiguredField>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <Input label="Country" value={formData.country} onChange={(event) => updateField('country', event.target.value)} />
+                <ConfiguredField module="supplier" name="country"><Input label="Country" value={formData.country} onChange={(event) => updateField('country', event.target.value)} /></ConfiguredField>
               </div>
             </div>
           </FormSection>
 
           <FormSection number="3" icon={HandCoins} title="Commercial Terms">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <CurrencyField
+              <ConfiguredField module="supplier" name="openingBalance"><CurrencyField
                 label="Opening Payable Balance"
                 value={formData.openingBalance}
                 onChange={(event) => updateField('openingBalance', event.target.value)}
                 error={errors.openingBalance}
                 helper="Amount already payable to this supplier before starting in the system."
-              />
-              <Select label="Payment Terms" options={PAYMENT_TERMS_OPTIONS} value={formData.paymentTerms} onChange={(event) => updateField('paymentTerms', event.target.value)} />
-              <CurrencyField label="Credit Limit" value={formData.creditLimit} onChange={(event) => updateField('creditLimit', event.target.value)} error={errors.creditLimit} />
-              <Select label="Purchase Currency" options={CURRENCY_OPTIONS} value={formData.purchaseCurrency} onChange={(event) => updateField('purchaseCurrency', event.target.value)} />
+              /></ConfiguredField>
+              <ConfiguredField module="supplier" name="paymentTerms"><Select label="Payment Terms" options={PAYMENT_TERMS_OPTIONS} value={formData.paymentTerms} onChange={(event) => updateField('paymentTerms', event.target.value)} /></ConfiguredField>
+              <ConfiguredField module="supplier" name="creditLimit"><CurrencyField label="Credit Limit" value={formData.creditLimit} onChange={(event) => updateField('creditLimit', event.target.value)} error={errors.creditLimit} /></ConfiguredField>
+              <ConfiguredField module="supplier" name="purchaseCurrency"><Select label="Purchase Currency" options={CURRENCY_OPTIONS} value={formData.purchaseCurrency} onChange={(event) => updateField('purchaseCurrency', event.target.value)} /></ConfiguredField>
             </div>
             <div className="mt-4">
-              <Input as="textarea" label="Notes" value={formData.notes} onChange={(event) => updateField('notes', event.target.value)} placeholder="Internal notes about this supplier (optional)" />
+              <ConfiguredField module="supplier" name="notes"><Input as="textarea" label="Notes" value={formData.notes} onChange={(event) => updateField('notes', event.target.value)} placeholder="Internal notes about this supplier (optional)" /></ConfiguredField>
             </div>
           </FormSection>
 

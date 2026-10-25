@@ -11,6 +11,7 @@ import {
   CreditCard,
   FileText,
   Landmark,
+  Mail,
   MapPin,
   Pencil,
   Phone,
@@ -902,6 +903,15 @@ export default function CustomerDetail() {
                 <Badge variant={customer.status === 'active' ? 'success' : 'danger'}>{customer.status === 'active' ? 'Active' : 'Inactive'}</Badge>
                 {customer.type && <Badge variant="primary">{customer.type}</Badge>}
               </div>
+              {/* Short city/state only, not the full billing address line (that already lives in
+                  the Address Information tab below) - keeps this header exactly as compact as it
+                  is today, just one short line instead of a potentially multi-line full address. */}
+              {[customer.city, customer.state].filter(Boolean).length > 0 && (
+                <p className="mt-2 flex items-center gap-1.5 text-sm text-neutral-500">
+                  <MapPin className="size-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
+                  {[customer.city, customer.state].filter(Boolean).join(', ')}
+                </p>
+              )}
             </div>
           </div>
 
@@ -919,6 +929,22 @@ export default function CustomerDetail() {
               label="Created / Updated"
               value={customer.createdAt || customer.updatedAt ? `${formatDate(customer.createdAt)} · ${formatDate(customer.updatedAt)}` : ''}
             />
+            {(customer.phone || customer.email) && (
+              <div className="grid min-w-0 gap-x-6 gap-y-2 text-sm text-neutral-500 sm:col-span-3 sm:grid-cols-3">
+                {customer.phone && (
+                  <a href={`tel:${customer.phone.replace(/[^\d+]/g, '')}`} className="inline-flex items-center gap-1.5 hover:text-primary-700 hover:underline">
+                    <Phone className="size-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
+                    <span>{customer.phone}</span>
+                  </a>
+                )}
+                {customer.email && (
+                  <a href={`mailto:${customer.email}`} className="inline-flex min-w-0 max-w-full items-center gap-1.5 hover:text-primary-700 hover:underline sm:col-start-2">
+                    <Mail className="size-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
+                    <span className="break-all">{customer.email}</span>
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

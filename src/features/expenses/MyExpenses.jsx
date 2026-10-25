@@ -1,3 +1,5 @@
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
+import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { ListOverview, ListStatCard, ListSummary } from '../../components/ui/ListPresentation'
 import ActionMenu from '../../components/ui/ActionMenu'
@@ -160,6 +162,7 @@ function Field({ label, value }) {
 }
 
 export default function MyExpenses() {
+  const { visible: fieldVisible } = useFormFieldSettings('expense')
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
   const { can } = usePermission()
@@ -318,9 +321,9 @@ export default function MyExpenses() {
     const amount = Math.round(Number(formData.amount))
     if (!formData.category) return setFormError('Choose an expense category.')
     if (!(amount > 0)) return setFormError('Enter an amount greater than zero.')
-    if (!formData.expenseDate) return setFormError('Choose the expense date.')
-    if (formData.expenseDate > todayIso()) return setFormError('The expense date cannot be in the future.')
-    if (!formData.description.trim()) return setFormError('Add a short description of the expense.')
+    if (fieldVisible('expenseDate') && !formData.expenseDate) return setFormError('Choose the expense date.')
+    if (fieldVisible('expenseDate') && formData.expenseDate > todayIso()) return setFormError('The expense date cannot be in the future.')
+    if (fieldVisible('description') && !formData.description.trim()) return setFormError('Add a short description of the expense.')
 
     setIsSubmitting(true)
     setFormError('')
@@ -615,16 +618,16 @@ export default function MyExpenses() {
           {!demo && categoryNotice && (
             <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">{categoryNotice}</div>
           )}
-          <Select
+          <ConfiguredField module="expense" name="category"><Select
             label="Expense Category"
             value={formData.category}
             onChange={(e) => setFormData((c) => ({ ...c, category: e.target.value }))}
             options={categories.map((cat) => ({ value: cat, label: cat }))}
             disabled={!demo && categories.length === 0}
             required
-          />
+          /></ConfiguredField>
           <div className="grid grid-cols-2 gap-4">
-            <Input
+            <ConfiguredField module="expense" name="amount"><Input
               label="Amount (₹)"
               type="number"
               min="1"
@@ -632,38 +635,38 @@ export default function MyExpenses() {
               value={formData.amount}
               onChange={(e) => setFormData((c) => ({ ...c, amount: e.target.value }))}
               required
-            />
-            <Input
+            /></ConfiguredField>
+            <ConfiguredField module="expense" name="expenseDate"><Input
               label="Expense Date"
               type="date"
               max={todayIso()}
               value={formData.expenseDate}
               onChange={(e) => setFormData((c) => ({ ...c, expenseDate: e.target.value }))}
               required
-            />
+            /></ConfiguredField>
           </div>
-          <Select
+          <ConfiguredField module="expense" name="paymentMode"><Select
             label="Payment Mode"
             value={formData.paymentMode}
             onChange={(e) => setFormData((c) => ({ ...c, paymentMode: e.target.value }))}
             options={PAYMENT_MODES.map((m) => ({ value: m, label: m }))}
-          />
-          <Input
+          /></ConfiguredField>
+          <ConfiguredField module="expense" name="description"><Input
             label="Description / Purpose"
             as="textarea"
             value={formData.description}
             onChange={(e) => setFormData((c) => ({ ...c, description: e.target.value }))}
             placeholder="What was this expense for?"
             required
-          />
-          <div>
+          /></ConfiguredField>
+          <ConfiguredField module="expense" name="receiptUrl"><div>
             <label className="mb-1 block text-sm font-medium text-neutral-700">Receipt / Proof (optional)</label>
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-300 p-4 text-center transition-colors hover:border-primary-500">
               <Upload className="size-7 text-neutral-400" aria-hidden="true" />
               <p className="text-sm text-neutral-500">{receiptFile ? receiptFile.name : 'Click to upload an image or PDF'}</p>
               <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => setReceiptFile(e.target.files?.[0] || null)} />
             </label>
-          </div>
+          </div></ConfiguredField>
           {duplicate && (
             <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-xs text-amber-700">
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />

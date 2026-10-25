@@ -117,6 +117,7 @@ const PRODUCT_FIELD_MAP = [
   ['notes', 'notes', 'string'],
   ['uom', 'uom', 'string'],
   ['subCategoryId', 'sub_category_id', 'string'],
+  ['productTypeId', 'product_type_id', 'string'],
   ['brandId', 'brand_id', 'string'],
 ]
 
@@ -190,12 +191,13 @@ function coerceFieldValue(kind, value) {
 // same table serve both full-object creation and partial PATCH updates.
 function applyProductFieldMap(requestBody, payload) {
   PRODUCT_FIELD_MAP.forEach(([formField, backendField, kind]) => {
-    const value = formField === 'uom' ? (payload.uom ?? payload.unitOfMeasure) : payload[formField]
+    const value = formField === 'uom' ? (payload.uom ?? payload.unitOfMeasure)
+      : formField === 'productTypeId' ? (payload.productTypeId !== undefined ? payload.productTypeId : payload.product_type_id) : payload[formField]
     if (value === undefined) return
 
     const coerced = coerceFieldValue(kind, value)
     if (coerced === undefined || coerced === null) return
-    requestBody[backendField] = backendField === 'sub_category_id' ? coerced || null : coerced
+    requestBody[backendField] = ['sub_category_id', 'product_type_id'].includes(backendField) ? coerced || null : coerced
   })
 }
 
@@ -226,7 +228,21 @@ function toVariationPayload(variant, includeId = false) {
     image_url: variant.imageUrl || variant.image_url || null,
   }
 
-  for (const [field, key] of [['openingStock', 'inventory'], ['minimumStockLevel', 'minimum_stock_level'], ['maximumStockLevel', 'maximum_stock_level'], ['reorderLevel', 'reorder_level'], ['reorderQuantity', 'reorder_quantity']]) {
+  // An EXISTING variant (includeId + a real, non-new id) can no longer have its stock changed
+  // through this PATCH - the backend now rejects an `inventory` that differs from the variant's
+  // current value with 422. The frontend has no reliable way to know whether its local
+  // openingStock still matches the backend's true current value (another tab/user may have
+  // adjusted stock since this form loaded), so the only safe behavior is to never send
+  // `inventory` for an existing variant at all - real stock changes go through
+  // POST /warehouses/{warehouse_id}/stock/adjust instead. A genuinely NEW variant (no id yet,
+  // or isNew === true) still sends its opening inventory - that's creation, not a stock edit,
+  // and the backend still supports it.
+  const isExistingVariant = includeId && variant.id && variant.isNew !== true
+  const inventoryFieldMap = isExistingVariant
+    ? [['minimumStockLevel', 'minimum_stock_level'], ['maximumStockLevel', 'maximum_stock_level'], ['reorderLevel', 'reorder_level'], ['reorderQuantity', 'reorder_quantity']]
+    : [['openingStock', 'inventory'], ['minimumStockLevel', 'minimum_stock_level'], ['maximumStockLevel', 'maximum_stock_level'], ['reorderLevel', 'reorder_level'], ['reorderQuantity', 'reorder_quantity']]
+
+  for (const [field, key] of inventoryFieldMap) {
     if (inventory[field] !== '' && inventory[field] != null) variation[key] = Number(inventory[field])
   }
 
@@ -359,15 +375,13 @@ export async function updateProduct(productId, payload) {
     if (payload.isActive !== undefined || payload.is_active !== undefined) {
       requestBody.is_active = payload.isActive ?? payload.is_active
     }
-    if (payload.totalInventory !== undefined || payload.total_inventory !== undefined) {
-      requestBody.total_inventory = Number(payload.totalInventory ?? payload.total_inventory) || 0
-    }
+    // total_inventory can no longer be changed via PATCH /products/{id} - the backend now
+    // rejects the request with 422 the instant this key is present at all (even unchanged, even
+    // 0 or null). Stock changes must go through POST /warehouses/{warehouse_id}/stock/adjust.
+    // Deliberately never set requestBody.total_inventory here, regardless of what the caller
+    // passes - silently dropped, not forwarded.
     if (payload.variants !== undefined) {
       requestBody.variations = payload.variants.map((variant) => toVariationPayload(variant, true))
-
-      if (requestBody.total_inventory === undefined && requestBody.variations.every((variant) => variant.inventory !== undefined)) {
-        requestBody.total_inventory = requestBody.variations.reduce((sum, variant) => sum + Number(variant.inventory || 0), 0)
-      }
     }
     // Only touch pricing when the caller actually sent pricing fields (e.g. a bare
     // `{ isActive }` status-toggle call shouldn't zero out mrp/wholesale/dealer/etc.) - `pricing`
@@ -383,6 +397,8 @@ export async function updateProduct(productId, payload) {
 
     applyProductFieldMap(requestBody, payload)
 
+    // Opening balances are creation-only; never replay stale stock from an edit form.
+    delete requestBody.opening_stock
     const { data } = await apiClient.patch(`/products/${productId}`, requestBody, {
       headers: authHeader(),
     })

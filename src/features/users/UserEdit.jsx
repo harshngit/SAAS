@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Button from '../../components/ui/Button'
+import Badge from '../../components/ui/Badge'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -644,6 +645,7 @@ export default function UserEdit() {
             <div>
               <p className="text-lg font-semibold text-neutral-900">{activeStaffFormSection.title}</p>
               <p className="mt-1 text-sm text-neutral-500">{activeStaffFormSection.description}</p>
+              {formData.employeeId && <div className="mt-2"><Badge variant="neutral">Employee ID: {formData.employeeId}</Badge></div>}
             </div>
             <Button
               type="button"
@@ -711,13 +713,6 @@ export default function UserEdit() {
                     </div>
                   </div>
                 </div>
-                <Input
-                  label="Employee ID"
-                  value={formData.employeeId || 'System calculated'}
-                  readOnly
-                  disabled
-                />
-                <div />
                 <Input
                   label="First Name"
                   required

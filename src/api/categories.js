@@ -145,6 +145,29 @@ export async function deleteCategory(categoryId) {
   }
 }
 
+// Product Type options belong to a subcategory; these are not sellable product variations.
+export async function listSubcategoryVariants(subcategoryId, { includeInactive = false } = {}) {
+  try {
+    const { data } = await apiClient.get(`/categories/${subcategoryId}/variants`, {
+      headers: authHeader(), params: { include_inactive: includeInactive },
+    })
+    return { success: true, variants: Array.isArray(data) ? data : [] }
+  } catch (error) {
+    return { success: false, error: formatApiError(error.response?.data?.detail, 'Unable to load Product Types.') }
+  }
+}
+
+export async function createSubcategoryVariant(subcategoryId, payload) {
+  try {
+    const { data } = await apiClient.post(`/categories/${subcategoryId}/variants`, {
+      name: payload.name.trim(), sort_order: payload.sort_order ?? 0,
+    }, { headers: authHeader() })
+    return { success: true, variant: data }
+  } catch (error) {
+    return { success: false, error: formatApiError(error.response?.data?.detail, 'Unable to create Product Type.') }
+  }
+}
+
 export async function deleteCategoriesBulk(categoryIds) {
   try {
     await apiClient.post('/categories/bulk-delete', { ids: categoryIds }, {

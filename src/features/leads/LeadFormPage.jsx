@@ -1,3 +1,5 @@
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
+import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -39,6 +41,7 @@ const emptyForm = {
 }
 
 export default function LeadFormPage() {
+  const { visibleErrors } = useFormFieldSettings('lead')
   const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
   const isSalesOfficer = currentUser?.role === ROLES.SALES_OFFICER
@@ -133,6 +136,7 @@ export default function LeadFormPage() {
       nextErrors.assignedSalespersonId = 'Assigned salesperson is required.'
     }
 
+    for (const key of Object.keys(nextErrors)) { if (!visibleErrors(nextErrors)[key]) delete nextErrors[key] }
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -224,21 +228,21 @@ export default function LeadFormPage() {
             )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input
+              <ConfiguredField module="lead" name="name"><Input
                 label="Prospect / Business Name"
                 required
                 value={formData.name}
                 onChange={(event) => updateField('name', event.target.value)}
                 placeholder="e.g. Sunrise Distributors"
                 error={errors.name}
-              />
-              <Input
+              /></ConfiguredField>
+              <ConfiguredField module="lead" name="contactPerson"><Input
                 label="Contact Person"
                 value={formData.contactPerson}
                 onChange={(event) => updateField('contactPerson', event.target.value)}
                 placeholder="Who to speak with"
-              />
-              <Select
+              /></ConfiguredField>
+              <ConfiguredField module="lead" name="leadSource"><Select
                 label="Lead Source"
                 required
                 options={LEAD_SOURCE_OPTIONS}
@@ -246,23 +250,23 @@ export default function LeadFormPage() {
                 onChange={(event) => updateField('leadSource', event.target.value)}
                 placeholder="Select lead source"
                 error={errors.leadSource}
-              />
-              <Input
+              /></ConfiguredField>
+              <ConfiguredField module="lead" name="mobileNumber"><Input
                 label="Mobile Number"
                 required
                 value={formData.mobileNumber}
                 onChange={(event) => updateField('mobileNumber', event.target.value)}
                 placeholder="Contact mobile number"
                 error={errors.mobileNumber}
-              />
-              <Input
+              /></ConfiguredField>
+              <ConfiguredField module="lead" name="email"><Input
                 label="Email"
                 type="email"
                 value={formData.email}
                 onChange={(event) => updateField('email', event.target.value)}
                 placeholder="Contact email address"
-              />
-              <Select
+              /></ConfiguredField>
+              <ConfiguredField module="lead" name="assignedSalespersonId"><Select
                 label="Assigned Salesperson"
                 required={isSalesOfficer}
                 options={salespersonOptions}
@@ -271,27 +275,27 @@ export default function LeadFormPage() {
                 placeholder={isLoadingOptions ? 'Loading...' : isSalesOfficer ? '' : 'Unassigned'}
                 error={errors.assignedSalespersonId}
                 disabled={isLoadingOptions || isSalesOfficer}
-              />
-              <Select
+              /></ConfiguredField>
+              <ConfiguredField module="lead" name="leadType"><Select
                 label="Lead Type"
                 options={LEAD_TYPE_OPTIONS}
                 value={formData.leadType}
                 onChange={(event) => updateField('leadType', event.target.value)}
                 placeholder="Select a type"
-              />
-              <Select
+              /></ConfiguredField>
+              <ConfiguredField module="lead" name="segment"><Select
                 label="Segment"
                 options={LEAD_SEGMENT_OPTIONS}
                 value={formData.segment}
                 onChange={(event) => updateField('segment', event.target.value)}
                 placeholder="Select a segment"
-              />
-              <InterestedProductsField
+              /></ConfiguredField>
+              <ConfiguredField module="lead" name="interestedProductList"><InterestedProductsField
                 selected={formData.interestedProductList}
                 onChange={(list) => updateField('interestedProductList', list)}
                 className="sm:col-span-2"
-              />
-              <Input
+              /></ConfiguredField>
+              <ConfiguredField module="lead" name="notes"><Input
                 as="textarea"
                 label="Notes"
                 value={formData.notes}
@@ -299,7 +303,7 @@ export default function LeadFormPage() {
                 placeholder="Any additional context for the sales team"
                 inputClassName="min-h-24"
                 className="sm:col-span-2"
-              />
+              /></ConfiguredField>
             </div>
           </div>
 

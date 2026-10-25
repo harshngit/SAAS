@@ -138,7 +138,7 @@ test('edit/save/fresh GET round trip preserves existing UUID, SKU, full pricing 
   let stored = structuredClone(product), request
   client.patch = async (_url, payload) => {
     request = payload
-    stored = { ...stored, ...payload, variations: payload.variations.map((row) => ({ ...row, variant_code: product.variations.find((old) => old.id === row.id).variant_code })) }
+    stored = { ...stored, ...payload, variations: payload.variations.map((row) => ({ ...product.variations.find((old) => old.id === row.id), ...row })) }
     return { data: structuredClone(stored) }
   }
   client.get = async () => ({ data: JSON.parse(JSON.stringify(stored)) })
@@ -277,7 +277,7 @@ test('product category change clears the child selection and validation rejects 
   const helpers = await formHelpers()
   const validate = await handler('features/products/ProductForm.jsx', 'validate', { ...helpers, ...variants,
     formData: { ...helpers.hydrateProduct(utils.normalizeApiProduct(product)), productType: categoryId, subCategoryId: 'wrong-child' },
-    subCategoryOptions: [{ value: childId }], setErrors() {} })
+    subCategoryOptions: [{ value: childId }], visibleErrors: (errors) => errors, setErrors() {} })
   const errors = validate()
   assert.match(errors.subCategory, /belonging/)
   assert.match(errors.productType, /name/)
@@ -303,7 +303,7 @@ test('actual product submit preserves zero prices and blank variant SKU through 
   let submitted, request
   const syncVariants = await handler('features/products/ProductForm.jsx', 'syncVariants', helpers)
   const submit = await handler('features/products/ProductForm.jsx', 'handleSubmit', {
-    ...helpers, formData, syncVariants, validate: () => ({}), setValidationBanner() {}, onSave: (payload) => { submitted = payload },
+    ...helpers, product: null, formData, syncVariants, validate: () => ({}), setValidationBanner() {}, onSave: (payload) => { submitted = payload },
   })
   submit({ preventDefault() {} })
   client.patch = async (_url, payload) => { request = payload; return { data: { id: product.id, ...payload } } }

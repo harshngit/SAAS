@@ -18,9 +18,11 @@ import {
   X,
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
+import Badge from '../../components/ui/Badge'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
-import { listCategories } from '../../api/categories'
+import { listCategories, listSubcategoryVariants } from '../../api/categories'
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import { listBrands, getBrandCategories } from '../../api/brands'
 import { listSuppliers, getSupplierBrands } from '../../api/suppliers'
 import { mapProductBackendField } from '../../api/products'
@@ -68,6 +70,7 @@ const emptyForm = {
   name: '',
   shortName: '',
   productType: '',
+  productTypeId: '',
   category: '',
   subCategory: '',
   subCategoryId: '',
@@ -200,6 +203,7 @@ function section(title, fields) {
 }
 
 function findSectionForErrorField(sections, fieldName) {
+  if (fieldName === 'productTypeId') fieldName = 'productType'
   if (fieldName === 'subCategoryId') fieldName = 'subCategory'
   if (fieldName.startsWith('variantInventory.')) {
     return sections.find((sectionItem) => sectionItem.id === 'variants-attributes')
@@ -210,7 +214,6 @@ function findSectionForErrorField(sections, fieldName) {
 
 const productSections = [
   section('Basic Information', [
-    { name: 'productId', label: 'Product ID', description: 'Server-generated business ID.', input: 'readonly' },
     { name: 'productCode', label: 'Product Code / SKU', required: true, maxLength: 50 },
     { name: 'barcode', label: 'Barcode' },
     { name: 'name', label: 'Product Name', required: true, maxLength: 150 },
@@ -236,6 +239,7 @@ const productSections = [
     { name: 'productManual', label: 'Product Manual', input: 'file', accept: '.pdf' },
   ]),
   section('Variants & Attributes', [
+    { name: 'hasVariants', label: 'This product has variants', input: 'checkbox', wide: true },
     {
       name: 'variantAttributes',
       label: 'Attribute Types',
@@ -245,7 +249,9 @@ const productSections = [
     { name: 'variants', label: 'Variants', input: 'variants', wide: true },
   ]),
   section('Inventory Information', [
+    { name: 'inventoryTracking', label: 'Track inventory', input: 'checkbox' },
     { name: 'unitOfMeasure', label: 'Unit of Measure (UOM)', input: 'select', required: true },
+    { name: 'openingStock', label: 'Opening Stock', input: 'number', step: '1' },
     { name: 'variantInventory', label: 'Variant Inventory', input: 'variantInventory', wide: true },
   ]),
   section('Pricing Information', [
@@ -337,12 +343,14 @@ function hydrateProduct(product) {
     ...emptyForm,
     ...product,
     // Real, backend-assigned business ID when the backend sends one - left blank otherwise
-    // (shows "System calculated" below). Never a frontend placeholder, never the internal UUID.
+    // (shown in the header after saving). Never a frontend placeholder, never the internal UUID.
     productId: product?.productId || '',
     productCode,
     category: String(product?.category_id || product?.categoryId || product?.category || ''),
     categoryId: String(product?.category_id || product?.categoryId || ''),
     productType: readableClassification(product?.productType),
+    productTypeId: product?.productTypeId || product?.product_type_id || '',
+    hasVariants: product?.hasVariants ?? product?.has_variants ?? Boolean(product?.variants?.length),
     purchasePrice: product?.purchasePrice ?? '',
     sellingPrice: product?.sellingPrice ?? '',
     unitOfMeasure: product?.unitOfMeasure || firstVariant.unit || 'Piece',
@@ -442,6 +450,10 @@ export default function ProductForm({
   formErrorFields = [],
   catalogProducts = [],
 }) {
+  const { visible, required, visibleErrors } = useFormFieldSettings('product')
+  const [productTypes, setProductTypes] = useState([])
+  const [productTypesError, setProductTypesError] = useState('')
+  const [isLoadingProductTypes, setIsLoadingProductTypes] = useState(false)
   const [formData, setFormData] = useState(emptyForm)
   const [initialFormData, setInitialFormData] = useState(emptyForm)
   const [categoryOptions, setCategoryOptions] = useState([])
@@ -464,13 +476,30 @@ export default function ProductForm({
   const [documentUploadError, setDocumentUploadError] = useState('')
   const [validationBanner, setValidationBanner] = useState('')
 
-  const activeFormSection = useMemo(
-    () => productSections.find((sectionItem) => sectionItem.id === activeSection) || productSections[0],
-    [activeSection],
-  )
-  const activeSectionIndex = productSections.findIndex((sectionItem) => sectionItem.id === activeSection)
+  useEffect(() => {
+    let cancelled = false
+    setProductTypes([])
+    setProductTypesError('')
+    setIsLoadingProductTypes(false)
+    if (!isOpen || !formData.subCategoryId) return undefined
+    setIsLoadingProductTypes(true)
+    listSubcategoryVariants(formData.subCategoryId, { includeInactive: Boolean(product) }).then((result) => {
+      if (cancelled) return
+      setIsLoadingProductTypes(false)
+      if (result.success) setProductTypes(result.variants)
+      else setProductTypesError(result.error)
+    })
+    return () => { cancelled = true }
+  }, [isOpen, formData.subCategoryId, product])
+
+  const fieldIsVisible = (field) => visible(field.name)
+    && !(formData.hasVariants && ['purchasePrice', 'sellingPrice', 'mrp', 'wholesalePrice', 'dealerPrice', 'discountPercent', 'taxInclusivePrice', 'currency', 'openingStock'].includes(field.name))
+    && !(!formData.hasVariants && ['variants', 'variantAttributes', 'variantInventory'].includes(field.name))
+  const visibleSections = productSections.map((item) => ({ ...item, fields: item.fields.filter(fieldIsVisible) })).filter((item) => item.fields.length)
+  const activeFormSection = visibleSections.find((item) => item.id === activeSection) || visibleSections[0]
+  const activeSectionIndex = visibleSections.findIndex((item) => item.id === activeFormSection.id)
   const isFirstSection = activeSectionIndex <= 0
-  const isLastSection = activeSectionIndex === productSections.length - 1
+  const isLastSection = activeSectionIndex === visibleSections.length - 1
   const hasChanges = !product || JSON.stringify(formData) !== JSON.stringify(initialFormData)
   const totalImageCount = (formData.coverImage ? 1 : 0) + formData.images.length
   const suggestionOptions = useMemo(() => {
@@ -715,12 +744,13 @@ export default function ProductForm({
     if (isUuidLike(formData.productType)) nextErrors.productType = 'Enter a Product Type name, not a category ID.'
     if (formData.subCategoryId && !subCategoryOptions.some((option) => option.value === formData.subCategoryId)) nextErrors.subCategory = 'Select a sub category belonging to this category.'
     if (!formData.status) nextErrors.status = 'Status is required.'
-    if (Number(formData.purchasePrice) < 0) nextErrors.purchasePrice = 'Purchase price cannot be negative.'
-    if (!formData.variants.length && !formData.purchasePrice && formData.purchasePrice !== 0) nextErrors.purchasePrice = 'Purchase price is required.'
-    if (Number(formData.sellingPrice) < 0) nextErrors.sellingPrice = 'Selling price cannot be negative.'
-    if (!formData.variants.length && !formData.sellingPrice && formData.sellingPrice !== 0) nextErrors.sellingPrice = 'Selling price is required.'
+    if (!formData.hasVariants && Number(formData.purchasePrice) < 0) nextErrors.purchasePrice = 'Purchase price cannot be negative.'
+    if (!formData.hasVariants && !formData.purchasePrice && formData.purchasePrice !== 0) nextErrors.purchasePrice = 'Purchase price is required.'
+    if (!formData.hasVariants && Number(formData.sellingPrice) < 0) nextErrors.sellingPrice = 'Selling price cannot be negative.'
+    if (!formData.hasVariants && !formData.sellingPrice && formData.sellingPrice !== 0) nextErrors.sellingPrice = 'Selling price is required.'
     if (formData.inventoryTracking && !formData.unitOfMeasure) nextErrors.unitOfMeasure = 'UOM is required for inventory-managed products.'
-    formData.variants.forEach((variant, index) => {
+    if (formData.hasVariants && !formData.variants.length) nextErrors.variants = 'Add at least one variant or turn off variants.'
+    ;(formData.hasVariants ? formData.variants : []).forEach((variant, index) => {
       const inventory = normalizeVariantInventory(variant)
       const variantLabel = getVariantName(variant, index)
       if (!variant.size.trim()) nextErrors.variants = 'Every variant needs a name.'
@@ -747,8 +777,9 @@ export default function ProductForm({
       }
     })
 
-    setErrors(nextErrors)
-    return nextErrors
+    const shownErrors = visibleErrors(nextErrors)
+    setErrors(shownErrors)
+    return shownErrors
   }
 
   // Proper file-upload flow: pick -> POST /files/upload -> store the returned "/files/{id}" path.
@@ -820,7 +851,7 @@ export default function ProductForm({
   }
 
   const syncVariants = (nextData) => {
-    const variants = nextData.variants
+    const variants = nextData.hasVariants ? nextData.variants : []
 
     return {
       ...nextData,
@@ -862,7 +893,8 @@ export default function ProductForm({
       brand: syncedData.brand,
       category: syncedData.category,
       categoryId: syncedData.categoryId || syncedData.category,
-      productType: syncedData.productType.trim(),
+      productTypeId: syncedData.productTypeId || null,
+      productType: product?.legacyProductType ?? (syncedData.productTypeId ? '' : syncedData.productType.trim()),
       price: Number(syncedData.sellingPrice) || 0,
       totalInventory: syncedData.variants.length ? (syncedData.variants.every((variant) => variant.inventory.openingStock !== '') ? totalVariantInventory : undefined) : Number(syncedData.openingStock) || 0,
       isActive: syncedData.status === 'active',
@@ -888,12 +920,12 @@ export default function ProductForm({
 
   const goToPreviousSection = () => {
     if (isFirstSection) return
-    setActiveSection(productSections[activeSectionIndex - 1].id)
+    setActiveSection(visibleSections[activeSectionIndex - 1].id)
   }
 
   const goToNextSection = () => {
     if (isLastSection) return
-    setActiveSection(productSections[activeSectionIndex + 1].id)
+    setActiveSection(visibleSections[activeSectionIndex + 1].id)
   }
 
   const updateVariant = (index, field, value) => {
@@ -959,17 +991,34 @@ export default function ProductForm({
   }
 
   const renderField = (field) => {
+    if (!visible(field.name)) return null
+    if (formData.hasVariants && ['purchasePrice', 'sellingPrice', 'mrp', 'wholesalePrice', 'dealerPrice', 'discountPercent', 'taxInclusivePrice', 'currency'].includes(field.name)) return null
+    if (!formData.hasVariants && ['variants', 'variantAttributes', 'variantInventory'].includes(field.name)) return null
     const commonProps = {
       label: field.label,
       value: formData[field.name] ?? '',
       onChange: (event) => updateField(field.name, event.target.value),
       error: errors[field.name],
-      required: field.required && !(formData.variants.length && ['purchasePrice', 'sellingPrice'].includes(field.name)),
+      required: required(field.name, field.required) && !(formData.hasVariants && ['purchasePrice', 'sellingPrice'].includes(field.name)),
       maxLength: field.maxLength,
       placeholder: field.placeholder,
     }
 
     if (field.input === 'select') {
+      if (field.name === 'productType') {
+        const current = productTypes.find((item) => item.id === formData.productTypeId)
+        const choices = productTypes.filter((item) => item.is_active !== false || item.id === formData.productTypeId).map((item) => ({ value: item.id, label: `${item.name}${item.is_active === false ? ' (inactive)' : ''}` }))
+        if (formData.productTypeId && !current) choices.unshift({ value: formData.productTypeId, label: formData.productType || 'Saved Product Type (unavailable)' })
+        return <div className="space-y-1"><Select {...commonProps}
+          value={formData.productTypeId} options={[{ value: '', label: 'None' }, ...choices]} searchable
+          disabled={!formData.subCategoryId || isLoadingProductTypes || Boolean(productTypesError)}
+          placeholder={isLoadingProductTypes ? 'Loading Product Types...' : formData.subCategoryId ? 'Select a Product Type' : 'Select a subcategory first'}
+          onChange={(event) => setFormData((currentData) => ({ ...currentData, productTypeId: event.target.value, productType: productTypes.find((item) => item.id === event.target.value)?.name || '' }))} />
+          {!formData.productTypeId && (product?.legacyProductType || formData.productType) && <p className="text-xs text-neutral-500">Legacy Product Type: {product?.legacyProductType || formData.productType}</p>}
+          {productTypesError && <p role="alert" className="text-xs text-red-600">{productTypesError}</p>}
+          {!isLoadingProductTypes && !productTypesError && formData.subCategoryId && !choices.length && <p className="text-xs text-neutral-500">No Product Types configured for this subcategory.</p>}
+        </div>
+      }
       if (field.name === 'category') {
         return (
           <Select
@@ -990,6 +1039,12 @@ export default function ProductForm({
                 categoryLabel: effectiveCategoryOptions.find((option) => option.value === event.target.value)?.label || '',
                 subCategory: '',
                 subCategoryId: '',
+                // Category -> Subcategory -> Product Type is a dependency chain (client spec
+                // §4): changing Category invalidates whatever Subcategory was selected, which in
+                // turn invalidates Product Type (its options come from the Subcategory). Clear
+                // both, not just Subcategory.
+                productType: '',
+                productTypeId: '',
               }))
               setErrors((current) => ({ ...current, category: '' }))
             }}
@@ -1021,7 +1076,10 @@ export default function ProductForm({
             error={errors.subCategory}
             onChange={(event) => {
               const option = subCategoryOptions.find((opt) => opt.value === event.target.value)
-              setFormData((current) => ({ ...current, subCategoryId: event.target.value, subCategory: option?.label || '' }))
+              // Product Type's available options are scoped to the selected Subcategory (client
+              // spec §4) - whatever was selected under the PREVIOUS Subcategory is no longer
+              // necessarily valid, so clear it on every Subcategory change.
+              setFormData((current) => ({ ...current, subCategoryId: event.target.value, subCategory: option?.label || '', productType: '', productTypeId: '' }))
             }}
             placeholder={formData.category ? 'Select sub category' : 'Select a category first'}
             disabled={!formData.category}
@@ -1046,6 +1104,8 @@ export default function ProductForm({
                 ...current,
                 brandId: event.target.value,
                 brand: option?.label || '',
+                productType: '',
+                productTypeId: '',
                 categoryId: '',
                 category: '',
                 subCategoryId: '',
@@ -1074,6 +1134,8 @@ export default function ProductForm({
                 ...current,
                 preferredSupplierId: event.target.value,
                 preferredSupplier: option?.label || '',
+                productType: '',
+                productTypeId: '',
                 brandId: '',
                 brand: '',
                 categoryId: '',
@@ -1220,6 +1282,8 @@ export default function ProductForm({
                               min="0"
                               step="1"
                               value={inventory[inventoryField.key] ?? ''}
+                              disabled={inventoryField.key === 'openingStock' && Boolean(variant.id) && !variant.isNew}
+                              title={inventoryField.key === 'openingStock' && variant.id && !variant.isNew ? 'Use Inventory stock adjustment to change saved stock.' : undefined}
                               onChange={(event) => updateVariantInventory(index, inventoryField.key, event.target.value)}
                               aria-label={`${variantName} ${inventoryField.label}`}
                               className={`h-9 ${inventoryField.width} rounded-lg border bg-neutral-50 px-2.5 text-sm text-neutral-900 transition-all focus:bg-surface focus:outline-none focus:ring-4 ${
@@ -1365,6 +1429,8 @@ export default function ProductForm({
                             min="0"
                             step="1"
                             value={variantInventory.openingStock}
+                            disabled={Boolean(variant.id) && !variant.isNew}
+                            title={variant.id && !variant.isNew ? 'Use Inventory stock adjustment to change saved stock.' : undefined}
                             onChange={(event) => updateVariant(index, 'inventory', event.target.value)}
                             className="h-9 w-20 rounded-lg border border-neutral-200 bg-surface px-2.5 text-center text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                           />
@@ -1409,10 +1475,6 @@ export default function ProductForm({
           )}
         </div>
       )
-    }
-
-    if (field.input === 'readonly') {
-      return <Input label={field.label} value={formData[field.name] || 'System calculated'} readOnly disabled error={errors[field.name]} />
     }
 
     if (field.input === 'file') {
@@ -1634,6 +1696,7 @@ export default function ProductForm({
     return (
       <Input
         {...commonProps}
+        disabled={field.name === 'openingStock' && Boolean(product)}
         type={field.input === 'number' ? 'number' : field.input === 'date' ? 'date' : field.input === 'url' ? 'url' : 'text'}
         min={field.input === 'number' ? '0' : undefined}
         step={field.input === 'number' ? field.step : undefined}
@@ -1649,7 +1712,7 @@ export default function ProductForm({
       <div className="grid min-h-[34rem]" style={{ gridTemplateColumns: '17rem minmax(0, 1fr)' }}>
         <aside className="border-b border-neutral-100 p-4 lg:border-b-0 lg:border-r lg:p-5">
           <nav className="sticky top-6 flex flex-col gap-3">
-            {productSections.map((sectionItem) => {
+            {visibleSections.map((sectionItem) => {
               const Icon = sectionItem.icon
               const isActive = sectionItem.id === activeSection
 
@@ -1677,6 +1740,7 @@ export default function ProductForm({
             <div>
               <p className="text-lg font-semibold text-neutral-900">{activeFormSection.title}</p>
               <p className="mt-1 text-sm text-neutral-500">{activeFormSection.description}</p>
+              {product && formData.productId && <div className="mt-2"><Badge variant="neutral">Product ID: {formData.productId}</Badge></div>}
             </div>
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
               Back to Products

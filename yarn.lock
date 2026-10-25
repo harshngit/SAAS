@@ -1047,7 +1047,7 @@ fflate@^0.8.1:
   resolved "https://registry.npmjs.org/fflate/-/fflate-0.8.3.tgz"
   integrity sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==
 
-firebase@^13.1.0:
+firebase@13.1.0:
   version "13.1.0"
   resolved "https://registry.npmjs.org/firebase/-/firebase-13.1.0.tgz"
   integrity sha512-II/6P63vYzWdS6gTM9+OaMZD6XaCHJdI/9OVa8Z+bEs18t3CR2JlSwCI12KYMramNqTkywJocjSpGePaVPng+A==

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ClipboardList, ImageIcon, Info, Plus, Upload, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createCategory, listCategories } from '../../api/categories'
+import { createCategory, createSubcategoryVariant, listCategories } from '../../api/categories'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -31,6 +31,8 @@ export default function CategoryFormPage() {
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [subcategoryName, setSubcategoryName] = useState('')
+  const [subcategoryVariants, setSubcategoryVariants] = useState({})
+  const saved = useRef({ categoryId: '', children: {}, variants: new Set() })
 
   const hasImage = Boolean(formData.image)
 
@@ -107,6 +109,9 @@ export default function CategoryFormPage() {
     if (duplicate) {
       nextErrors.name = 'Category name already exists.'
     }
+    if (Object.values(subcategoryVariants).some((value) => value.split(',').some((name) => name.trim().length > 150))) {
+      nextErrors.variants = 'Each Product Type name must be 150 characters or fewer.'
+    }
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -119,7 +124,9 @@ export default function CategoryFormPage() {
     setIsSaving(true)
     setFormError('')
 
-    const result = await createCategory({ name: formData.name, image: formData.image, description: formData.description, parentId: formData.parentId })
+    const result = saved.current.categoryId
+      ? { success: true, category: { id: saved.current.categoryId } }
+      : await createCategory({ name: formData.name, image: formData.image, description: formData.description, parentId: formData.parentId })
 
     if (!result.success) {
       setFormError(result.error)
@@ -128,10 +135,14 @@ export default function CategoryFormPage() {
     }
 
     const parentId = result.category?.id
+    saved.current.categoryId = parentId
     if (formData.subcategories.length > 0 && parentId) {
-      const childResults = await Promise.all(
-        formData.subcategories.map((name) => createCategory({ name, parentId })),
-      )
+      const childResults = await Promise.all(formData.subcategories.map(async (name) => {
+        if (saved.current.children[name]) return { success: true }
+        const child = await createCategory({ name, parentId })
+        if (child.success) saved.current.children[name] = child.category.id
+        return child
+      }))
       const failedNames = childResults
         .map((childResult, index) => (childResult.success ? null : formData.subcategories[index]))
         .filter(Boolean)
@@ -140,6 +151,22 @@ export default function CategoryFormPage() {
         setFormError(`Category saved, but these subcategories could not be created: ${failedNames.join(', ')}.`)
         setIsSaving(false)
         return
+      }
+    }
+
+    const targets = formData.parentId ? [{ key: '__self', id: parentId }] : formData.subcategories.map((name) => ({ key: name, id: saved.current.children[name] }))
+    for (const target of targets) {
+      const names = [...new Set((subcategoryVariants[target.key] || '').split(',').map((name) => name.trim()).filter(Boolean))]
+      for (const [sortOrder, name] of names.entries()) {
+        const savedKey = `${target.id}:${name.toLowerCase()}`
+        if (saved.current.variants.has(savedKey)) continue
+        const variant = await createSubcategoryVariant(target.id, { name, sort_order: sortOrder })
+        if (!variant.success) {
+          setFormError(`Category saved, but Product Type "${name}" could not be saved: ${variant.error} Retry to continue without duplicating saved categories.`)
+          setIsSaving(false)
+          return
+        }
+        saved.current.variants.add(savedKey)
       }
     }
 
@@ -184,6 +211,7 @@ export default function CategoryFormPage() {
           <div className="flex flex-col gap-1">
             <Input
               label="Category Name"
+              disabled={Boolean(saved.current.categoryId)}
               placeholder="e.g. Mineral Water"
               value={formData.name}
               onChange={(event) => updateField('name', event.target.value)}
@@ -197,6 +225,7 @@ export default function CategoryFormPage() {
           <div className="flex flex-col gap-1">
             <Select
               label="Parent Category (optional)"
+              disabled={Boolean(saved.current.categoryId)}
               searchable
               options={[{ value: '', label: '— None (top-level category) —' }, ...categories.map((item) => ({ value: item.id, label: item.name }))]}
               value={formData.parentId}
@@ -212,6 +241,7 @@ export default function CategoryFormPage() {
               <Input
                 placeholder="Paste image URL"
                 value={formData.image}
+                disabled={Boolean(saved.current.categoryId)}
                 onChange={(event) => updateField('image', event.target.value)}
                 className="flex-1"
                 compact
@@ -219,7 +249,7 @@ export default function CategoryFormPage() {
               <label className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-linear-to-b from-primary-500 to-primary-600 px-3.5 text-sm font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(0_9_42/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
                 <Upload className="size-4" aria-hidden="true" />
                 Upload
-                <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={handleImageUpload} />
+                <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" disabled={Boolean(saved.current.categoryId)} onChange={handleImageUpload} />
               </label>
             </div>
             <p className="text-xs text-neutral-400">Add a link to an image or upload a file from your device.</p>
@@ -229,6 +259,7 @@ export default function CategoryFormPage() {
             <Input
               as="textarea"
               label="Category Description"
+              disabled={Boolean(saved.current.categoryId)}
               placeholder="Write a short description about this category..."
               maxLength={500}
               value={formData.description}
@@ -285,6 +316,16 @@ export default function CategoryFormPage() {
               </div>
             )}
           </div>
+          {(formData.parentId || formData.subcategories.length > 0) && <div className="space-y-3 border-t border-neutral-100 pt-4">
+            <p className="text-sm font-semibold text-neutral-900">Subcategory Variants / Product Types</p>
+            <p className="text-xs text-neutral-500">These options populate Product Type on products in each subcategory. Separate names with commas.</p>
+            {errors.variants && <p role="alert" className="text-xs text-red-600">{errors.variants}</p>}
+            {(formData.parentId ? ['__self'] : formData.subcategories).map((key) => <Input key={key}
+              label={key === '__self' ? 'Product Types for this subcategory' : `${key} — Product Types`}
+              placeholder="e.g. Ceiling Fan, Table Fan" maxLength={2000}
+              value={subcategoryVariants[key] || ''}
+              onChange={(event) => setSubcategoryVariants((current) => ({ ...current, [key]: event.target.value }))} />)}
+          </div>}
         </section>
 
         <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">

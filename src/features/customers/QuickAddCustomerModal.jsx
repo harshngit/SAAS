@@ -1,3 +1,5 @@
+import ConfiguredField from '../../fieldSettings/ConfiguredField'
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import { useState } from 'react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -15,6 +17,7 @@ const emptyForm = {
 }
 
 export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
+  const { visible } = useFormFieldSettings('customer')
   const [form, setForm] = useState(emptyForm)
   const [sameAsBilling, setSameAsBilling] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -32,7 +35,7 @@ export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
   const handleSubmit = async (event) => {
     event.preventDefault()
 
-    if (!form.customerName.trim() || !form.mobileNumber.trim() || !form.primaryContactPerson.trim() || !form.billingAddress.trim()) {
+    if (['customerName', 'mobileNumber', 'primaryContactPerson', 'billingAddress'].some((name) => visible(name) && !form[name].trim())) {
       setFormError('Please fill in all required fields.')
       return
     }
@@ -79,7 +82,7 @@ export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Customer Name" required value={form.customerName} onChange={updateField('customerName')} placeholder="Enter customer name" />
-          <div className="flex flex-col gap-1.5">
+          <ConfiguredField module="customer" name="mobileNumber"><div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-neutral-700">
               Mobile Number<span className="text-red-500"> *</span>
             </label>
@@ -94,17 +97,17 @@ export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
                 className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
               />
             </div>
-          </div>
+          </div></ConfiguredField>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input label="Contact Person" required value={form.primaryContactPerson} onChange={updateField('primaryContactPerson')} placeholder="Enter contact person name" />
-          <Input label="Email (Optional)" type="email" value={form.email} onChange={updateField('email')} placeholder="Enter email address" />
+          <ConfiguredField module="customer" name="primaryContactPerson"><Input label="Contact Person" required value={form.primaryContactPerson} onChange={updateField('primaryContactPerson')} placeholder="Enter contact person name" /></ConfiguredField>
+          <ConfiguredField module="customer" name="email"><Input label="Email (Optional)" type="email" value={form.email} onChange={updateField('email')} placeholder="Enter email address" /></ConfiguredField>
         </div>
 
-        <Input label="GSTIN (Optional)" value={form.gstNumber} onChange={updateField('gstNumber')} placeholder="Enter GSTIN" />
+        <ConfiguredField module="customer" name="gstNumber"><Input label="GSTIN (Optional)" value={form.gstNumber} onChange={updateField('gstNumber')} placeholder="Enter GSTIN" /></ConfiguredField>
 
-        <div className="flex flex-col gap-1.5">
+        <ConfiguredField module="customer" name="billingAddress"><div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-neutral-700">
             Billing Address<span className="text-red-500"> *</span>
           </label>
@@ -117,9 +120,9 @@ export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
             className="h-20 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
           />
           <p className="text-right text-xs text-neutral-400">{form.billingAddress.length} / 300</p>
-        </div>
+        </div></ConfiguredField>
 
-        <label className="flex items-center gap-2.5 text-sm font-medium text-neutral-700">
+        <ConfiguredField module="customer" name="shippingAddress"><label className="flex items-center gap-2.5 text-sm font-medium text-neutral-700">
           <input
             type="checkbox"
             checked={sameAsBilling}
@@ -127,9 +130,9 @@ export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
             className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500/20"
           />
           Delivery Address is same as Billing Address
-        </label>
+        </label></ConfiguredField>
 
-        <div className="flex flex-col gap-1.5">
+        <ConfiguredField module="customer" name="notes"><div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-neutral-700">Notes (Optional)</label>
           <textarea
             value={form.notes}
@@ -139,7 +142,7 @@ export default function QuickAddCustomerModal({ isOpen, onClose, onCreated }) {
             className="h-16 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
           />
           <p className="text-right text-xs text-neutral-400">{form.notes.length} / 200</p>
-        </div>
+        </div></ConfiguredField>
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
 

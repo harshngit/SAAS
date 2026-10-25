@@ -1,3 +1,5 @@
+import ConfiguredField from '../../fieldSettings/ConfiguredField'
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { useEffect, useMemo, useState } from 'react'
@@ -70,6 +72,7 @@ function SectionBadge({ number }) {
 }
 
 export default function QuotationFormPage() {
+  const { visibleErrors } = useFormFieldSettings('quotation')
   const navigate = useNavigate()
   const { id: editId } = useParams()
   const [searchParams] = useSearchParams()
@@ -338,6 +341,7 @@ export default function QuotationFormPage() {
 
     const variantError = validateVariantItems(formData.items, products)
     if (variantError) nextErrors.items = variantError
+    for (const key of Object.keys(nextErrors)) { if (!visibleErrors(nextErrors)[key]) delete nextErrors[key] }
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -450,18 +454,18 @@ export default function QuotationFormPage() {
             <h3 className="text-sm font-semibold text-neutral-900">Quotation Details</h3>
           </div>
           <div className="grid gap-3 p-4 sm:grid-cols-2 sm:items-start">
-            <Select
+            <ConfiguredField module="quotation" name="quotationFor"><Select
               label="Quotation For"
               required
               options={quotationForOptions}
               value={formData.quotationFor}
               onChange={(event) => updateField('quotationFor', event.target.value)}
               disabled={isEdit && Boolean(formData.customerId)}
-            />
-            <Select label="Currency" required options={currencyOptions} value={formData.currency} onChange={(event) => updateField('currency', event.target.value)} error={errors.currency} />
+            /></ConfiguredField>
+            <ConfiguredField module="quotation" name="currency"><Select label="Currency" required options={currencyOptions} value={formData.currency} onChange={(event) => updateField('currency', event.target.value)} error={errors.currency} /></ConfiguredField>
 
             {entityIsLead ? (
-              <div className="space-y-1.5">
+              <ConfiguredField module="quotation" name="leadId"><div className="space-y-1.5">
                 <Select
                   label="Lead / Prospect"
                   required
@@ -473,9 +477,9 @@ export default function QuotationFormPage() {
                   disabled={isLoadingOptions}
                   error={errors.entity}
                 />
-              </div>
+              </div></ConfiguredField>
             ) : (
-              <div className="space-y-1.5">
+              <ConfiguredField module="quotation" name="customerId"><div className="space-y-1.5">
                 <Select
                   label="Customer"
                   required
@@ -495,9 +499,9 @@ export default function QuotationFormPage() {
                   <UserPlus className="size-3.5" aria-hidden="true" />
                   Quick Add Customer
                 </button>
-              </div>
+              </div></ConfiguredField>
             )}
-            <Select label="Salesperson" required options={salespersonOptions} value={formData.salespersonId} onChange={(event) => updateField('salespersonId', event.target.value)} placeholder={isLoadingOptions ? 'Loading...' : 'Select salesperson'} error={errors.salespersonId} disabled={isLoadingOptions || isSalesOfficer} />
+            <ConfiguredField module="quotation" name="salespersonId"><Select label="Salesperson" required options={salespersonOptions} value={formData.salespersonId} onChange={(event) => updateField('salespersonId', event.target.value)} placeholder={isLoadingOptions ? 'Loading...' : 'Select salesperson'} error={errors.salespersonId} disabled={isLoadingOptions || isSalesOfficer} /></ConfiguredField>
 
             {entityIsLead && selectedLead && (
               <div className="rounded-xl border border-neutral-100 bg-neutral-50/70 p-3 text-sm sm:col-span-2">
@@ -512,10 +516,10 @@ export default function QuotationFormPage() {
               </div>
             )}
 
-            <Input label="Quotation Date" type="date" required value={formData.quotationDate} onChange={(event) => updateField('quotationDate', event.target.value)} error={errors.quotationDate} />
-            <Input label="Valid Until" type="date" min={formData.quotationDate} value={formData.validUntil} onChange={(event) => updateField('validUntil', event.target.value)} error={errors.validUntil} />
-            <Input label="Billing Address" value={formData.billingAddress} onChange={(event) => updateField('billingAddress', event.target.value)} />
-            <Input label="Shipping Address" value={formData.shippingAddress} onChange={(event) => updateField('shippingAddress', event.target.value)} />
+            <ConfiguredField module="quotation" name="quotationDate"><Input label="Quotation Date" type="date" required value={formData.quotationDate} onChange={(event) => updateField('quotationDate', event.target.value)} error={errors.quotationDate} /></ConfiguredField>
+            <ConfiguredField module="quotation" name="validUntil"><Input label="Valid Until" type="date" min={formData.quotationDate} value={formData.validUntil} onChange={(event) => updateField('validUntil', event.target.value)} error={errors.validUntil} /></ConfiguredField>
+            <ConfiguredField module="quotation" name="billingAddress"><Input label="Billing Address" value={formData.billingAddress} onChange={(event) => updateField('billingAddress', event.target.value)} /></ConfiguredField>
+            <ConfiguredField module="quotation" name="shippingAddress"><Input label="Shipping Address" value={formData.shippingAddress} onChange={(event) => updateField('shippingAddress', event.target.value)} /></ConfiguredField>
           </div>
         </div>
 
@@ -526,10 +530,10 @@ export default function QuotationFormPage() {
             <h3 className="text-sm font-semibold text-neutral-900">Terms Details</h3>
           </div>
           <div className="grid gap-3 p-4 sm:grid-cols-2">
-            <Select label="Payment Terms" options={paymentTermOptions} value={formData.paymentTerms} onChange={(event) => updateField('paymentTerms', event.target.value)} placeholder="Select payment terms" />
-            <Select label="Delivery Terms" options={deliveryTermOptions} value={formData.deliveryTerms} onChange={(event) => updateField('deliveryTerms', event.target.value)} placeholder="Select delivery terms" />
-            <Input as="textarea" label="Notes" value={formData.notes} onChange={(event) => updateField('notes', event.target.value)} inputClassName="min-h-16" placeholder="Internal remarks — not printed on the quotation" />
-            <Input as="textarea" label="Terms & Conditions" value={formData.termsConditions} onChange={(event) => updateField('termsConditions', event.target.value)} inputClassName="min-h-16" placeholder="Printed on the customer quotation PDF" />
+            <ConfiguredField module="quotation" name="paymentTerms"><Select label="Payment Terms" options={paymentTermOptions} value={formData.paymentTerms} onChange={(event) => updateField('paymentTerms', event.target.value)} placeholder="Select payment terms" /></ConfiguredField>
+            <ConfiguredField module="quotation" name="deliveryTerms"><Select label="Delivery Terms" options={deliveryTermOptions} value={formData.deliveryTerms} onChange={(event) => updateField('deliveryTerms', event.target.value)} placeholder="Select delivery terms" /></ConfiguredField>
+            <ConfiguredField module="quotation" name="notes"><Input as="textarea" label="Notes" value={formData.notes} onChange={(event) => updateField('notes', event.target.value)} inputClassName="min-h-16" placeholder="Internal remarks — not printed on the quotation" /></ConfiguredField>
+            <ConfiguredField module="quotation" name="termsConditions"><Input as="textarea" label="Terms & Conditions" value={formData.termsConditions} onChange={(event) => updateField('termsConditions', event.target.value)} inputClassName="min-h-16" placeholder="Printed on the customer quotation PDF" /></ConfiguredField>
           </div>
         </div>
         </div>

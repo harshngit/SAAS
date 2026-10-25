@@ -3,6 +3,7 @@ import AppRoutes from './routes/AppRoutes'
 import { ToastProvider } from './components/ui/Toast'
 import ThemeProvider from './theme/ThemeProvider'
 import EntitlementsProvider from './entitlements/EntitlementsProvider'
+import FieldSettingsProvider from './fieldSettings/FieldSettingsProvider'
 import { useAuthStore } from './store/authStore'
 import { syncPushToken } from './push/pushService'
 
@@ -21,9 +22,11 @@ function App() {
   return (
     <ThemeProvider>
       <EntitlementsProvider>
-        <ToastProvider>
-          <AppRoutes />
-        </ToastProvider>
+        <FieldSettingsProvider>
+          <ToastProvider>
+            <AppRoutes />
+          </ToastProvider>
+        </FieldSettingsProvider>
       </EntitlementsProvider>
     </ThemeProvider>
   )

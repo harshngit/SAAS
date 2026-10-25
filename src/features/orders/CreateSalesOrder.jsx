@@ -1,3 +1,5 @@
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
+import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { useEffect, useMemo, useState } from 'react'
@@ -89,6 +91,7 @@ const resolveCustomerAddress = (customer) =>
     .find((address) => typeof address === 'string' && address.trim())?.trim() || ''
 
 export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
+  const { visibleErrors } = useFormFieldSettings('sales_order')
   const navigate = useNavigate()
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
@@ -499,6 +502,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       }
     }
 
+    for (const key of Object.keys(nextErrors)) { if (!visibleErrors(nextErrors)[key]) delete nextErrors[key] }
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -781,7 +785,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 </label>
               </div>
 
-              <div className="space-y-2">
+              <ConfiguredField module="sales_order" name="selectedCustomerId"><div className="space-y-2">
                 <Select
                   searchable
                   options={customerOptions}
@@ -824,7 +828,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <span>Outstanding balance: {formatCurrency(outstandingBalance)}. This is for your information only and does not block the order.</span>
                   </div>
                 )}
-              </div>
+              </div></ConfiguredField>
             </div>
 
             <div className="space-y-4 p-5">
@@ -834,23 +838,23 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
+                <ConfiguredField module="sales_order" name="orderDate"><div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-neutral-700">Order Date</label>
                   <div className="flex h-11 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 text-sm text-neutral-600">
                     {new Date(orderDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </div>
-                </div>
-                <div className="flex flex-col gap-1.5">
+                </div></ConfiguredField>
+                <ConfiguredField module="sales_order" name="deliveryDate"><div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-neutral-700">
                     {deliveryType === 'pickup' ? 'Pickup Date' : 'Delivery Date'}
                     {deliveryType !== 'pickup' && <span className="text-red-500"> *</span>}
                   </label>
                   <DatePicker value={deliveryDate} onChange={setDeliveryDate} error={errors.deliveryDate} />
-                </div>
+                </div></ConfiguredField>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Select
+                <ConfiguredField module="sales_order" name="warehouseId"><Select
                   label="Warehouse"
                   required
                   options={warehouses
@@ -862,9 +866,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   onChange={(event) => setWarehouseId(event.target.value)}
                   placeholder={isLoadingOptions ? 'Loading...' : 'Select warehouse'}
                   disabled={isLoadingOptions}
-                />
+                /></ConfiguredField>
 
-                <div className="flex flex-col gap-1.5">
+                <ConfiguredField module="sales_order" name="paymentMethod"><div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-neutral-700">
                     Payment Type<span className="text-red-500"> *</span>
                   </label>
@@ -878,11 +882,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     placeholder="Select payment type"
                     error={errors.paymentMethod}
                   />
-                </div>
+                </div></ConfiguredField>
               </div>
 
               {paymentMethod === 'credit' && (
-                <Select label="Payment Terms" required options={paymentTermsOptions} value={paymentTerms} onChange={(event) => setPaymentTerms(event.target.value)} />
+                <ConfiguredField module="sales_order" name="paymentTerms"><Select label="Payment Terms" required options={paymentTermsOptions} value={paymentTerms} onChange={(event) => setPaymentTerms(event.target.value)} /></ConfiguredField>
               )}
             </div>
           </div>
@@ -919,14 +923,14 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <span className="font-semibold text-neutral-900">{formatCurrency(totals.subtotal)}</span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <ConfiguredField module="sales_order" name="discountValue"><div className="flex items-center gap-2">
                     <span className="text-xs text-neutral-500">Discount</span>
-                    <Select
+                    <ConfiguredField module="sales_order" name="discountType"><Select
                       options={discountTypeOptions}
                       value={discountType}
                       onChange={(event) => setDiscountType(event.target.value)}
                       className="w-40"
-                    />
+                    /></ConfiguredField>
                     <input
                       type="number"
                       min="0"
@@ -941,7 +945,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       className="h-10 w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                     />
                     <span className="text-xs font-medium text-neutral-500">{discountType === 'percentage' ? '%' : '₹'}</span>
-                  </div>
+                  </div></ConfiguredField>
 
                   <div className="flex items-center justify-between gap-2 sm:justify-start">
                     <span className="text-xs text-neutral-500">Discount Amount</span>
@@ -980,7 +984,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               </div>
             ) : (
               <>
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <ConfiguredField module="sales_order" name="deliveryType"><div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {deliveryOptions.map((option) => {
                     const Icon = option.icon
                     const isSelected = deliveryType === option.value
@@ -1012,7 +1016,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       </label>
                     )
                   })}
-                </div>
+                </div></ConfiguredField>
                 {errors.deliveryType && <p className="mt-3 text-sm text-red-600">{errors.deliveryType}</p>}
 
                 {deliveryType === 'pickup' && (
@@ -1024,7 +1028,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
                 {deliveryType === 'delivery_boy' && (
                   <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
-                    <div className="flex flex-col gap-1.5">
+                    <ConfiguredField module="sales_order" name="deliveryAddress"><div className="flex flex-col gap-1.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <label htmlFor="order-delivery-address" className="text-sm font-medium text-neutral-700">
                           Delivery Address <span className="text-red-500">*</span>
@@ -1060,10 +1064,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                           ? 'Your customer’s saved address is filled by default. You can edit it for this order.'
                           : 'No saved customer address. Enter the delivery address for this order.'}</p>
                       )}
-                    </div>
+                    </div></ConfiguredField>
 
                     {!isEditMode ? (
-                      <div className="flex flex-col gap-1.5">
+                      <ConfiguredField module="sales_order" name="deliveryPartnerId"><div className="flex flex-col gap-1.5">
                         <Select
                           label="Delivery Partner"
                           options={deliveryPartners.map((partner) => ({ value: partner.id, label: partner.name }))}
@@ -1083,7 +1087,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                             Optional — you can also assign a partner later from the order via Plan Delivery.
                           </p>
                         )}
-                      </div>
+                      </div></ConfiguredField>
                     ) : (
                       <p className="rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500 sm:self-center">
                         Manage the delivery partner from the order page via{' '}
@@ -1103,7 +1107,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               <h3 className="text-base font-semibold text-neutral-900">Notes</h3>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
+              <ConfiguredField module="sales_order" name="orderNotes"><div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-neutral-700">Order Notes</label>
                 <textarea
                   value={orderNotes}
@@ -1112,8 +1116,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
                 <p className="text-right text-xs text-neutral-400">{orderNotes.length} / 250</p>
-              </div>
-              <div className="flex flex-col gap-1.5">
+              </div></ConfiguredField>
+              <ConfiguredField module="sales_order" name="orderNotes"><div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-neutral-700">Internal Notes</label>
                 <textarea
                   value={internalNotes}
@@ -1122,7 +1126,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   className="h-24 resize-none rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
                 <p className="text-right text-xs text-neutral-400">{internalNotes.length} / 250</p>
-              </div>
+              </div></ConfiguredField>
             </div>
           </div>
 

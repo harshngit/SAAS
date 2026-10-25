@@ -1,3 +1,5 @@
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
+import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { LocateFixed, X } from 'lucide-react'
@@ -16,6 +18,7 @@ export const customerCategoryOptions = ['Retail', 'Wholesale', 'Corporate', 'VIP
 }))
 
 export function LeadEditForm({ isOpen = true, lead, salespersonOptions, saving, formError, onClose, onSave, lockAssignee = false }) {
+  const { visibleErrors } = useFormFieldSettings('lead')
   const [formData, setFormData] = useState(() => (lead ? { ...lead, interestedProductList: leadInterestedProductList(lead) } : lead))
   const [errors, setErrors] = useState({})
 
@@ -61,6 +64,7 @@ export function LeadEditForm({ isOpen = true, lead, salespersonOptions, saving, 
     if (!formData.mobileNumber?.trim()) nextErrors.mobileNumber = 'Mobile number is required.'
     if (lockAssignee && !formData.assignedSalespersonId) nextErrors.assignedSalespersonId = 'Assigned salesperson is required.'
 
+    for (const key of Object.keys(nextErrors)) { if (!visibleErrors(nextErrors)[key]) delete nextErrors[key] }
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -107,38 +111,38 @@ export function LeadEditForm({ isOpen = true, lead, salespersonOptions, saving, 
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input
+        <ConfiguredField module="lead" name="name"><Input
           label="Prospect / Business Name"
           value={formData.name}
           onChange={(event) => updateField('name', event.target.value)}
-        />
-        <Input
+        /></ConfiguredField>
+        <ConfiguredField module="lead" name="contactPerson"><Input
           label="Contact Person"
           value={formData.contactPerson}
           onChange={(event) => updateField('contactPerson', event.target.value)}
-        />
-        <Select
+        /></ConfiguredField>
+        <ConfiguredField module="lead" name="leadSource"><Select
           label="Lead Source"
           required
           options={LEAD_SOURCE_OPTIONS}
           value={formData.leadSource}
           onChange={(event) => updateField('leadSource', event.target.value)}
           error={errors.leadSource}
-        />
-        <Input
+        /></ConfiguredField>
+        <ConfiguredField module="lead" name="mobileNumber"><Input
           label="Mobile Number"
           required
           value={formData.mobileNumber}
           onChange={(event) => updateField('mobileNumber', event.target.value)}
           error={errors.mobileNumber}
-        />
-        <Input
+        /></ConfiguredField>
+        <ConfiguredField module="lead" name="email"><Input
           label="Email"
           type="email"
           value={formData.email}
           onChange={(event) => updateField('email', event.target.value)}
-        />
-        <Select
+        /></ConfiguredField>
+        <ConfiguredField module="lead" name="assignedSalespersonId"><Select
           label="Assigned Salesperson"
           required={lockAssignee}
           options={assigneeSelectOptions}
@@ -146,47 +150,47 @@ export function LeadEditForm({ isOpen = true, lead, salespersonOptions, saving, 
           onChange={(event) => updateField('assignedSalespersonId', event.target.value)}
           error={errors.assignedSalespersonId}
           disabled={lockAssignee}
-        />
+        /></ConfiguredField>
         {formData.leadStatus === 'won' ? (
           // A converted lead's status is locked - it can't be changed back by hand.
           <Input label="Lead Status" value={formatLeadStatus('won')} readOnly disabled />
         ) : (
-          <Select
+          <ConfiguredField module="lead" name="leadStatus"><Select
             label="Lead Status"
             required
             options={statusOptions}
             value={formData.leadStatus}
             onChange={(event) => updateField('leadStatus', event.target.value)}
-          />
+          /></ConfiguredField>
         )}
-        <Select
+        <ConfiguredField module="lead" name="leadType"><Select
           label="Lead Type"
           options={LEAD_TYPE_OPTIONS}
           value={formData.leadType || ''}
           onChange={(event) => updateField('leadType', event.target.value)}
           placeholder="Select a type"
-        />
-        <Select
+        /></ConfiguredField>
+        <ConfiguredField module="lead" name="segment"><Select
           label="Segment"
           options={LEAD_SEGMENT_OPTIONS}
           value={formData.segment || ''}
           onChange={(event) => updateField('segment', event.target.value)}
           placeholder="Select a segment"
-        />
-        <InterestedProductsField
+        /></ConfiguredField>
+        <ConfiguredField module="lead" name="interestedProductList"><InterestedProductsField
           selected={formData.interestedProductList || []}
           legacyText={formData.interestedProduct}
           onChange={(list) => updateField('interestedProductList', list)}
           className="sm:col-span-2"
-        />
-        <Input
+        /></ConfiguredField>
+        <ConfiguredField module="lead" name="notes"><Input
           as="textarea"
           label="Notes"
           value={formData.notes}
           onChange={(event) => updateField('notes', event.target.value)}
           inputClassName="min-h-20"
           className="sm:col-span-2"
-        />
+        /></ConfiguredField>
       </div>
         </div>
 

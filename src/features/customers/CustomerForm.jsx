@@ -1,3 +1,4 @@
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BadgeInfo,
@@ -118,8 +119,7 @@ function toDateInputValue(value) {
 }
 
 const optionValues = {
-  // The API enforces this exact lowercase enum — do not add/relabel values here.
-  industry: ['Food & Beverage', 'Retail', 'Wholesale', 'Corporate', 'Healthcare', 'Education', 'Hospitality', 'Manufacturing', 'Services'],
+  industry: ['IT', 'Healthcare', 'Banking', 'Manufacturing', 'Food & Beverage', 'Retail', 'Wholesale', 'Corporate', 'Education', 'Hospitality', 'Services'],
   customerCategory: ['Retail', 'Wholesale', 'Corporate', 'VIP', 'Dealer', 'Distributor'],
   status: [
     { value: 'active', label: 'Active' },
@@ -149,14 +149,15 @@ function isPaymentDetailFieldVisible(fieldName, preferredPaymentMethod) {
   return true
 }
 
-// Fixed backend enum (see CustomerProfileIn.basic_information.customer_type) - not something
-// to infer from existing customer records.
+// Explicit choices use the existing lowercase customer_type serialization.
+// Keep older choices available so saved customers retain their type when edited.
 const customerTypeOptions = [
   { value: 'individual', label: 'Individual' },
   { value: 'business', label: 'Business' },
+  { value: 'distributor', label: 'Distributor' },
+  { value: 'reseller', label: 'Reseller' },
   { value: 'government', label: 'Government' },
   { value: 'dealer', label: 'Dealer' },
-  { value: 'distributor', label: 'Distributor' },
   { value: 'vendor', label: 'Vendor' },
 ]
 
@@ -187,15 +188,14 @@ function section(title, fields) {
 const formSections = [
   section('Basic Information', [
     { name: 'profileImage', label: 'Customer Image', description: 'Photo or logo shown on the customer profile.', type: 'Image Upload', input: 'image', wide: true },
-    { name: 'customerId', label: 'Customer ID', description: 'Unique customer identifier. Auto-generated.', type: 'Text (Auto Number)', required: true, input: 'readonly' },
-    { name: 'customerType', label: 'Customer Type', description: 'Individual, Business, Government, Dealer, Distributor, Vendor.', type: 'Dropdown', input: 'select', required: true },
-    { name: 'customerName', label: 'Customer Name', description: 'Name of the customer or business.', type: 'Text (Max 100 chars)', required: true, maxLength: 100 },
+    { name: 'customerName', label: 'Customer / Business Name', description: 'Name of the customer or business.', type: 'Text (Max 100 chars)', required: true, maxLength: 100 },
     { name: 'legalBusinessName', label: 'Legal Business Name', description: 'Registered business name for companies.', type: 'Text' },
     { name: 'displayName', label: 'Display Name', description: 'Name displayed in invoices and reports.', type: 'Text' },
-    { name: 'industry', label: 'Industry', description: 'Industry or business category.', type: 'Dropdown', input: 'select' },
     { name: 'customerCategory', label: 'Customer Category', description: 'Retail, Wholesale, Corporate, VIP, etc.', type: 'Dropdown', input: 'select' },
-    { name: 'customerSince', label: 'Customer Since', description: 'Date the customer was added.', type: 'Date Picker', required: true, input: 'date' },
+    { name: 'customerType', label: 'Customer Type', description: 'Individual, Business, Distributor, Reseller, Government, Dealer, Vendor.', type: 'Dropdown', input: 'select', required: true },
+    { name: 'industry', label: 'Industry', description: 'Industry or business category.', type: 'Dropdown', input: 'select' },
     { name: 'status', label: 'Status', description: 'Active, Inactive, Blacklisted, or Prospect.', type: 'Dropdown', required: true, input: 'select' },
+    { name: 'customerSince', label: 'Customer Since', description: 'Date the customer was added.', type: 'Date Picker', required: true, input: 'date' },
   ]),
   section('Contact Information', [
     { name: 'primaryContactPerson', label: 'Primary Contact Person', description: 'Main point of contact.', type: 'Text', required: true },
@@ -224,7 +224,6 @@ const formSections = [
   section('Payment Information', [
     { name: 'paymentTerms', label: 'Payment Terms', description: 'Net 15, Net 30, Advance, Immediate, etc.', type: 'Dropdown', input: 'select' },
     { name: 'creditLimit', label: 'Credit Limit', description: 'Maximum allowed credit.', type: 'Decimal', input: 'number' },
-    { name: 'outstandingBalance', label: 'Outstanding Balance', description: 'Current outstanding amount.', type: 'Decimal (Read-only/System Calculated)', input: 'moneyReadonly' },
     { name: 'preferredPaymentMethod', label: 'Preferred Payment Method', description: 'Cash, Card, UPI, Bank Transfer, Cheque.', type: 'Dropdown', input: 'select' },
     { name: 'upiId', label: 'UPI ID', description: 'Customer UPI ID.', type: 'Text' },
     { name: 'bankName', label: 'Bank Name', description: 'Bank name.', type: 'Text' },
@@ -328,7 +327,7 @@ function hydrateCustomer(formCustomer, isSalesOfficer, currentUser, salesOfficer
     ...baseFields,
     ...formCustomer,
     // Real, backend-assigned business ID (e.g. CS-10001-2027-0001) when editing - left blank on
-    // a brand-new customer; the readonly field below shows "System calculated" until then. Never
+    // a brand-new customer; the saved business ID is displayed in the header. Never
     // a frontend-fabricated placeholder, and never the internal UUID (`formCustomer.id`) either.
     customerId: formCustomer?.customerId || '',
     profileImage: formCustomer?.profileImage || formCustomer?.profile_image || '',
@@ -599,6 +598,7 @@ export default function CustomerForm({
   saving = false,
   formError = '',
 }) {
+  const { visible, visibleErrors } = useFormFieldSettings('customer')
   const isSalesOfficer = currentUser?.role === ROLES.SALES_OFFICER
   const [formData, setFormData] = useState(baseFields)
   const [initialFormData, setInitialFormData] = useState(baseFields)
@@ -985,6 +985,7 @@ export default function CustomerForm({
     else if (Number(formData.creditLimit) < 0) nextErrors.creditLimit = 'Credit limit cannot be negative.'
     else if (/e/i.test(String(formData.creditLimit))) nextErrors.creditLimit = 'Enter a plain number, not scientific notation.'
 
+    for (const key of Object.keys(nextErrors)) { if (!visibleErrors(nextErrors)[key]) delete nextErrors[key] }
     setErrors(nextErrors)
 
     const errorFieldNames = Object.keys(nextErrors)
@@ -1054,6 +1055,7 @@ export default function CustomerForm({
   }
 
   const renderField = (field) => {
+    if (!visible(field.name)) return null
     const commonProps = {
       label: field.label,
       value: formData[field.name] ?? '',
@@ -1178,20 +1180,6 @@ export default function CustomerForm({
       )
     }
 
-    if (field.input === 'readonly' || field.input === 'moneyReadonly') {
-      const value = field.input === 'moneyReadonly' ? formatCurrency(Number(formData[field.name]) || 0) : formData[field.name] || 'System calculated'
-
-      return (
-        <Input
-          label={field.label}
-          value={value}
-          readOnly
-          disabled
-          error={errors[field.name]}
-        />
-      )
-    }
-
     return (
       <Input
         {...commonProps}
@@ -1248,6 +1236,7 @@ export default function CustomerForm({
                 <p className="mt-1 text-sm text-neutral-500">{activeFormSection.description}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                {customer && formData.customerId && <Badge variant="neutral">Customer ID: {formData.customerId}</Badge>}
                 {customer && (
                   <Badge variant={customer.outstandingBalance > 0 ? 'warning' : 'neutral'}>
                     Outstanding {formatCurrency(customer.outstandingBalance || 0)}
@@ -1267,7 +1256,7 @@ export default function CustomerForm({
 
             <section className="border-b border-neutral-100 py-5">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {activeFormSection.fields.map((field) => {
+                {activeFormSection.fields.filter((field) => visible(field.name)).map((field) => {
                   if (
                     activeFormSection.id === 'payment-information'
                     && !isPaymentDetailFieldVisible(field.name, formData.preferredPaymentMethod)

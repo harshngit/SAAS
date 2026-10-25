@@ -74,6 +74,7 @@ test('home delivery validates the editable address; takeaway does not require it
       deliveryDate: '2026-10-19', orderItems: [{ quantity: 1, unitPrice: 75 }],
       availableProducts: [], validateVariantItems: () => '', paymentMethod: 'upi',
       restrictToVehicleStock: false, deliveryType, deliveryAddress,
+      visibleErrors: (errors) => errors,
       setErrors: (value) => { errors = value },
     })()
     return { valid, errors }

@@ -146,6 +146,8 @@ export default function PurchaseInvoiceDetail() {
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [isActing, setIsActing] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
+  const [isReceiveGoodsPromptOpen, setIsReceiveGoodsPromptOpen] = useState(false)
 
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
@@ -260,8 +262,13 @@ export default function PurchaseInvoiceDetail() {
     setPurchase((current) => ({ ...current, ...partial }))
   }
 
-  // Purchase confirm is a purely commercial transition - it moves NO stock. Only a confirmed
-  // GRN receives goods into the warehouse.
+  // Purchase confirm is a purely commercial transition - it moves NO stock (backend contract:
+  // POST /purchases/{id}/confirm takes no body and performs no stock movement). Only a confirmed
+  // GRN receives goods into the warehouse. The client spec asks for a popup after confirming
+  // that asks whether to "update inventory" - there is no backend action to wire a real Yes/No
+  // choice into (confirm has no such parameter), so instead of faking one, this offers the one
+  // real, honest equivalent: jump straight to the Goods Receipts tab on this same page to
+  // actually receive the stock, which is the real action that moves inventory.
   const handleConfirm = async () => {
     setIsActing(true)
     setActionError('')
@@ -269,7 +276,8 @@ export default function PurchaseInvoiceDetail() {
     if (isDemo) {
       applyDemo({ status: 'confirmed' })
       setIsActing(false)
-      showToast({ title: 'Purchase confirmed', message: 'This purchase is now Confirmed. Receive goods via a Goods Receipt.' })
+      showToast({ title: 'Purchase confirmed', message: 'This purchase is now Confirmed.' })
+      setIsReceiveGoodsPromptOpen(true)
       return
     }
 
@@ -281,6 +289,7 @@ export default function PurchaseInvoiceDetail() {
     }
     setPurchase(result.purchase)
     showToast({ title: 'Purchase confirmed', message: 'This purchase is now Confirmed.' })
+    setIsReceiveGoodsPromptOpen(true)
   }
 
   // Close is only valid once fully received (backend also blocks an early close). No stock move.
@@ -566,7 +575,7 @@ export default function PurchaseInvoiceDetail() {
         <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={formatCurrency(outstanding)} />
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="overflow-x-auto pb-1">
           <TabsList className="min-w-max">
             <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -903,6 +912,30 @@ export default function PurchaseInvoiceDetail() {
         onClose={() => setQuickViewInvoiceId(null)}
         onOpenFull={() => navigate(`/admin/supplier-invoices/${quickViewInvoiceId}`)}
       />
+
+      {/* Confirming a purchase moves no stock (see handleConfirm) - this offers the one real
+          action that does: jump to the Goods Receipts tab on this same page to receive the
+          stock now, rather than a fake "update inventory" choice with nothing behind it. */}
+      <Modal isOpen={isReceiveGoodsPromptOpen} onClose={() => setIsReceiveGoodsPromptOpen(false)} title="Receive goods now?">
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-neutral-600">
+            This purchase is confirmed. Confirming doesn&apos;t move any stock - inventory only updates once goods are received against
+            a Goods Receipt. Would you like to record that now?
+          </p>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setIsReceiveGoodsPromptOpen(false)}>I&apos;ll do this later</Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setIsReceiveGoodsPromptOpen(false)
+                setActiveTab('receipts')
+              }}
+            >
+              Receive Goods Now
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

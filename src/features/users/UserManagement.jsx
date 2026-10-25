@@ -976,6 +976,7 @@ export default function UserManagement() {
                   <div>
                     <p className="text-lg font-semibold text-neutral-900">{activeStaffFormSection.title}</p>
                     <p className="mt-1 text-sm text-neutral-500">{activeStaffFormSection.description}</p>
+                    {formData.employeeId && <div className="mt-2"><Badge variant="neutral">Employee ID: {formData.employeeId}</Badge></div>}
                   </div>
                   <Button
                     type="button"
@@ -1003,10 +1004,6 @@ export default function UserManagement() {
                   onChange={handleUploadChange}
                   onRemove={handleUploadRemove}
                 />
-                <div className="hidden lg:block" aria-hidden="true" />
-                <StaffField description="Unique employee identifier. Auto-generated." format="Text (Auto Number)" required={false}>
-                  <Input label="Employee ID" value={formData.employeeId || 'System calculated'} readOnly disabled />
-                </StaffField>
                 <div className="hidden lg:block" aria-hidden="true" />
                 <StaffField description="Employee's first name." format="Text, max 50 characters" required>
                   <Input label="First Name" name="firstName" maxLength={50} value={formData.firstName} onChange={handleFormChange} required />
