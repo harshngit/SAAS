@@ -1,24 +1,36 @@
-# Beas Suite CRM — Full Backend API List
+# Beas Suite CRM — Backend API Reference (from Backend to Frontend)
 
-This is the complete list of every backend endpoint the current web frontend (React) calls.
-It is meant as a reference for building a Flutter app against the **same backend**.
+**From:** Backend team · **To:** Web (React) and mobile (Flutter) frontend teams
 
-- **Base URL**: `VITE_API_BASE_URL` in `.env` → currently `https://crm-saas-backend.bsmart.workers.dev`
-- **Auth**: every endpoint below (except `/auth/*` login/register/forgot-password) requires
-  `Authorization: Bearer <access_token>` — the token comes from `POST /auth/login`.
-- File uploads use `multipart/form-data` with a field named `file`.
-- This list is extracted directly from the frontend's API wrapper code (`src/api/*.js`), not from
-  backend source — so it reflects exactly what the web app actually calls today.
-- For the "why / where / logic" behind each of these, see **API_USAGE_GUIDE.md** (the companion
-  file).
+This file is the backend's list of the endpoints you build against. The backend owns it and
+updates it with every backend change, so treat it as the source of truth for paths. If your
+code calls something that isn't listed here, ask the backend team before you build on it.
+
+**How to use this file:**
+1. Start with **API_USAGE_GUIDE.md → "Action required"** at the top. It lists what changed in
+   the backend and exactly what you need to do about it.
+2. Use this file to look up paths. 🆕 marks something new, and ⚠️ marks something whose
+   behaviour changed. The full request/response contract for each is in API_USAGE_GUIDE.md,
+   in the section with the same number.
+
+**Rules for every call:**
+- **Base URL:** `https://crm-saas-backend.bsmart.workers.dev`
+- **Authentication:** send `Authorization: Bearer <access_token>` on every call, except login,
+  register, forgot/reset-password, Google sign-in and phone OTP. You get the access token from
+  `POST /auth/login`, `POST /auth/phone/verify-otp` or the Google flow.
+- **File uploads:** send `multipart/form-data` with the file in a field named `file`.
+- **Payloads:** JSON in `snake_case`.
 
 ---
 
 ## 1. Authentication & Session
 - `POST /auth/login`
 - `POST /auth/register`
-- `POST /auth/forgot-password`
-- `POST /auth/reset-password`
+- ⚠️ `POST /auth/forgot-password` — `{email}` → 200, the same answer for every address; 429 when rate limited
+- ⚠️ `POST /auth/reset-password` — `{token, new_password, confirm_password?}` → 200; 400 for a bad, expired or used token; 422
+- 🆕 `POST /auth/phone/send-otp` — staff mobile OTP login, step 1: `{phone}` → 200 `{detail, resend_after}`
+- 🆕 `POST /auth/phone/verify-otp` — step 2: `{phone, code}` → the same response as `/auth/login`
+- ❌ Removed: `POST /auth/reset-password-direct` and `POST /auth/check-email`. Don't call them.
 - `POST /auth/change-password`
 - `GET /auth/me`
 - `POST /auth/logout`
@@ -125,8 +137,9 @@ It is meant as a reference for building a Flutter app against the **same backend
 - `PATCH /brands/{id}`
 - `DELETE /brands/{id}`
 - `POST /brands/bulk-delete`
+- ⚠️ `GET /brands` — each brand now also carries `categories: [{id, name}]`
 - `GET /brands/{id}/categories`
-- `POST /brands/{id}/categories`
+- ⚠️ `POST /brands/{id}/categories` — answers 422 if you send a sub category
 - `DELETE /brands/{id}/categories/{categoryId}`
 
 ## 10. Categories
@@ -136,6 +149,11 @@ It is meant as a reference for building a Flutter app against the **same backend
 - `PATCH /categories/{id}`
 - `DELETE /categories/{id}`
 - `POST /categories/bulk-delete`
+- 🆕 `GET /categories/{id}/brands` — the brands a product in this category can use
+- 🆕 `PUT /categories/{id}/brands` — `{brand_ids: [...]}` replaces the category's brand list
+- `GET /categories/{subcategoryId}/variants` — a sub category's Product Types
+- `POST /categories/{subcategoryId}/variants`
+- `PATCH /categories/{subcategoryId}/variants/{variantId}`
 
 ## 11. Warehouses, Stock & Transfers
 - `GET /warehouses`
@@ -405,7 +423,17 @@ It is meant as a reference for building a Flutter app against the **same backend
 
 ---
 
-## Known backend gap (frontend-confirmed, not a Flutter TODO)
-**Cash Reconciliation** (`src/features/reconciliation/CashReconciliation.jsx`) has no backend
-list/get/save endpoint at all today. The web app shows an honest "not available" state in real
-mode. Don't build Flutter screens expecting a working endpoint here until the backend adds one.
+## 36. Cash Reconciliation
+The backend has a full Cash Reconciliation API. Earlier versions of this file said it didn't
+exist, which was wrong. You can build against these:
+- `GET /cash-reconciliation`
+- `POST /cash-reconciliation`
+- `GET /cash-reconciliation/{id}`
+- `PATCH /cash-reconciliation/{id}`
+- `DELETE /cash-reconciliation/{id}`
+- `POST /cash-reconciliation/{id}/close`
+- `GET /cash-reconciliation/expected`
+- `GET /cash-reconciliation/preview`
+- `GET /cash-reconciliation/for-date/{business_date}`
+
+Ask the backend team for the full request/response contract before you build these screens.
