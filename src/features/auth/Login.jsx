@@ -1,3 +1,4 @@
+import PhoneOtpLogin from "./PhoneOtpLogin";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -10,7 +11,7 @@ import FullScreenLoader from "../../components/ui/FullScreenLoader";
 import AuthShowcase from "../../components/auth/AuthShowcase";
 import AuthFooterLinks from "../../components/auth/AuthFooterLinks";
 import { zodResolver } from "../../utils/zodResolver";
-import { forgotPassword, googleLoginRedirect, login, resetPassword } from "../../api/auth";
+import { forgotPassword, googleLoginRedirect, login } from "../../api/auth";
 import { roleHomePath } from "../../auth/roles";
 
 const schema = z.object({
@@ -21,18 +22,20 @@ const schema = z.object({
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [loginMethod, setLoginMethod] = useState("email");
+  const [mobileAvailable, setMobileAvailable] = useState(() => {
+    try { return sessionStorage.getItem('beas-mobile-login-disabled') !== 'true'; } catch { return true; }
+  });
+  const [phoneBusy, setPhoneBusy] = useState(false);
   const [serverError, setServerError] = useState("");
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
-  const [resetStep, setResetStep] = useState("email"); // 'email' | 'token'
+  const [isResettingPassword, setIsResettingPassword] = useState(Boolean(location.state?.forgotPassword));
+  const [resetSent, setResetSent] = useState(false);
+  const [resetDetail, setResetDetail] = useState("");
   const [resetEmail, setResetEmail] = useState("");
-  const [resetToken, setResetToken] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [resetError, setResetError] = useState("");
-  const [resetInfo, setResetInfo] = useState("");
-  const [resetMessage, setResetMessage] = useState("");
+  const [resetMessage, setResetMessage] = useState(location.state?.message || "");
   const [isResetSubmitting, setIsResetSubmitting] = useState(false);
 
   const {
@@ -50,6 +53,10 @@ export default function Login() {
       setServerError(result.error);
       return;
     }
+    finishLogin(result);
+  };
+
+  const finishLogin = (result) => {
     setIsRedirecting(true);
     const redirectTo =
       location.state?.from?.pathname ||
@@ -62,23 +69,19 @@ export default function Login() {
     setServerError("");
     setResetError("");
     setResetMessage("");
-    setResetInfo("");
-    setResetStep("email");
+    setResetSent(false);
     setIsResettingPassword(true);
   };
 
   const cancelPasswordReset = () => {
     setIsResettingPassword(false);
     setResetError("");
-    setResetInfo("");
-    setResetStep("email");
-    setResetToken("");
-    setNewPassword("");
-    setConfirmNewPassword("");
+    setResetSent(false);
   };
 
   const handleRequestReset = async (event) => {
     event.preventDefault();
+    if (isResetSubmitting || resetSent) return;
     setResetError("");
 
     if (!z.string().email().safeParse(resetEmail).success) {
@@ -95,47 +98,10 @@ export default function Login() {
       return;
     }
 
-    setResetInfo(result.detail);
-    if (result.resetToken) setResetToken(result.resetToken);
-    setResetStep("token");
+    setResetDetail(result.detail);
+    setResetSent(true);
   };
 
-  const handlePasswordReset = async (event) => {
-    event.preventDefault();
-    setResetError("");
-
-    if (!resetToken.trim()) {
-      setResetError("Enter the reset token from your email");
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      setResetError("New password must be at least 8 characters");
-      return;
-    }
-
-    if (newPassword !== confirmNewPassword) {
-      setResetError("Passwords do not match");
-      return;
-    }
-
-    setIsResetSubmitting(true);
-    const result = await resetPassword({ token: resetToken.trim(), newPassword });
-    setIsResetSubmitting(false);
-
-    if (!result.success) {
-      setResetError(result.error);
-      return;
-    }
-
-    setResetMessage(result.detail);
-    setIsResettingPassword(false);
-    setResetStep("email");
-    setResetEmail("");
-    setResetToken("");
-    setNewPassword("");
-    setConfirmNewPassword("");
-  };
 
   return (
     <div className="min-h-svh bg-neutral-50 p-4 sm:p-6 lg:p-8">
@@ -168,76 +134,49 @@ export default function Login() {
               Sign in to your workspace to continue
             </p>
 
+            {!isResettingPassword && mobileAvailable && <div role="group" aria-label="Sign-in method" className="mt-7 rounded-xl bg-primary-50 p-1">
+              <div className="relative grid grid-cols-2">
+              <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 left-0 w-1/2 rounded-lg bg-primary-600 shadow-(--shadow-xs) transition-transform duration-300 ease-in-out motion-reduce:transition-none ${loginMethod === 'phone' ? 'translate-x-full' : 'translate-x-0'}`} />
+              {[['email', 'Email'], ['phone', 'Mobile']].map(([method, label]) => (
+                <button key={method} type="button" aria-pressed={loginMethod === method} disabled={isSubmitting || phoneBusy || isRedirecting}
+                  onClick={() => { setLoginMethod(method); setServerError(''); }}
+                  className={`relative z-10 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-300 ease-in-out motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-wait ${loginMethod === method ? 'text-white disabled:text-white disabled:opacity-100' : 'text-primary-700 hover:text-primary-900 disabled:opacity-60'}`}>
+                  {label}
+                </button>
+              ))}
+              </div>
+            </div>}
+
             {isResettingPassword ? (
-              <form
-                onSubmit={resetStep === "email" ? handleRequestReset : handlePasswordReset}
-                className="mt-7 space-y-4"
-              >
-                {resetStep === "email" ? (
+              <form onSubmit={handleRequestReset} className="mt-7 space-y-4">
+                {resetSent ? (
+                  <p role="status" className="rounded-xl bg-primary-50 px-3.5 py-2.5 text-sm text-primary-800">
+                    {resetDetail}
+                  </p>
+                ) : (
                   <>
-                    <Input
-                      label="Email"
-                      type="email"
-                      placeholder="you@company.com"
-                      value={resetEmail}
-                      onChange={(event) => setResetEmail(event.target.value)}
-                      error={resetError}
-                    />
-                    <Button
-                      type="submit"
-                      className="w-full rounded-xl bg-linear-to-b from-neutral-800 to-neutral-950 shadow-[0_10px_24px_-10px_rgb(17_24_39/0.55)] hover:from-neutral-800 hover:to-neutral-900"
-                      loading={isResetSubmitting}
-                    >
+                    <Input label="Email" type="email" autoComplete="email" placeholder="you@company.com"
+                      value={resetEmail} disabled={isResetSubmitting} onChange={(event) => setResetEmail(event.target.value)} error={resetError} />
+                    <Button type="submit" className="w-full rounded-xl bg-linear-to-b from-neutral-800 to-neutral-950 shadow-[0_10px_24px_-10px_rgb(17_24_39/0.55)] hover:from-neutral-800 hover:to-neutral-900" loading={isResetSubmitting}>
                       Send Reset Link
                     </Button>
                   </>
-                ) : (
-                  <>
-                    {resetInfo && (
-                      <p className="rounded-xl bg-primary-50 px-3.5 py-2.5 text-sm text-primary-800">{resetInfo}</p>
-                    )}
-                    <Input
-                      label="Reset Token"
-                      placeholder="Paste the token from your email"
-                      value={resetToken}
-                      onChange={(event) => setResetToken(event.target.value)}
-                    />
-                    <Input
-                      label="New Password"
-                      type="password"
-                      placeholder="Enter new password"
-                      value={newPassword}
-                      onChange={(event) => setNewPassword(event.target.value)}
-                    />
-                    <Input
-                      label="Confirm New Password"
-                      type="password"
-                      placeholder="Confirm new password"
-                      value={confirmNewPassword}
-                      onChange={(event) => setConfirmNewPassword(event.target.value)}
-                    />
-                    {resetError && (
-                      <p className="text-sm text-red-600">{resetError}</p>
-                    )}
-                    <Button
-                      type="submit"
-                      className="w-full rounded-xl bg-linear-to-b from-neutral-800 to-neutral-950 shadow-[0_10px_24px_-10px_rgb(17_24_39/0.55)] hover:from-neutral-800 hover:to-neutral-900"
-                      loading={isResetSubmitting}
-                    >
-                      Reset Password
-                    </Button>
-                  </>
                 )}
-
-                <button
-                  type="button"
-                  onClick={cancelPasswordReset}
-                  className="w-full text-center text-sm font-medium text-primary-600 hover:underline"
-                >
+                <button type="button" onClick={cancelPasswordReset} disabled={isResetSubmitting}
+                  className="w-full text-center text-sm font-medium text-primary-600 hover:underline">
                   Back to sign in
                 </button>
               </form>
             ) : (
+              <>
+              <div hidden={loginMethod !== 'phone'}>
+                <PhoneOtpLogin onSuccess={finishLogin} onBusyChange={setPhoneBusy} onUnavailable={() => {
+                  try { sessionStorage.setItem('beas-mobile-login-disabled', 'true'); } catch { /* Still hide it in memory. */ }
+                  setMobileAvailable(false); setLoginMethod('email');
+                  setServerError('Mobile login is temporarily unavailable. Please use email login.');
+                }} disabled={isRedirecting} />
+              </div>
+              <div hidden={loginMethod !== 'email'}>
               <form
                 onSubmit={handleSubmit(performLogin)}
                 className="mt-7 space-y-4"
@@ -283,6 +222,10 @@ export default function Login() {
                   Sign in
                 </Button>
 
+
+              </form>
+              </div>
+              <div className="mt-4 space-y-4">
                 <div className="flex items-center gap-3">
                   <span className="h-px flex-1 bg-neutral-200" />
                   <span className="text-xs font-medium text-neutral-400">OR</span>
@@ -297,7 +240,8 @@ export default function Login() {
                   <FcGoogle className="size-5" aria-hidden="true" />
                   Continue with Google
                 </button>
-              </form>
+              </div>
+              </>
             )}
 
             <p className="mt-8 text-center text-sm text-neutral-500">

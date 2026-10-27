@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -398,7 +399,7 @@ function PreviewPanel({ settings, printMode, setPrintMode, regularPresetId, ther
               <Minus className="size-3.5" aria-hidden="true" />
             </button>
             <span className="flex w-11 items-center justify-center">
-              <input
+              <NumericInput
                 type="text"
                 inputMode="numeric"
                 aria-label="Zoom percentage"
@@ -972,7 +973,7 @@ export default function InvoiceSettings() {
                 <div className="grid grid-cols-2 gap-4">
                   <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-700">
                     Extra Lines at End
-                    <input
+                    <NumericInput
                       type="number" min={0} max={20}
                       value={settings.thermalPrint.extraLines}
                       onChange={(event) => setThermalPrint('extraLines', Math.max(0, Math.min(20, Number(event.target.value) || 0)))}
@@ -981,7 +982,7 @@ export default function InvoiceSettings() {
                   </label>
                   <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-700">
                     Number of Copies
-                    <input
+                    <NumericInput
                       type="number" min={1} max={10}
                       value={settings.thermalPrint.copies}
                       disabled

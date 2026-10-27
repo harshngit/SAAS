@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, CheckCircle2, Eye, Info, PackageCheck, RotateCw, Truck } from 'lucide-react'
@@ -147,7 +148,7 @@ function ReturnLines({ lines, editable, onChange, lineErrors }) {
                   <td className="px-3 py-3 text-right font-medium text-neutral-900">{line.expectedRemaining}</td>
                   <td className="px-3 py-3 text-center">
                     {editable ? (
-                      <input
+                      <NumericInput
                         className={NUM_INPUT}
                         inputMode="numeric"
                         value={line.physicalCount}
@@ -162,7 +163,7 @@ function ReturnLines({ lines, editable, onChange, lineErrors }) {
                   <td className="px-3 py-3 text-right font-semibold text-primary-700">{displayGoodReturn(line)}</td>
                   <td className="px-3 py-3 text-center">
                     {editable ? (
-                      <input
+                      <NumericInput
                         className={NUM_INPUT}
                         inputMode="numeric"
                         value={line.damaged}
@@ -234,7 +235,7 @@ function ReturnLines({ lines, editable, onChange, lineErrors }) {
                 <label className="text-xs text-neutral-500">
                   Physical
                   {editable ? (
-                    <input
+                    <NumericInput
                       className={`${NUM_INPUT} mt-1 w-full`}
                       inputMode="numeric"
                       value={line.physicalCount}
@@ -248,7 +249,7 @@ function ReturnLines({ lines, editable, onChange, lineErrors }) {
                 <label className="text-xs text-neutral-500">
                   Damaged
                   {editable ? (
-                    <input
+                    <NumericInput
                       className={`${NUM_INPUT} mt-1 w-full`}
                       inputMode="numeric"
                       value={line.damaged}

@@ -22,6 +22,7 @@ import {
   computeInvoiceTotals,
   derivePaymentStatusFromAmount,
   invoiceOutstanding,
+  invoicePaymentHistoryStatusMeta,
   invoiceStatusMeta,
   lifecycleMeta,
   paymentStatusMeta,
@@ -165,7 +166,7 @@ export default function SupplierInvoiceDetail() {
       const verified = result.invoice.verificationStatus
       showToast({
         title: 'Supplier invoice recorded.',
-        message: verified === 'mismatched' ? 'Verification flagged a mismatch — review required.' : 'Verification matched.',
+        message: verified === 'matched' ? 'Verification matched.' : verified === 'pending' ? 'Pending / Awaiting Goods.' : verified === 'mismatched' ? 'Verification flagged a mismatch - review required.' : 'Check the current verification status.',
       })
     } else {
       showToast({ title: 'Supplier invoice cancelled.' })
@@ -217,6 +218,7 @@ export default function SupplierInvoiceDetail() {
           tax: safeNumber(item.taxRate),
           lineTotal: computeInvoiceLine(item).lineTotal,
           taxAmount: computeInvoiceLine(item).taxAmount,
+          discountAmount: computeInvoiceLine(item).discountAmount,
         })),
         matching: null,
       }
@@ -327,8 +329,8 @@ export default function SupplierInvoiceDetail() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={IndianRupee} iconVariant="primary" label="Invoice Total" value={formatCurrency(view.grandTotal)} />
-        <StatCard icon={Wallet} iconVariant="success" label="Amount Paid" value={formatCurrency(view.amountPaid)} />
-        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding" value={formatCurrency(view.outstanding)} />
+        <StatCard icon={Wallet} iconVariant="success" label="Amount Paid" value={(view.amountPaid == null ? '—' : formatCurrency(view.amountPaid))} />
+        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding" value={(view.outstanding == null ? '—' : formatCurrency(view.outstanding))} />
         <StatCard icon={Wallet} iconVariant="info" label="Payment Status" value={view.payment.label} />
       </div>
 
@@ -366,8 +368,8 @@ export default function SupplierInvoiceDetail() {
               <Field label="Tax" value={formatCurrency(view.taxTotal)} />
               <Field label="Additional Charges" value={formatCurrency(view.additionalCharges)} />
               <Field label="Invoice Total" value={formatCurrency(view.grandTotal)} />
-              <Field label="Amount Paid" value={formatCurrency(view.amountPaid)} />
-              <Field label="Outstanding" value={formatCurrency(view.outstanding)} />
+              <Field label="Amount Paid" value={(view.amountPaid == null ? '—' : formatCurrency(view.amountPaid))} />
+              <Field label="Outstanding" value={(view.outstanding == null ? '—' : formatCurrency(view.outstanding))} />
             </div>
           </Card>
         </TabsContent>
@@ -393,16 +395,16 @@ export default function SupplierInvoiceDetail() {
                 <tbody className="divide-y divide-neutral-50">
                   {(view.items || []).map((item, index) => (
                     <tr key={item.id || item.productId || index}>
-                      <td className="px-5 py-3.5 font-medium text-neutral-900">{item.productName || 'Item'}</td>
+                      <td className="px-5 py-3.5 font-medium text-neutral-900">{item.productName || '—'}</td>
                       <td className="px-5 py-3.5 text-neutral-600">{item.sku || '—'}</td>
                       <td className="px-5 py-3.5 text-right text-neutral-600">{item.orderedQty ?? '—'}</td>
                       <td className="px-5 py-3.5 text-right text-neutral-600">{item.receivedQty ?? '—'}</td>
-                      <td className="px-5 py-3.5 text-right text-neutral-900">{safeNumber(item.billedQty)}</td>
-                      <td className="px-5 py-3.5 text-right text-neutral-600">{formatCurrency(item.unitPrice)}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-900">{item.billedQty ?? '—'}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-600">{item.unitPrice == null ? '—' : formatCurrency(item.unitPrice)}</td>
                       <td className="px-5 py-3.5 text-right text-neutral-500">{item.purchasePrice != null ? formatCurrency(item.purchasePrice) : '—'}</td>
-                      <td className="px-5 py-3.5 text-right text-neutral-600">{item.discount ? `${item.discount}%` : '—'}</td>
-                      <td className="px-5 py-3.5 text-right text-neutral-600">{item.tax ? `${item.tax}%` : '—'}</td>
-                      <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-600">{item.discountAmount == null ? '—' : formatCurrency(item.discountAmount)}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-600">{item.taxAmount == null ? '—' : formatCurrency(item.taxAmount)}</td>
+                      <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{item.lineTotal == null ? '—' : formatCurrency(item.lineTotal)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -421,8 +423,8 @@ export default function SupplierInvoiceDetail() {
                 {!isDemo && view.matching ? (
                   <>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <Field label="Quantity Match" value={view.matching.quantityMatch == null ? '—' : view.matching.quantityMatch ? 'Matched' : 'Mismatch'} />
-                      <Field label="Price Match" value={view.matching.priceMatch == null ? '—' : view.matching.priceMatch ? 'Matched' : 'Mismatch'} />
+                      <Field label="Quantity Match" value={view.matching.quantityMatch == null ? '—' : view.matching.quantityMatch ? '✓ Matched' : '✕ Mismatch'} />
+                      <Field label="Price Match" value={view.matching.priceMatch == null ? '—' : view.matching.priceMatch ? '✓ Matched' : '✕ Mismatch'} />
                       <div>
                         <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Overall Verification</p>
                         <div className="mt-1"><Badge variant={view.verification.variant}>{view.verification.label}</Badge></div>
@@ -501,8 +503,8 @@ export default function SupplierInvoiceDetail() {
         <TabsContent value="payments" className="mt-4 space-y-4">
           <Card title="Payments" subtitle="Aggregate amount and status for this supplier invoice.">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Field label="Amount Paid" value={formatCurrency(view.amountPaid)} />
-              <Field label="Outstanding" value={formatCurrency(view.outstanding)} />
+              <Field label="Amount Paid" value={(view.amountPaid == null ? '—' : formatCurrency(view.amountPaid))} />
+              <Field label="Outstanding" value={(view.outstanding == null ? '—' : formatCurrency(view.outstanding))} />
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Payment Status</p>
                 <div className="mt-1"><Badge variant={view.payment.variant}>{view.payment.label}</Badge></div>
@@ -532,18 +534,23 @@ export default function SupplierInvoiceDetail() {
                     </thead>
                     <tbody className="divide-y divide-neutral-50">
                       {realPayments.map((entry) => {
-                        const allocated = (entry.allocations || [])
-                          .filter((allocation) => allocation.supplierInvoiceId === id)
-                          .reduce((sum, allocation) => sum + safeNumber(allocation.amount), 0)
-                        const status = supplierPaymentStatusMeta(entry.status)
+                        const status = invoicePaymentHistoryStatusMeta(entry.status)
                         return (
-                          <tr key={entry.id} className="hover:bg-primary-50/35">
+                          <tr key={entry.id || entry.paymentNumber} className={status.key === 'voided' ? 'bg-neutral-50 text-neutral-500' : 'hover:bg-primary-50/35'}>
                             <td className="px-5 py-3.5 font-medium text-primary-700">{entry.paymentNumber}</td>
                             <td className="px-5 py-3.5 text-neutral-600">{formatDate(entry.paymentDate)}</td>
                             <td className="px-5 py-3.5 text-right font-medium text-neutral-900">
-                              {formatCurrency(allocated || entry.allocatedAmount)}
+                              {entry.allocatedAmount == null ? '—' : formatCurrency(entry.allocatedAmount)}
                             </td>
-                            <td className="px-5 py-3.5"><Badge variant={status.variant}>{status.label}</Badge></td>
+                            <td className="px-5 py-3.5">
+                              <Badge variant={status.variant}>{status.label}</Badge>
+                              {status.key === 'voided' && (
+                                <div className="mt-1 space-y-1 text-xs text-neutral-500">
+                                  {entry.voidedAt && <p>Voided on {formatDate(entry.voidedAt)}</p>}
+                                  {entry.voidReason && <p className="max-w-xs break-words">Reason: {entry.voidReason}</p>}
+                                </div>
+                              )}
+                            </td>
                           </tr>
                         )
                       })}

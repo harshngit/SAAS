@@ -208,7 +208,12 @@ export async function getSupplierInvoicePayments(supplierInvoiceId) {
   try {
     const { data } = await apiClient.get(`/supplier-invoices/${encodeURIComponent(supplierInvoiceId)}/payments`)
     const { rows } = unwrapList(data)
-    return { success: true, payments: rows.map(normalizeSupplierPayment) }
+    return { success: true, payments: rows.map((raw) => ({
+      ...normalizeSupplierPayment(raw),
+      // Invoice history status is authoritative; do not inherit the shared default.
+      status: String(raw.status ?? '').trim().toLowerCase(),
+      allocatedAmount: raw.allocated_amount == null ? null : num(raw.allocated_amount),
+    })) }
   } catch (error) {
     return { success: false, error: apiError(error, 'Unable to load payment history for this invoice.') }
   }

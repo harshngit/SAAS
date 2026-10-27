@@ -168,6 +168,27 @@ export async function createSubcategoryVariant(subcategoryId, payload) {
   }
 }
 
+export async function getCategoryBrands(categoryId) {
+  try {
+    const { data } = await apiClient.get(`/categories/${categoryId}/brands`, { headers: authHeader() })
+    return { success: true, brands: data }
+  } catch (error) {
+    return { success: false, status: error.response?.status, error: formatApiError(error.response?.data?.detail, 'Unable to load allowed brands.') }
+  }
+}
+
+export async function setCategoryBrands(categoryId, ids) {
+  try {
+    const { data } = await apiClient.put(`/categories/${categoryId}/brands`, { brand_ids: ids }, { headers: authHeader() })
+    return { success: true, brands: data }
+  } catch (error) {
+    const status = error.response?.status
+    return { success: false, status, error: status === 409
+      ? 'Someone else saved this at the same time. Reload and try again.'
+      : formatApiError(error.response?.data?.detail, 'Unable to save allowed brands.') }
+  }
+}
+
 export async function deleteCategoriesBulk(categoryIds) {
   try {
     await apiClient.post('/categories/bulk-delete', { ids: categoryIds }, {

@@ -117,14 +117,20 @@ function normalizeAgeing(raw) {
 }
 
 export function normalizePayableSummary(raw) {
-  const data = raw || {}
+  const summary = raw?.summary || {}
+  const ageing = raw?.ageing || {}
   return {
-    totalPayable: num(data.total_payable ?? data.total_outstanding ?? data.outstanding_total),
-    totalOverdue: num(data.total_overdue ?? data.overdue_amount ?? data.overdue_total),
-    dueToday: num(data.due_today ?? data.due_today_amount),
-    openInvoiceCount: num(data.open_invoice_count ?? data.open_invoices ?? data.invoice_count),
-    supplierCount: num(data.supplier_count ?? data.suppliers ?? data.supplier_total),
-    ageing: normalizeAgeing(data),
+    totalPayable: num(summary.total_payable),
+    totalOverdue: num(summary.total_overdue),
+    dueToday: num(summary.total_due_today),
+    openInvoiceCount: num(summary.open_invoice_count),
+    supplierCount: num(summary.supplier_count),
+    ageing: {
+      '0_30': num(ageing.bucket_0_30),
+      '31_60': num(ageing.bucket_31_60),
+      '61_90': num(ageing.bucket_61_90),
+      '90_plus': num(ageing.bucket_90_plus),
+    },
   }
 }
 

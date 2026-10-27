@@ -97,7 +97,7 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config
     const isUnauthorized = error.response?.status === 401
     const requestUrl = originalRequest?.url || ''
-    const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/refresh')
+    const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/refresh') || requestUrl.includes('/auth/phone/')
 
     if (!isUnauthorized || !originalRequest || originalRequest._retry || isAuthRequest) {
       return Promise.reject(error)

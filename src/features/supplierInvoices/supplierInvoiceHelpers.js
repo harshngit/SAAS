@@ -32,7 +32,7 @@ export function lifecycleMeta(key) {
 
 // Canonical verification result (backend `verification_status`).
 export const VERIFICATION_META = {
-  pending: { key: 'pending', label: 'Pending Verification', variant: 'neutral' },
+  pending: { key: 'pending', label: 'Pending / Awaiting Goods', variant: 'neutral' },
   matched: { key: 'matched', label: 'Matched', variant: 'success' },
   mismatched: { key: 'mismatched', label: 'Mismatch / Review Required', variant: 'warning' },
 }
@@ -87,7 +87,16 @@ export function invoiceStatusMeta(key) {
 }
 
 export function paymentStatusMeta(key) {
-  return PAYMENT_STATUS_META[String(key || '').toLowerCase()] || PAYMENT_STATUS_META.unpaid
+  const raw = String(key || '').toLowerCase()
+  return PAYMENT_STATUS_META[raw] || { key: raw || 'unknown', label: raw ? raw.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) : 'Unknown', variant: 'neutral' }
+}
+
+// Audit-history lifecycle is separate from the invoice's payment status.
+export function invoicePaymentHistoryStatusMeta(status) {
+  const key = String(status ?? '').trim().toLowerCase()
+  if (key === 'recorded') return { key, label: 'Recorded', variant: 'success' }
+  if (key === 'voided') return { key, label: 'Voided', variant: 'neutral' }
+  return { key: key || 'unknown', label: key ? key.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) : 'Unknown', variant: 'neutral' }
 }
 
 // ---- money -------------------------------------------------------------------

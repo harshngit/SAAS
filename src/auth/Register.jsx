@@ -29,6 +29,7 @@ export default function Register() {
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm({ resolver: zodResolver(schema) })
 
@@ -36,7 +37,8 @@ export default function Register() {
     setServerError('')
     const result = await registerOrganization(data)
     if (!result.success) {
-      setServerError(result.error)
+      if (result.fieldErrors?.phone) setError('phone', { type: 'server', message: result.fieldErrors.phone })
+      else setServerError(result.error)
       return
     }
     navigate(resolveHomePath({ fullAccess: result.full_access, role: result.role, currentUser: result.user }), { replace: true })
@@ -105,7 +107,7 @@ export default function Register() {
                       error={errors.password?.message}
                       {...register('password')}
                     />
-                    <Input label="Phone Number" type="tel" error={errors.phone?.message} {...register('phone')} />
+                    <Input label="Phone Number" type="tel" placeholder="+91 98765 43210" error={errors.phone?.message} {...register('phone')} />
                   </div>
                 </section>
               </div>

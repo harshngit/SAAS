@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, PackageSearch, PackageX, Search } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -529,7 +530,7 @@ export default function PurchaseReturnFormPage() {
                         <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{line.alreadyReturned}</td>
                         <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">{line.returnableQty}</td>
                         <td className="whitespace-nowrap px-5 py-3.5 text-right">
-                          <input
+                          <NumericInput
                             type="number"
                             min="0"
                             max={line.returnableQty}

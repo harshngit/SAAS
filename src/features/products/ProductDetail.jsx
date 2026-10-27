@@ -513,6 +513,7 @@ export default function ProductDetail() {
         </Card>
       )}
 
+      {product.variants.length > 0 && (
       <Card title="Variants" subtitle="Size, tax and pricing configuration for this product" className="p-0" bodyClassName="p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-3xl text-left text-sm">
@@ -562,6 +563,7 @@ export default function ProductDetail() {
           </table>
         </div>
       </Card>
+      )}
 
       {batches.length > 0 && (
         <Card title="Batches" subtitle="Batch/expiry-tracked stock lots for this product" className="p-0" bodyClassName="p-0">

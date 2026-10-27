@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { itemKey, productVariants, readableClassification, selectedProductValues } from '../../utils/productVariants'
 import { useMemo, useState } from 'react'
 import { AlertTriangle, ChevronDown, Minus, Package, Pencil, Plus, Search } from 'lucide-react'
@@ -242,7 +243,7 @@ export default function ProductPickerList({
                   {isSelected && (
                     <div className="flex items-center gap-1 rounded-md border border-neutral-200 bg-surface pl-2 pr-1">
                       <span className="text-[0.7rem] text-neutral-400">{variant ? variant.currency : '₹'}</span>
-                      <input
+                      <NumericInput
                         type="number"
                         min="0"
                         step="1"
@@ -272,7 +273,7 @@ export default function ProductPickerList({
                     >
                       <Minus className="size-3.5" aria-hidden="true" />
                     </button>
-                    <input
+                    <NumericInput
                       value={quantity}
                       disabled={!canAdd}
                       onChange={(event) => onSetQuantity(product, event.target.value, variant?.id)}

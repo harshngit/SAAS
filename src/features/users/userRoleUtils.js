@@ -38,6 +38,8 @@ export function normalizeApiUser(user) {
     email: user.email,
     username: user.username,
     phone: user.phone,
+    phoneVerified: user.phone_verified === true,
+    lastLogin: user.last_login ?? null,
     role,
     role_id: user.role_id,
     roleId: user.role_id,

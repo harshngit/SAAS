@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ClipboardList, ImageIcon, Info, Plus, Upload, X } from 'lucide-react'
+import AllowedBrandsField from '../../components/ui/AllowedBrandsField'
+import { useCategoryBrandSelection } from '../../hooks/useCategoryBrandSelection'
+import { usePermission } from '../../auth/usePermission'
+import { useCallback, useEffect, useMemo, useRef, useState, useId } from 'react'
+import { ArrowLeft, ImageIcon, Plus, Trash2, Upload, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createCategory, createSubcategoryVariant, listCategories } from '../../api/categories'
+import { createCategory, createSubcategoryVariant, listCategories, setCategoryBrands } from '../../api/categories'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import Select from '../../components/ui/Select'
 import { readImageAsDataUrl } from '../../utils/imageFile'
 import { getFileUrl } from '../../api/files'
 
@@ -13,7 +15,6 @@ const emptyForm = {
   name: '',
   image: '',
   description: '',
-  parentId: '',
   subcategories: [],
 }
 
@@ -23,18 +24,51 @@ const normalizeCategory = (category) => ({
   parentId: category.parent_id || category.parentId || '',
 })
 
+function CategoryImageUpload({ image, name, disabled, onChange, onRemove }) {
+  const inputId = useId()
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-neutral-700">Images <span className="ml-1 font-normal text-neutral-400">(optional)</span></p>
+      <div className="flex min-h-28 flex-wrap items-center gap-4 py-2">
+        <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-50">
+          {image
+            ? <img src={getFileUrl(image)} alt={`${name} preview`} className="size-full object-contain p-1" />
+            : <ImageIcon className="size-7 text-neutral-300" aria-hidden="true" />}
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="text-xs text-neutral-500">PNG, JPG or WebP. Up to 2MB.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={inputId} className={`relative inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-surface px-3 py-2 text-sm font-medium text-primary-700 transition-colors focus-within:ring-2 focus-within:ring-primary-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-primary-300 hover:bg-primary-50'}`}>
+              <Upload className="size-4" aria-hidden="true" />
+              {image ? 'Replace image' : 'Upload image'}
+              <input id={inputId} type="file" aria-label={`${image ? 'Replace' : 'Upload'} ${name} image`}
+                accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={disabled} onChange={onChange} />
+            </label>
+            {image && <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onRemove} aria-label={`Remove ${name} image`}>
+              <Trash2 className="size-4" aria-hidden="true" /> Remove
+            </Button>}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function CategoryFormPage() {
   const navigate = useNavigate()
+  const { can } = usePermission()
+  const canSetBrands = can('products', 'edit')
+  const brandSelection = useCategoryBrandSelection(null, canSetBrands)
   const [formData, setFormData] = useState(emptyForm)
   const [categories, setCategories] = useState([])
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [subcategoryName, setSubcategoryName] = useState('')
-  const [subcategoryVariants, setSubcategoryVariants] = useState({})
+  const [uploadingImages, setUploadingImages] = useState(0)
   const saved = useRef({ categoryId: '', children: {}, variants: new Set() })
 
-  const hasImage = Boolean(formData.image)
+  const fieldsDisabled = isSaving || Boolean(saved.current.categoryId)
+  const imageControlsDisabled = fieldsDisabled || Boolean(uploadingImages)
 
   const loadCategories = useCallback(async () => {
     const result = await listCategories()
@@ -56,45 +90,50 @@ export default function CategoryFormPage() {
     setFormError('')
   }
 
-  const handleImageUpload = async (event) => {
+  const updateSubcategory = (id, changes) => {
+    setFormData((current) => ({ ...current, subcategories: current.subcategories.map((item) => item.id === id ? { ...item, ...changes } : item) }))
+    setErrors((current) => ({ ...current, [id]: '' }))
+    setFormError('')
+  }
+
+  const handleImageUpload = async (event, subcategoryId) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
-
     setFormError('')
-
+    setUploadingImages((count) => count + 1)
     try {
-      const dataUrl = await readImageAsDataUrl(file)
-      updateField('image', dataUrl)
+      const image = await readImageAsDataUrl(file)
+      if (subcategoryId) updateSubcategory(subcategoryId, { image })
+      else updateField('image', image)
     } catch (error) {
       setFormError(error.message)
+    } finally {
+      setUploadingImages((count) => count - 1)
     }
   }
 
   const addSubcategory = () => {
-    const name = subcategoryName.trim()
-    if (!name) return
-
-    const duplicate = formData.subcategories.some((subcategory) => subcategory.toLowerCase() === name.toLowerCase())
-    if (duplicate) {
-      setErrors((current) => ({ ...current, subcategories: 'Subcategory already added.' }))
-      return
-    }
-
-    setFormData((current) => ({
-      ...current,
-      subcategories: [...current.subcategories, name],
-    }))
-    setSubcategoryName('')
-    setErrors((current) => ({ ...current, subcategories: '' }))
-    setFormError('')
+    setFormData((current) => ({ ...current, subcategories: [...current.subcategories,
+      { id: crypto.randomUUID(), name: '', image: '', variants: [], variantDraft: '' },
+    ] }))
   }
 
-  const removeSubcategory = (subcategoryName) => {
-    setFormData((current) => ({
-      ...current,
-      subcategories: current.subcategories.filter((subcategory) => subcategory !== subcategoryName),
-    }))
+  const removeSubcategory = (id) => {
+    setFormData((current) => ({ ...current, subcategories: current.subcategories.filter((item) => item.id !== id) }))
+  }
+
+  const addVariant = (subcategory) => {
+    const name = subcategory.variantDraft.trim()
+    if (!name || name.length > 150) {
+      setErrors((current) => ({ ...current, [subcategory.id]: 'Enter a Variant name of 1 to 150 characters.' }))
+      return
+    }
+    if (subcategory.variants.some((item) => item.toLowerCase() === name.toLowerCase())) {
+      setErrors((current) => ({ ...current, [subcategory.id]: 'This Variant is already added.' }))
+      return
+    }
+    updateSubcategory(subcategory.id, { variants: [...subcategory.variants, name], variantDraft: '' })
   }
 
   const validate = () => {
@@ -109,8 +148,13 @@ export default function CategoryFormPage() {
     if (duplicate) {
       nextErrors.name = 'Category name already exists.'
     }
-    if (Object.values(subcategoryVariants).some((value) => value.split(',').some((name) => name.trim().length > 150))) {
-      nextErrors.variants = 'Each Product Type name must be 150 characters or fewer.'
+    const childNames = new Set()
+    for (const child of formData.subcategories) {
+      const childName = child.name.trim().toLowerCase()
+      if (!childName || childName === '.') nextErrors[child.id] = 'Enter a valid Sub Category Name.'
+      else if (childNames.has(childName)) nextErrors[child.id] = 'Subcategory name already added.'
+      childNames.add(childName)
+      if (child.variantDraft.trim()) nextErrors[child.id] = 'Click Add to include the pending Variant before saving.'
     }
 
     setErrors(nextErrors)
@@ -119,14 +163,14 @@ export default function CategoryFormPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (!validate()) return
+    if (isSaving || uploadingImages || (canSetBrands && (brandSelection.loading || brandSelection.error)) || !validate()) return
 
     setIsSaving(true)
     setFormError('')
 
     const result = saved.current.categoryId
       ? { success: true, category: { id: saved.current.categoryId } }
-      : await createCategory({ name: formData.name, image: formData.image, description: formData.description, parentId: formData.parentId })
+      : await createCategory({ name: formData.name, image: formData.image, description: formData.description, parentId: null })
 
     if (!result.success) {
       setFormError(result.error)
@@ -135,16 +179,31 @@ export default function CategoryFormPage() {
     }
 
     const parentId = result.category?.id
+    if (!parentId) {
+      setFormError('The category response did not include an ID. Reload the category list before retrying.')
+      setIsSaving(false)
+      return
+    }
     saved.current.categoryId = parentId
+    if (canSetBrands && !saved.current.brandsSaved) {
+      const mapping = await setCategoryBrands(parentId, brandSelection.selectedIds)
+      if (!mapping.success) {
+        setFormError(mapping.error)
+        setIsSaving(false)
+        return
+      }
+      saved.current.brandsSaved = true
+    }
     if (formData.subcategories.length > 0 && parentId) {
-      const childResults = await Promise.all(formData.subcategories.map(async (name) => {
-        if (saved.current.children[name]) return { success: true }
-        const child = await createCategory({ name, parentId })
-        if (child.success) saved.current.children[name] = child.category.id
+      const childResults = await Promise.all(formData.subcategories.map(async (subcategory) => {
+        if (saved.current.children[subcategory.id]) return { success: true }
+        const child = await createCategory({ name: subcategory.name, image: subcategory.image, parentId })
+        if (child.success && child.category?.id) saved.current.children[subcategory.id] = child.category.id
+        else if (child.success) return { success: false }
         return child
       }))
       const failedNames = childResults
-        .map((childResult, index) => (childResult.success ? null : formData.subcategories[index]))
+        .map((childResult, index) => (childResult.success ? null : formData.subcategories[index].name))
         .filter(Boolean)
 
       if (failedNames.length > 0) {
@@ -154,15 +213,16 @@ export default function CategoryFormPage() {
       }
     }
 
-    const targets = formData.parentId ? [{ key: '__self', id: parentId }] : formData.subcategories.map((name) => ({ key: name, id: saved.current.children[name] }))
-    for (const target of targets) {
-      const names = [...new Set((subcategoryVariants[target.key] || '').split(',').map((name) => name.trim()).filter(Boolean))]
+    for (const subcategory of formData.subcategories) {
+      const target = { id: saved.current.children[subcategory.id] }
+      const names = subcategory.variants
+
       for (const [sortOrder, name] of names.entries()) {
         const savedKey = `${target.id}:${name.toLowerCase()}`
         if (saved.current.variants.has(savedKey)) continue
         const variant = await createSubcategoryVariant(target.id, { name, sort_order: sortOrder })
         if (!variant.success) {
-          setFormError(`Category saved, but Product Type "${name}" could not be saved: ${variant.error} Retry to continue without duplicating saved categories.`)
+          setFormError(`Category saved, but Variant "${name}" could not be saved: ${variant.error} Retry to continue without duplicating saved categories.`)
           setIsSaving(false)
           return
         }
@@ -174,7 +234,7 @@ export default function CategoryFormPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="w-full space-y-6">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -204,182 +264,86 @@ export default function CategoryFormPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <section className="space-y-3.5 rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
-          <p className="text-sm font-semibold text-neutral-900">Category Details</p>
-
-          <div className="flex flex-col gap-1">
-            <Input
-              label="Category Name"
-              disabled={Boolean(saved.current.categoryId)}
-              placeholder="e.g. Mineral Water"
-              value={formData.name}
-              onChange={(event) => updateField('name', event.target.value)}
-              error={errors.name}
-              required
-              compact
-            />
-            <p className="text-xs text-neutral-400">Choose a clear and descriptive name for the category.</p>
+      <div className="space-y-8">
+        <section className="space-y-5 pt-1" aria-labelledby="category-details-heading">
+          <div className="flex items-center justify-between gap-3">
+            <h3 id="category-details-heading" className="font-semibold text-neutral-900">Category Details</h3>
+            <Badge variant="neutral">Draft</Badge>
           </div>
-
-          <div className="flex flex-col gap-1">
-            <Select
-              label="Parent Category (optional)"
-              disabled={Boolean(saved.current.categoryId)}
-              searchable
-              options={[{ value: '', label: '— None (top-level category) —' }, ...categories.map((item) => ({ value: item.id, label: item.name }))]}
-              value={formData.parentId}
-              onChange={(event) => updateField('parentId', event.target.value)}
-              placeholder="None — this is a top-level category"
-            />
-            <p className="text-xs text-neutral-400">Pick an existing category to make this a subcategory of it.</p>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-neutral-700">Image URL</label>
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Paste image URL"
-                value={formData.image}
-                disabled={Boolean(saved.current.categoryId)}
-                onChange={(event) => updateField('image', event.target.value)}
-                className="flex-1"
-                compact
-              />
-              <label className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-linear-to-b from-primary-500 to-primary-600 px-3.5 text-sm font-medium tracking-tight text-white shadow-[0_8px_18px_-8px_rgb(0_9_42/0.45)] transition-all hover:from-primary-500 hover:to-primary-700">
-                <Upload className="size-4" aria-hidden="true" />
-                Upload
-                <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" disabled={Boolean(saved.current.categoryId)} onChange={handleImageUpload} />
-              </label>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-8">
+            <div className="space-y-5">
+              <Input label="Category Name" disabled={fieldsDisabled} placeholder="e.g. Footwear"
+                value={formData.name} onChange={(event) => updateField('name', event.target.value)} error={errors.name} required />
+              <Input as="textarea" label="Description" disabled={fieldsDisabled} placeholder="Describe the products in this category..."
+                maxLength={500} value={formData.description} onChange={(event) => updateField('description', event.target.value)} inputClassName="min-h-24" />
             </div>
-            <p className="text-xs text-neutral-400">Add a link to an image or upload a file from your device.</p>
+            <CategoryImageUpload image={formData.image} name="Category" disabled={imageControlsDisabled}
+              onChange={(event) => handleImageUpload(event)} onRemove={() => updateField('image', '')} />
           </div>
-
-          <div className="flex flex-col gap-1">
-            <Input
-              as="textarea"
-              label="Category Description"
-              disabled={Boolean(saved.current.categoryId)}
-              placeholder="Write a short description about this category..."
-              maxLength={500}
-              value={formData.description}
-              onChange={(event) => updateField('description', event.target.value)}
-              inputClassName="min-h-16"
-              compact
-            />
-            <p className="text-xs text-neutral-400">This description will help your team and customers understand this category.</p>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-neutral-700">Subcategories</label>
-            <p className="text-xs text-neutral-400">Each name here is created as its own category under this one. Press Enter or click Add.</p>
-            <div className="mt-0.5 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-              <Input
-                placeholder="Type a subcategory name"
-                value={subcategoryName}
-                onChange={(event) => {
-                  setSubcategoryName(event.target.value)
-                  setErrors((current) => ({ ...current, subcategories: '' }))
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    addSubcategory()
-                  }
-                }}
-                error={errors.subcategories}
-                compact
-              />
-              <Button type="button" variant="outline" size="sm" className="h-9 min-w-24 rounded-xl" onClick={addSubcategory}>
-                Add
-              </Button>
-            </div>
-
-            {formData.subcategories.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {formData.subcategories.map((subcategory) => (
-                  <span
-                    key={subcategory}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 ring-1 ring-primary-100 transition-colors hover:bg-primary-100"
-                  >
-                    {subcategory}
-                    <button
-                      type="button"
-                      aria-label={`Remove ${subcategory}`}
-                      className="rounded-full text-primary-500 hover:text-primary-800"
-                      onClick={() => removeSubcategory(subcategory)}
-                    >
-                      <X className="size-3.5" aria-hidden="true" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-          {(formData.parentId || formData.subcategories.length > 0) && <div className="space-y-3 border-t border-neutral-100 pt-4">
-            <p className="text-sm font-semibold text-neutral-900">Subcategory Variants / Product Types</p>
-            <p className="text-xs text-neutral-500">These options populate Product Type on products in each subcategory. Separate names with commas.</p>
-            {errors.variants && <p role="alert" className="text-xs text-red-600">{errors.variants}</p>}
-            {(formData.parentId ? ['__self'] : formData.subcategories).map((key) => <Input key={key}
-              label={key === '__self' ? 'Product Types for this subcategory' : `${key} — Product Types`}
-              placeholder="e.g. Ceiling Fan, Table Fan" maxLength={2000}
-              value={subcategoryVariants[key] || ''}
-              onChange={(event) => setSubcategoryVariants((current) => ({ ...current, [key]: event.target.value }))} />)}
-          </div>}
+          {canSetBrands && <AllowedBrandsField selection={brandSelection} disabled={fieldsDisabled} />}
         </section>
 
-        <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">
-          <div className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
-            <div className="flex items-center gap-1.5">
-              <p className="text-sm font-semibold text-neutral-900">Image Preview</p>
-              <Info className="size-3.5 text-neutral-300" aria-hidden="true" />
+        <section className="space-y-5 border-t border-neutral-200 pt-6" aria-labelledby="subcategories-heading">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 id="subcategories-heading" className="font-semibold text-neutral-900">Subcategories <span className="ml-2 rounded-md bg-neutral-100 px-2 py-0.5 text-xs font-medium tabular-nums text-neutral-600">{formData.subcategories.length}</span></h3>
+              <p className="mt-1 text-sm text-neutral-500">Group related products and add Variants for each subcategory.</p>
             </div>
-            <div className="mt-3 flex h-40 flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border border-dashed border-neutral-200 bg-neutral-50 p-3 text-center">
-              {hasImage ? (
-                <img src={getFileUrl(formData.image)} alt="Category preview" className="size-full rounded-lg object-cover" />
-              ) : (
-                <>
-                  <span className="flex size-12 items-center justify-center rounded-full bg-surface text-neutral-300 ring-1 ring-neutral-200">
-                    <ImageIcon className="size-6" aria-hidden="true" />
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-700">No image yet</p>
-                    <p className="mt-0.5 text-xs text-neutral-400">Add an image URL to see preview</p>
+          </div>
+          {formData.subcategories.length === 0 && <p className="py-3 text-sm text-neutral-500">No subcategories added. Add one below, or save this Category on its own.</p>}
+          {formData.subcategories.map((subcategory, index) => (
+            <fieldset key={subcategory.id} disabled={fieldsDisabled} className="min-w-0 space-y-4 border-0 border-b border-neutral-100 pb-6 last:border-b-0">
+              <legend className="sr-only">Subcategory {index + 1}</legend>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="flex min-w-0 items-center gap-3 text-sm font-semibold text-neutral-800">
+                  <span className="text-xs font-medium tabular-nums text-neutral-400">{index + 1}</span>
+                  <span className="break-words">{subcategory.name.trim() || 'New Subcategory'}</span>
+                </p>
+                <Button type="button" variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => removeSubcategory(subcategory.id)}>
+                  <Trash2 className="size-3.5" aria-hidden="true" /> Remove Subcategory
+                </Button>
+              </div>
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-8">
+                  <Input label="Sub Category Name" required value={subcategory.name} placeholder="e.g. Casual Footwear"
+                    onChange={(event) => updateSubcategory(subcategory.id, { name: event.target.value })} />
+                  <CategoryImageUpload image={subcategory.image} name={`Subcategory ${index + 1}`} disabled={imageControlsDisabled}
+                    onChange={(event) => handleImageUpload(event, subcategory.id)} onRemove={() => updateSubcategory(subcategory.id, { image: '' })} />
+                </div>
+                <div className="space-y-3">
+                  <div className="flex max-w-xl items-end gap-2">
+                    <Input label="Variants" placeholder="Enter variant name" maxLength={150} value={subcategory.variantDraft} className="min-w-0 flex-1"
+                      onChange={(event) => updateSubcategory(subcategory.id, { variantDraft: event.target.value })}
+                      onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addVariant(subcategory) } }} />
+                    <Button type="button" variant="outline" onClick={() => addVariant(subcategory)}><Plus className="size-4" aria-hidden="true" /> Add</Button>
                   </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-neutral-100 bg-surface p-4 shadow-(--shadow-card)">
-            <div className="flex items-center gap-2">
-              <ClipboardList className="size-4 text-primary-600" aria-hidden="true" />
-              <p className="text-sm font-semibold text-neutral-900">Preview Summary</p>
-            </div>
-            <div className="mt-3 divide-y divide-neutral-100">
-              <div className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-                <span className="text-sm text-neutral-600">Status</span>
-                <Badge variant="warning">Draft</Badge>
+                  {subcategory.variants.length > 0 && <div className="flex flex-wrap gap-2">
+                    {subcategory.variants.map((name) => <span key={name} className="inline-flex max-w-full items-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 py-1.5 text-sm text-primary-700">
+                      <span className="min-w-0 break-words">{name}</span>
+                      <button type="button" aria-label={`Remove Variant ${name} from ${subcategory.name || `Subcategory ${index + 1}`}`}
+                        className="shrink-0 rounded p-0.5 hover:bg-primary-100 focus-visible:outline-2 focus-visible:outline-primary-500"
+                        onClick={() => updateSubcategory(subcategory.id, { variants: subcategory.variants.filter((item) => item !== name) })}>
+                        <X className="size-3.5" aria-hidden="true" />
+                      </button>
+                    </span>)}
+                  </div>}
+                </div>
+                {errors[subcategory.id] && <p role="alert" className="text-xs text-red-600">{errors[subcategory.id]}</p>}
               </div>
-              <div className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-                <span className="text-sm text-neutral-600">Subcategories</span>
-                <span className="text-sm font-semibold text-neutral-900">{formData.subcategories.length}</span>
-              </div>
-              <div className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-                <span className="text-sm text-neutral-600">Products</span>
-                <span className="text-sm font-semibold text-neutral-900">0</span>
-              </div>
-            </div>
-          </div>
-        </aside>
+            </fieldset>
+          ))}
+          <Button type="button" variant="outline" disabled={fieldsDisabled} onClick={addSubcategory}>
+            <Plus className="size-4" aria-hidden="true" /> Add Another Subcategory
+          </Button>
+        </section>
       </div>
 
-      <div className="sticky bottom-0 z-10 -mx-4 border-t border-neutral-100 bg-surface/90 px-4 py-2.5 backdrop-blur sm:-mx-5 sm:px-5 lg:-mx-7 lg:px-7">
+      <div className="sticky bottom-0 z-10 border-t border-neutral-200 bg-surface/95 py-4 backdrop-blur">
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" size="sm" disabled={isSaving} onClick={() => navigate('/admin/categories')}>
             Cancel
           </Button>
-          <Button type="submit" size="sm" loading={isSaving} disabled={!hasChanges}>
+          <Button type="submit" size="sm" loading={isSaving} disabled={!hasChanges || Boolean(uploadingImages) || (canSetBrands && (brandSelection.loading || Boolean(brandSelection.error)))}>
             <Plus className="size-4" aria-hidden="true" />
             Add Category
           </Button>

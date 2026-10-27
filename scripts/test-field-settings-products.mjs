@@ -83,7 +83,7 @@ test('provider fails open before load, enforces locked classes, and ignores anot
 
 test('has_variants switches pricing and variation fields while keeping the checkbox available', async () => {
   const formData = { hasVariants: false }
-  const visible = await arrow('features/products/ProductForm.jsx', 'fieldIsVisible', { formData, visible: () => true })
+  const visible = await arrow('features/products/ProductForm.jsx', 'fieldIsVisible', { formData, visible: () => true, showProductType: false })
   assert.equal(visible({ name: 'sellingPrice' }), true)
   assert.equal(visible({ name: 'variants' }), false)
   assert.equal(visible({ name: 'hasVariants' }), true)
@@ -100,7 +100,7 @@ test('real Product Create markup hides a disabled Product Type field without a r
   const render = (hidden) => renderToStaticMarkup(React.createElement(context.Provider, {
     value: { isFieldVisible: (_module, key) => !hidden.includes(key), getFieldMeta: () => null },
   }, React.createElement(ProductForm, { isOpen: true, onClose() {}, onSave() {} })))
-  assert.match(render([]), /Product Type/)
+  assert.doesNotMatch(render([]), /Select a Product Type/)
   assert.doesNotMatch(render(['product_type_id']), /Product Type/)
   assert.match(render(['sku', 'category_id']), /Product Name/)
 })
@@ -155,9 +155,9 @@ test('category partial save retries failed types without recreating categories o
   const categoryCalls = [], typeCalls = []
   let first = true, navigated = false
   const submit = await arrow('features/categories/CategoryFormPage.jsx', 'handleSubmit', {
-    validate: () => true, setIsSaving() {}, setFormError() {},
-    formData: { name: 'Fans', subcategories: ['Home'], parentId: '' },
-    saved, subcategoryVariants: { Home: 'Ceiling Fan, Table Fan' },
+    canSetBrands: false, validate: () => true, isSaving: false, uploadingImages: 0, setIsSaving() {}, setFormError() {},
+    formData: { name: 'Fans', subcategories: [{ id: 'home', name: 'Home', image: 'child.png', variants: ['Ceiling Fan', 'Table Fan'] }] },
+    saved,
     createCategory: async (body) => { categoryCalls.push(body); return { success: true, category: { id: body.parentId ? 'child' : 'root' } } },
     createSubcategoryVariant: async (_id, body) => { typeCalls.push(body.name); if (body.name === 'Table Fan' && first) { first = false; return { success: false, error: 'temporary failure' } } return { success: true } },
     navigate() { navigated = true },
@@ -170,9 +170,9 @@ test('category partial save retries failed types without recreating categories o
   assert.deepEqual(typeCalls, ['Ceiling Fan', 'Table Fan', 'Table Fan'])
 })
 
-test('classification cascade clears IDs on category, subcategory, brand and supplier changes', async () => {
+test('classification cascade clears IDs on category and subcategory changes', async () => {
   const { code, nodes } = await source('features/products/ProductForm.jsx')
-  for (const marker of ['categoryId: event.target.value', "subCategoryId: event.target.value", 'brandId: event.target.value', 'preferredSupplierId: event.target.value']) {
+  for (const marker of ['categoryId: event.target.value', "subCategoryId: event.target.value"]) {
     const attr = nodes.find((node) => node.type === 'JSXAttribute' && node.name.name === 'onChange' && code.slice(node.start,node.end).includes(marker))
     assert.ok(attr, marker)
     let form = { productTypeId: 'saved-type', productType: 'Saved type' }
@@ -195,4 +195,98 @@ test('hidden customer fields no longer block validation; mandatory customer name
   values.customerName = ''
   assert.equal(validate(), false)
   assert.match(errors.customerName, /required/)
+})
+
+
+test('independent subcategory chips trim names and reject case-insensitive duplicates', async () => {
+  const children = [{ id: 'a', name: 'Casual', variants: ['Shoe'], variantDraft: '  Shoe  ' },
+    { id: 'b', name: 'Sports', variants: [], variantDraft: ' Running Shoe ' }]
+  let error
+  const add = await arrow('features/categories/CategoryFormPage.jsx', 'addVariant', {
+    setErrors(update) { error = update({}) },
+    updateSubcategory(id, changes) { Object.assign(children.find((item) => item.id === id), changes) },
+  })
+  add(children[0])
+  assert.match(error.a, /already added/)
+  assert.deepEqual(children[0].variants, ['Shoe'])
+  children[0].variantDraft = 'sHoE'
+  add(children[0])
+  assert.deepEqual(children[0].variants, ['Shoe'])
+  add(children[1])
+  assert.deepEqual(children[1].variants, ['Running Shoe'])
+  assert.equal(children[1].variantDraft, '')
+  assert.deepEqual(children[0].variants, ['Shoe'])
+})
+
+test('two subcategories save their own images and variants under the new parent', async () => {
+  const calls = [], types = []
+  const submit = await arrow('features/categories/CategoryFormPage.jsx', 'handleSubmit', {
+    canSetBrands: false, isSaving: false, uploadingImages: 0, validate: () => true, setIsSaving() {}, setFormError(message) { if (message) assert.fail(message) },
+    formData: { name: 'Footwear', image: 'root.png', description: 'Shoes', subcategories: [
+      { id: 'a', name: 'Casual', image: 'casual.png', variants: ['Shoe', 'Sandal'] },
+      { id: 'b', name: 'Sports', image: 'sports.png', variants: ['Running Shoe'] },
+    ] }, saved: { current: { categoryId: '', children: {}, variants: new Set() } },
+    createCategory: async (body) => { calls.push(body); return { success: true, category: { id: body.name } } },
+    createSubcategoryVariant: async (id, body) => { types.push({ id, ...body }); return { success: true } }, navigate() {},
+  })
+  await submit({ preventDefault() {} })
+  assert.equal(calls[0].parentId, null)
+  assert.deepEqual(calls.slice(1), [{ name: 'Casual', image: 'casual.png', parentId: 'Footwear' }, { name: 'Sports', image: 'sports.png', parentId: 'Footwear' }])
+  assert.deepEqual(types, [{ id: 'Casual', name: 'Shoe', sort_order: 0 }, { id: 'Casual', name: 'Sandal', sort_order: 1 }, { id: 'Sports', name: 'Running Shoe', sort_order: 0 }])
+})
+
+test('Product Type stays hidden with no subcategory, no configured types, or while loading', async () => {
+  const { code, nodes } = await source('features/products/ProductForm.jsx')
+  const expression = nodes.find((node) => node.type === 'VariableDeclarator' && node.id.name === 'showProductType').init
+  const show = (values) => evaluate(code, expression, { formData: { subCategoryId: 'child', productTypeId: '' }, productTypes: [], productTypesError: '', isLoadingProductTypes: false, ...values })
+  assert.equal(show({}), false)
+  assert.equal(show({ productTypes: [{ id: 'type', name: 'Shoe' }] }), true)
+  assert.equal(show({ productTypes: [{ id: 'type', name: 'Shoe' }], formData: { subCategoryId: '', productTypeId: '' } }), false)
+  assert.equal(show({ productTypes: [{ id: 'type', name: 'Shoe' }], isLoadingProductTypes: true }), false)
+  assert.equal(show({ productTypes: [{ id: 'inactive', is_active: false }] }), false)
+})
+
+test('Brand and Supplier changes preserve the selected Category hierarchy', async () => {
+  const { code, nodes } = await source('features/products/ProductForm.jsx')
+  for (const marker of ['brandId: event.target.value,', 'preferredSupplierId: event.target.value,']) {
+    const attr = nodes.find((node) => node.type === 'JSXAttribute' && node.name.name === 'onChange' && code.slice(node.start, node.end).includes(marker))
+    let form = { categoryId: 'root', subCategoryId: 'child', productTypeId: 'type' }
+    evaluate(code, attr.value.expression, { setFormData(update) { form = update(form) }, setErrors() {}, effectiveBrandOptions: [], supplierOptions: [] })({ target: { value: 'new' } })
+    assert.equal(form.categoryId, 'root')
+    assert.equal(form.subCategoryId, 'child')
+    assert.equal(form.productTypeId, 'type')
+  }
+})
+
+
+test('Category listing groups children under main rows and searches by child name', async () => {
+  const categories = [
+    { id: 'root', name: 'Footwear', createdAt: '2026-01-01' },
+    { id: 'child-a', name: 'Casual Footwear', parentId: 'root' },
+    { id: 'child-b', name: 'Sports Footwear', parentId: 'root' },
+    { id: 'other', name: 'Electronics', createdAt: '2026-01-02' },
+  ]
+  const subcategoriesByParent = (await arrow('features/categories/CategoryList.jsx', 'subcategoriesByParent', { categories }))()
+  assert.deepEqual(subcategoriesByParent.get('root').map((item) => item.id), ['child-a', 'child-b'])
+  const base = { categories, subcategoriesByParent, searchTerm: '', categoryFilter: 'all', categorySort: 'recent', dateFrom: '', dateTo: '', sortBy: '', sortOrder: 'asc', isWithinDateRange: () => true }
+  const filtered = async (changes) => (await arrow('features/categories/CategoryList.jsx', 'filteredCategories', { ...base, ...changes }))()
+  assert.deepEqual((await filtered({})).map((item) => item.id), ['other', 'root'])
+  assert.deepEqual((await filtered({ searchTerm: 'sports' })).map((item) => item.id), ['root'])
+  assert.deepEqual((await filtered({ sortBy: 'subcategories' })).map((item) => item.id), ['other', 'root'])
+  assert.deepEqual((await filtered({ sortBy: 'subcategories', sortOrder: 'desc' })).map((item) => item.id), ['root', 'other'])
+  assert.equal(categories.length, 4)
+})
+
+test('Category export includes subcategory names with main categories only', async () => {
+  const root = { id: 'root', name: 'Footwear', description: 'Shoes' }
+  const child = { id: 'child', name: 'Sports', parentId: 'root' }
+  let rows
+  const exportCategories = await arrow('features/categories/CategoryList.jsx', 'exportCategories', {
+    categories: [root, child], filteredCategories: [root], selectedIds: ['root'],
+    subcategoriesByParent: new Map([['root', [child]]]), exportRowsToExcel(_filename, value) { rows = value },
+  })
+  exportCategories()
+  assert.deepEqual(rows, [['Category', 'Subcategories', 'Description'], ['Footwear', 'Sports', 'Shoes']])
+  exportCategories(true)
+  assert.equal(rows.length, 2)
 })

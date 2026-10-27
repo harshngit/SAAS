@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { productVariants } from '../../utils/productVariants'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -1067,7 +1068,7 @@ export default function OrderDetail() {
                     <p className="truncate text-sm font-medium text-neutral-800">{item.productName}</p>
                     <p className="text-xs text-neutral-400">Ordered: {item.quantity}</p>
                   </div>
-                  <input
+                  <NumericInput
                     type="number"
                     min="0"
                     max={item.quantity}
@@ -1124,7 +1125,7 @@ export default function OrderDetail() {
                     <p className="truncate text-sm font-medium text-neutral-800">{item.productName}</p>
                     <p className="text-xs text-neutral-400">Ordered: {item.quantity}</p>
                   </div>
-                  <input
+                  <NumericInput
                     type="number"
                     min="0"
                     max={item.quantity}

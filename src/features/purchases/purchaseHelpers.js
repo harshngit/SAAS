@@ -54,6 +54,7 @@ export const PURCHASE_RECEIVING_FILTER_OPTIONS = [
 const PAYMENT_STATUS_MAP = {
   unpaid: { key: 'unpaid', label: 'Unpaid', variant: 'danger' },
   partial: { key: 'partial', label: 'Partially Paid', variant: 'warning' },
+  partially_paid: { key: 'partial', label: 'Partially Paid', variant: 'warning' },
   paid: { key: 'paid', label: 'Paid', variant: 'success' },
 }
 
@@ -68,6 +69,7 @@ export function safeNumber(value, fallback = 0) {
 // total - amountPaid (demo records, or any record missing the field), clamped to >= 0 so a
 // rendered value is never NaN/undefined/Infinity.
 export function derivePurchaseOutstanding(purchase) {
+  if (purchase?.outstandingAmount === null) return null
   const backend = Number(purchase?.outstandingAmount)
   if (Number.isFinite(backend)) return Math.max(backend, 0)
   const total = safeNumber(purchase?.total)
@@ -125,7 +127,7 @@ export function deriveReceivingStatus(purchase) {
 
 export function derivePaymentStatus(purchase) {
   const raw = String(purchase?.paymentStatus || '').toLowerCase()
-  return PAYMENT_STATUS_MAP[raw] || PAYMENT_STATUS_MAP.unpaid
+  return PAYMENT_STATUS_MAP[raw] || { key: raw || 'unknown', label: raw ? raw.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) : 'Unknown', variant: 'neutral' }
 }
 
 // PURCHASE STATUS - straight from the canonical backend `status` (draft | confirmed | closed |

@@ -97,6 +97,7 @@ export const useAuthStore = create(
         role,
         permissions,
         full_access,
+        phone_verified,
         data_scope,
         theme,
       }) => {
@@ -112,6 +113,7 @@ export const useAuthStore = create(
 
         const normalizedUser = {
           ...user,
+          phone_verified: user.phone_verified ?? phone_verified ?? false,
           orgId: user.organization_id,
           status: user.is_active ? 'active' : 'inactive',
           joinedAt: user.created_at,

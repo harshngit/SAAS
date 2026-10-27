@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { useEffect, useState } from 'react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -131,7 +132,7 @@ export default function StockEntryForm({ isOpen, onClose, product, saving = fals
                   <td className="whitespace-nowrap px-4 py-2.5 font-medium text-neutral-800">{row.name}</td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-neutral-600">{row.inventory}</td>
                   <td className="px-4 py-2.5">
-                    <input
+                    <NumericInput
                       type="number"
                       min="0"
                       step="1"

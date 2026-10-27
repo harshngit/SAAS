@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import NumericInput from '../../components/ui/NumericInput'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Ban, Check, FileText, IndianRupee, PackageSearch, Pencil, RotateCcw, Trash2, Upload, Wallet } from 'lucide-react'
+import { ArrowLeft, Ban, Check, FileText, IndianRupee, PackageCheck, PackageSearch, Pencil, RotateCcw, Trash2, Upload, Wallet } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -11,6 +12,8 @@ import Modal from '../../components/ui/Modal'
 import StatCard from '../../components/ui/StatCard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs'
 import { useToast } from '../../components/ui/toastContext'
+import { usePermission } from '../../auth/usePermission'
+import { useWarehouseName } from '../../hooks/useWarehouseName'
 import { formatCurrency } from '../../utils/format'
 import {
   cancelPurchase,
@@ -136,17 +139,22 @@ export default function PurchaseInvoiceDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const { can } = usePermission()
   const currentUser = useAuthStore((state) => state.currentUser)
   const isSalesPath = window.location.pathname.startsWith('/sales')
   const basePath = isSalesPath ? '/sales/purchases' : '/admin/purchases'
   const isDemo = isDemoPurchase(id)
 
   const [purchase, setPurchase] = useState(null)
+  const warehouseName = useWarehouseName(purchase?.warehouseId, purchase?.warehouseName)
+  const purchaseWithWarehouse = useMemo(() => purchase ? { ...purchase, warehouseName } : null, [purchase, warehouseName])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [isActing, setIsActing] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
+  const [createReceiptRequested, setCreateReceiptRequested] = useState(false)
+  const clearCreateReceiptRequest = useCallback(() => setCreateReceiptRequested(false), [])
   const [isReceiveGoodsPromptOpen, setIsReceiveGoodsPromptOpen] = useState(false)
 
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -168,8 +176,8 @@ export default function PurchaseInvoiceDetail() {
   const [quickViewInvoiceId, setQuickViewInvoiceId] = useState(null)
   const [realSupplierInvoices, setRealSupplierInvoices] = useState([])
 
-  const loadPurchase = async () => {
-    setIsLoading(true)
+  const loadPurchase = async ({ silent = false } = {}) => {
+    if (!silent) setIsLoading(true)
     setLoadError('')
 
     if (isDemo) {
@@ -182,7 +190,8 @@ export default function PurchaseInvoiceDetail() {
 
     const result = await getPurchase(id)
     if (!result.success) {
-      setLoadError(result.error)
+      if (silent) setActionError(result.error)
+      else setLoadError(result.error)
       setIsLoading(false)
       return
     }
@@ -221,12 +230,14 @@ export default function PurchaseInvoiceDetail() {
     if (isDemo || !purchase?.id) return
     let active = true
     listSupplierInvoices({ purchaseId: purchase.id }).then((result) => {
-      if (active && result.success) setRealSupplierInvoices(result.invoices)
+      if (!active) return
+      if (result.success) setRealSupplierInvoices(result.invoices)
+      else { setRealSupplierInvoices([]); setActionError(result.error) }
     })
     return () => {
       active = false
     }
-  }, [isDemo, purchase?.id])
+  }, [isDemo, purchase?.id, grnRefresh])
   const payment = useMemo(() => derivePaymentStatus(purchase), [purchase])
   const outstanding = useMemo(() => derivePurchaseOutstanding(purchase), [purchase])
 
@@ -252,10 +263,7 @@ export default function PurchaseInvoiceDetail() {
     return item.remainingQty ?? Math.max(ordered - (Number(item.receivedQty) || 0), 0)
   }
   const tax = useMemo(() => derivePurchaseTax(purchase), [purchase])
-  const paymentPreview = useMemo(
-    () => derivePaymentStatus({ paymentStatus: derivePaymentStatusFromAmount(paymentAmount, purchase?.total) }),
-    [paymentAmount, purchase],
-  )
+
 
   const applyDemo = (partial) => {
     patchDemoPurchase(id, partial)
@@ -490,7 +498,7 @@ export default function PurchaseInvoiceDetail() {
   }
 
   return (
-    <div className="space-y-5 pb-10">
+    <div className="space-y-5 pb-24">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <Button variant="secondary" size="sm" onClick={() => navigate(basePath)}>
@@ -571,8 +579,8 @@ export default function PurchaseInvoiceDetail() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={IndianRupee} iconVariant="primary" label="Grand Total" value={formatCurrency(purchase.total)} />
         <StatCard icon={PackageSearch} iconVariant="info" label="Receiving" value={receiving.label} />
-        <StatCard icon={Wallet} iconVariant="success" label="Amount Paid" value={formatCurrency(purchase.amountPaid)} />
-        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={formatCurrency(outstanding)} />
+        <StatCard icon={Wallet} iconVariant="success" label="Amount Paid" value={(purchase.amountPaid == null ? '—' : formatCurrency(purchase.amountPaid))} />
+        <StatCard icon={IndianRupee} iconVariant="warning" label="Outstanding Payable" value={(outstanding == null ? '—' : formatCurrency(outstanding))} />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -595,7 +603,7 @@ export default function PurchaseInvoiceDetail() {
               <DetailField label="Supplier Reference / Invoice #" value={purchase.invoiceNumber} />
               <DetailField label="Purchase Type" value={purchase.purchaseType} />
               <DetailField label="Purchase Date" value={formatDate(purchase.purchaseDate || purchase.invoiceDate)} />
-              <DetailField label="Warehouse" value={purchase.warehouseName} />
+              <DetailField label="Warehouse" value={warehouseName || (purchase.warehouseId ? 'Warehouse name unavailable' : 'No warehouse assigned')} />
               <DetailField label="Billing Address" value={purchase.billingAddress} />
               <DetailField label="Financial Year" value={purchase.financialYear} />
               <DetailField label="Purchase Status" value={purchaseStatus.label} />
@@ -611,8 +619,8 @@ export default function PurchaseInvoiceDetail() {
               <DetailField label="Discount" value={formatCurrency(purchase.discount)} />
               <DetailField label="Tax" value={formatCurrency(tax)} />
               <DetailField label="Grand Total" value={formatCurrency(purchase.total)} />
-              <DetailField label="Amount Paid" value={formatCurrency(purchase.amountPaid)} />
-              <DetailField label="Outstanding" value={formatCurrency(outstanding)} />
+              <DetailField label="Amount Paid" value={(purchase.amountPaid == null ? '—' : formatCurrency(purchase.amountPaid))} />
+              <DetailField label="Outstanding" value={(outstanding == null ? '—' : formatCurrency(outstanding))} />
             </div>
           </Card>
         </TabsContent>
@@ -661,17 +669,19 @@ export default function PurchaseInvoiceDetail() {
 
         <TabsContent value="receipts" className="mt-4 space-y-4">
           <PurchaseGrnPanel
-            purchase={purchase}
+            purchase={purchaseWithWarehouse}
             isDemo={isDemo}
             currentUserName={currentUser?.name}
             purchaseStatusKey={purchaseStatus.key}
             receivingKey={receiving.key}
+            createRequested={createReceiptRequested}
+            onCreateRequestHandled={clearCreateReceiptRequest}
             onGrnCount={setRealGrnCount}
             onGrnChange={() => {
               setGrnRefresh((tick) => tick + 1)
               // Real mode: a confirmed GRN rolls up received_qty / receiving_status on the
               // Purchase - refresh from the server so the Items tab + Receiving card update.
-              if (!isDemo) loadPurchase()
+              if (!isDemo) loadPurchase({ silent: true })
             }}
           />
           {isDemo && PURCHASE_RETURNS_DEMO_ENABLED && (
@@ -750,7 +760,7 @@ export default function PurchaseInvoiceDetail() {
                           <td className="px-5 py-3.5 font-medium text-primary-700">{invoice.number}</td>
                           <td className="px-5 py-3.5 text-neutral-600">{formatDate(invoice.invoiceDate)}</td>
                           <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(invoice.total)}</td>
-                          <td className="px-5 py-3.5 text-right text-neutral-700">{formatCurrency(invoice.outstanding)}</td>
+                          <td className="px-5 py-3.5 text-right text-neutral-700">{(invoice.outstanding == null ? '—' : formatCurrency(invoice.outstanding))}</td>
                           <td className="px-5 py-3.5"><Badge variant={invoice.payment.variant} dot>{invoice.payment.label}</Badge></td>
                           <td className="px-5 py-3.5"><Badge variant={invoice.lifecycle.variant}>{invoice.lifecycle.label}</Badge></td>
                           <td className="px-5 py-3.5">{invoice.verification ? <Badge variant={invoice.verification.variant}>{invoice.verification.label}</Badge> : <span className="text-neutral-400">—</span>}</td>
@@ -774,7 +784,7 @@ export default function PurchaseInvoiceDetail() {
         <TabsContent value="payments" className="mt-4">
           <Card
             title="Payments"
-            subtitle="Aggregate payment amount and status for this purchase."
+            subtitle="Payment totals from allocated supplier payments."
             actions={
               actions.includes('recordPayment') ? (
                 <Button type="button" size="sm" onClick={openPaymentModal}>
@@ -785,15 +795,15 @@ export default function PurchaseInvoiceDetail() {
             }
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <DetailField label="Amount Paid" value={formatCurrency(purchase.amountPaid)} />
-              <DetailField label="Outstanding" value={formatCurrency(outstanding)} />
+              <DetailField label="Amount Paid" value={(purchase.amountPaid == null ? '—' : formatCurrency(purchase.amountPaid))} />
+              <DetailField label="Outstanding" value={(outstanding == null ? '—' : formatCurrency(outstanding))} />
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Payment Status</p>
                 <div className="mt-1"><Badge variant={payment.variant}>{payment.label}</Badge></div>
               </div>
             </div>
             <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
-              This tracks one aggregate amount/status for the purchase. Itemised supplier payment records are not yet supported.
+              Payment totals are derived from supplier payments allocated to this purchase&apos;s supplier invoices.
             </p>
           </Card>
         </TabsContent>
@@ -844,10 +854,7 @@ export default function PurchaseInvoiceDetail() {
           {paymentError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{paymentError}</div>}
           <p className="text-sm text-neutral-500">Grand Total: <span className="font-medium text-neutral-800">{formatCurrency(purchase.total)}</span></p>
           <Input label="Amount Paid" type="number" min="0" max={purchase.total} step="1" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
-          <div className="flex items-center gap-2 text-sm text-neutral-500">
-            Payment Status: <Badge variant={paymentPreview.variant}>{paymentPreview.label}</Badge>
-            <span className="text-xs text-neutral-400">(derived from amount)</span>
-          </div>
+          <p className="text-sm text-neutral-500">Updated payment totals and status appear after saving.</p>
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" disabled={isActing} onClick={() => setPaymentOpen(false)}>Cancel</Button>
             <Button type="button" loading={isActing} onClick={handleUpdatePayment}>Save</Button>
@@ -873,7 +880,7 @@ export default function PurchaseInvoiceDetail() {
                       />
                       {purchaseItem.productName || 'Item'}
                     </label>
-                    <input
+                    <NumericInput
                       type="number"
                       min="1"
                       max={purchaseItem.quantity}
@@ -912,6 +919,17 @@ export default function PurchaseInvoiceDetail() {
         onClose={() => setQuickViewInvoiceId(null)}
         onOpenFull={() => navigate(`/admin/supplier-invoices/${quickViewInvoiceId}`)}
       />
+
+      {(isDemo || can('grn', 'create')) && purchaseStatus.key === 'confirmed' && receiving.key !== 'fully_received' && (
+        <div className="fixed bottom-5 right-4 z-30 sm:bottom-6 sm:right-6">
+          <Button type="button" disabled={isActing} className="shadow-lg" onClick={() => {
+            setActiveTab('receipts')
+            setCreateReceiptRequested(true)
+          }}>
+            <PackageCheck className="size-4" aria-hidden="true" /> Create Goods Receipt
+          </Button>
+        </div>
+      )}
 
       {/* Confirming a purchase moves no stock (see handleConfirm) - this offers the one real
           action that does: jump to the Goods Receipts tab on this same page to receive the

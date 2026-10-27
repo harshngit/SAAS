@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
@@ -931,7 +932,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       onChange={(event) => setDiscountType(event.target.value)}
                       className="w-40"
                     /></ConfiguredField>
-                    <input
+                    <NumericInput
                       type="number"
                       min="0"
                       step="1"
@@ -1395,7 +1396,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               >
                                 <Minus className="size-3.5" aria-hidden="true" />
                               </button>
-                              <input
+                              <NumericInput
                                 value={quantity}
                                 onChange={(event) => setPickerQuantity(product, event.target.value, item.variantId)}
                                 inputMode="numeric"
@@ -1480,7 +1481,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <span className="text-neutral-500">Paid Amount</span>
                   <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-surface pl-2 pr-1">
                     <span className="text-[0.7rem] text-neutral-400">₹</span>
-                    <input
+                    <NumericInput
                       type="number"
                       min="0"
                       step="1"

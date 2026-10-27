@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Award, Check, Download, Edit, Eye, Filter, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
+import { listCategories } from '../../api/categories'
+import { usePermission } from '../../auth/usePermission'
+import { syncBrandCategories } from './brandCategoryMappings'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Award, Check, Download, Edit, Eye, Filter, Plus, RotateCw, Search, Trash2, X } from 'lucide-react'
 import {
   createBrand,
   deleteBrand,
@@ -26,22 +29,44 @@ const emptyForm = {
   name: '',
   description: '',
   isActive: true,
+  categoryIds: [],
 }
 
 const normalizeBrand = (brand) => ({
   id: brand.id,
   name: brand.name || '',
   description: brand.description || '',
+  categories: Array.isArray(brand.categories) ? brand.categories : [],
   isActive: brand.is_active !== false,
   createdAt: brand.created_at || brand.createdAt || '',
 })
 
-function BrandForm({ brand, existingBrands, saving, formError, onClose, onSave }) {
+function BrandForm({ brand, persistedBrandId, existingBrands, saving, formError, onClose, onSave }) {
   const [formData, setFormData] = useState(emptyForm)
   const [errors, setErrors] = useState({})
+  const { can } = usePermission()
+  const canMapCategories = can('products', 'edit')
+  const [topCategories, setTopCategories] = useState([])
+  const [categoriesLoading, setCategoriesLoading] = useState(canMapCategories)
+  const [categoriesError, setCategoriesError] = useState('')
+  const [categoryReload, setCategoryReload] = useState(0)
 
   useEffect(() => {
-    setFormData(brand ? { ...emptyForm, ...brand } : emptyForm)
+    if (!canMapCategories) return undefined
+    let cancelled = false
+    setCategoriesLoading(true)
+    setCategoriesError('')
+    listCategories().then((result) => {
+      if (cancelled) return
+      setCategoriesLoading(false)
+      if (!result.success) { setCategoriesError(result.error); return }
+      setTopCategories(result.categories.filter((category) => !(category.parent_id || category.parentId)).map((category) => ({ id: category.id, name: category.name || category.category_name || '' })))
+    })
+    return () => { cancelled = true }
+  }, [canMapCategories, categoryReload])
+
+  useEffect(() => {
+    setFormData(brand ? { ...emptyForm, ...brand, categoryIds: brand.categories.map((category) => category.id) } : emptyForm)
     setErrors({})
   }, [brand])
 
@@ -49,11 +74,13 @@ function BrandForm({ brand, existingBrands, saving, formError, onClose, onSave }
     const nextErrors = {}
     const name = formData.name.trim()
     const duplicate = existingBrands.some(
-      (item) => item.id !== brand?.id && item.name.trim().toLowerCase() === name.toLowerCase(),
+      (item) => item.id !== (brand?.id || persistedBrandId) && item.name.trim().toLowerCase() === name.toLowerCase(),
     )
 
     if (!name) nextErrors.name = 'Enter a valid brand name.'
     if (duplicate) nextErrors.name = 'Brand name already exists.'
+
+    if (canMapCategories && formData.categoryIds.some((id) => !topCategories.some((category) => category.id === id))) nextErrors.categories = 'Remove unavailable Categories. Only top-level Categories can be assigned.'
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -61,12 +88,13 @@ function BrandForm({ brand, existingBrands, saving, formError, onClose, onSave }
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    if (!validate()) return
-    onSave(formData)
+    if (saving || (canMapCategories && (categoriesLoading || categoriesError)) || !validate()) return
+    onSave({ ...formData, categoryIds: canMapCategories ? formData.categoryIds : undefined, topCategories })
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit}>
+      <fieldset disabled={saving} className="space-y-5">
       {formError && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
           {formError}
@@ -93,6 +121,28 @@ function BrandForm({ brand, existingBrands, saving, formError, onClose, onSave }
         />
         <p className="text-right text-xs font-medium text-neutral-400">{formData.description.length} / 500</p>
       </div>
+      <div className="space-y-2">
+        <Select key={formData.categoryIds.join(',')} label="Applicable Categories" searchable value=""
+          disabled={!canMapCategories || categoriesLoading || Boolean(categoriesError)}
+          placeholder={categoriesLoading ? 'Loading Categories...' : 'Add a Category'}
+          options={topCategories.filter((category) => !formData.categoryIds.includes(category.id)).map((category) => ({ value: category.id, label: category.name }))}
+          onChange={(event) => { if (event.target.value) setFormData((current) => ({ ...current, categoryIds: [...new Set([...current.categoryIds, event.target.value])] })) }} />
+        <p className="text-xs leading-5 text-neutral-500">If no Categories are assigned, this Brand remains available through the default fallback for unmapped Categories.</p>
+        {formData.categoryIds.length > 0 && <div className="flex flex-wrap items-center gap-2">
+          {formData.categoryIds.map((id) => {
+            const name = topCategories.find((category) => category.id === id)?.name || brand?.categories.find((category) => category.id === id)?.name || 'Unavailable Category'
+            return <span key={id} className="inline-flex max-w-full items-center gap-1 rounded-lg bg-primary-50 px-2.5 py-1 text-sm text-primary-700">
+              <span title={name} className="max-w-56 truncate">{name}</span>
+              {canMapCategories && <button type="button" aria-label={`Remove Category ${name}`} className="rounded p-1 hover:bg-primary-100 focus-visible:outline-2 focus-visible:outline-primary-500"
+                onClick={() => setFormData((current) => ({ ...current, categoryIds: current.categoryIds.filter((value) => value !== id) }))}><X className="size-3.5" aria-hidden="true" /></button>}
+            </span>
+          })}
+          {canMapCategories && <Button type="button" variant="ghost" size="sm" onClick={() => setFormData((current) => ({ ...current, categoryIds: [] }))}>Clear mappings</Button>}
+        </div>}
+        {errors.categories && <p role="alert" className="text-xs text-red-600">{errors.categories}</p>}
+        {categoriesError && <div className="flex items-center gap-2"><p role="alert" className="text-sm text-red-600">{categoriesError}</p><Button type="button" variant="ghost" size="sm" onClick={() => setCategoryReload((value) => value + 1)}>Retry</Button></div>}
+      </div>
+
       <label className="flex min-h-11 items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm font-medium text-neutral-700">
         <input
           type="checkbox"
@@ -107,7 +157,7 @@ function BrandForm({ brand, existingBrands, saving, formError, onClose, onSave }
         <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" loading={saving}>
+        <Button type="submit" loading={saving} disabled={canMapCategories && (categoriesLoading || Boolean(categoriesError))}>
           {brand ? 'Save Changes' : (
             <>
               <Check className="size-4" aria-hidden="true" />
@@ -116,6 +166,7 @@ function BrandForm({ brand, existingBrands, saving, formError, onClose, onSave }
           )}
         </Button>
       </div>
+      </fieldset>
     </form>
   )
 }
@@ -139,6 +190,7 @@ export default function BrandList() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const pendingBrandId = useRef('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   // Product count per brand - derived from the existing listProducts() API (one call for the
@@ -233,6 +285,7 @@ export default function BrandList() {
   const rangeEnd = Math.min(filteredBrands.length, currentPage * Number(pageSize))
 
   const openForm = (brand = null) => {
+    pendingBrandId.current = ''
     setEditingBrand(brand)
     setFormError('')
     setIsFormOpen(true)
@@ -241,33 +294,43 @@ export default function BrandList() {
   const closeForm = () => {
     if (isSaving) return
     setIsFormOpen(false)
+    pendingBrandId.current = ''
     setEditingBrand(null)
     setFormError('')
   }
 
   const handleSaveBrand = async (brandData) => {
+    if (isSaving) return
     setIsSaving(true)
     setFormError('')
-
-    const result = editingBrand
-      ? await updateBrand(editingBrand.id, brandData)
-      : await createBrand(brandData)
-
-    if (!result.success) {
-      setFormError(result.error)
+    const savedId = editingBrand?.id || pendingBrandId.current
+    const result = savedId ? await updateBrand(savedId, brandData) : await createBrand(brandData)
+    if (!result.success) { setFormError(result.error); setIsSaving(false); return }
+    const id = result.brand?.id || savedId
+    if (!id) {
+      setFormError('The saved Brand did not include an ID. Reload the Brands list before retrying.')
       setIsSaving(false)
       return
     }
-
-    const normalized = normalizeBrand({ ...brandData, ...result.brand, id: result.brand?.id || editingBrand?.id })
-
-    setBrands((current) =>
-      editingBrand
-        ? current.map((brand) => (brand.id === editingBrand.id ? normalized : brand))
-        : [normalized, ...current],
-    )
+    pendingBrandId.current = id
+    const normalized = normalizeBrand({ ...brandData, ...result.brand, id })
+    const updateSavedRow = (row) => setBrands((current) => current.some((brand) => brand.id === id)
+      ? current.map((brand) => brand.id === id ? row : brand) : [row, ...current])
+    updateSavedRow(normalized)
+    if (brandData.categoryIds !== undefined) {
+      const mapping = await syncBrandCategories(id, brandData.categoryIds, brandData.topCategories)
+      if (!mapping.success) {
+        if (mapping.categories) updateSavedRow({ ...normalized, categories: mapping.categories })
+        setFormError(`Brand saved, but Category mappings could not be completed: ${mapping.error} Retry to continue saving this Brand.`)
+        setIsSaving(false)
+        return
+      }
+      updateSavedRow({ ...normalized, categories: mapping.categories })
+    }
     setIsSaving(false)
-    closeForm()
+    setIsFormOpen(false)
+    setEditingBrand(null)
+    pendingBrandId.current = ''
   }
 
   const toggleSelected = (brandId) => {
@@ -287,7 +350,7 @@ export default function BrandList() {
 
   const exportBrands = (onlySelected = false) => {
     const brandsToExport = onlySelected ? brands.filter((brand) => selectedIds.includes(brand.id)) : sortedBrands
-    const rows = [['Brand', 'Description', 'Status'], ...brandsToExport.map((brand) => [brand.name, brand.description, brand.isActive ? 'Active' : 'Inactive'])]
+    const rows = [['Brand', 'Categories', 'Description', 'Status'], ...brandsToExport.map((brand) => [brand.name, brand.categories.map((category) => category.name).join(', '), brand.description, brand.isActive ? 'Active' : 'Inactive'])]
     exportRowsToExcel('brands', rows)
   }
 
@@ -421,7 +484,7 @@ export default function BrandList() {
               </Button>
             </div>
           ) : isLoading ? (
-            <LoadingSpinner variant="table" minWidth="min-w-[54rem]" columns={["", "Brand", "Description", "Products", "Status", "Actions"]} checkboxColumn={0} avatarColumn={1} label="Loading brands..." />
+            <LoadingSpinner variant="table" minWidth="min-w-[54rem]" columns={["", "Brand", "Categories", "Description", "Products", "Status", "Actions"]} checkboxColumn={0} avatarColumn={1} label="Loading brands..." />
           ) : brands.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-sm font-medium text-neutral-900">No brands yet</p>
@@ -447,6 +510,7 @@ export default function BrandList() {
                     />
                   </th>
                   <SortableHeaderCell label="Brand" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <th className="px-6 py-6">Categories</th>
                   <SortableHeaderCell label="Description" sortKey="description" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <SortableHeaderCell label="Products" sortKey="products" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <SortableHeaderCell label="Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
@@ -475,6 +539,14 @@ export default function BrandList() {
                           <Award className="size-4" aria-hidden="true" />
                         </div>
                         <span className="font-medium text-neutral-900">{brand.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex max-w-sm flex-wrap gap-1.5">
+                        {brand.categories.length ? <>
+                          {brand.categories.slice(0, 3).map((category) => <span key={category.id} title={category.name} className="max-w-40 truncate rounded-md bg-primary-50 px-2 py-1 text-xs text-primary-700">{category.name}</span>)}
+                          {brand.categories.length > 3 && <span title={brand.categories.slice(3).map((category) => category.name).join(', ')} className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-600">+{brand.categories.length - 3} more</span>}
+                        </> : <span className="text-xs text-neutral-400">No category mappings</span>}
                       </div>
                     </td>
                     <td className="max-w-xl px-6 py-5 text-neutral-600">
@@ -514,6 +586,7 @@ export default function BrandList() {
       <Modal isOpen={isFormOpen} onClose={closeForm} title={editingBrand ? 'Edit Brand' : 'Add Brand'} className="max-w-lg">
         <BrandForm
           brand={editingBrand}
+          persistedBrandId={pendingBrandId.current}
           existingBrands={brands}
           saving={isSaving}
           formError={formError}

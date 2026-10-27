@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowLeftRight, Ban, Boxes, CheckCircle2, Eye, Lock, PackageCheck, PackageSearch, Pencil, Search, Send, Warehouse as WarehouseIcon, X } from 'lucide-react'
@@ -796,7 +797,7 @@ function CreateTransferDrawer({ isOpen, isDemo, fromWarehouse, stock, destinatio
                         <td className="px-3 py-2 font-medium text-neutral-900">{item.productName}</td>
                         <td className="px-3 py-2 text-right text-neutral-600">{item.available}</td>
                         <td className="px-3 py-2 text-right">
-                          <input
+                          <NumericInput
                             type="number"
                             min="0"
                             max={item.available}

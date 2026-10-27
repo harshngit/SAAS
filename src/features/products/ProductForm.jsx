@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { isUuidLike, readableClassification } from '../../utils/productVariants'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
@@ -21,10 +22,9 @@ import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
-import { listCategories, listSubcategoryVariants } from '../../api/categories'
+import { listCategories, listSubcategoryVariants, getCategoryBrands } from '../../api/categories'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
-import { listBrands, getBrandCategories } from '../../api/brands'
-import { listSuppliers, getSupplierBrands } from '../../api/suppliers'
+import { listSuppliers } from '../../api/suppliers'
 import { mapProductBackendField } from '../../api/products'
 import { getImageFileError } from '../../utils/imageFile'
 import { getFileUrl, uploadFile } from '../../api/files'
@@ -204,6 +204,7 @@ function section(title, fields) {
 
 function findSectionForErrorField(sections, fieldName) {
   if (fieldName === 'productTypeId') fieldName = 'productType'
+  if (fieldName === 'brandId') fieldName = 'brand'
   if (fieldName === 'subCategoryId') fieldName = 'subCategory'
   if (fieldName.startsWith('variantInventory.')) {
     return sections.find((sectionItem) => sectionItem.id === 'variants-attributes')
@@ -214,22 +215,20 @@ function findSectionForErrorField(sections, fieldName) {
 
 const productSections = [
   section('Basic Information', [
-    { name: 'productCode', label: 'Product Code / SKU', required: true, maxLength: 50 },
-    { name: 'barcode', label: 'Barcode' },
     { name: 'name', label: 'Product Name', required: true, maxLength: 150 },
+    { name: 'productCode', label: 'Product Code / SKU', required: true, maxLength: 50 },
     { name: 'shortName', label: 'Short Name' },
-    // Catalog hierarchy (Supplier -> Brand -> Category -> Subcategory): each field's options
-    // narrow to its parent's associations once the parent is chosen - see the cascading-options
-    // effects below. Order here matches that dependency chain.
-    { name: 'preferredSupplier', label: 'Preferred Supplier', input: 'select' },
-    { name: 'brand', label: 'Brand', input: 'select' },
+    { name: 'barcode', label: 'Barcode' },
     { name: 'category', label: 'Category', input: 'select', required: true },
-    { name: 'subCategory', label: 'Sub Category', input: 'select' },
+    { name: 'subCategory', label: 'Sub Category', input: 'select', required: true },
     { name: 'productType', label: 'Product Type', input: 'select', maxLength: 100 },
+    { name: 'brand', label: 'Brand', input: 'select' },
+    { name: 'preferredSupplier', label: 'Preferred Supplier', input: 'select' },
     { name: 'manufacturer', label: 'Manufacturer', input: 'select' },
-    { name: 'modelNumber', label: 'Model Number' },
     { name: 'status', label: 'Product Status', input: 'select', required: true },
+    { name: 'modelNumber', label: 'Model Number' },
     { name: 'description', label: 'Product Description', input: 'textarea', wide: true },
+    { name: 'hasVariants', label: 'Do you have multiple variants under this Product?', input: 'checkbox', wide: true },
   ]),
   section('Product Images & Media', [
     { name: 'coverImage', label: 'Primary Product Image', input: 'image', required: true },
@@ -239,7 +238,6 @@ const productSections = [
     { name: 'productManual', label: 'Product Manual', input: 'file', accept: '.pdf' },
   ]),
   section('Variants & Attributes', [
-    { name: 'hasVariants', label: 'This product has variants', input: 'checkbox', wide: true },
     {
       name: 'variantAttributes',
       label: 'Attribute Types',
@@ -348,8 +346,10 @@ function hydrateProduct(product) {
     productCode,
     category: String(product?.category_id || product?.categoryId || product?.category || ''),
     categoryId: String(product?.category_id || product?.categoryId || ''),
-    productType: readableClassification(product?.productType),
+    productType: product?.product_type_ref?.name || readableClassification(product?.productType || product?.product_type),
     productTypeId: product?.productTypeId || product?.product_type_id || '',
+    brandId: product?.brandId || product?.brand_id || '',
+    brand: product?.brand_ref?.name || product?.brand || '',
     hasVariants: product?.hasVariants ?? product?.has_variants ?? Boolean(product?.variants?.length),
     purchasePrice: product?.purchasePrice ?? '',
     sellingPrice: product?.sellingPrice ?? '',
@@ -379,10 +379,7 @@ function hydrateProduct(product) {
   }
 }
 
-// If the field's current value isn't in the scoped (parent-filtered) options list - e.g. an
-// existing product whose Supplier<->Brand or Brand<->Category association hasn't been created
-// yet - fall back to the full, unscoped catalog list so the current selection still resolves to
-// a real label instead of silently disappearing (never auto-clear existing product data).
+// Keep only the saved Brand available when editing an unchanged classification.
 function withCurrentOption(scopedOptions, currentValue, allOptions) {
   if (!currentValue || scopedOptions.some((option) => option.value === currentValue)) return scopedOptions
   const fallback = allOptions.find((option) => option.value === currentValue)
@@ -458,17 +455,11 @@ export default function ProductForm({
   const [initialFormData, setInitialFormData] = useState(emptyForm)
   const [categoryOptions, setCategoryOptions] = useState([])
   const [subCategoryOptionsAll, setSubCategoryOptionsAll] = useState([])
-  const [brandOptions, setBrandOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
-  // Catalog hierarchy cascade: Brand options narrow to the selected supplier's linked brands
-  // (GET /suppliers/{id}/brands), Category options narrow to the selected brand's linked
-  // categories (GET /brands/{id}/categories). Empty when no parent is selected yet - the render
-  // below falls back to the full brandOptions/categoryOptions catalog in that case, so existing
-  // products with no supplier/brand set are never blocked from keeping/editing their category.
-  const [supplierBrandLinks, setSupplierBrandLinks] = useState([])
-  const [isLoadingSupplierBrands, setIsLoadingSupplierBrands] = useState(false)
-  const [brandCategoryLinks, setBrandCategoryLinks] = useState([])
-  const [isLoadingBrandCategories, setIsLoadingBrandCategories] = useState(false)
+  const [categoryBrandOptions, setCategoryBrandOptions] = useState([])
+  const [isLoadingCategoryBrands, setIsLoadingCategoryBrands] = useState(false)
+  const [categoryBrandsError, setCategoryBrandsError] = useState('')
+  const [loadedBrandCategoryId, setLoadedBrandCategoryId] = useState('')
   const [activeSection, setActiveSection] = useState(productSections[0].id)
   const [errors, setErrors] = useState({})
   const [imageError, setImageError] = useState('')
@@ -492,7 +483,10 @@ export default function ProductForm({
     return () => { cancelled = true }
   }, [isOpen, formData.subCategoryId, product])
 
+  const showProductType = Boolean(formData.subCategoryId) && !isLoadingProductTypes && !productTypesError
+    && productTypes.some((item) => item.is_active !== false || item.id === formData.productTypeId)
   const fieldIsVisible = (field) => visible(field.name)
+    && (field.name !== 'productType' || showProductType)
     && !(formData.hasVariants && ['purchasePrice', 'sellingPrice', 'mrp', 'wholesalePrice', 'dealerPrice', 'discountPercent', 'taxInclusivePrice', 'currency', 'openingStock'].includes(field.name))
     && !(!formData.hasVariants && ['variants', 'variantAttributes', 'variantInventory'].includes(field.name))
   const visibleSections = productSections.map((item) => ({ ...item, fields: item.fields.filter(fieldIsVisible) })).filter((item) => item.fields.length)
@@ -543,7 +537,7 @@ export default function ProductForm({
   useEffect(() => {
     if (!isOpen) return
 
-    Promise.all([listCategories(), listBrands(), listSuppliers()]).then(([categoriesResult, brandsResult, suppliersResult]) => {
+    Promise.all([listCategories(), listSuppliers()]).then(([categoriesResult, suppliersResult]) => {
       if (categoriesResult.success) {
         const allCategories = categoriesResult.categories
           .map((category) => ({
@@ -555,14 +549,6 @@ export default function ProductForm({
 
         setCategoryOptions(allCategories.filter((option) => !option.parentId))
         setSubCategoryOptionsAll(allCategories)
-      }
-
-      if (brandsResult.success) {
-        setBrandOptions(
-          brandsResult.brands
-            .map((brand) => ({ value: String(brand.id), label: brand.name || '' }))
-            .filter((option) => option.value && option.label),
-        )
       }
 
       if (suppliersResult.success) {
@@ -581,73 +567,40 @@ export default function ProductForm({
     })
   }, [isOpen])
 
-  // Cascading loads: fetch only the selected supplier's brands / selected brand's categories,
-  // never the whole catalog's associations at once (no unnecessary requests). Re-fires whenever
-  // the parent value changes, including the initial hydration of an existing product's saved
-  // preferredSupplierId/brandId - that's required so an edited product's Brand/Category dropdowns
-  // are correctly populated on open, not just after a user interaction.
+  // Category is the only source of Brand options. Supplier choices do not
+  // override the category's allowed list, including an unrestricted category.
   useEffect(() => {
-    if (!isOpen || !formData.preferredSupplierId) {
-      setSupplierBrandLinks([])
-      return undefined
-    }
     let cancelled = false
-    setIsLoadingSupplierBrands(true)
-    getSupplierBrands(formData.preferredSupplierId).then((result) => {
+    const categoryId = formData.categoryId
+    setCategoryBrandOptions([])
+    setCategoryBrandsError('')
+    setLoadedBrandCategoryId('')
+    setIsLoadingCategoryBrands(false)
+    if (!isOpen || !categoryId || !categoryOptions.some((option) => option.value === categoryId)) return undefined
+    setIsLoadingCategoryBrands(true)
+    getCategoryBrands(categoryId).then((result) => {
       if (cancelled) return
-      setIsLoadingSupplierBrands(false)
-      setSupplierBrandLinks(result.success ? result.links : [])
+      setIsLoadingCategoryBrands(false)
+      if (!result.success) { setCategoryBrandsError(result.error); return }
+      const choices = result.brands.map((brand) => ({ value: String(brand.id), label: brand.name }))
+      setCategoryBrandOptions(choices)
+      setLoadedBrandCategoryId(categoryId)
+      setFormData((current) => {
+        if (current.categoryId !== categoryId) return current
+        const unchangedSaved = Boolean(product && current.categoryId === initialFormData.categoryId && current.brandId === initialFormData.brandId)
+        if (!current.brandId || unchangedSaved || choices.some((choice) => choice.value === current.brandId)) return current
+        return { ...current, brandId: '', brand: '' }
+      })
     })
     return () => { cancelled = true }
-  }, [isOpen, formData.preferredSupplierId])
+  }, [isOpen, formData.categoryId, categoryOptions, product, initialFormData.categoryId, initialFormData.brandId])
 
-  useEffect(() => {
-    if (!isOpen || !formData.brandId) {
-      setBrandCategoryLinks([])
-      return undefined
-    }
-    let cancelled = false
-    setIsLoadingBrandCategories(true)
-    getBrandCategories(formData.brandId).then((result) => {
-      if (cancelled) return
-      setIsLoadingBrandCategories(false)
-      setBrandCategoryLinks(result.success ? result.links : [])
-    })
-    return () => { cancelled = true }
-  }, [isOpen, formData.brandId])
-
-  const supplierBrandOptions = useMemo(
-    () => supplierBrandLinks
-      .map((link) => ({
-        value: String(link.brandId),
-        label: link.brandName || brandOptions.find((option) => option.value === String(link.brandId))?.label || '',
-      }))
-      .filter((option) => option.value && option.label),
-    [supplierBrandLinks, brandOptions],
-  )
-  const brandCategoryOptions = useMemo(
-    () => brandCategoryLinks
-      .filter((link) => categoryOptions.some((option) => option.value === String(link.categoryId)))
-      .map((link) => ({
-        value: String(link.categoryId),
-        label: link.categoryName || categoryOptions.find((option) => option.value === String(link.categoryId))?.label || '',
-      }))
-      .filter((option) => option.value && option.label),
-    [brandCategoryLinks, categoryOptions],
-  )
-
-  // Progressive narrowing, not a hard requirement: once a Supplier/Brand is chosen, its dependent
-  // field scopes to only the associated options (Part 3's step-by-step flow). Until then - or for
-  // an old product that already has a Brand/Category value but no association record yet (Part
-  // 12) - the field falls back to the full catalog list rather than disabling and hiding data the
-  // product already has.
-  const effectiveBrandOptions = formData.preferredSupplierId
-    ? withCurrentOption(supplierBrandOptions, formData.brandId, brandOptions)
-    : brandOptions
-  const brandFieldDisabled = !formData.preferredSupplierId && !formData.brandId
-  const effectiveCategoryOptions = formData.brandId
-    ? withCurrentOption(brandCategoryOptions, formData.categoryId, categoryOptions)
-    : categoryOptions
+  const unchangedSavedBrand = Boolean(product && formData.categoryId === initialFormData.categoryId && formData.brandId === initialFormData.brandId)
+  const effectiveBrandOptions = unchangedSavedBrand
+    ? withCurrentOption(categoryBrandOptions, initialFormData.brandId, [{ value: initialFormData.brandId, label: product.brand_ref?.name || initialFormData.brand || 'Saved brand' }])
+    : categoryBrandOptions
+  const brandFieldDisabled = !formData.categoryId || isLoadingCategoryBrands || loadedBrandCategoryId !== formData.categoryId || Boolean(categoryBrandsError)
+  const effectiveCategoryOptions = categoryOptions
 
   const subCategoryOptions = useMemo(
     () => subCategoryOptionsAll.filter((option) => option.parentId === formData.category),
@@ -682,7 +635,8 @@ export default function ProductForm({
 
     const sectionWithError = findSectionForErrorField(productSections, mappedFieldName)
     if (sectionWithError) setActiveSection(sectionWithError.id)
-  }, [formErrorFields])
+    if (['brand', 'brandId'].includes(mappedFieldName)) setErrors((current) => ({ ...current, brand: formError }))
+  }, [formErrorFields, formError])
 
   if (!isOpen) return null
 
@@ -741,6 +695,8 @@ export default function ProductForm({
     if (formData.name.trim().length > 150) nextErrors.name = 'Product name must be 150 characters or fewer.'
     if (!formData.productCode.trim()) nextErrors.productCode = 'Product code / SKU is required.'
     if (!formData.category) nextErrors.category = 'Category is required.'
+    if (formData.brandId && brandFieldDisabled) nextErrors.brand = categoryBrandsError || 'Wait for the Category brands to load before saving.'
+    if (!formData.subCategoryId) nextErrors.subCategory = 'Sub Category is required.'
     if (isUuidLike(formData.productType)) nextErrors.productType = 'Enter a Product Type name, not a category ID.'
     if (formData.subCategoryId && !subCategoryOptions.some((option) => option.value === formData.subCategoryId)) nextErrors.subCategory = 'Select a sub category belonging to this category.'
     if (!formData.status) nextErrors.status = 'Status is required.'
@@ -1026,16 +982,14 @@ export default function ProductForm({
             className="w-full max-w-full"
             triggerClassName="w-full max-w-full"
             options={effectiveCategoryOptions}
-            placeholder={
-              formData.brandId
-                ? (isLoadingBrandCategories ? 'Loading categories…' : `Type or select ${field.label.toLowerCase()}`)
-                : 'Select a category'
-            }
+            placeholder="Select a category"
             onChange={(event) => {
               setFormData((current) => ({
                 ...current,
                 category: event.target.value,
                 categoryId: event.target.value,
+                brandId: event.target.value ? current.brandId : '',
+                brand: event.target.value ? current.brand : '',
                 categoryLabel: effectiveCategoryOptions.find((option) => option.value === event.target.value)?.label || '',
                 subCategory: '',
                 subCategoryId: '',
@@ -1046,7 +1000,7 @@ export default function ProductForm({
                 productType: '',
                 productTypeId: '',
               }))
-              setErrors((current) => ({ ...current, category: '' }))
+              setErrors((current) => ({ ...current, category: '', brand: '' }))
             }}
             searchable
           />
@@ -1074,6 +1028,7 @@ export default function ProductForm({
             options={subCategoryOptions}
             value={formData.subCategoryId}
             error={errors.subCategory}
+            required={commonProps.required}
             onChange={(event) => {
               const option = subCategoryOptions.find((opt) => opt.value === event.target.value)
               // Product Type's available options are scoped to the selected Subcategory (client
@@ -1099,20 +1054,16 @@ export default function ProductForm({
             disabled={brandFieldDisabled}
             onChange={(event) => {
               const option = effectiveBrandOptions.find((opt) => opt.value === event.target.value)
-              // Brand changed -> everything downstream (Category, Subcategory) no longer applies.
+              // Optional catalog metadata does not reset the Category hierarchy.
               setFormData((current) => ({
                 ...current,
                 brandId: event.target.value,
                 brand: option?.label || '',
-                productType: '',
-                productTypeId: '',
-                categoryId: '',
-                category: '',
-                subCategoryId: '',
-                subCategory: '',
               }))
+              setErrors((current) => ({ ...current, brand: '' }))
             }}
-            placeholder={formData.preferredSupplierId ? (isLoadingSupplierBrands ? 'Loading brands…' : 'Search and select a brand') : (formData.brandId ? 'Search and select a brand' : 'Select a supplier first')}
+            error={errors.brand || categoryBrandsError}
+            placeholder={!formData.categoryId ? 'Select a category first' : isLoadingCategoryBrands ? 'Loading brands...' : 'Search and select a brand'}
             searchable
           />
         )
@@ -1128,20 +1079,11 @@ export default function ProductForm({
             value={formData.preferredSupplierId}
             onChange={(event) => {
               const option = supplierOptions.find((opt) => opt.value === event.target.value)
-              // Supplier changed -> the whole downstream chain (Brand, Category, Subcategory)
-              // no longer applies (Part 10).
+              // Keep the selected classification and Brand when changing Supplier.
               setFormData((current) => ({
                 ...current,
                 preferredSupplierId: event.target.value,
                 preferredSupplier: option?.label || '',
-                productType: '',
-                productTypeId: '',
-                brandId: '',
-                brand: '',
-                categoryId: '',
-                category: '',
-                subCategoryId: '',
-                subCategory: '',
               }))
             }}
             placeholder="Search and select a supplier"
@@ -1277,7 +1219,7 @@ export default function ProductForm({
                         const errorKey = `variantInventory.${variant.id || index}.${inventoryField.key}`
                         return (
                           <td key={inventoryField.key} className="px-3 py-2.5">
-                            <input
+                            <NumericInput
                               type="number"
                               min="0"
                               step="1"
@@ -1424,7 +1366,7 @@ export default function ProductForm({
                           />
                         </td>
                         <td className="px-3 py-3.5">
-                          <input
+                          <NumericInput
                             type="number"
                             min="0"
                             step="1"
@@ -1437,7 +1379,7 @@ export default function ProductForm({
                         </td>
                         {['purchasePrice', 'sellingPrice', 'mrp', 'wholesalePrice', 'dealerPrice', 'discountPercent'].map((pricingField) => (
                           <td key={pricingField} className="px-3 py-3.5">
-                            <input type="number" min="0" max={pricingField === 'discountPercent' ? 100 : undefined} step="any"
+                            <NumericInput type="number" min="0" max={pricingField === 'discountPercent' ? 100 : undefined} step="any"
                               value={variant[pricingField] ?? ''} aria-label={`${getVariantName(variant, index)} ${pricingField}`}
                               onChange={(event) => updateVariant(index, pricingField, event.target.value)}
                               className="h-9 w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25" />
@@ -1754,10 +1696,11 @@ export default function ProductForm({
           )}
 
           <section className="border-b border-neutral-100 py-5">
+            {activeFormSection.id === 'basic-information' && productTypesError && <p role="alert" className="mb-4 text-sm text-red-600">{productTypesError}</p>}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {activeFormSection.fields.map((field) => (
                 <Fragment key={field.name}>
-                  <div className={`min-w-0 ${field.wide ? 'lg:col-span-2' : ''}`}>
+                  <div className={`min-w-0 ${field.wide ? 'lg:col-span-2' : field.name === 'brand' && !showProductType ? 'lg:col-start-2' : ''}`}>
                     {renderField(field)}
                   </div>
                 </Fragment>

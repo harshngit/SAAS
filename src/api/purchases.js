@@ -201,7 +201,7 @@ function normalizePurchase(purchase) {
   const fallbackSubtotal = items.reduce((sum, item) => sum + item.quantity * item.purchasePrice, 0)
   const fallbackTotal = items.reduce((sum, item) => sum + item.lineTotal, 0)
   const total = purchase.total ?? fallbackTotal
-  const amountPaid = purchase.amount_paid ?? 0
+  const amountPaid = purchase.amount_paid ?? null
 
   return {
     id: purchase.id,
@@ -219,13 +219,13 @@ function normalizePurchase(purchase) {
     invoiceDate: purchase.invoice_date,
     // Canonical lifecycle status - draft | confirmed | closed | cancelled.
     status: String(purchase.status || 'draft').toLowerCase(),
-    paymentStatus: purchase.payment_status || 'unpaid',
+    paymentStatus: purchase.payment_status ?? null,
     subtotal: purchase.subtotal ?? fallbackSubtotal,
     discount: purchase.discount ?? 0,
     tax: purchase.tax ?? 0,
     total,
     amountPaid,
-    outstandingAmount: Math.max(0, total - amountPaid),
+    outstandingAmount: purchase.outstanding_balance ?? purchase.outstanding_amount ?? null,
     notes: purchase.notes || '',
     attachmentUrl: purchase.attachment_url || '',
     items,
@@ -233,7 +233,7 @@ function normalizePurchase(purchase) {
     purchaseDate: purchase.purchase_date,
     financialYear: purchase.financial_year || '',
     billingAddress: purchase.billing_address || '',
-    warehouseId: purchase.warehouse_id || '',
+    warehouseId: purchase.warehouse_id || purchase.warehouse?.id || '',
     // Canonical receiving status - not_received | partially_received | fully_received.
     receivingStatus: String(purchase.receiving_status || 'not_received').toLowerCase(),
     receivedQty: Number(purchase.received_qty ?? purchase.total_received_qty) || items.reduce((sum, i) => sum + i.receivedQty, 0),

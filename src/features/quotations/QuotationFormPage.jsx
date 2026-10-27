@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
@@ -571,7 +572,7 @@ export default function QuotationFormPage() {
                   <span className="text-xs text-neutral-500">Discount</span>
                   <div className="mt-1 flex items-center gap-2">
                     <Select options={discountTypeOptions} value={discountType} onChange={(event) => setDiscountType(event.target.value)} className="flex-1" />
-                    <input
+                    <NumericInput
                       type="number"
                       min="0"
                       step="1"

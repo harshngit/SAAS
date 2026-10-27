@@ -484,6 +484,7 @@ export default function UserManagement() {
   const [listError, setListError] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formError, setFormError] = useState('')
+  const [phoneError, setPhoneError] = useState('')
   const [planLimitReached, setPlanLimitReached] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [statusUser, setStatusUser] = useState(null)
@@ -567,6 +568,7 @@ export default function UserManagement() {
   const handleOpenModal = () => {
     setFormError('')
     setPlanLimitReached(false)
+    setPhoneError('')
     setActiveStaffSection('1')
     setUploadPreviews((current) => {
       Object.values(current).forEach(revokeUploadPreviewUrls)
@@ -599,6 +601,7 @@ export default function UserManagement() {
   }
 
   const handleFormChange = (event) => {
+    if (event.target.name === 'mobileNumber') setPhoneError('')
     const { name, type, checked, value } = event.target
     setFormError('')
     setFormData((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }))
@@ -808,11 +811,13 @@ export default function UserManagement() {
 
     setIsSaving(true)
     setPlanLimitReached(false)
+    setPhoneError('')
     const result = await createUser(payload)
 
     if (!result.success) {
       setIsSaving(false)
-      setFormError(result.error)
+      if (result.fieldErrors?.phone) { setPhoneError(result.fieldErrors.phone); setActiveStaffSection('2') }
+      else setFormError(result.error)
       setPlanLimitReached(result.planCode === 'PLAN_LIMIT_REACHED')
       return
     }
@@ -1035,7 +1040,7 @@ export default function UserManagement() {
               {activeStaffSection === '2' && (
               <StaffSection number="2" title="Contact Information" description="Primary, secondary, and emergency contact details.">
                 <StaffField description="Primary contact number." format="Phone number" required>
-                  <Input label="Mobile Number" name="mobileNumber" type="tel" value={formData.mobileNumber} onChange={handleFormChange} required />
+                  <Input label="Mobile Number" name="mobileNumber" type="tel" placeholder="+91 98765 43210" error={phoneError} value={formData.mobileNumber} onChange={handleFormChange} required />
                 </StaffField>
                 <StaffField description="Secondary contact number." format="Phone number" required={false}>
                   <Input label="Alternate Mobile Number" name="alternateMobileNumber" type="tel" value={formData.alternateMobileNumber} onChange={handleFormChange} />

@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Download, FileSpreadsheet, RefreshCw, SlidersHorizontal, X } from 'lucide-react'
@@ -657,7 +658,7 @@ function ReportFilterControl({ filter, value, selectedLabel, onChange, entityOpt
 
   if (filter.type === 'number') {
     return (
-      <input
+      <NumericInput
         type="number"
         min="0"
         step="0.01"

@@ -3,6 +3,7 @@ import { Bell, BellOff, Building2, Calendar, Camera, CreditCard, Hash, Mail, Map
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import Input from '../../components/ui/Input'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
@@ -41,7 +42,7 @@ function formatDetailValue(value) {
   return String(value)
 }
 
-function DetailItem({ icon: Icon, label, value }) {
+function DetailItem({ icon: Icon, label, value, verified = false }) {
   return (
     <div className="flex items-start gap-3">
       {Icon && (
@@ -51,7 +52,7 @@ function DetailItem({ icon: Icon, label, value }) {
       )}
       <div className="min-w-0">
         <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">{label}</p>
-        <p className="mt-0.5 truncate text-sm font-medium text-neutral-900">{formatDetailValue(value)}</p>
+        <div className="flex flex-wrap items-center gap-2"><p className="mt-0.5 truncate text-sm font-medium text-neutral-900">{formatDetailValue(value)}</p>{verified && <Badge variant="success">Verified</Badge>}</div>
       </div>
     </div>
   )
@@ -84,6 +85,10 @@ export default function Profile() {
   const { fullAccess: canEditOwnPhoto } = usePermission()
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [photoLoadFailed, setPhotoLoadFailed] = useState(false)
+  const [editingPhone, setEditingPhone] = useState(false)
+  const [phoneDraft, setPhoneDraft] = useState('')
+  const [phoneError, setPhoneError] = useState('')
+  const [savingPhone, setSavingPhone] = useState(false)
   // null while unresolved (and the whole card stays hidden) - pushAvailable is a build-time
   // config check (no Firebase env vars = feature doesn't exist for this deployment, never shown);
   // pushStatus is the actual per-browser status, resolved async since it depends on an
@@ -216,6 +221,28 @@ export default function Profile() {
     showToast({ title: 'Photo updated', message: 'Your profile photo has been changed.' })
   }
 
+  const savePhone = async (event) => {
+    event.preventDefault()
+    if (!canEditOwnPhoto || !currentUser?.id || savingPhone) return
+    setPhoneError('')
+    if (!/^\+?[0-9][0-9\s-]{9,14}$/.test(phoneDraft.trim())) {
+      setPhoneError('Enter a valid phone number')
+      return
+    }
+    setSavingPhone(true)
+    const result = await updateUser(currentUser.id, { phone: phoneDraft.trim() })
+    if (!result.success) {
+      setSavingPhone(false)
+      setPhoneError(result.fieldErrors?.phone || result.error)
+      return
+    }
+    const profile = await getCurrentProfile()
+    setSavingPhone(false)
+    if (!profile.success) { setPhoneError(profile.error); return }
+    setEditingPhone(false)
+    showToast({ title: 'Phone number updated.' })
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -269,7 +296,24 @@ export default function Profile() {
 
         <Card title="Account Details">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <DetailItem icon={Phone} label="Phone" value={currentUser?.phone} />
+            <div>
+              {editingPhone ? (
+                <form onSubmit={savePhone} className="space-y-3">
+                  <Input label="Phone" type="tel" placeholder="+91 98765 43210" value={phoneDraft} error={phoneError} disabled={savingPhone}
+                    onChange={(event) => { setPhoneDraft(event.target.value); setPhoneError('') }} />
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" loading={savingPhone}>Save</Button>
+                    <Button type="button" size="sm" variant="ghost" disabled={savingPhone} onClick={() => setEditingPhone(false)}>Cancel</Button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <DetailItem icon={Phone} label="Phone" value={currentUser?.phone} verified={currentUser?.phone_verified === true} />
+                  {canEditOwnPhoto && <button type="button" className="ml-11 mt-1 text-xs font-medium text-primary-600 hover:underline"
+                    onClick={() => { setPhoneDraft(currentUser?.phone || ''); setPhoneError(''); setEditingPhone(true) }}>Edit phone</button>}
+                </>
+              )}
+            </div>
             <DetailItem icon={ShieldCheck} label="Role" value={roleLabels[currentUser?.role] || currentUser?.role} />
             <DetailItem icon={Calendar} label="Joined" value={formatDate(currentUser?.created_at || currentUser?.joinedAt)} />
             <DetailItem icon={Hash} label="User ID" value={currentUser?.id} />

@@ -184,7 +184,7 @@ function Avatar({ name, photoUrl, size = 'size-20', textSize = 'text-lg' }) {
   )
 }
 
-function TopInfoItem({ icon: Icon, label, value }) {
+function TopInfoItem({ icon: Icon, label, value, verified = false }) {
   return (
     <div className="flex items-start gap-2.5">
       <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
@@ -192,7 +192,7 @@ function TopInfoItem({ icon: Icon, label, value }) {
       </div>
       <div className="min-w-0">
         <p className="text-xs text-neutral-400">{label}</p>
-        <p className="truncate text-sm font-semibold text-neutral-900" title={value || '-'}>{value || '-'}</p>
+        <div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold text-neutral-900" title={value || '-'}>{value || '-'}</p>{verified && <Badge variant="success">Verified</Badge>}</div>
       </div>
     </div>
   )
@@ -695,10 +695,11 @@ export default function UserDetail() {
           </div>
 
           <div className="grid grid-cols-1 gap-x-6 gap-y-4 border-t border-neutral-100 pt-5 sm:grid-cols-2 lg:border-x lg:border-t-0 lg:px-6 lg:pt-0">
-            <TopInfoItem icon={Phone} label="Phone" value={user.phone} />
+            <TopInfoItem icon={Phone} label="Phone" value={user.phone} verified={user.phoneVerified} />
             <TopInfoItem icon={MapPin} label="Territory" value={user.workLocation} />
             <TopInfoItem icon={Mail} label="Email" value={user.email} />
             <TopInfoItem icon={Calendar} label="Joined" value={formatDate(user.dateOfJoining)} />
+            <TopInfoItem icon={Calendar} label="Last login" value={user.lastLogin ? new Date(user.lastLogin).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Never'} />
             {isDeliveryWorkspace && (
               <TopInfoItem
                 icon={Truck}

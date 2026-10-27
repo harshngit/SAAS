@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Wand2, X } from 'lucide-react'
@@ -281,7 +282,7 @@ export default function RecordSupplierPaymentDrawer({ isOpen, onClose, onRecorde
                           <td className="px-3 py-2 text-right text-neutral-600">{formatCurrency(invoice.invoiceTotal)}</td>
                           <td className="px-3 py-2 text-right text-neutral-800">{formatCurrency(invoice.outstanding)}</td>
                           <td className="px-3 py-2 text-right">
-                            <input
+                            <NumericInput
                               type="number"
                               min="0"
                               max={invoice.outstanding}

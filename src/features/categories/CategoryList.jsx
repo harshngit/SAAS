@@ -1,3 +1,6 @@
+import AllowedBrandsField from '../../components/ui/AllowedBrandsField'
+import { useCategoryBrandSelection } from '../../hooks/useCategoryBrandSelection'
+import { usePermission } from '../../auth/usePermission'
 import { SkeletonValue } from '../../components/ui/Skeleton'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -10,6 +13,7 @@ import {
   getCategory,
   listCategories,
   updateCategory,
+  setCategoryBrands,
 } from '../../api/categories'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Button from '../../components/ui/Button'
@@ -59,12 +63,10 @@ const formatDateLabel = (value) => {
 }
 
 function CategoryForm({ category, existingCategories, saving, formError, onClose, onSave }) {
-  const parentOptions = [
-    { value: '', label: '— None (top-level category) —' },
-    ...existingCategories.filter((item) => item.id !== category?.id).map((item) => ({ value: item.id, label: item.name })),
-  ]
-
   const [formData, setFormData] = useState(emptyForm)
+  const { can } = usePermission()
+  const canSetBrands = can('products', 'edit') && !category?.parentId
+  const brandSelection = useCategoryBrandSelection(category?.id, canSetBrands)
   const [errors, setErrors] = useState({})
   const [imageError, setImageError] = useState('')
   const [previewFailed, setPreviewFailed] = useState(false)
@@ -114,7 +116,8 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
   const handleSubmit = (event) => {
     event.preventDefault()
     if (!validate()) return
-    onSave(formData)
+    if (canSetBrands && (brandSelection.loading || brandSelection.error)) return
+    onSave({ ...formData, parentId: category?.parentId || '', allowedBrandIds: canSetBrands ? brandSelection.selectedIds : undefined })
   }
 
   return (
@@ -132,14 +135,6 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
         onChange={(event) => setFormData((current) => ({ ...current, name: event.target.value }))}
         error={errors.name}
         required
-      />
-      <Select
-        label="Parent Category (optional)"
-        searchable
-        options={parentOptions}
-        value={formData.parentId || ''}
-        onChange={(event) => setFormData((current) => ({ ...current, parentId: event.target.value }))}
-        placeholder="None — this is a top-level category"
       />
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-neutral-700">Category Image</label>
@@ -187,11 +182,13 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
         <p className="text-right text-xs font-medium text-neutral-400">{formData.description.length} / 500</p>
       </div>
 
+      {canSetBrands && <AllowedBrandsField selection={brandSelection} disabled={saving} />}
+
       <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
         <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" loading={saving}>
+        <Button type="submit" loading={saving} disabled={canSetBrands && (brandSelection.loading || Boolean(brandSelection.error))}>
           {category ? (
             'Save Changes'
           ) : (
@@ -248,16 +245,28 @@ export default function CategoryList() {
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
+  const subcategoriesByParent = useMemo(() => {
+    const grouped = new Map()
+    for (const category of categories) {
+      if (!category.parentId) continue
+      const children = grouped.get(category.parentId) || []
+      children.push(category)
+      grouped.set(category.parentId, children)
+    }
+    return grouped
+  }, [categories])
+
   const filteredCategories = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
     const filtered = categories.filter((category) => {
+      if (category.parentId) return false
       if (categoryFilter === 'with-image' && !category.image) return false
       if (categoryFilter === 'without-image' && category.image) return false
       if (!isWithinDateRange(category.createdAt, dateFrom, dateTo)) return false
       if (!normalizedSearch) return true
 
-      return [category.name, category.description]
+      return [category.name, category.description, ...(subcategoriesByParent.get(category.id) || []).map((child) => child.name)]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(normalizedSearch))
     })
@@ -265,7 +274,7 @@ export default function CategoryList() {
     if (sortBy) {
       const accessors = {
         name: (category) => category.name?.toLowerCase() || '',
-        parent: (category) => (category.parentId ? categories.find((item) => item.id === category.parentId)?.name?.toLowerCase() || '' : ''),
+        subcategories: (category) => (subcategoriesByParent.get(category.id) || []).length,
         image: (category) => (category.image ? 1 : 0),
         description: (category) => category.description?.toLowerCase() || '',
       }
@@ -290,7 +299,7 @@ export default function CategoryList() {
       if (categorySort === 'oldest') return leftTime - rightTime
       return rightTime - leftTime
     })
-  }, [categoryFilter, categorySort, categories, searchTerm, dateFrom, dateTo, sortBy, sortOrder])
+  }, [categoryFilter, categorySort, categories, subcategoriesByParent, searchTerm, dateFrom, dateTo, sortBy, sortOrder])
 
   const totalPages = Math.max(1, Math.ceil(filteredCategories.length / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
@@ -383,6 +392,11 @@ export default function CategoryList() {
       return
     }
 
+    if (!categoryData.parentId && categoryData.allowedBrandIds !== undefined) {
+      const mapping = await setCategoryBrands(result.category?.id || editingCategory?.id, categoryData.allowedBrandIds)
+      if (!mapping.success) { setFormError(mapping.error); setIsSaving(false); return }
+    }
+
     const normalized = normalizeCategory({ ...categoryData, ...result.category, id: result.category?.id || editingCategory?.id })
 
     setCategories((current) =>
@@ -436,8 +450,8 @@ export default function CategoryList() {
   }
 
   const exportCategories = (onlySelected = false) => {
-    const categoriesToExport = onlySelected ? categories.filter((category) => selectedIds.includes(category.id)) : filteredCategories
-    const rows = [['Category', 'Parent', 'Description'], ...categoriesToExport.map((category) => [category.name, category.parentId ? categories.find((item) => item.id === category.parentId)?.name || '' : '', category.description])]
+    const categoriesToExport = onlySelected ? categories.filter((category) => !category.parentId && selectedIds.includes(category.id)) : filteredCategories
+    const rows = [['Category', 'Subcategories', 'Description'], ...categoriesToExport.map((category) => [category.name, (subcategoriesByParent.get(category.id) || []).map((child) => child.name).join(', '), category.description])]
     exportRowsToExcel('categories', rows)
   }
 
@@ -486,7 +500,7 @@ export default function CategoryList() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Categories</h2>
-              <p className="mt-1 text-xs text-neutral-400">Create and manage product categories used across catalog items.</p>
+              <p className="mt-1 text-xs text-neutral-400">Manage main Categories and view their Subcategories. Search by either name.</p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2 [&>button]:h-9 [&>button]:rounded-xl [&>button]:px-3.5">
               <div className="relative w-full sm:w-60">
@@ -588,7 +602,7 @@ export default function CategoryList() {
               </Button>
             </div>
           ) : isLoading ? (
-            <LoadingSpinner variant="table" minWidth="min-w-[64rem]" columns={["", "Category", "Parent", "Image", "Description", "Actions"]} checkboxColumn={0} avatarColumn={1} label="Loading categories..." />
+            <LoadingSpinner variant="table" minWidth="min-w-[64rem]" columns={["", "Category", "Subcategories", "Image", "Description", "Actions"]} checkboxColumn={0} avatarColumn={1} label="Loading categories..." />
           ) : categories.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-sm font-medium text-neutral-900">No categories yet</p>
@@ -614,7 +628,7 @@ export default function CategoryList() {
                     />
                   </th>
                   <SortableHeaderCell label="Category" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
-                  <SortableHeaderCell label="Parent" sortKey="parent" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
+                  <SortableHeaderCell label="Subcategories" sortKey="subcategories" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <SortableHeaderCell label="Image" sortKey="image" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <SortableHeaderCell label="Description" sortKey="description" sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="whitespace-nowrap px-6 py-6" />
                   <th className="whitespace-nowrap px-6 py-6 text-right">Actions</th>
@@ -657,9 +671,17 @@ export default function CategoryList() {
                       </div>
                     </td>
                     <td className="px-6 py-5 text-neutral-600">
-                      {category.parentId ? categories.find((item) => item.id === category.parentId)?.name || '—' : (
-                        <span className="text-neutral-300">—</span>
-                      )}
+                      {(subcategoriesByParent.get(category.id) || []).length > 0 ? (
+                        <div className="flex max-w-sm flex-wrap gap-1.5">
+                          {subcategoriesByParent.get(category.id).map((child) => (
+                            <button key={child.id} type="button" onClick={() => handleViewDetails(child)}
+                              aria-label={`View subcategory ${child.name}`}
+                              className="max-w-full rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-left text-xs text-neutral-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-2 focus-visible:outline-primary-500">
+                              <span className="break-words">{child.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : <span className="text-xs text-neutral-400">No subcategories</span>}
                     </td>
                     <td className="px-6 py-5">
                       {category.image ? (
@@ -821,6 +843,17 @@ export default function CategoryList() {
                 </div>
               </div>
             </div>
+
+            {viewCategory && (subcategoriesByParent.get(viewCategory.id) || []).length > 0 && (
+              <section className="space-y-2" aria-label="Subcategories">
+                <h4 className="text-sm font-semibold text-neutral-900">Subcategories</h4>
+                <div className="flex flex-wrap gap-2">
+                  {subcategoriesByParent.get(viewCategory.id).map((child) => (
+                    <Button key={child.id} type="button" variant="outline" size="sm" onClick={() => handleViewDetails(child)}>{child.name}</Button>
+                  ))}
+                </div>
+              </section>
+            )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-neutral-200 bg-surface px-4 py-4">

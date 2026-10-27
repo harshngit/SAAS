@@ -1,3 +1,4 @@
+import { phoneConflictFields } from '../utils/phoneConflict'
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
 import { planErrorCode } from './entitlements'
@@ -146,6 +147,8 @@ function flattenSectionedUser(data) {
     is_active: data.is_active,
     status: preferences.account_status || (data.is_active === false ? 'inactive' : 'active'),
     created_at: data.created_at,
+    last_login: data.last_login ?? null,
+    phone_verified: data.phone_verified ?? false,
 
     role_id: employment.role_id,
     role_detail: employment.role_detail,
@@ -359,7 +362,7 @@ export async function createUser(payload) {
 
     // planCode lets UserManagement.jsx show a dedicated max_users plan-limit UI instead of the
     // generic error banner (§8) - the raw axios error is otherwise lost once stringified above.
-    return { success: false, error: message, planCode: planErrorCode(error) }
+    return { success: false, error: message, planCode: planErrorCode(error), fieldErrors: phoneConflictFields(error.response?.status, message) }
   }
 }
 
@@ -582,7 +585,7 @@ export async function updateUser(userId, payload) {
       'Unable to update staff. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, error: message, fieldErrors: phoneConflictFields(error.response?.status, message) }
   }
 }
 

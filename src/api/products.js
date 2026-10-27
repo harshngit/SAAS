@@ -160,6 +160,7 @@ export function mapProductBackendField(backendField) {
 // FastAPI 422s shape errors as { detail: [{ loc: ["body", "field_name", ...], msg, type }, ...] }.
 // Pulls out just the field name (first loc segment after "body") from each entry.
 function extractErrorFields(detail) {
+  if (typeof detail === 'string' && /brand.*(mapped|inactive)|inactive.*brand/i.test(detail)) return ['brand_id']
   if (!Array.isArray(detail)) return []
 
   return detail
@@ -197,7 +198,7 @@ function applyProductFieldMap(requestBody, payload) {
 
     const coerced = coerceFieldValue(kind, value)
     if (coerced === undefined || coerced === null) return
-    requestBody[backendField] = ['sub_category_id', 'product_type_id'].includes(backendField) ? coerced || null : coerced
+    requestBody[backendField] = ['sub_category_id', 'product_type_id', 'brand_id'].includes(backendField) ? coerced || null : coerced
   })
 }
 

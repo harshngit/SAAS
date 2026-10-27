@@ -5,6 +5,7 @@ import ProtectedRoute from '../auth/ProtectedRoute'
 import RequirePermissionRoute from '../auth/RequirePermission'
 import { ENTITLEMENT_KEYS } from '../entitlements/entitlementKeys'
 import Login from '../features/auth/Login'
+import ResetPassword from '../features/auth/ResetPassword'
 import Register from '../auth/Register'
 import GoogleAuthCallback from '../features/auth/GoogleAuthCallback'
 import GoogleRegister from '../features/auth/GoogleRegister'
@@ -127,6 +128,7 @@ export default function AppRoutes() {
       <StorageLimitModal />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/register" element={<Register />} />
         <Route path="/auth/callback" element={<GoogleAuthCallback />} />
         <Route path="/auth/register/google" element={<GoogleRegister />} />

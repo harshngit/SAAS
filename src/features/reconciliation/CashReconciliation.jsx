@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BadgeCheck, Info, RefreshCw, Scale, Trash2, Wallet } from 'lucide-react'
@@ -75,7 +76,7 @@ function signedCurrency(value) {
 // lets a negative value be typed, decimal-friendly on mobile keyboards.
 function MoneyInput({ value, onChange, disabled, className = '' }) {
   return (
-    <input
+    <NumericInput
       type="number"
       min="0"
       step="0.01"

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatBytes, formatCompactCurrency, formatCurrency, formatStoragePercent } from '../../utils/format'
+import { loadDashboardOptions, validateDashboardDates } from './dashboardFilters'
 import { getAdminDashboard } from '../../api/dashboard'
 import { getMyStorageUsage } from '../../api/entitlements'
 import { getExpenseCategories } from '../../api/expenses'
@@ -325,6 +326,7 @@ function getOrderAmountSplit(order) {
 
 function FeaturedSalesCard({
   salesAmount,
+  scoped = false,
   receivedAmount = 0,
   pendingAmount = 0,
   ordersCount = 0,
@@ -348,14 +350,14 @@ function FeaturedSalesCard({
 
       <div className="min-w-0 pr-20">
         <p className="max-w-full whitespace-nowrap text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/78">
-          TODAY&apos;S SALES
+          {scoped ? 'Selected Period Sales' : 'Today’s Sales'}
         </p>
         <p className="mt-1 font-(--font-display) text-[2.1rem] font-semibold leading-none tracking-tight text-white">
           {formatCurrency(salesAmount)}
         </p>
       </div>
 
-      <div className="relative mt-10 grid grid-cols-2 gap-x-8 gap-y-2">
+      {!scoped && <div className="relative mt-10 grid grid-cols-2 gap-x-8 gap-y-2">
         <div className="min-w-0">
           <p className="text-[0.92rem] font-semibold leading-none text-white/90">Received</p>
           <p className="mt-1 truncate text-[1.50rem] font-semibold leading-none tracking-tight text-white">
@@ -368,11 +370,12 @@ function FeaturedSalesCard({
             {formatCurrency(pendingAmount)}
           </p>
         </div>
-      </div>
+      </div>}
+      {scoped && <p className="mt-5 text-sm text-white/90">For the applied dates and filters.</p>}
 
       <div className="flex-1" />
 
-      <div className="mb-4 grid grid-cols-3 divide-x divide-white/25 text-left">
+      {!scoped && <div className="mb-4 grid grid-cols-3 divide-x divide-white/25 text-left">
         <div className="pr-3">
           <p className="text-[0.78rem] font-semibold leading-none text-white/88">Orders</p>
           <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
@@ -385,7 +388,7 @@ function FeaturedSalesCard({
           <p className="text-[0.78rem] font-semibold leading-none text-white/88">Pending</p>
           <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(pendingOrdersCount)}</p>
         </div>
-      </div>
+      </div>}
 
       <div className="mt-auto flex items-end justify-end pt-3 text-[0.92rem] font-semibold leading-4 text-white/90">
         <span className="inline-flex items-center gap-1.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-white">
@@ -502,6 +505,11 @@ export default function AdminDashboard() {
   const [customerId, setCustomerId] = useState('')
   const [supplierId, setSupplierId] = useState('')
   const [filterOptions, setFilterOptions] = useState({ companies: [], warehouses: [], customers: [], suppliers: [] })
+  const [appliedFilters, setAppliedFilters] = useState({ preset: 'this_month', range: { from: '', to: '' }, scope: {} })
+  const [dateError, setDateError] = useState('')
+  const [optionsError, setOptionsError] = useState('')
+  const [optionsLoading, setOptionsLoading] = useState(false)
+  const dashboardRequest = useRef(0)
   const [recentOrdersSearch, setRecentOrdersSearch] = useState('')
   const [topProductsMetric, setTopProductsMetric] = useState('amount')
   const [dashboard, setDashboard] = useState(null)
@@ -511,6 +519,8 @@ export default function AdminDashboard() {
   const [error, setError] = useState('')
 
   const loadDashboard = useCallback(async (preset, range, scope = {}) => {
+    const scoped = preset !== 'this_month' || Object.values(scope).some(Boolean)
+    const request = ++dashboardRequest.current
     setIsLoading(true)
     setError('')
 
@@ -524,11 +534,14 @@ export default function AdminDashboard() {
         ...(scope.customerId ? { customer_id: scope.customerId } : {}),
         ...(scope.supplierId ? { supplier_id: scope.supplierId } : {}),
       }),
-      DEMO_MODE
+      scoped
+        ? Promise.resolve({ success: true, orders: [] })
+        : DEMO_MODE
         ? Promise.resolve({ success: true, orders: DEMO_EMPTY ? [] : demoOrdersResolved() })
-        : listOrders(),
+        : loadDashboardOptions(listOrders, 'orders'),
     ])
 
+    if (request !== dashboardRequest.current) return
     setIsLoading(false)
 
     if (!dashboardResult.success) {
@@ -536,11 +549,16 @@ export default function AdminDashboard() {
       return
     }
 
+    setAppliedFilters({ preset, range: { ...range }, scope: { ...scope } })
     setDashboard(dashboardResult.dashboard)
     setOrders(ordersResult.success ? ordersResult.orders : [])
+    if (!ordersResult.success) setError(ordersResult.error || 'Unable to load today’s orders.')
   }, [])
 
   const applyFilters = useCallback(() => {
+    const validation = validateDashboardDates(datePreset, customRange)
+    setDateError(validation)
+    if (validation) return
     loadDashboard(datePreset, customRange, { companyId, warehouseId, customerId, supplierId })
   }, [loadDashboard, datePreset, customRange, companyId, warehouseId, customerId, supplierId])
 
@@ -568,26 +586,27 @@ export default function AdminDashboard() {
     loadStorageUsage()
   }, [loadStorageUsage])
 
-  // Filter dropdown option lists (real mode only; demo dashboards aren't scope-filtered).
-  // listCompanies fails soft to [] -> the Company dropdown just shows "All Companies".
-  useEffect(() => {
+  const loadFilterOptions = useCallback(async () => {
     if (DEMO_MODE) return
-    let active = true
-    Promise.all([listCompanies({ active: true }), listWarehouses(), listCustomers(), listSuppliers()]).then(
-      ([co, w, c, s]) => {
-        if (!active) return
-        setFilterOptions({
-          companies: co.success ? co.companies : [],
-          warehouses: w.success ? w.warehouses : [],
-          customers: c.success ? c.customers : [],
-          suppliers: s.success ? s.suppliers : [],
-        })
-      },
-    )
-    return () => {
-      active = false
-    }
+    setOptionsLoading(true)
+    setOptionsError('')
+    const results = await Promise.all([
+      listCompanies({ active: true }), listWarehouses(),
+      loadDashboardOptions(listCustomers, 'customers'), loadDashboardOptions(listSuppliers, 'suppliers'),
+    ])
+    const [co, w, c, s] = results
+    setFilterOptions((current) => ({
+      companies: co.success ? co.companies : current.companies,
+      warehouses: w.success ? w.warehouses : current.warehouses,
+      customers: c.success ? c.customers : current.customers,
+      suppliers: s.success ? s.suppliers : current.suppliers,
+    }))
+    const failed = ['Companies', 'Warehouses', 'Customers', 'Suppliers'].filter((_, i) => !results[i].success)
+    if (failed.length) setOptionsError(`Unable to load: ${failed.join(', ')}. Retry filter options.`)
+    setOptionsLoading(false)
   }, [])
+
+  useEffect(() => { loadFilterOptions() }, [loadFilterOptions])
 
   // Category names for the Expense Breakdown legend — so it lists rows even at ₹0 spend.
   useEffect(() => {
@@ -681,10 +700,10 @@ export default function AdminDashboard() {
   // For This Month / Last Month, expand the API's (sparse) day rows to one point per day
   // across the whole calendar month — otherwise a fresh month shows just 2-3 points. Longer
   // ranges (quarter/year/custom) keep the API's own bucketing untouched.
-  const isDailyMonthChart = datePreset === 'this_month' || datePreset === 'last_month'
+  const isDailyMonthChart = appliedFilters.preset === 'this_month' || appliedFilters.preset === 'last_month'
   const monthChartRange = isDailyMonthChart
     ? (() => {
-        const { date_from } = resolveDateRange(datePreset, customRange)
+        const { date_from } = resolveDateRange(appliedFilters.preset, appliedFilters.range)
         const start = parseLocalDate(date_from)
         return { from: date_from, to: localIso(new Date(start.getFullYear(), start.getMonth() + 1, 0)) }
       })()
@@ -781,9 +800,19 @@ export default function AdminDashboard() {
     },
     { deliveredAmount: 0, pendingAmount: 0 },
   )
-  const rangeLabel = datePreset === 'custom' && customRange.from && customRange.to
-    ? `${formatRangeLabel(customRange.from)} – ${formatRangeLabel(customRange.to)}`
-    : dateRangePresets.find((preset) => preset.value === datePreset)?.label
+  const rangeLabel = appliedFilters.preset === 'custom'
+    ? `${formatRangeLabel(appliedFilters.range.from)} / ${formatRangeLabel(appliedFilters.range.to)}`
+    : dateRangePresets.find((preset) => preset.value === appliedFilters.preset)?.label
+  const scopedSales = appliedFilters.preset !== 'this_month' || Object.values(appliedFilters.scope).some(Boolean)
+  const appliedScopeLabels = [
+    ['companyId', 'companies', 'Company'], ['warehouseId', 'warehouses', 'Warehouse'],
+    ['customerId', 'customers', 'Customer'], ['supplierId', 'suppliers', 'Supplier'],
+  ].flatMap(([key, optionsKey, label]) => {
+    const id = appliedFilters.scope[key]
+    if (!id) return []
+    const row = filterOptions[optionsKey].find((option) => option.id === id)
+    return [`${label}: ${row?.name || row?.business_name || id}`]
+  })
 
   const recentOrdersSearchTerm = recentOrdersSearch.trim().toLowerCase()
   const filteredRecentOrders = !recentOrdersSearchTerm
@@ -833,7 +862,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-4 rounded-2xl bg-transparent">
       <div className="overflow-hidden rounded-2xl border border-white/70 bg-surface p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
-        <div className="grid w-full grid-cols-[1fr_repeat(4,minmax(0,1fr))_84px] items-end gap-1.5">
+        <div className="grid w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))_84px] items-end gap-1.5">
           <FilterField label="Period">
             <Select
               options={dateRangePresets}
@@ -844,6 +873,8 @@ export default function AdminDashboard() {
           </FilterField>
           <FilterField label="Company">
             <Select
+              id="dashboard-company"
+              disabled={optionsLoading}
               searchable
               options={[
                 { value: '', label: 'All Companies' },
@@ -857,6 +888,8 @@ export default function AdminDashboard() {
           </FilterField>
           <FilterField label="Warehouse">
             <Select
+              id="dashboard-warehouse"
+              disabled={optionsLoading}
               searchable
               options={[
                 { value: '', label: 'All Warehouses' },
@@ -870,10 +903,12 @@ export default function AdminDashboard() {
           </FilterField>
           <FilterField label="Customer">
             <Select
+              id="dashboard-customer"
+              disabled={optionsLoading}
               searchable
               options={[
                 { value: '', label: 'All Customers' },
-                ...filterOptions.customers.map((customer) => ({ value: customer.id, label: customer.name })),
+                ...filterOptions.customers.map((customer) => ({ value: customer.id, label: customer.name || customer.business_name || customer.email || customer.phone || customer.id, searchText: [customer.business_name, customer.email, customer.phone, customer.mobile].filter(Boolean).join(' ') })),
               ]}
               value={customerId}
               onChange={(event) => setCustomerId(event.target.value)}
@@ -883,10 +918,12 @@ export default function AdminDashboard() {
           </FilterField>
           <FilterField label="Supplier">
             <Select
+              id="dashboard-supplier"
+              disabled={optionsLoading}
               searchable
               options={[
                 { value: '', label: 'All Suppliers' },
-                ...filterOptions.suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name })),
+                ...filterOptions.suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name || supplier.business_name || supplier.email || supplier.phone || supplier.id, searchText: [supplier.business_name, supplier.email, supplier.phone, supplier.mobile].filter(Boolean).join(' ') })),
               ]}
               value={supplierId}
               onChange={(event) => setSupplierId(event.target.value)}
@@ -925,6 +962,15 @@ export default function AdminDashboard() {
             </p>
           </div>
         )}
+        {dateError && <p role="alert" className="mt-2 text-sm text-red-600">{dateError}</p>}
+        {optionsError && <div role="alert" className="mt-2 text-sm text-red-600">{optionsError} <button type="button" onClick={loadFilterOptions} disabled={optionsLoading} className="underline">Retry</button></div>}
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
+          <span>Showing: {[rangeLabel, ...appliedScopeLabels].join(' / ')}. Select filters, then press Apply.</span>
+          <button type="button" disabled={isLoading} className="text-primary-600 underline" onClick={() => {
+            setDatePreset('this_month'); setCustomRange({ from: '', to: '' }); setCompanyId(''); setWarehouseId(''); setCustomerId(''); setSupplierId(''); setDateError('')
+            loadDashboard('this_month', { from: '', to: '' })
+          }}>Reset filters</button>
+        </div>
       </div>
 
       {error && (
@@ -934,7 +980,8 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
         <div className="min-w-0 self-start">
           <FeaturedSalesCard
-            salesAmount={todaysSalesAmount}
+            scoped={scopedSales}
+            salesAmount={scopedSales ? periodSales : todaysSalesAmount}
             receivedAmount={orderAmounts.deliveredAmount}
             pendingAmount={orderAmounts.pendingAmount}
             ordersCount={featuredOrdersCount}
@@ -946,7 +993,7 @@ export default function AdminDashboard() {
           className="grid min-w-0 w-full self-start content-start grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6"
         >
           <KpiCard
-            title="This Month Sales"
+            title={`${rangeLabel} Sales`}
             value={formatCurrency(summary.period_sales ?? summary.month_sales)}
             delta={`${salesGrowth >= 0 ? '+' : ''}${salesGrowth}% vs last month`}
             footer="View Sales Report"

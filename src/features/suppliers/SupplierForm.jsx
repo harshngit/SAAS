@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { useEffect, useMemo, useState } from 'react'
@@ -206,7 +207,7 @@ function CurrencyField({ label, value, onChange, error, helper }) {
       <label className="text-sm font-medium text-neutral-700">{label}</label>
       <div className="relative mt-1.5">
         <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-neutral-400">₹</span>
-        <input
+        <NumericInput
           type="number"
           min="0"
           step="1"

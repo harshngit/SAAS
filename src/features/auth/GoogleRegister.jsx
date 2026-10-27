@@ -37,6 +37,7 @@ export default function GoogleRegister() {
   const {
     register,
     handleSubmit,
+    setError,
     reset,
     formState: { errors, isSubmitting },
   } = useForm({ resolver: zodResolver(schema) })
@@ -68,7 +69,8 @@ export default function GoogleRegister() {
     const result = await completeGoogleRegistration({ ...data, registrationCode })
 
     if (!result.success) {
-      setServerError(result.error)
+      if (result.fieldErrors?.phone) setError('phone', { type: 'server', message: result.fieldErrors.phone })
+      else setServerError(result.error)
       return
     }
 
@@ -156,7 +158,7 @@ export default function GoogleRegister() {
                 </div>
                 <div className="mt-5 grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2">
                   <Input label="Business Type" error={errors.businessType?.message} {...register('businessType')} />
-                  <Input label="Phone Number" type="tel" error={errors.phone?.message} {...register('phone')} />
+                  <Input label="Phone Number" type="tel" placeholder="+91 98765 43210" error={errors.phone?.message} {...register('phone')} />
                   <Input label="GST Number" error={errors.gstNumber?.message} {...register('gstNumber')} />
                   <Input label="PAN Number" error={errors.panNumber?.message} {...register('panNumber')} />
                   <Input label="Financial Year" placeholder="e.g. 2025-2026" error={errors.financialYear?.message} {...register('financialYear')} />

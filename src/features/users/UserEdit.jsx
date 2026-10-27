@@ -260,6 +260,7 @@ export default function UserEdit() {
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingAccountStatus, setIsSavingAccountStatus] = useState(false)
   const [error, setError] = useState('')
+  const [phoneError, setPhoneError] = useState('')
   const [profilePictureFile, setProfilePictureFile] = useState(null)
   const [profilePictureRemoved, setProfilePictureRemoved] = useState(false)
   const [profilePicturePreviewUrl, setProfilePicturePreviewUrl] = useState('')
@@ -479,6 +480,7 @@ export default function UserEdit() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    setPhoneError('')
     setError('')
 
     if (!userProfileChanged) {
@@ -535,7 +537,8 @@ export default function UserEdit() {
 
     if (!updateResult.success) {
       setIsSaving(false)
-      setError(updateResult.error)
+      if (updateResult.fieldErrors?.phone) { setPhoneError(updateResult.fieldErrors.phone); setActiveSection('2') }
+      else setError(updateResult.error)
       return
     }
 
@@ -777,8 +780,10 @@ export default function UserEdit() {
                   label="Mobile Number"
                   type="tel"
                   required
+                  placeholder="+91 98765 43210"
+                  error={phoneError}
                   value={formData.phone}
-                  onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
+                  onChange={(event) => { setPhoneError(''); setFormData({ ...formData, phone: event.target.value }) }}
                 />
                 <Input
                   label="Alternate Mobile Number"

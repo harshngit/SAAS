@@ -64,7 +64,7 @@ export const SUPPLIER_INVOICE_STATUS_OPTIONS = [
 ]
 
 export const SUPPLIER_INVOICE_VERIFICATION_OPTIONS = [
-  { value: 'pending', label: 'Pending Verification' },
+  { value: 'pending', label: 'Pending / Awaiting Goods' },
   { value: 'matched', label: 'Matched' },
   { value: 'mismatched', label: 'Mismatch / Review Required' },
 ]
@@ -75,36 +75,36 @@ export const SUPPLIER_INVOICE_PAYMENT_OPTIONS = [
   { value: 'paid', label: 'Paid' },
 ]
 
+const nullableNumber = (value) => value == null ? null : num(value)
+
 // ---- normalizers -----------------------------------------------------------
 
 function normalizeItem(item) {
   if (!item) return item
-  const billedQty = num(item.billed_qty ?? item.invoice_qty ?? item.quantity)
-  const unitPrice = num(item.unit_price ?? item.rate)
-  const lineTotal =
-    item.line_total !== undefined && item.line_total !== null ? num(item.line_total) : billedQty * unitPrice
+  const billedQty = nullableNumber(item.billed_qty)
+  const unitPrice = nullableNumber(item.unit_price)
+  const lineTotal = nullableNumber(item.line_total)
   return {
     id: item.id,
     productId: item.product_id || item.product?.id || item.productId || '',
     variantId: item.variant_id || item.variantId || '',
     purchaseItemId: item.purchase_item_id || item.purchaseItemId || null,
-    productName: item.product_name || item.product?.name || item.productName || '',
-    sku: item.product_sku || item.sku || '',
+    productName: item.product_name ?? '',
+    sku: item.sku ?? '',
     uom: item.uom || item.unit || '',
     billedQty,
     unitPrice,
     discount: num(item.discount ?? item.discount_percent),
     tax: num(item.tax ?? item.tax_percent ?? item.tax_rate),
-    taxAmount: item.tax_amount !== undefined ? num(item.tax_amount) : null,
+    discountAmount: nullableNumber(item.discount_amount),
+    taxAmount: nullableNumber(item.tax_amount),
     lineTotal,
     // Context fields (backend-exposed where available) - never persisted by the form.
-    orderedQty: item.ordered_qty !== undefined ? num(item.ordered_qty) : null,
-    receivedQty:
-      item.received_qty !== undefined
-        ? num(item.received_qty)
-        : item.accepted_qty !== undefined
-          ? num(item.accepted_qty)
-          : null,
+    orderedQty: nullableNumber(item.ordered_qty),
+    receivedQty: nullableNumber(item.received_qty),
+    availableQty: nullableNumber(item.available_qty),
+    quantityMatch: item.quantity_match ?? null,
+    priceMatch: item.price_match ?? null,
     previouslyInvoicedQty:
       item.previously_invoiced_qty !== undefined ? num(item.previously_invoiced_qty) : null,
     remainingInvoiceableQty:
@@ -113,13 +113,13 @@ function normalizeItem(item) {
         : item.remaining_billable_qty !== undefined
           ? num(item.remaining_billable_qty)
           : null,
-    purchasePrice: item.purchase_price !== undefined ? num(item.purchase_price) : null,
+    purchasePrice: nullableNumber(item.purchase_price),
   }
 }
 
 function normalizeMatching(raw) {
   const source = raw?.matching_result || raw?.verification || raw?.match_summary || null
-  if (!source && raw?.verification_status === undefined) return null
+  if (!source && raw?.verification_status === undefined && raw?.quantity_match === undefined && raw?.price_match === undefined) return null
   const issues = Array.isArray(source?.issues)
     ? source.issues
     : Array.isArray(raw?.verification_issues)
@@ -127,9 +127,9 @@ function normalizeMatching(raw) {
       : []
   const bool = (value) => (value === undefined || value === null ? null : Boolean(value))
   return {
-    quantityMatch: bool(source?.quantity_match ?? source?.qty_match),
-    priceMatch: bool(source?.price_match),
-    overall: String(source?.overall ?? raw?.verification_status ?? 'pending').toLowerCase(),
+    quantityMatch: bool(Object.hasOwn(raw, 'quantity_match') ? raw.quantity_match : source?.quantity_match ?? source?.qty_match),
+    priceMatch: bool(Object.hasOwn(raw, 'price_match') ? raw.price_match : source?.price_match),
+    overall: String(raw?.verification_status ?? source?.overall ?? 'pending').toLowerCase(),
     issues: issues
       .map((issue) => (typeof issue === 'string' ? issue : formatApiError(issue)))
       .filter(Boolean),
@@ -140,11 +140,8 @@ export function normalizeSupplierInvoice(raw) {
   if (!raw) return raw
   const items = Array.isArray(raw.items) ? raw.items.map(normalizeItem) : []
   const grandTotal = num(raw.grand_total ?? raw.total ?? raw.invoice_total)
-  const amountPaid = num(raw.amount_paid)
-  const outstanding =
-    raw.outstanding_amount !== undefined && raw.outstanding_amount !== null
-      ? num(raw.outstanding_amount)
-      : Math.max(grandTotal - amountPaid, 0)
+  const amountPaid = nullableNumber(raw.amount_paid)
+  const outstanding = nullableNumber(raw.outstanding_amount ?? raw.outstanding_balance)
   return {
     id: raw.id,
     supplierInvoiceNumber: raw.supplier_invoice_number || raw.invoice_number || raw.number || '',
@@ -157,7 +154,7 @@ export function normalizeSupplierInvoice(raw) {
     dueDate: raw.due_date || null,
     status: String(raw.status || 'draft').toLowerCase(),
     verificationStatus: String(raw.verification_status || 'pending').toLowerCase(),
-    paymentStatus: String(raw.payment_status || 'unpaid').toLowerCase(),
+    paymentStatus: raw.payment_status == null ? null : String(raw.payment_status).toLowerCase(),
     notes: raw.notes || '',
     items,
     // Backend is authoritative for every money field.

@@ -1,11 +1,12 @@
 import { forwardRef, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
+import NumericInput from './NumericInput'
 
 const Input = forwardRef(function Input(
   { label, error, as = 'input', type = 'text', className = '', inputClassName = '', compact = false, required = false, ...rest },
   ref,
 ) {
-  const Component = as
+  const Component = as === 'input' && (type === 'number' || ['numeric', 'decimal'].includes(rest.inputMode)) ? NumericInput : as
   const [showPassword, setShowPassword] = useState(false)
   const isPassword = as === 'input' && type === 'password'
   const fieldAnchorId = typeof rest.name === 'string' ? rest.name : undefined

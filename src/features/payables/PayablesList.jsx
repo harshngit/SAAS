@@ -269,7 +269,7 @@ export default function PayablesList() {
       </div>
 
       <ListOverview>
-      <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-4">
+      <ListSummary loading={isLoading} className={DEMO_MODE ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-5'}>
         <StatCard icon={IndianRupee} iconVariant="warning" label="Total Payable" value={formatCurrency(stats.totalOutstanding)} />
         {DEMO_MODE ? (
           <>
@@ -281,14 +281,15 @@ export default function PayablesList() {
           <>
             <StatCard icon={AlertTriangle} iconVariant="danger" label="Total Overdue" value={formatCurrency(stats.totalOverdue)} />
             <StatCard icon={CalendarClock} iconVariant="info" label="Due Today" value={formatCurrency(stats.dueToday)} />
-            <StatCard icon={Wallet} iconVariant="primary" label="Open Invoices" value={`${stats.openCount} · ${stats.supplierCount} suppliers`} />
+            <StatCard icon={Wallet} iconVariant="primary" label="Open Invoices" value={stats.openCount} />
+            <StatCard icon={Wallet} iconVariant="primary" label="Open Suppliers" value={stats.supplierCount} />
           </>
         )}
       </ListSummary>
       </ListOverview>
 
       {!DEMO_MODE && stats.ageing && (
-        <Card title="Ageing" subtitle="From the backend summary — reflects all matching payables, not the current page.">
+        <Card title="Ageing" subtitle="Invoices without a due date remain in Total Payable and open counts, but are excluded from overdue amounts and ageing buckets.">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               ['0_30', '1–30 Days'],

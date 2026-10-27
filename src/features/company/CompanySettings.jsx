@@ -1332,10 +1332,21 @@ function CompanyProfileCompletionModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Company Profile Completion"
-      className="!max-w-md"
+      className="max-w-6xl"
+      footer={
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex min-w-0 items-start gap-2 text-xs leading-5 text-neutral-500">
+            <Info className="mt-0.5 size-4 shrink-0 text-primary-600" aria-hidden="true" />
+            <span>You&apos;ll be taken directly to the first missing field in the selected section.</span>
+          </p>
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={handleClose}>
+            Close
+          </Button>
+        </div>
+      }
     >
-      <div className="pr-1">
-        <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 p-2.5">
+      <div className="space-y-5">
+        <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 p-4">
           <div className="flex items-center gap-2.5">
             <div
               className="grid size-9 shrink-0 place-items-center rounded-full"
@@ -1349,7 +1360,7 @@ function CompanyProfileCompletionModal({
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-neutral-900">
+              <p className="text-sm font-semibold text-neutral-900">
                 {completion.completedRequiredFields} of {completion.totalRequiredFields} required fields completed
               </p>
               <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface/70">
@@ -1362,7 +1373,7 @@ function CompanyProfileCompletionModal({
           </div>
         </div>
 
-        <div className="mt-2.5 space-y-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {incompleteSections.length > 0 ? (
             incompleteSections.map((section) => {
               const missingSummary = section.incompleteFields.map((field) => field.label);
@@ -1370,16 +1381,16 @@ function CompanyProfileCompletionModal({
               return (
                 <article
                   key={section.id}
-                  className="rounded-lg border border-neutral-100 bg-surface p-2.5 shadow-sm transition-shadow hover:shadow-md"
+                  className="flex min-w-0 flex-col rounded-xl border border-neutral-200 bg-surface p-4"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h4 className="text-xs font-semibold text-neutral-900">
+                      <h4 className="text-sm font-semibold text-neutral-900">
                         {section.label}
                       </h4>
-                      <p className="mt-0.5 text-[0.7rem] text-neutral-500">
+                      <p className="mt-0.5 text-xs text-neutral-500">
                         {section.incompleteFields.length} required field
-                        {section.incompleteFields.length === 1 ? "" : "s"} is missing
+                        {section.incompleteFields.length === 1 ? " is" : "s are"} missing
                       </p>
                     </div>
                     <span className="inline-flex shrink-0 items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[0.62rem] font-semibold text-amber-700">
@@ -1398,7 +1409,7 @@ function CompanyProfileCompletionModal({
                     ))}
                   </div>
 
-                  <div className="mt-2 flex items-center justify-end">
+                  <div className="mt-auto flex items-center justify-end pt-4">
                     <Button
                       type="button"
                       size="sm"
@@ -1413,23 +1424,14 @@ function CompanyProfileCompletionModal({
               );
             })
           ) : (
-            <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/60 p-3 text-xs text-neutral-500">
+            <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/60 p-4 text-sm text-neutral-500 md:col-span-2">
               All profile sections are complete.
             </div>
           )}
         </div>
 
-        <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-neutral-50 px-2.5 py-2 text-[0.7rem] text-neutral-600">
-          <Info className="size-3.5 shrink-0 text-emerald-700" />
-          <span>You&apos;ll be taken directly to the first missing field in the selected section.</span>
-        </div>
       </div>
 
-      <div className="mt-3 flex justify-end border-t border-neutral-100 pt-3">
-        <Button type="button" variant="ghost" size="sm" onClick={handleClose}>
-          Close
-        </Button>
-      </div>
     </Modal>
   );
 }

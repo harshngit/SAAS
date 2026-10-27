@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Ban, Check, PackageCheck, PackageSearch, Pencil, Trash2 } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
@@ -10,6 +11,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
+import { useWarehouseName } from '../../hooks/useWarehouseName'
 import {
   cancelGrn,
   confirmGrn,
@@ -60,7 +62,7 @@ function DemoGrnHistoryRow({ grn, onView }) {
   )
 }
 
-export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, purchaseStatusKey, receivingKey, onGrnChange, onGrnCount }) {
+export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, purchaseStatusKey, receivingKey, onGrnChange, onGrnCount, createRequested = false, onCreateRequestHandled }) {
   const { showToast } = useToast()
   const { can } = usePermission()
   // Backend permission contract: create=grn:create, edit=grn:edit, confirm/cancel=grn:approve,
@@ -75,6 +77,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
   // Edit mode preserves the Draft GRN's OWN warehouse - never silently replaced with the
   // Purchase warehouse (even though the backend currently keeps them equal).
   const [editGrnWarehouse, setEditGrnWarehouse] = useState({ id: '', name: '' })
+  const editWarehouseName = useWarehouseName(editGrnWarehouse.id, editGrnWarehouse.name)
   const [isPreparingEdit, setIsPreparingEdit] = useState(false)
   const [receiptDate, setReceiptDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [receiveNotes, setReceiveNotes] = useState('')
@@ -151,7 +154,8 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
           ? 'You do not have permission to create a goods receipt.'
           : undefined
 
-  const openReceiveModal = () => {
+  const openReceiveModal = useCallback(() => {
+    if (!canReceive) return
     setReceiveError('')
     setEditingGrnId(null)
     setEditGrnWarehouse({ id: '', name: '' })
@@ -184,11 +188,18 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
       }),
     )
     setReceiveOpen(true)
-  }
+  }, [canReceive, purchase.items, isDemo, alreadyReceived])
+
+  useEffect(() => {
+    if (!createRequested) return
+    if (canReceive) openReceiveModal()
+    onCreateRequestHandled?.()
+  }, [createRequested, canReceive, openReceiveModal, onCreateRequestHandled])
 
   // Edit a real DRAFT GRN - reuses the Create Goods Receipt modal. Fetches the GRN fresh so the
   // line values / tracking fields are authoritative, then PATCHes on save. Never auto-confirms.
   const openEditModal = async (grn) => {
+    if (isPreparingEdit || busyId || !canEditGrn || !grnActions(grn).includes('edit')) return
     setActionErr('')
     setReceiveError('')
     setIsPreparingEdit(true)
@@ -202,7 +213,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
     setEditingGrnId(fresh.id)
     setEditGrnWarehouse({
       id: fresh.warehouseId || purchase.warehouseId || '',
-      name: fresh.warehouseName || purchase.warehouseName || '',
+      name: fresh.warehouseName || (fresh.warehouseId === purchase.warehouseId ? purchase.warehouseName : '') || '',
     })
     setReceiveNotes(fresh.notes || '')
     setReceiptDate((fresh.receivedDate || new Date().toISOString().slice(0, 10)).slice(0, 10))
@@ -247,6 +258,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
         }
       }),
     )
+    setDetailGrnId(null)
     setReceiveOpen(true)
   }
 
@@ -361,6 +373,8 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
 
   // ---- Real GRN lifecycle actions ---------------------------------------------------------
   const runGrnAction = async (grn, kind) => {
+    const allowed = kind === 'delete' ? canDeleteGrn : canApproveGrn
+    if (busyId || isPreparingEdit || !allowed || !grnActions(grn).includes(kind)) return
     setBusyId(grn.id)
     setActionErr('')
     let result
@@ -379,9 +393,26 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
     } else {
       showToast({ title: 'Draft goods receipt deleted', message: `${grn.grnNumber} was removed.` })
     }
+    if (detailGrnId === grn.id) {
+      if (kind === 'delete') setDetailGrnId(null)
+      else if (result.grn) setDetailGrn(result.grn)
+      else setDetailTick((tick) => tick + 1)
+    }
     await loadRealGrns()
     // Confirm / cancel change the parent Purchase's received_qty / receiving_status.
     onGrnChange?.()
+  }
+
+  // The list and detail popup share the same actions and permission checks.
+  const grnActionItems = (grn) => {
+    if (isDemo) return []
+    const acts = grnActions(grn)
+    return [
+      { key: 'edit', label: 'Edit Draft', icon: Pencil, allowed: canEditGrn, onClick: () => openEditModal(grn) },
+      { key: 'confirm', label: 'Confirm', icon: Check, allowed: canApproveGrn, onClick: () => runGrnAction(grn, 'confirm') },
+      { key: 'cancel', label: 'Cancel GRN', icon: Ban, allowed: canApproveGrn, danger: true, onClick: () => runGrnAction(grn, 'cancel') },
+      { key: 'delete', label: 'Delete Draft', icon: Trash2, allowed: canDeleteGrn, danger: true, onClick: () => runGrnAction(grn, 'delete') },
+    ].filter((item) => item.allowed && acts.includes(item.key))
   }
 
   // ---- GRN detail (real: fetch fresh; demo: from local store) ----------------------------
@@ -491,27 +522,15 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
               <tbody className="divide-y divide-neutral-50">
                 {realGrns.map((grn) => {
                   const meta = grnLifecycleMeta(grn.status)
-                  const acts = grnActions(grn)
-                  const busy = busyId === grn.id
-                  const menuItems = [{ label: 'View GRN', onClick: () => setDetailGrnId(grn.id) }]
-                  // Draft only: Edit=grn:edit, Confirm/Cancel=grn:approve, Delete=grn:delete.
-                  if (acts.includes('edit') && canEditGrn) {
-                    menuItems.push({ label: isPreparingEdit ? 'Opening…' : 'Edit Draft', icon: Pencil, onClick: () => openEditModal(grn) })
-                  }
-                  if (acts.includes('confirm') && canApproveGrn) {
-                    menuItems.push({ label: busy ? 'Confirming…' : 'Confirm', icon: Check, onClick: () => runGrnAction(grn, 'confirm') })
-                  }
-                  if (acts.includes('cancel') && canApproveGrn) {
-                    menuItems.push({ label: 'Cancel GRN', icon: Ban, danger: true, onClick: () => runGrnAction(grn, 'cancel') })
-                  }
-                  if (acts.includes('delete') && canDeleteGrn) {
-                    menuItems.push({ label: 'Delete Draft', icon: Trash2, danger: true, onClick: () => runGrnAction(grn, 'delete') })
-                  }
+                  const menuItems = [
+                    { label: 'View GRN', onClick: () => { setActionErr(''); setDetailGrnId(grn.id) } },
+                    ...grnActionItems(grn),
+                  ]
                   return (
-                    <tr key={grn.id} className="cursor-pointer transition-colors hover:bg-primary-50/35" onClick={() => setDetailGrnId(grn.id)}>
+                    <tr key={grn.id} className="cursor-pointer transition-colors hover:bg-primary-50/35" onClick={() => { setActionErr(''); setDetailGrnId(grn.id) }}>
                       <td className="px-5 py-3.5 font-medium text-primary-700">{grn.grnNumber}</td>
                       <td className="px-5 py-3.5 text-neutral-600">{formatDate(grn.receivedDate)}</td>
-                      <td className="px-5 py-3.5 text-neutral-600">{grn.warehouseName || '—'}</td>
+                      <td className="px-5 py-3.5 text-neutral-600">{grn.warehouseName || (grn.warehouseId && grn.warehouseId === purchase.warehouseId ? purchase.warehouseName : '') || (grn.warehouseId ? 'Warehouse name unavailable' : 'No warehouse assigned')}</td>
                       <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{grn.acceptedTotal}</td>
                       <td className="px-5 py-3.5 text-right text-neutral-600">{grn.damagedTotal}</td>
                       <td className="px-5 py-3.5 text-right text-neutral-600">{grn.rejectedTotal}</td>
@@ -540,7 +559,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
           setEditGrnWarehouse({ id: '', name: '' })
         }}
         title={editingGrnId ? 'Edit Draft Goods Receipt' : 'Create Goods Receipt'}
-        size="4xl"
+        className="max-w-[90rem]"
       >
         <div className="space-y-5">
           {receiveError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{receiveError}</div>}
@@ -551,13 +570,18 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
             <Input label="Purchase #" value={purchase.purchaseNumber || purchase.invoiceNumber} disabled />
             <Input
               label="Warehouse"
-              value={(editingGrnId ? editGrnWarehouse.name : purchase.warehouseName) || '—'}
+              value={(editingGrnId ? editWarehouseName : purchase.warehouseName) || ((editingGrnId ? editGrnWarehouse.id : purchase.warehouseId) ? 'Warehouse name unavailable' : 'No warehouse assigned')}
               disabled
             />
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-neutral-100">
-            <table className="w-full min-w-4xl text-left text-sm">
+            <table className="w-full min-w-[56rem] table-fixed text-left text-sm">
+              <colgroup>
+                <col className="w-[22%]" />
+                <col className="w-[12%]" />
+                {Array.from({ length: 7 }, (_, index) => <col key={index} />)}
+              </colgroup>
               <thead>
                 <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.66rem] font-semibold text-neutral-400">
                   <th className="px-3 py-2.5">Product</th>
@@ -577,24 +601,24 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
                   return (
                     <Fragment key={line.productId}>
                       <tr>
-                        <td className="px-3 py-2.5 font-medium text-neutral-900">{line.productName}</td>
-                        <td className="px-3 py-2.5 text-neutral-500">{line.sku || '—'}</td>
+                        <td className="break-words px-3 py-2.5 font-medium text-neutral-900">{line.productName}</td>
+                        <td className="break-words px-3 py-2.5 text-neutral-500">{line.sku || '—'}</td>
                         <td className="px-3 py-2.5 text-right text-neutral-600">{line.orderedQty}</td>
                         <td className="px-3 py-2.5 text-right text-neutral-600">{line.previousReceived}</td>
                         <td className="px-3 py-2.5 text-right">
-                          <input type="number" min="0" step="1" value={line.receivingNow}
+                          <NumericInput type="number" min="0" step="1" value={line.receivingNow} aria-label={`Received Now for ${line.productName}`}
                             onChange={(event) => updateLine(index, 'receivingNow', event.target.value)}
-                            className="w-20 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
+                            className="w-full max-w-20 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                         </td>
                         <td className="px-3 py-2.5 text-right">
-                          <input type="number" min="0" step="1" value={line.damagedQty}
+                          <NumericInput type="number" min="0" step="1" value={line.damagedQty} aria-label={`Damaged for ${line.productName}`}
                             onChange={(event) => updateLine(index, 'damagedQty', event.target.value)}
-                            className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
+                            className="w-full max-w-20 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                         </td>
                         <td className="px-3 py-2.5 text-right">
-                          <input type="number" min="0" step="1" value={line.rejectedQty}
+                          <NumericInput type="number" min="0" step="1" value={line.rejectedQty} aria-label={`Rejected for ${line.productName}`}
                             onChange={(event) => updateLine(index, 'rejectedQty', event.target.value)}
-                            className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
+                            className="w-full max-w-20 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                         </td>
                         <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{computed.acceptedQty}</td>
                         <td className="px-3 py-2.5 text-right text-neutral-600">{computed.remainingQty}</td>
@@ -642,11 +666,24 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
       </Modal>
 
       {/* GRN detail */}
-      <Modal isOpen={Boolean(detailGrnId)} onClose={() => setDetailGrnId(null)} title={detailGrn?.grnNumber || 'Goods Receipt'} size="4xl">
+      <Modal isOpen={Boolean(detailGrnId)} onClose={() => { if (!busyId && !isPreparingEdit) setDetailGrnId(null) }} title={detailGrn?.grnNumber || 'Goods Receipt'} className="max-w-[90rem]"
+        footer={<div className="flex w-full flex-wrap items-center justify-end gap-2">
+          <Button type="button" variant="ghost" disabled={Boolean(busyId) || isPreparingEdit} onClick={() => setDetailGrnId(null)}>Close</Button>
+          {!isLoadingDetail && detailGrn && grnActionItems(detailGrn).map((item) => (
+            <Button key={item.key} type="button" variant={item.key === 'confirm' ? 'primary' : 'outline'}
+              className={item.danger ? 'text-red-600 hover:bg-red-50 hover:text-red-700' : ''}
+              disabled={Boolean(busyId) || isPreparingEdit} onClick={item.onClick}>
+              <item.icon className="size-4" aria-hidden="true" />
+              {isPreparingEdit && item.key === 'edit' ? 'Opening...' : busyId === detailGrn.id ? 'Please wait...' : item.label}
+            </Button>
+          ))}
+        </div>}
+      >
+        {actionErr && <div role="alert" className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionErr}</div>}
         {isLoadingDetail ? (
           <LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["Product", "SKU", "Ordered", "Prev. Received", "Received", "Damaged", "Rejected", "Accepted", "Batch / Serial / Expiry"]} label="Loading goods receipt..." />
         ) : detailGrn ? (
-          <GrnDetailBody grn={detailGrn} isDemo={isDemo} />
+          <GrnDetailBody grn={detailGrn} isDemo={isDemo} purchase={purchase} />
         ) : (
           <p className="py-6 text-center text-sm text-neutral-500">Goods receipt not found.</p>
         )}
@@ -655,7 +692,12 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
   )
 }
 
-function GrnDetailBody({ grn, isDemo }) {
+function GrnDetailBody({ grn, isDemo, purchase }) {
+  const samePurchase = Boolean(grn.purchaseId && grn.purchaseId === purchase?.id)
+  const warehouseName = useWarehouseName(grn.warehouseId,
+    grn.warehouseName || (grn.warehouseId && grn.warehouseId === purchase?.warehouseId ? purchase.warehouseName : ''))
+  const purchaseNumber = grn.purchaseNumber || (samePurchase ? purchase.purchaseNumber : '')
+  const supplierName = grn.supplierName || (samePurchase && (!grn.supplierId || grn.supplierId === purchase.supplierId) ? purchase.supplierName : '')
   // Demo GRNs carry the client-computed line shape; real GRNs carry backend fields.
   const totals = isDemo
     ? summarizeGrn(grn)
@@ -672,10 +714,10 @@ function GrnDetailBody({ grn, isDemo }) {
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <DetailPair label="GRN Number" value={grn.grnNumber} />
-        <DetailPair label="Purchase #" value={grn.purchaseNumber} />
-        <DetailPair label="Supplier" value={grn.supplierName} />
+        <DetailPair label="Purchase #" value={purchaseNumber} />
+        <DetailPair label="Supplier" value={supplierName} />
         <DetailPair label="Received Date" value={formatDate(grn.receivedDate || grn.receiptDate)} />
-        <DetailPair label="Warehouse" value={grn.warehouseName} />
+        <DetailPair label="Warehouse" value={warehouseName || (grn.warehouseId ? 'Warehouse name unavailable' : 'No warehouse assigned')} />
         {meta ? (
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Status</p>
@@ -696,7 +738,13 @@ function GrnDetailBody({ grn, isDemo }) {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-neutral-100">
-        <table className="w-full min-w-4xl text-left text-sm">
+        <table className="w-full min-w-[56rem] table-fixed text-left text-sm">
+          <colgroup>
+            <col className="w-[22%]" />
+            <col className="w-[12%]" />
+            {Array.from({ length: 6 }, (_, index) => <col key={index} />)}
+            <col className="w-[16%]" />
+          </colgroup>
           <thead>
             <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.66rem] font-semibold text-neutral-400">
               <th className="px-3 py-2.5">Product</th>
@@ -713,15 +761,15 @@ function GrnDetailBody({ grn, isDemo }) {
           <tbody className="divide-y divide-neutral-50">
             {rows.map((line, index) => (
               <tr key={line.id || line.productId || index}>
-                <td className="px-3 py-2.5 font-medium text-neutral-900">{line.productName}</td>
-                <td className="px-3 py-2.5 text-neutral-500">{line.sku || '—'}</td>
+                <td className="break-words px-3 py-2.5 font-medium text-neutral-900">{line.productName}</td>
+                <td className="break-words px-3 py-2.5 text-neutral-500">{line.sku || '—'}</td>
                 <td className="px-3 py-2.5 text-right text-neutral-600">{line.orderedQty ?? '—'}</td>
                 <td className="px-3 py-2.5 text-right text-neutral-600">{line.previousReceived ?? '—'}</td>
                 <td className="px-3 py-2.5 text-right text-neutral-600">{line.receivedQty ?? line.receivingNow ?? 0}</td>
                 <td className="px-3 py-2.5 text-right text-neutral-600">{line.damagedQty ?? 0}</td>
                 <td className="px-3 py-2.5 text-right text-neutral-600">{line.rejectedQty ?? 0}</td>
                 <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{line.acceptedQty ?? 0}</td>
-                <td className="px-3 py-2.5 text-neutral-500">
+                <td className="break-words px-3 py-2.5 text-neutral-500">
                   {grnLineHasTracking(line)
                     ? [line.batchNumber, ...(line.serialNumbers || []), line.serialNumber, line.expiryDate ? formatDate(line.expiryDate) : '']
                         .filter(Boolean)

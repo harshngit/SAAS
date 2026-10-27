@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
@@ -1048,7 +1049,7 @@ function CreateSalesInvoiceForm() {
                           />
                         </td>
                         <td className="px-3 py-2.5">
-                          <input
+                          <NumericInput
                             type="number"
                             min="1"
                             step="1"
@@ -1059,7 +1060,7 @@ function CreateSalesInvoiceForm() {
                           />
                         </td>
                         <td className="px-3 py-2.5">
-                          <input
+                          <NumericInput
                             type="number"
                             min="0"
                             step="1"
@@ -1069,7 +1070,7 @@ function CreateSalesInvoiceForm() {
                           />
                         </td>
                         <td className="px-3 py-2.5">
-                          <input
+                          <NumericInput
                             type="number"
                             min="0"
                             max="100"
@@ -1081,7 +1082,7 @@ function CreateSalesInvoiceForm() {
                           />
                         </td>
                         <td className="px-3 py-2.5">
-                          <input
+                          <NumericInput
                             type="number"
                             min="0"
                             max="100"

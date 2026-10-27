@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
@@ -507,7 +508,7 @@ export default function SupplierInvoiceForm() {
                       <td className="px-3 py-2.5 text-right text-neutral-500">{item.purchasePrice != null ? formatCurrency(item.purchasePrice) : '—'}</td>
                       <td className="px-3 py-2.5 text-right text-neutral-500">{item.remainingInvoiceableQty != null ? item.remainingInvoiceableQty : '—'}</td>
                       <td className="px-3 py-2.5 text-right">
-                        <input
+                        <NumericInput
                           type="number"
                           min="0"
                           step="1"
@@ -517,7 +518,7 @@ export default function SupplierInvoiceForm() {
                         />
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <input
+                        <NumericInput
                           type="number"
                           min="0"
                           step="1"
@@ -527,10 +528,10 @@ export default function SupplierInvoiceForm() {
                         />
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <input type="number" min="0" max="100" step="1" value={item.discount} onChange={(event) => updateItem(index, 'discount', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
+                        <NumericInput type="number" min="0" max="100" step="1" value={item.discount} onChange={(event) => updateItem(index, 'discount', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <input type="number" min="0" max="100" step="1" value={item.taxRate} onChange={(event) => updateItem(index, 'taxRate', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
+                        <NumericInput type="number" min="0" max="100" step="1" value={item.taxRate} onChange={(event) => updateItem(index, 'taxRate', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                       </td>
                       <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(line.lineTotal)}</td>
                       <td className="px-3 py-2.5 text-right">

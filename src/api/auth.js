@@ -1,6 +1,7 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient, API_BASE_URL, normalizeTokens } from './client'
 import { disablePushForLogout, syncPushToken } from '../push/pushService'
+import { phoneConflictFields } from '../utils/phoneConflict'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -76,6 +77,32 @@ export async function login({ email, password }) {
   }
 }
 
+export async function sendPhoneOtp({ phone }) {
+  try {
+    const { data } = await apiClient.post('/auth/phone/send-otp', { phone })
+    return { success: true, detail: data.detail, resendAfter: data.resend_after ?? 30 }
+  } catch (error) {
+    const data = error.response?.data
+    return { success: false, status: error.response?.status, error: formatApiError(data?.detail || data, 'Unable to send OTP. Please try again.') }
+  }
+}
+
+export async function loginWithPhoneOtp({ phone, code }) {
+  try {
+    const { data } = await apiClient.post('/auth/phone/verify-otp', { phone, code })
+    const tokens = normalizeTokens(data)
+    if (!tokens?.access_token) return { success: false, error: 'Unable to sign in. Please try again.' }
+    useAuthStore.getState().setAuthTokens(tokens)
+    const profileResult = await getCurrentProfile()
+    if (!profileResult.success) return profileResult
+    syncPushToken()
+    return { success: true, ...profileResult }
+  } catch (error) {
+    const data = error.response?.data
+    return { success: false, status: error.response?.status, error: formatApiError(data?.detail || data, 'Unable to verify OTP. Please try again.') }
+  }
+}
+
 export async function registerOrganization(payload) {
   try {
     const requestBody = {
@@ -97,7 +124,7 @@ export async function registerOrganization(payload) {
       'Unable to register organization. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, error: message, fieldErrors: phoneConflictFields(error.response?.status, message) }
   }
 }
 
@@ -107,9 +134,7 @@ export async function forgotPassword({ email }) {
       email: email.trim().toLowerCase(),
     })
 
-    // reset_token is only populated when the backend runs with expose_reset_token enabled
-    // (dev/demo) - production responses omit it and rely on the emailed link instead.
-    return { success: true, detail: data?.detail || 'If an account exists for that email, a reset link has been sent.', resetToken: data?.reset_token || '' }
+    return { success: true, detail: data?.detail || 'If an account exists for this email, a reset link has been sent. Please check your inbox.' }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(
@@ -121,11 +146,12 @@ export async function forgotPassword({ email }) {
   }
 }
 
-export async function resetPassword({ token, newPassword }) {
+export async function resetPassword({ token, newPassword, confirmPassword }) {
   try {
     const { data } = await apiClient.post('/auth/reset-password', {
       token,
       new_password: newPassword,
+      confirm_password: confirmPassword,
     })
 
     return { success: true, detail: data?.detail || 'Password reset successfully.' }
@@ -136,7 +162,14 @@ export async function resetPassword({ token, newPassword }) {
       'Unable to reset password. The reset link may have expired.',
     )
 
-    return { success: false, error: message }
+    const fieldErrors = {}
+    if (Array.isArray(errorData?.detail)) {
+      for (const issue of errorData.detail) {
+        const key = issue.loc?.find((part) => ['new_password', 'confirm_password'].includes(part))
+        if (key) fieldErrors[key === 'new_password' ? 'newPassword' : 'confirmPassword'] = issue.msg
+      }
+    }
+    return { success: false, status: error.response?.status, error: message, fieldErrors }
   }
 }
 
@@ -280,6 +313,6 @@ export async function completeGoogleRegistration(payload) {
       'Unable to complete registration. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, error: message, fieldErrors: phoneConflictFields(error.response?.status, message) }
   }
 }

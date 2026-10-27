@@ -1,3 +1,4 @@
+import NumericInput from '../../components/ui/NumericInput'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -182,7 +183,7 @@ function AddDeliveryProductModal({ isOpen, onClose, products, catalogProducts, o
                       {catalog?.price != null ? ` · ${formatCurrency(Number(catalog.price) || 0)}` : ''}
                     </p>
                   </div>
-                  <input
+                  <NumericInput
                     type="number"
                     min="1"
                     step="1"
@@ -1146,7 +1147,7 @@ export default function DeliveryDetail() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-neutral-500">Picked Qty</label>
-                  <input
+                  <NumericInput
                     type="number"
                     min="0"
                     max={item.plannedQuantity}
@@ -1274,7 +1275,7 @@ export default function DeliveryDetail() {
                               >
                                 <Minus className="size-3.5" aria-hidden="true" />
                               </button>
-                              <input
+                              <NumericInput
                                 value={delivering}
                                 onChange={(event) => setDeliveringQty(item.id, event.target.value)}
                                 inputMode="numeric"
@@ -1339,7 +1340,7 @@ export default function DeliveryDetail() {
                             >
                               <Minus className="size-3.5" aria-hidden="true" />
                             </button>
-                            <input
+                            <NumericInput
                               value={entry.quantity}
                               onChange={(event) => {
                                 const rounded = Math.max(1, Math.round(Number(event.target.value) || 1))
