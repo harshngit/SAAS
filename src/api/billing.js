@@ -29,7 +29,7 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
-function normalizePayment(payment) {
+export function normalizePayment(payment) {
   if (!payment) return payment
   return {
     id: payment.id,

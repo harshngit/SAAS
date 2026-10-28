@@ -261,7 +261,7 @@ const Select = forwardRef(function Select(
             // unclickable, forcing the user to type into the search box with no list to pick
             // from. Matches the level DatePicker.jsx's own popover already uses for the same
             // reason, so every floating field control stacks consistently above any modal/drawer.
-            className="fixed z-[140] overflow-x-hidden overflow-y-auto rounded-xl border border-surface-border bg-(--modal-bg) p-1 text-sm text-fg shadow-popover"
+            className="app-scrollbar fixed z-[140] overflow-x-hidden overflow-y-auto rounded-xl border border-surface-border bg-(--modal-bg) p-1 text-sm text-fg shadow-popover"
           >
             {visibleOptions.length === 0 ? (
               <div className="cursor-default rounded-lg px-3 py-2 text-neutral-400">No matches</div>

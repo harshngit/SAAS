@@ -130,7 +130,7 @@ export default function ReportTable({ columns, rows, getRowKey, sortable = false
                     <button
                       type="button"
                       onClick={() => handleSortClick(column)}
-                      className={`inline-flex items-center gap-1 ${column.align === 'right' ? 'flex-row-reverse' : ''} hover:text-neutral-600`}
+                      className={`inline-flex items-center gap-1 transition-opacity hover:opacity-80 ${column.align === 'right' ? 'flex-row-reverse' : ''}`}
                     >
                       {column.label}
                       {isActive ? (

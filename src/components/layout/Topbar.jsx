@@ -287,7 +287,7 @@ export default function Topbar() {
                     </button>
                   )}
                 </div>
-                <div className="max-h-80 overflow-y-auto">
+                <div className="app-scrollbar max-h-80 overflow-y-auto">
                   {isLoadingNotifications ? (
                     <div className="space-y-3 px-4 py-4" role="status" aria-label="Loading notifications">
                       {Array.from({ length: 3 }).map((_, index) => (

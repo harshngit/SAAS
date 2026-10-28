@@ -211,7 +211,7 @@ export async function getSupplierInvoicePayments(supplierInvoiceId) {
     return { success: true, payments: rows.map((raw) => ({
       ...normalizeSupplierPayment(raw),
       // Invoice history status is authoritative; do not inherit the shared default.
-      status: String(raw.status ?? '').trim().toLowerCase(),
+      status: String(raw.status ?? raw.payment_status ?? '').trim().toLowerCase(),
       allocatedAmount: raw.allocated_amount == null ? null : num(raw.allocated_amount),
     })) }
   } catch (error) {

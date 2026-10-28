@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, CreditCard, Crown, Database, Wallet } from 'lucide-react'
+import { Check, Columns3, CreditCard, Crown, Database, Wallet } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -61,6 +61,8 @@ export default function AdminPlans() {
   const [isTestModePayment, setIsTestModePayment] = useState(false)
 
   const plansGridRef = useRef(null)
+  const comparisonRef = useRef(null)
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -133,6 +135,17 @@ export default function AdminPlans() {
 
   const scrollToPlans = () => {
     plansGridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  // Single open/close trigger for the comparison table, lives here in the page header - opening
+  // it also scrolls it into view, since it otherwise sits below the plan cards where a newly
+  // opened table could land off-screen.
+  const toggleComparison = () => {
+    setIsComparisonOpen((value) => {
+      const next = !value
+      if (next) requestAnimationFrame(() => comparisonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+      return next
+    })
   }
 
   const handleChoosePlan = (plan) => {
@@ -332,6 +345,10 @@ export default function AdminPlans() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:ml-auto lg:pl-5">
+            <Button variant="outline" size="sm" onClick={toggleComparison}>
+              <Columns3 className="size-4" aria-hidden="true" />
+              {isComparisonOpen ? 'Hide Comparison' : 'Compare Plans'}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/admin/billing-history')}>
               <CreditCard className="size-4" aria-hidden="true" />
               Manage Billing
@@ -563,7 +580,11 @@ export default function AdminPlans() {
         )}
       </div>
 
-      {!isLoading && plans.length > 0 && <PlanComparisonTable plans={plans} />}
+      {!isLoading && plans.length > 0 && (
+        <div ref={comparisonRef}>
+          <PlanComparisonTable plans={plans} isExpanded={isComparisonOpen} />
+        </div>
+      )}
     </div>
   )
 }

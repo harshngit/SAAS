@@ -97,6 +97,11 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config
     const isUnauthorized = error.response?.status === 401
     const requestUrl = originalRequest?.url || ''
+    if (isUnauthorized && requestUrl.startsWith('/platform/')) {
+      useAuthStore.getState().logout()
+      redirectToLogin()
+      return Promise.reject(error)
+    }
     const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/refresh') || requestUrl.includes('/auth/phone/')
 
     if (!isUnauthorized || !originalRequest || originalRequest._retry || isAuthRequest) {

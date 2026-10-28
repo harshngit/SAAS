@@ -1,3 +1,4 @@
+import { platformRoleForUser, platformHomeForUser } from './platformRoles'
 import { ENTITLEMENT_KEYS } from '../entitlements/entitlementKeys'
 import {
   LayoutDashboard,
@@ -48,6 +49,7 @@ import {
 
 export const ROLES = {
   SUPER_ADMIN: 'super_admin',
+  PLATFORM_SALES_MANAGER: 'platform_sales_manager',
   ADMIN: 'admin',
   SALES_OFFICER: 'sales_officer',
   DELIVERY_PARTNER: 'delivery_partner',
@@ -56,6 +58,7 @@ export const ROLES = {
 
 export const roleLabels = {
   [ROLES.SUPER_ADMIN]: 'Super Admin',
+  [ROLES.PLATFORM_SALES_MANAGER]: 'Sales Manager',
   [ROLES.ADMIN]: 'Admin',
   [ROLES.SALES_OFFICER]: 'Sales Officer',
   [ROLES.DELIVERY_PARTNER]: 'Delivery Partner',
@@ -64,6 +67,7 @@ export const roleLabels = {
 
 export const roleHomePath = {
   [ROLES.SUPER_ADMIN]: '/superadmin/dashboard',
+  [ROLES.PLATFORM_SALES_MANAGER]: '/platform/organizations',
   [ROLES.ADMIN]: '/admin/dashboard',
   [ROLES.SALES_OFFICER]: '/sales/dashboard',
   [ROLES.DELIVERY_PARTNER]: '/delivery/dashboard',
@@ -96,8 +100,10 @@ const WORKSPACE_TO_ROLE = {
 // Falls back to the raw role string if neither is recognised. Not authorization - just shell
 // selection; every screen is still permission-gated.
 export function resolveWorkspaceRole({ role, currentUser } = {}) {
+  const platform = platformRoleForUser(currentUser)
+  if (platform) return platform === 'sales_manager' ? ROLES.PLATFORM_SALES_MANAGER : ROLES.SUPER_ADMIN
   const raw = currentUser?.role
-  if (raw && Object.values(ROLES).includes(raw)) return raw
+  if (raw && raw !== ROLES.PLATFORM_SALES_MANAGER && Object.values(ROLES).includes(raw)) return raw
   return WORKSPACE_TO_ROLE[role?.workspace] || raw || null
 }
 
@@ -105,6 +111,8 @@ export function resolveWorkspaceRole({ role, currentUser } = {}) {
 // dashboard; otherwise workspace drives it; falls back to the legacy role-string map for
 // sessions that predate the workspace field, and finally to a page every role can reach.
 export function resolveHomePath({ fullAccess, role, currentUser } = {}) {
+  const platformHome = platformHomeForUser(currentUser)
+  if (platformHome) return platformHome
   if (fullAccess) return roleHomePath[ROLES.ADMIN]
 
   const workspace = role?.workspace
@@ -116,6 +124,11 @@ export function resolveHomePath({ fullAccess, role, currentUser } = {}) {
 }
 
 export const roleMenus = {
+  [ROLES.PLATFORM_SALES_MANAGER]: [{ section: 'Platform Operations', items: [
+    { label: 'Organizations', path: '/platform/organizations', icon: Building2 },
+    { label: 'Upgrade Requests', path: '/platform/upgrade-requests', icon: TrendingUp },
+    { label: 'Feature Requests', path: '/platform/feature-requests', icon: ClipboardList },
+  ] }],
   [ROLES.SUPER_ADMIN]: [
     {
       section: 'Main Menu',
@@ -123,6 +136,8 @@ export const roleMenus = {
         { label: 'Dashboard', path: '/superadmin/dashboard', icon: LayoutDashboard },
         { label: 'Organizations', path: '/superadmin/organizations', icon: Building2 },
         { label: 'Upgrade Requests', path: '/superadmin/upgrade-requests', icon: TrendingUp },
+        { label: 'Feature Requests', path: '/superadmin/feature-requests', icon: ClipboardList },
+        { label: 'Platform Staff', path: '/superadmin/staff', icon: Users },
         { label: 'Plans', path: '/superadmin/plans', icon: CreditCard },
         { label: 'Platform Analytics', path: '/superadmin/analytics', icon: Activity },
         { label: 'Superadmins', path: '/superadmin/admins', icon: ShieldCheck },

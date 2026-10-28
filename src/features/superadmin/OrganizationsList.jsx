@@ -1,3 +1,5 @@
+import { usePlatformAccess } from './platformHelpers'
+import { listPlatformOrganizations as listSuperAdminOrganizations } from '../../api/platform'
 import { SkeletonValue } from '../../components/ui/Skeleton'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { useEffect, useMemo, useState } from 'react'
@@ -27,7 +29,7 @@ import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import ActionMenu from '../../components/ui/ActionMenu'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
-import { deleteOrganization, listSuperAdminOrganizations } from '../../api/superadmin'
+import { deleteOrganization } from '../../api/superadmin'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { exportRowsToExcel } from '../../utils/exportToExcel'
@@ -131,6 +133,7 @@ function exportOrganizations(rows) {
 
 export default function OrganizationsList() {
   const navigate = useNavigate()
+  const { isSuperAdmin, basePath } = usePlatformAccess()
   const [searchParams, setSearchParams] = useSearchParams()
   const [organizations, setOrganizations] = useState([])
   const [summaryOrganizations, setSummaryOrganizations] = useState([])
@@ -242,7 +245,8 @@ export default function OrganizationsList() {
       setIsLoadingOrganizations(true)
       setListError('')
 
-      const [result, summaryResult] = await Promise.all([listSuperAdminOrganizations({
+      const [result, summaryResult] = await Promise.all([loadSummaryRows(listSuperAdminOrganizations, 'organizations', {
+        search: searchTerm,
         status: statusFilter,
         upgrade_status: upgradeStatusFilter,
         ...sortParams,
@@ -260,12 +264,13 @@ export default function OrganizationsList() {
       setOrganizations((result.organizations || []).map(normalizeOrganization))
     }
 
-    loadOrganizations()
+    const timer = setTimeout(loadOrganizations, 250)
 
     return () => {
+      clearTimeout(timer)
       isMounted = false
     }
-  }, [statusFilter, upgradeStatusFilter, sortParams])
+  }, [statusFilter, upgradeStatusFilter, sortParams, searchTerm])
 
   // Options are derived from whatever is actually loaded - never a guessed/hardcoded list - so a
   // plan or business type that doesn't currently exist on any organization never appears as a
@@ -356,11 +361,13 @@ export default function OrganizationsList() {
   }
 
   const openDeleteConfirm = (rows) => {
+    if (!isSuperAdmin) return
     setDeleteError('')
     setDeleteTarget({ ids: rows.map((row) => row.id), names: rows.map((row) => row.name) })
   }
 
   const handleConfirmDelete = async () => {
+    if (!isSuperAdmin) return
     if (!deleteTarget) return
 
     setIsDeleting(true)
@@ -498,7 +505,7 @@ export default function OrganizationsList() {
               <Download className="size-4" aria-hidden="true" />
               Export Selected
             </Button>
-            <Button
+            {isSuperAdmin && (            <Button
               type="button"
               variant="danger"
               size="sm"
@@ -506,7 +513,7 @@ export default function OrganizationsList() {
             >
               <Trash2 className="size-4" aria-hidden="true" />
               Delete Selected
-            </Button>
+            </Button>)}
             <button type="button" onClick={() => setSelectedIds([])} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">
               Clear
             </button>
@@ -595,7 +602,7 @@ export default function OrganizationsList() {
               {paginatedOrganizations.map((organization) => (
                   <tr
                     key={organization.id}
-                    onClick={() => navigate(`/superadmin/organizations/${organization.id}`)}
+                    onClick={() => navigate(`${basePath}/organizations/${organization.id}`)}
                     className="cursor-pointer bg-surface transition-colors hover:bg-primary-50/30"
                   >
                     <td className="px-6 py-5 align-middle" onClick={(event) => event.stopPropagation()}>
@@ -636,7 +643,7 @@ export default function OrganizationsList() {
                       <div className="inline-flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => navigate(`/superadmin/organizations/${organization.id}`)}
+                          onClick={() => navigate(`${basePath}/organizations/${organization.id}`)}
                           className="inline-flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-neutral-100 hover:text-slate-950"
                           aria-label={`View ${organization.name}`}
                         >
@@ -644,11 +651,11 @@ export default function OrganizationsList() {
                         </button>
                         <ActionMenu
                           triggerClassName="size-9 text-slate-400 hover:text-slate-700"
-                          items={[
+                          items={isSuperAdmin ? [
                             {
                               label: 'View details',
                               icon: Eye,
-                              onClick: () => navigate(`/superadmin/organizations/${organization.id}`),
+                              onClick: () => navigate(`${basePath}/organizations/${organization.id}`),
                             },
                             {
                               label: 'Copy ID',
@@ -666,7 +673,7 @@ export default function OrganizationsList() {
                               danger: true,
                               onClick: () => openDeleteConfirm([organization]),
                             },
-                          ]}
+                          ] : [{ label: 'View Organization', icon: Eye, onClick: () => navigate(`${basePath}/organizations/${organization.id}`) }]}
                         />
                       </div>
                     </td>

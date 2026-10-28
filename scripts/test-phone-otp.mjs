@@ -174,8 +174,8 @@ test('email and phone share the same saved-location/role dashboard redirect', as
   const node = walk(ast.program).find((item) => item.type === 'VariableDeclarator' && item.id.name === 'finishLogin').init
   for (const [from, role, expected] of [['/admin/products', 'sales', '/admin/products'], ['', 'sales', '/sales/dashboard'], ['', 'unknown', '/admin/dashboard']]) {
     let destination, loading
-    const finish = new Function('location', 'roleHomePath', 'navigate', 'setIsRedirecting', `return (${source.slice(node.start, node.end)})`)(
-      { state: { from: { pathname: from } } }, { sales: '/sales/dashboard' }, (path) => { destination = path }, (value) => { loading = value },
+    const finish = new Function('location', 'roleHomePath', 'navigate', 'setIsRedirecting', 'platformHomeForUser', `return (${source.slice(node.start, node.end)})`)(
+      { state: { from: { pathname: from } } }, { sales: '/sales/dashboard' }, (path) => { destination = path }, (value) => { loading = value }, () => null,
     )
     finish({ user: { role } })
     assert.equal(destination, expected)

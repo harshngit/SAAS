@@ -202,13 +202,14 @@ export async function getCurrentProfile() {
     useAuthStore.getState().setAuthenticatedSession(data)
     return { success: true, ...data }
   } catch (error) {
+    if (error.response?.status === 401) useAuthStore.getState().logout()
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to load profile details. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, status: error.response?.status, error: message }
   }
 }
 

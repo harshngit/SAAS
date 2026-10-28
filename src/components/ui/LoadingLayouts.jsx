@@ -107,6 +107,40 @@ export function DashboardLoading({ layout = 'admin' }) {
       </div>
     </div>
   </div>
+  if (layout === 'superadmin') {
+    const panelHeading = (withAction = true) => <div className="mb-5 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <Skeleton className="size-5 shrink-0 rounded-lg" />
+        <Skeleton className="h-4 w-36 rounded-lg" />
+      </div>{withAction && <Skeleton className="h-8 w-20 shrink-0 rounded-lg" />}</div>
+    return <div className="space-y-4">
+      <StatsLoading count={6} divided={false} className="grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" />
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.65fr_1fr]">
+        <Chart height="h-56" />
+        <Chart height="h-56" donut />
+      </div>
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.18fr_1fr_0.8fr]">
+        <Panel>
+          {panelHeading()}
+          <TableLoading columns={5} rows={4} minWidth="min-w-0" cellClassName="px-3 py-3" />
+        </Panel>
+        <Panel>
+          {panelHeading()}
+          <TableLoading columns={4} rows={4} minWidth="min-w-0" cellClassName="px-3 py-3" />
+        </Panel>
+        <Panel>
+          {panelHeading(false)}
+          <div className="space-y-3">{Array.from({ length: 4 }, (_, i) => <div key={i} className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-3 last:border-b-0 last:pb-0">
+              <div className="flex min-w-0 items-center gap-3">
+                <Skeleton className="size-7 shrink-0 rounded-lg" />
+                <Skeleton className="h-3 w-28" />
+              </div>
+              <Skeleton className="h-3.5 w-8 shrink-0" />
+            </div>)}</div>
+        </Panel>
+      </div>
+    </div>
+  }
   const count = layout === 'accounts' ? 5 : 4
   return <div className="space-y-5">
     <Panel>

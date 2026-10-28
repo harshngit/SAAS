@@ -43,11 +43,18 @@ function cellValue(plan, row) {
     : <Minus className="mx-auto size-4 text-neutral-300" aria-hidden="true" />
 }
 
-export default function PlanComparisonTable({ plans }) {
-  if (!plans || plans.length === 0) return null
+// Controlled by the caller (AdminPlans.jsx renders the single "Compare Plans" open/close trigger
+// in its own top header bar, next to Manage Billing/Upgrade Plan) - this component has no toggle
+// of its own, so there's exactly one place on the page that opens/closes it, not a second control
+// buried down here too.
+export default function PlanComparisonTable({ plans, isExpanded }) {
+  if (!plans || plans.length === 0 || !isExpanded) return null
 
   return (
-    <Card title="Compare Plans" subtitle="What each plan actually includes, read directly from its configuration.">
+    <Card
+      title="Compare Plans"
+      subtitle="What each plan actually includes, read directly from its configuration."
+    >
       <div className="overflow-x-auto rounded-xl border border-neutral-100">
         <table className="w-full text-left text-sm">
           <thead>

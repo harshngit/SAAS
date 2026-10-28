@@ -1,3 +1,4 @@
+import { platformRoleForUser } from '../auth/platformRoles'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { normalizeOrganizationTheme, DEFAULT_THEME } from '../api/theme'
@@ -113,6 +114,7 @@ export const useAuthStore = create(
 
         const normalizedUser = {
           ...user,
+          role: platformRoleForUser(user) === 'sales_manager' ? 'platform_sales_manager' : platformRoleForUser(user) === 'super_admin' ? 'super_admin' : user.role,
           phone_verified: user.phone_verified ?? phone_verified ?? false,
           orgId: user.organization_id,
           status: user.is_active ? 'active' : 'inactive',

@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 
-function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
+export function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
     return fallbackMessage
   }

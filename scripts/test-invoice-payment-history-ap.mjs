@@ -65,11 +65,26 @@ test('invoice history keeps voided and recorded rows and trusts status over paym
   assert.equal(invoice.paymentStatus, 'partially_paid')
 })
 test('missing and unknown history states never become Recorded', async () => {
-  client.get = async () => ({ data: [{ id: 'missing', payment_status: 'recorded' }, { id: 'new', status: 'under_review' }] })
+  client.get = async () => ({ data: [{ id: 'missing' }, { id: 'new', status: 'under_review' }] })
   const result = await payments.getSupplierInvoicePayments('invoice')
   assert.equal(helpers.invoicePaymentHistoryStatusMeta(result.payments[0].status).label, 'Unknown')
   assert.equal(helpers.invoicePaymentHistoryStatusMeta(result.payments[1].status).label, 'Under Review')
   assert.equal(helpers.invoicePaymentHistoryStatusMeta(result.payments[1].status).variant, 'neutral')
+})
+
+test('history supports both backend status fields and prefers the new field', async () => {
+  client.get = async () => ({ data: [
+    { id: 'new-void', status: 'voided' },
+    { id: 'old-void', payment_status: 'voided' },
+    { id: 'new-recorded', status: 'recorded' },
+    { id: 'old-recorded', payment_status: 'recorded' },
+    { id: 'null-new', status: null, payment_status: ' VOIDED ' },
+    { id: 'both', status: 'recorded', payment_status: 'voided' },
+  ] })
+  const result = await payments.getSupplierInvoicePayments('invoice')
+  assert.deepEqual(result.payments.map(entry => helpers.invoicePaymentHistoryStatusMeta(entry.status).label), [
+    'Voided', 'Voided', 'Recorded', 'Recorded', 'Voided', 'Recorded',
+  ])
 })
 test('canonical allocated zero/null does not fall back to allocation sums', async () => {
   client.get = async () => ({ data: [

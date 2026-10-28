@@ -1,3 +1,4 @@
+import { platformHomeForUser } from '../../auth/platformRoles'
 import PhoneOtpLogin from "./PhoneOtpLogin";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -59,6 +60,7 @@ export default function Login() {
   const finishLogin = (result) => {
     setIsRedirecting(true);
     const redirectTo =
+      platformHomeForUser(result.user) ||
       location.state?.from?.pathname ||
       roleHomePath[result.user.role] ||
       "/admin/dashboard";

@@ -105,7 +105,7 @@ export default function DataTable({
                     <button
                       type="button"
                       onClick={() => toggleSort(column)}
-                      className="inline-flex items-center gap-1 hover:text-neutral-700"
+                      className="inline-flex items-center gap-1 transition-opacity hover:opacity-80"
                     >
                       {column.header}
                       {sort.key === column.key ? (

@@ -305,7 +305,7 @@ export default function UniversalSearch({ className = '', inputClassName = '', p
           <div
             ref={panelRef}
             style={{ position: 'fixed', top: dropdownPosition.top, left: dropdownPosition.left, width: dropdownPosition.width }}
-            className="z-50 max-h-104 overflow-y-auto rounded-2xl border border-surface-border bg-(--modal-bg) shadow-(--shadow-popover)"
+            className="app-scrollbar z-50 max-h-104 overflow-y-auto rounded-2xl border border-surface-border bg-(--modal-bg) shadow-(--shadow-popover)"
           >
           {matchingQuickLinks.length > 0 && (
             <div className="border-b border-neutral-50 py-1.5">

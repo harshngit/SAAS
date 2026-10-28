@@ -26,7 +26,8 @@ import { useAuthStore } from '../../store/authStore'
 import { roleMenus, roleLabels, ROLES, resolveWorkspaceRole } from '../../auth/roles'
 import { usePermission } from '../../auth/usePermission'
 import { useEntitlements } from '../../entitlements/EntitlementsContext'
-import { listSuperAdminOrganizations } from '../../api/superadmin'
+import { listPlatformRequests } from '../../api/platform'
+import { loadSummaryRows } from '../../utils/listSummary'
 import { getMyAttendance } from '../../api/attendance'
 import { durationLabel, formatTimeLabel, normalizeAttendanceRecord } from '../../features/attendance/attendanceUtils'
 
@@ -143,10 +144,10 @@ export default function Sidebar({
     let isMounted = true
 
     async function loadPendingUpgradeCount() {
-      const result = await listSuperAdminOrganizations({ upgrade_status: 'pending' })
+      const result = await loadSummaryRows(params => listPlatformRequests('upgrade', params), 'requests')
       if (!isMounted || !result.success) return
 
-      setNavBadgeCounts((current) => ({ ...current, pendingUpgrades: result.organizations?.length || 0 }))
+      setNavBadgeCounts((current) => ({ ...current, pendingUpgrades: result.requests.filter(row => row.status === 'pending').length }))
     }
 
     loadPendingUpgradeCount()

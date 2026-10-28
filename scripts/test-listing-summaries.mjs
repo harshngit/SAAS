@@ -30,7 +30,7 @@ const pages = [
   ['supplierInvoices/SupplierInvoiceList', 'stats', 'summaryInvoices'],
   ['leaves/MyLeaves', 'counts', 'leaves'],
   ['superadmin/OrganizationsList', 'stats', 'summaryOrganizations'],
-  ['superadmin/UpgradeRequests', 'requestSummary', 'summaryRequests'],
+  ['superadmin/PlatformRequests', 'requestSummary', 'summaryRequests'],
 ]
 
 function nodes(value, out = []) {

@@ -1,3 +1,6 @@
+import PlatformGuard from '../auth/PlatformGuard'
+import PlatformStaff from '../features/superadmin/PlatformStaff'
+import FeatureRequests from '../features/superadmin/FeatureRequests'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from '../components/layout/Layout'
 import StorageLimitModal from '../components/ui/StorageLimitModal'
@@ -160,18 +163,29 @@ export default function AppRoutes() {
 
         <Route
           element={
-            <ProtectedRoute allowedRoles={[ROLES.SUPER_ADMIN]}>
+            <PlatformGuard superAdminOnly>
               <Layout />
-            </ProtectedRoute>
+            </PlatformGuard>
           }
         >
           <Route path="/superadmin/dashboard" element={<SuperAdminDashboard />} />
           <Route path="/superadmin/organizations" element={<OrganizationsList />} />
           <Route path="/superadmin/organizations/:id" element={<OrganizationDetail />} />
           <Route path="/superadmin/upgrade-requests" element={<UpgradeRequests />} />
+          <Route path="/superadmin/staff" element={<PlatformStaff />} />
+          <Route path="/superadmin/feature-requests" element={<FeatureRequests />} />
+          <Route path="/superadmin/superadmins" element={<SuperAdminsList />} />
           <Route path="/superadmin/plans" element={<SubscriptionPlans />} />
           <Route path="/superadmin/analytics" element={<PlatformAnalytics />} />
           <Route path="/superadmin/admins" element={<SuperAdminsList />} />
+        </Route>
+
+        <Route element={<PlatformGuard><Layout /></PlatformGuard>}>
+          <Route path="/platform" element={<Navigate to="/platform/organizations" replace />} />
+          <Route path="/platform/organizations" element={<OrganizationsList />} />
+          <Route path="/platform/organizations/:id" element={<OrganizationDetail />} />
+          <Route path="/platform/upgrade-requests" element={<UpgradeRequests />} />
+          <Route path="/platform/feature-requests" element={<FeatureRequests />} />
         </Route>
 
         <Route

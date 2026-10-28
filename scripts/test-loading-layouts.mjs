@@ -107,5 +107,5 @@ test('every existing LoadingSpinner call explicitly chooses its layout', async (
     }
   }
   await audit(root)
-  assert.equal(count, 118)
+  assert.equal(count, 119)
 })

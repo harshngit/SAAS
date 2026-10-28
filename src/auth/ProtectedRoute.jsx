@@ -1,3 +1,4 @@
+import { platformRoleForUser } from './platformRoles'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { resolveHomePath, resolveWorkspaceRole } from './roles'
@@ -17,7 +18,7 @@ export default function ProtectedRoute({ allowedRoles, children }) {
   // Custom roles resolve to their workspace's canonical shell so they aren't locked out of
   // (or redirect-looped around) their own route tree. Per-screen permission guards still apply.
   const effectiveRole = resolveWorkspaceRole({ role, currentUser })
-  if (allowedRoles && !fullAccess && !allowedRoles.includes(effectiveRole)) {
+  if (allowedRoles && !allowedRoles.includes(effectiveRole) && (!fullAccess || platformRoleForUser(currentUser) || allowedRoles.includes('super_admin'))) {
     return <Navigate to={resolveHomePath({ fullAccess, role, currentUser })} replace />
   }
 

@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react'
+import OrganizationOperations from './OrganizationOperations'
+import { usePlatformAccess } from './platformHelpers'
+import { getPlatformOrganization as getOrganization, listPlatformPlans as listPlans, getPlatformPayments as getSuperAdminSubscriptionPayments } from '../../api/platform'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -17,25 +20,18 @@ import {
   Settings,
   Trash2,
   Warehouse,
-  X,
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import Select from '../../components/ui/Select'
-import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import {
-  approveOrganizationUpgrade,
   deleteOrganization,
-  getOrganization,
-  listPlans,
-  rejectOrganizationUpgrade,
   updateOrganizationStatus,
 } from '../../api/superadmin'
-import { getSuperAdminSubscriptionPayments } from '../../api/billing'
 import { formatCurrency } from '../../utils/format'
 import { buildPlanSummaryBullets, formatLimitValue } from '../../entitlements/entitlementKeys'
 import OrganizationPlanAccess from './OrganizationPlanAccess'
@@ -58,11 +54,6 @@ const statusOptions = [
   { value: 'suspended', label: 'Suspended' },
 ]
 
-const upgradeStatusVariant = {
-  pending: 'warning',
-  approved: 'success',
-  rejected: 'danger',
-}
 
 const metricCardClasses = {
   plan: 'border-surface-border bg-surface',
@@ -148,6 +139,9 @@ function SectionTitle({ icon: Icon, title, actions }) {
 export default function OrganizationDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { isSuperAdmin, basePath } = usePlatformAccess()
+  const [operationsTick, setOperationsTick] = useState(0)
+  const loadedOrganizationId = useRef(null)
 
   const [organization, setOrganization] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -157,11 +151,6 @@ export default function OrganizationDetail() {
   const [statusDraft, setStatusDraft] = useState('')
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
 
-  const [isApproving, setIsApproving] = useState(false)
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
-  const [isRejecting, setIsRejecting] = useState(false)
-  const [rejectReason, setRejectReason] = useState('')
-  const [rejectError, setRejectError] = useState('')
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -181,7 +170,7 @@ export default function OrganizationDetail() {
     let isMounted = true
 
     async function load() {
-      setIsLoading(true)
+      if (loadedOrganizationId.current !== id) setIsLoading(true)
       setLoadError('')
 
       const result = await getOrganization(id)
@@ -196,6 +185,7 @@ export default function OrganizationDetail() {
         return
       }
 
+      loadedOrganizationId.current = id
       setOrganization(result.organization)
       setStatusDraft(result.organization.status || '')
     }
@@ -226,7 +216,7 @@ export default function OrganizationDetail() {
     return () => {
       isMounted = false
     }
-  }, [id])
+  }, [id, operationsTick])
 
   const applyOrganization = (nextOrganization) => {
     setOrganization(nextOrganization)
@@ -234,6 +224,7 @@ export default function OrganizationDetail() {
   }
 
   const handleUpdateStatus = async () => {
+    if (!isSuperAdmin) return
     if (!statusDraft || statusDraft === organization.status) return
 
     setActionError('')
@@ -251,51 +242,8 @@ export default function OrganizationDetail() {
     applyOrganization(result.organization)
   }
 
-  const handleApprove = async () => {
-    setActionError('')
-    setIsApproving(true)
-
-    const result = await approveOrganizationUpgrade(id)
-
-    setIsApproving(false)
-
-    if (!result.success) {
-      setActionError(result.error)
-      return
-    }
-
-    applyOrganization(result.organization)
-  }
-
-  const openRejectModal = () => {
-    setRejectReason('')
-    setRejectError('')
-    setIsRejectModalOpen(true)
-  }
-
-  const handleReject = async () => {
-    if (!rejectReason.trim()) {
-      setRejectError('Please provide a reason for the organization admin.')
-      return
-    }
-
-    setRejectError('')
-    setIsRejecting(true)
-
-    const result = await rejectOrganizationUpgrade(id, rejectReason.trim())
-
-    setIsRejecting(false)
-
-    if (!result.success) {
-      setRejectError(result.error)
-      return
-    }
-
-    applyOrganization(result.organization)
-    setIsRejectModalOpen(false)
-  }
-
   const handleDelete = async () => {
+    if (!isSuperAdmin) return
     setDeleteError('')
     setIsDeleting(true)
 
@@ -308,7 +256,7 @@ export default function OrganizationDetail() {
       return
     }
 
-    navigate('/superadmin/organizations')
+    navigate(`${basePath}/organizations`)
   }
 
   if (isLoading) {
@@ -322,13 +270,12 @@ export default function OrganizationDetail() {
           icon={Building2}
           title="Organization not found"
           description={loadError || 'This organization may have been deleted or the link is out of date.'}
-          action={{ label: 'Back to Organizations', onClick: () => navigate('/superadmin/organizations') }}
+          action={{ label: 'Back to Organizations', onClick: () => navigate(`${basePath}/organizations`) }}
         />
       </Card>
     )
   }
 
-  const hasUpgradeRequest = organization.upgrade_status && organization.upgrade_status !== 'none'
   const currentPlanName = organization.plan?.name || 'No plan'
   const currentPrice = formatCurrency(
     organization.billing_cycle === 'yearly'
@@ -343,7 +290,7 @@ export default function OrganizationDetail() {
           variant="outline"
           size="sm"
           className="h-9 rounded-full px-4 text-xs"
-          onClick={() => navigate('/superadmin/organizations')}
+          onClick={() => navigate(`${basePath}/organizations`)}
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           Back
@@ -371,7 +318,7 @@ export default function OrganizationDetail() {
               <p className="mt-1 text-sm text-fg-muted">Organization details and subscription controls</p>
             </div>
           </div>
-          <Button
+          {isSuperAdmin && (          <Button
             variant="danger"
             className="h-11 px-5 shadow-[0_12px_24px_-10px_rgb(220_38_38/0.8)]"
             onClick={() => {
@@ -381,7 +328,7 @@ export default function OrganizationDetail() {
           >
             <Trash2 className="size-4" aria-hidden="true" />
             Delete Organization
-          </Button>
+          </Button>)}
         </div>
       </div>
 
@@ -421,42 +368,7 @@ export default function OrganizationDetail() {
         />
       </div>
 
-      {hasUpgradeRequest && (
-        <Card title="Plan Upgrade Request" subtitle="Review the organization's latest plan change request.">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-surface-border bg-surface-muted/60 px-4 py-3">
-              <Badge variant={upgradeStatusVariant[organization.upgrade_status] || 'neutral'} dot>
-                {titleCase(organization.upgrade_status)}
-              </Badge>
-              <p className="text-sm text-fg-muted">
-                Requested <span className="font-semibold text-fg">{organization.requested_plan?.name || 'a new plan'}</span>
-                {organization.upgrade_requested_at && ` on ${formatDate(organization.upgrade_requested_at)}`}
-              </p>
-            </div>
-
-            {organization.upgrade_status === 'rejected' && organization.upgrade_reject_reason && (
-              <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-                Rejection reason: {organization.upgrade_reject_reason}
-              </p>
-            )}
-
-            {organization.upgrade_status === 'pending' && (
-              <div className="flex flex-col-reverse gap-3 sm:flex-row">
-                <Button type="button" variant="outline" onClick={openRejectModal} disabled={isApproving}>
-                  <X className="size-4" aria-hidden="true" />
-                  Reject
-                </Button>
-                <Button type="button" onClick={handleApprove} loading={isApproving}>
-                  <Check className="size-4" aria-hidden="true" />
-                  Approve Upgrade
-                </Button>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
-
-      <Card className="p-4">
+      {isSuperAdmin && (      <Card className="p-4">
         <div className="flex min-h-[58px] flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-primary-600">
@@ -487,19 +399,19 @@ export default function OrganizationDetail() {
             </Button>
           </div>
         </div>
-      </Card>
+      </Card>)}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="min-h-[220px]">
           <SectionTitle
             icon={Building2}
             title="Organization Details"
-            actions={
+            actions={isSuperAdmin && (
               <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3 text-xs">
                 <Edit3 className="size-3.5" aria-hidden="true" />
                 Edit Details
               </Button>
-            }
+            )}
           />
           <div>
             <DetailRow icon={Building2} label="Business Type" value={organization.business_type} />
@@ -545,24 +457,25 @@ export default function OrganizationDetail() {
               <CreditCard className="size-8 text-fg-muted" aria-hidden="true" />
               <p className="mt-3 text-sm font-semibold text-fg">No active plan</p>
               <p className="mt-1 text-xs text-fg-muted">This organization has no active plan.</p>
-              <Button type="button" className="mt-4 h-10 px-5" onClick={() => navigate('/superadmin/plans')}>
+{isSuperAdmin && (              <Button type="button" className="mt-4 h-10 px-5" onClick={() => navigate('/superadmin/plans')}>
                 <CreditCard className="size-4" aria-hidden="true" />
                 View Plans
-              </Button>
+              </Button>)}
             </div>
           )}
         </Card>
       </div>
 
-      <OrganizationPlanAccess orgId={id} />
+      {isSuperAdmin && <OrganizationPlanAccess key={operationsTick} orgId={id} />}
+      <OrganizationOperations organization={organization} onOrganizationChanged={() => setOperationsTick(value => value + 1)} />
 
-      <Card title="Payments" subtitle="Online subscription payments for this organization">
+      <Card title="Subscription / Billing" subtitle="Online subscription payments for this organization">
         {isLoadingPayments ? (
           <LoadingSpinner variant="table" minWidth="min-w-2xl" columns={["Date", "Plan", "Cycle", "Amount", "Status", "Payment ID"]} label="Loading payments..." />
         ) : paymentsError ? (
           <p className="py-6 text-center text-sm text-red-600">{paymentsError}</p>
         ) : payments.length === 0 ? (
-          <EmptyState icon={CreditCard} title="No payments yet" description="This organization hasn't made an online plan payment." />
+          <EmptyState icon={CreditCard} title="No subscription payments found." description="Subscription payments will appear here when available." />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-surface-border">
             <table className="w-full min-w-2xl text-left text-sm">
@@ -597,34 +510,7 @@ export default function OrganizationDetail() {
         )}
       </Card>
 
-      <Modal
-        isOpen={isRejectModalOpen}
-        onClose={() => {
-          if (isRejecting) return
-          setIsRejectModalOpen(false)
-        }}
-        title="Reject Upgrade Request"
-      >
-        <div className="space-y-4">
-          <Input
-            label="Reason"
-            as="textarea"
-            placeholder="Explain why this upgrade request is being rejected..."
-            value={rejectReason}
-            onChange={(event) => setRejectReason(event.target.value)}
-            error={rejectError}
-            required
-          />
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" disabled={isRejecting} onClick={() => setIsRejectModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="button" variant="danger" onClick={handleReject} loading={isRejecting}>
-              Reject Upgrade
-            </Button>
-          </div>
-        </div>
-      </Modal>
+
 
       <Modal
         isOpen={isDeleteModalOpen}

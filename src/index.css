@@ -568,6 +568,20 @@ body {
   display: none;
 }
 
+/* Shared hidden-scrollbar treatment for floating dropdown/menu panels (Select's options list,
+   DatePicker's popover) - several already reference this class, but until now nothing defined
+   it, so they silently fell back to the browser's default (visible, chunky) scrollbar. Same
+   hide-but-still-scrollable technique as .sidebar-nav above: wheel/trackpad/touch scrolling
+   keeps working, only the track/thumb chrome is gone. */
+.app-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.app-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Shared visual language for primary list tables - theme-aware (Part 2.3/2.4: this one block is
    what themes every page's .listing-table without touching each page). Header background/text
    use the org's own accent + its WCAG-computed contrast color (ThemeProvider/themeConfig.js) -

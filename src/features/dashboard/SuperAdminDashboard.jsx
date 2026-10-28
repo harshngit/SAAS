@@ -5,12 +5,12 @@ import {
   ArrowDownToLine,
   Ban,
   Building2,
-  CalendarDays,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Clock3,
   Eye,
+  Loader2,
   PieChart as PieChartIcon,
   Trash2,
   TrendingUp,
@@ -33,10 +33,13 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import ActionMenu from '../../components/ui/ActionMenu'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { deleteOrganization, listSuperAdminOrganizations, updateOrganizationStatus } from '../../api/superadmin'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
 import { exportRowsToExcel } from '../../utils/exportToExcel'
+import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { DATE_RANGE_PRESETS, isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 
 const statusVariant = {
   trial: 'info',
@@ -220,7 +223,13 @@ export default function SuperAdminDashboard() {
   const [actionError, setActionError] = useState('')
   const [updatingStatusId, setUpdatingStatusId] = useState(null)
   const [growthRange, setGrowthRange] = useState('30D')
-  const [isDateRangeOpen, setIsDateRangeOpen] = useState(false)
+  // Independent from growthRange (the Organizations Growth chart's own 7D/30D/3M/6M/1Y toggle,
+  // untouched below) - this is the top-bar filter's own state, same preset+custom-range shape
+  // every other list page's Date filter uses (DateRangeFilter/DATE_RANGE_PRESETS), driving only
+  // the Export Report button's date range and which organizations it includes.
+  const [datePreset, setDatePreset] = useState('last7')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [planFilter, setPlanFilter] = useState('All Plans')
   const [isPlanFilterOpen, setIsPlanFilterOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -248,10 +257,9 @@ export default function SuperAdminDashboard() {
   }, [])
 
   useEffect(() => {
-    if (!isDateRangeOpen && !isPlanFilterOpen) return undefined
+    if (!isPlanFilterOpen) return undefined
 
     const closeOpenMenus = () => {
-      setIsDateRangeOpen(false)
       setIsPlanFilterOpen(false)
     }
     const handleEscape = (event) => {
@@ -264,7 +272,7 @@ export default function SuperAdminDashboard() {
       window.removeEventListener('click', closeOpenMenus)
       window.removeEventListener('keydown', handleEscape)
     }
-  }, [isDateRangeOpen, isPlanFilterOpen])
+  }, [isPlanFilterOpen])
 
   const organizations = useMemo(() => rawOrganizations.map(normalizeOrganization), [rawOrganizations])
 
@@ -305,15 +313,23 @@ export default function SuperAdminDashboard() {
     }
   }, [growthRange])
 
-  const organizationsInDateWindow = useMemo(
-    () =>
-      organizations.filter((organization) => {
-        if (!organization.createdAtRaw) return false
-        const createdAt = new Date(organization.createdAtRaw)
-        return !Number.isNaN(createdAt.getTime()) && createdAt >= dateWindow.start && createdAt <= dateWindow.end
-      }),
-    [dateWindow, organizations],
+  // Top-bar filter's own resolved range + matching organizations + button label - entirely
+  // separate from dateWindow/organizationsInDateWindow above (the growth chart's own range).
+  const { dateFrom: exportDateFrom, dateTo: exportDateTo } = useMemo(
+    () => resolveDateRange(datePreset, customFrom, customTo),
+    [datePreset, customFrom, customTo],
   )
+  const organizationsInExportWindow = useMemo(
+    () => organizations.filter((organization) => isWithinDateRange(organization.createdAtRaw, exportDateFrom, exportDateTo)),
+    [organizations, exportDateFrom, exportDateTo],
+  )
+  const exportRangeLabel = useMemo(() => {
+    if (datePreset === 'custom') {
+      if (exportDateFrom && exportDateTo) return `${exportDateFrom} to ${exportDateTo}`
+      return 'Custom Range'
+    }
+    return DATE_RANGE_PRESETS.find((option) => option.value === datePreset)?.label || 'All Time'
+  }, [datePreset, exportDateFrom, exportDateTo])
 
   const growthChartData = useMemo(() => {
     const datedOrganizations = organizations.filter((organization) => organization.createdAtRaw)
@@ -429,53 +445,35 @@ export default function SuperAdminDashboard() {
           </h1>
           <p className="mt-1 text-sm font-medium leading-none text-[#64748b]">Here's what's happening with your platform today.</p>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
-          <div className="relative" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => setIsDateRangeOpen((isOpen) => !isOpen)}
-              className="inline-flex h-11 items-center justify-center gap-3 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-[0_10px_30px_-26px_rgb(15_23_42/0.55)]"
-              aria-haspopup="listbox"
-              aria-expanded={isDateRangeOpen}
-            >
-              <CalendarDays className="size-4 text-slate-500" aria-hidden="true" />
-              {dateWindow.label}
-              <ChevronDown className={`size-4 text-slate-500 transition-transform ${isDateRangeOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-            </button>
-            {isDateRangeOpen && (
-              <div
-                role="listbox"
-                className="absolute right-0 top-12 z-20 w-44 overflow-hidden rounded-xl border border-neutral-200 bg-white p-1.5 shadow-[0_18px_42px_-24px_rgb(15_23_42/0.45)]"
-              >
-                {growthRangeOptions.map((range) => (
-                  <button
-                    key={range.value}
-                    type="button"
-                    role="option"
-                    aria-selected={growthRange === range.value}
-                    onClick={() => {
-                      setGrowthRange(range.value)
-                      setIsDateRangeOpen(false)
-                    }}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors ${
-                      growthRange === range.value ? 'bg-primary-50 text-primary-800' : 'text-slate-600 hover:bg-neutral-50'
-                    }`}
-                  >
-                    {range.value}
-                    {growthRange === range.value && <span className="size-1.5 rounded-full bg-primary-700" aria-hidden="true" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button
+        <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-center xl:justify-end">
+          {/* DateRangeFilter already renders its own Select trigger (border, chevron, open/close) -
+              it IS the control, not something to nest behind a second custom toggle button (that
+              produced two stacked dropdown triggers for one filter). Same bare rendering this
+              component uses everywhere else in the app, e.g. Organizations.
+              inline: this header is a wide horizontal row (not a narrow drawer), so once "Custom
+              Range" is picked the two date fields sit beside the preset dropdown instead of
+              stacking into a 3-row-tall column that throws off the Export button's alignment. */}
+          <DateRangeFilter
+            inline
+            preset={datePreset}
+            onPresetChange={setDatePreset}
+            customFrom={customFrom}
+            customTo={customTo}
+            onCustomChange={({ from, to }) => {
+              setCustomFrom(from)
+              setCustomTo(to)
+            }}
+          />
+          <Button
             type="button"
-            onClick={() => exportDashboardReport({ stats, dateWindow, organizations: organizationsInDateWindow })}
-            className="inline-flex h-11 items-center justify-center gap-3 rounded-xl border border-primary-100 bg-primary-50 px-5 text-sm font-bold text-primary-800 shadow-[0_12px_26px_-24px_rgb(0_9_42/0.65)]"
+            variant="outline"
+            onClick={() => exportDashboardReport({ stats, dateWindow: { label: exportRangeLabel }, organizations: organizationsInExportWindow })}
+            disabled={isLoadingOrganizations}
+            className="h-11 gap-3 rounded-xl px-5 text-sm font-bold"
           >
-            <ArrowDownToLine className="size-4" aria-hidden="true" />
+            {isLoadingOrganizations ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <ArrowDownToLine className="size-4" aria-hidden="true" />}
             Export Report
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -486,6 +484,10 @@ export default function SuperAdminDashboard() {
         <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
       )}
 
+      {isLoadingOrganizations ? (
+        <LoadingSpinner variant="dashboard" layout="superadmin" label="Loading dashboard..." />
+      ) : (
+      <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         <KpiTile
           icon={Building2}
@@ -747,7 +749,7 @@ export default function SuperAdminDashboard() {
               },
             ]}
             rows={recentOrganizations}
-            emptyText={isLoadingOrganizations ? 'Loading organizations...' : 'No organizations found'}
+            emptyText="No organizations found"
           />
         </DashboardCard>
 
@@ -789,7 +791,7 @@ export default function SuperAdminDashboard() {
               { key: 'createdAt', label: 'Date', width: '0.85fr' },
             ]}
             rows={upgradeRequests}
-            emptyText={isLoadingOrganizations ? 'Loading requests...' : 'No pending upgrade requests'}
+            emptyText="No pending upgrade requests"
           />
         </DashboardCard>
 
@@ -815,6 +817,8 @@ export default function SuperAdminDashboard() {
           </div>
         </DashboardCard>
       </div>
+      </>
+      )}
 
       <Modal
         isOpen={Boolean(deleteTarget)}
