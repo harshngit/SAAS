@@ -170,6 +170,12 @@ const options = {
     { value: 'months', label: 'Months' },
     { value: 'years', label: 'Years' },
   ],
+  // Always-available defaults for the UOM combobox - the catalog-derived suggestions alone are
+  // empty for an organization's very first product, which made the dropdown look broken.
+  unitOfMeasure: [
+    'Piece', 'Box', 'Carton', 'Dozen', 'Pair', 'Set', 'Pack', 'Bundle', 'Roll', 'Bag', 'Bottle',
+    'Kg', 'Gram', 'Litre', 'Millilitre', 'Meter', 'Centimetre', 'Square Feet',
+  ],
 }
 
 const sectionMeta = {
@@ -513,6 +519,7 @@ export default function ProductForm({
       brand: collect(catalogProducts.map((item) => item.brand)),
       manufacturer: collect(catalogProducts.map((item) => item.manufacturer)),
       unitOfMeasure: collect(
+        options.unitOfMeasure,
         catalogProducts.flatMap((item) => [item.unitOfMeasure, ...(item.variants || []).map((variant) => variant.unit)]),
       ),
       taxCategory: collect(catalogProducts.map((item) => item.taxCategory)),
@@ -1100,6 +1107,20 @@ export default function ProductForm({
             triggerClassName="w-full max-w-full"
             options={field.name === 'weightUnit' ? options.weightUnit : options.durationUnit}
             placeholder={`Select ${field.label.toLowerCase()}`}
+          />
+        )
+      }
+
+      if (field.name === 'unitOfMeasure') {
+        return (
+          <Select
+            {...commonProps}
+            className="w-full max-w-full"
+            triggerClassName="w-full max-w-full"
+            options={suggestionOptions.unitOfMeasure}
+            placeholder="Type or pick unit of measure (UOM)"
+            searchable
+            creatable
           />
         )
       }

@@ -19,6 +19,9 @@ const Select = forwardRef(function Select(
     triggerClassName = '',
     required = false,
     searchable = false,
+    // Lets the user commit whatever they typed as the value even when it matches no option -
+    // e.g. a free-text UOM/tag field that also offers common picks. No effect unless searchable.
+    creatable = false,
     ...rest
   },
   ref,
@@ -30,7 +33,9 @@ const Select = forwardRef(function Select(
   const [menuStyle, setMenuStyle] = useState(null)
   const [selectedValue, setSelectedValue] = useState(value ?? defaultValue ?? '')
   const [searchQuery, setSearchQuery] = useState('')
-  const selectedOption = options.find((option) => option.value === selectedValue)
+  const selectedOption =
+    options.find((option) => option.value === selectedValue) ||
+    (creatable && selectedValue ? { value: selectedValue, label: selectedValue } : undefined)
   const visibleOptions = useMemo(() => {
     if (!searchable) return options
 
@@ -41,6 +46,12 @@ const Select = forwardRef(function Select(
       `${option.label} ${option.searchText || ''}`.toLowerCase().includes(normalizedQuery),
     )
   }, [options, searchable, searchQuery])
+  const trimmedSearchQuery = searchQuery.trim()
+  const showCreateOption =
+    creatable &&
+    Boolean(trimmedSearchQuery) &&
+    !options.some((option) => option.label.trim().toLowerCase() === trimmedSearchQuery.toLowerCase())
+  const menuRowCount = visibleOptions.length + (showCreateOption ? 1 : 0)
 
   useEffect(() => {
     if (value !== undefined) {
@@ -75,7 +86,7 @@ const Select = forwardRef(function Select(
       if (!trigger) return
 
       const rect = trigger.getBoundingClientRect()
-      const menuHeight = Math.min(224, visibleOptions.length * 41 + 8)
+      const menuHeight = Math.min(224, menuRowCount * 41 + 8)
       const spaceBelow = window.innerHeight - rect.bottom
       const shouldOpenUp = spaceBelow < menuHeight + 12 && rect.top > menuHeight
       // Menus must be at least as wide as the trigger, but a narrow trigger (sized to
@@ -98,7 +109,7 @@ const Select = forwardRef(function Select(
       window.removeEventListener('resize', updateMenuPosition)
       window.removeEventListener('scroll', updateMenuPosition, true)
     }
-  }, [isOpen, visibleOptions.length])
+  }, [isOpen, menuRowCount])
 
   const emitChange = (nextValue) => {
     const event = { target: { name, value: nextValue }, type: 'change' }
@@ -111,7 +122,7 @@ const Select = forwardRef(function Select(
     setSelectedValue(nextValue)
     const nextOption = options.find((option) => option.value === nextValue)
     if (searchable) {
-      setSearchQuery(nextOption?.label || '')
+      setSearchQuery(nextOption?.label || nextValue)
     }
     emitChange(nextValue)
     setIsOpen(false)
@@ -122,9 +133,15 @@ const Select = forwardRef(function Select(
 
     if (searchable && event.key === 'Enter') {
       event.preventDefault()
-      const exactMatch = options.find((option) => option.label.trim().toLowerCase() === searchQuery.trim().toLowerCase())
+      const trimmedQuery = searchQuery.trim()
+      const exactMatch = options.find((option) => option.label.trim().toLowerCase() === trimmedQuery.toLowerCase())
       if (exactMatch) {
         handleSelect(exactMatch.value)
+        return
+      }
+
+      if (creatable && trimmedQuery) {
+        handleSelect(trimmedQuery)
         return
       }
 
@@ -198,11 +215,14 @@ const Select = forwardRef(function Select(
                 onBlur?.(event)
                 window.setTimeout(() => {
                   if (!wrapperRef.current?.contains(document.activeElement)) {
+                    const trimmedQuery = searchQuery.trim()
                     const exactMatch = options.find(
-                      (option) => option.label.trim().toLowerCase() === searchQuery.trim().toLowerCase(),
+                      (option) => option.label.trim().toLowerCase() === trimmedQuery.toLowerCase(),
                     )
                     if (exactMatch) {
                       handleSelect(exactMatch.value)
+                    } else if (creatable && trimmedQuery) {
+                      handleSelect(trimmedQuery)
                     } else {
                       setSearchQuery(selectedOption?.label || '')
                       setIsOpen(false)
@@ -263,31 +283,47 @@ const Select = forwardRef(function Select(
             // reason, so every floating field control stacks consistently above any modal/drawer.
             className="app-scrollbar fixed z-[140] overflow-x-hidden overflow-y-auto rounded-xl border border-surface-border bg-(--modal-bg) p-1 text-sm text-fg shadow-popover"
           >
-            {visibleOptions.length === 0 ? (
+            {visibleOptions.length === 0 && !showCreateOption ? (
               <div className="cursor-default rounded-lg px-3 py-2 text-neutral-400">No matches</div>
-            ) : visibleOptions.map((option) => {
-              const isSelected = option.value === selectedValue
+            ) : (
+              <>
+                {visibleOptions.map((option) => {
+                  const isSelected = option.value === selectedValue
 
-              return (
-                <div
-                  key={option.value}
-                  role="option"
-                  aria-selected={isSelected}
-                  tabIndex={-1}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => handleSelect(option.value)}
-                  title={option.label}
-                  className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 transition-colors ${
-                    isSelected
-                      ? 'bg-primary-50 font-medium text-primary-700'
-                      : 'text-fg hover:bg-primary-50 hover:text-primary-700'
-                  }`}
-                >
-                  <span className="truncate">{option.label}</span>
-                  {isSelected && <Check className="size-4 shrink-0 text-primary-600" aria-hidden="true" />}
-                </div>
-              )
-            })}
+                  return (
+                    <div
+                      key={option.value}
+                      role="option"
+                      aria-selected={isSelected}
+                      tabIndex={-1}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => handleSelect(option.value)}
+                      title={option.label}
+                      className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 transition-colors ${
+                        isSelected
+                          ? 'bg-primary-50 font-medium text-primary-700'
+                          : 'text-fg hover:bg-primary-50 hover:text-primary-700'
+                      }`}
+                    >
+                      <span className="truncate">{option.label}</span>
+                      {isSelected && <Check className="size-4 shrink-0 text-primary-600" aria-hidden="true" />}
+                    </div>
+                  )
+                })}
+                {showCreateOption && (
+                  <div
+                    role="option"
+                    aria-selected={false}
+                    tabIndex={-1}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => handleSelect(trimmedSearchQuery)}
+                    className="cursor-pointer truncate rounded-lg px-3 py-2 text-fg hover:bg-primary-50 hover:text-primary-700"
+                  >
+                    Use &ldquo;<span className="font-medium">{trimmedSearchQuery}</span>&rdquo;
+                  </div>
+                )}
+              </>
+            )}
           </div>,
           document.body,
         )}

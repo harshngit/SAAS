@@ -3,6 +3,12 @@ import { forwardRef, useState } from 'react'
 function selectZero(event) {
   const input = event.currentTarget
   if (!event.defaultPrevented && !input.disabled && !input.readOnly && input.value.trim() !== '' && Number(input.value) === 0) {
+    // Clear the DOM value directly rather than relying on input.select(): browsers (Firefox in
+    // particular) don't support text selection on type="number" inputs, so select() alone can
+    // silently no-op there, leaving the "0" in place for the next keystroke to land next to -
+    // "0" + "2" => "20" instead of "2". Clearing the value outright works in every browser and
+    // for both controlled and uncontrolled usage.
+    input.value = ''
     input.select()
     return true
   }
