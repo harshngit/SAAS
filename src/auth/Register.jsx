@@ -99,7 +99,7 @@ export default function Register() {
                       {...register('organizationName')}
                     />
                     <Input label="Admin Name" error={errors.adminName?.message} {...register('adminName')} />
-                    <Input label="Email Address" type="email" error={errors.email?.message} {...register('email')} />
+                    <Input label="Email Address" type="email" autoCapitalize="none" error={errors.email?.message} {...register('email')} />
                     <Input
                       label="Password"
                       type="password"

@@ -33,16 +33,18 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import DatePicker from '../../components/ui/DatePicker'
 import EmptyState from '../../components/ui/EmptyState'
+import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
+import Select from '../../components/ui/Select'
 import SocialLinks from '../../components/ui/SocialLinks'
 import { useToast } from '../../components/ui/toastContext'
 import { ROLES } from '../../auth/roles'
+import { usePermission } from '../../auth/usePermission'
 import {
   deleteCustomer,
   getCustomer,
   getCustomerAccountStatement,
-  getCustomerPaymentReceipt,
   getCustomerPayments,
   listCustomerDocuments,
   updateCustomer,
@@ -59,7 +61,7 @@ import {
   formatStatus as formatCollectionStatus,
 } from '../collections/collectionHelpers'
 import { ORDER_STATUS_VARIANT, formatOrderStatus, getDeliveryStatus } from '../orders/orderHelpers'
-import { getCustomerFollowUps, getCustomerVisits } from '../../api/visits'
+import { VISIT_TYPE_OPTIONS, createVisit, getCustomerFollowUps, getCustomerVisits } from '../../api/visits'
 import { getFileUrl } from '../../api/files'
 import { useAuthStore } from '../../store/authStore'
 import { getSystemRoleFromRoleName } from '../users/userRoleUtils'
@@ -84,33 +86,6 @@ const paymentModeOptions = [
   { value: 'card', label: 'Card' },
   { value: 'cheque', label: 'Cheque' },
 ]
-
-function openReceiptDocument(receipt) {
-  const receiptValue = String(receipt || '').trim()
-
-  if (!receiptValue) return false
-
-  if (receiptValue.startsWith('http://') || receiptValue.startsWith('https://') || receiptValue.startsWith('data:')) {
-    window.open(receiptValue, '_blank', 'noopener,noreferrer')
-    return true
-  }
-
-  try {
-    const binary = window.atob(receiptValue)
-    const bytes = new Uint8Array(binary.length)
-
-    for (let index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index)
-    }
-
-    const objectUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
-    window.open(objectUrl, '_blank', 'noopener,noreferrer')
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
-    return true
-  } catch {
-    return false
-  }
-}
 
 const normalizeCustomer = (customer) => ({
   ...customer,
@@ -326,6 +301,22 @@ const CUSTOMER_TABS = [
 const followUpStatusVariant = { pending: 'warning', completed: 'success', cancelled: 'neutral' }
 const visitStatusVariant = { planned: 'info', completed: 'success', cancelled: 'neutral' }
 
+// Matches the Lead Detail "Schedule Visit" form shape (Visit Type -> Date/Time -> Purpose ->
+// Notes) - same createVisit API, just preselecting this customer instead of a lead.
+function emptyVisitFormData() {
+  const now = new Date()
+  const roundedMinutes = Math.ceil(now.getMinutes() / 15) * 15
+  now.setMinutes(roundedMinutes, 0, 0)
+
+  return {
+    visitType: 'site_visit',
+    visitDate: now.toISOString().slice(0, 10),
+    visitTime: now.toTimeString().slice(0, 5),
+    purpose: '',
+    notes: '',
+  }
+}
+
 function FollowUpRow({ task }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface px-3 py-2 text-sm">
@@ -348,6 +339,8 @@ export default function CustomerDetail() {
   const currentUser = useAuthStore((state) => state.currentUser)
   const isAdmin = currentUser?.role === ROLES.ADMIN
   const basePath = customerBasePathByRole[currentUser?.role] || '/sales/customers'
+  const { can } = usePermission()
+  const canCreateVisit = can('visits', 'create')
 
   const [customer, setCustomer] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -365,7 +358,6 @@ export default function CustomerDetail() {
   const [collections, setCollections] = useState([])
   const [isLoadingCollections, setIsLoadingCollections] = useState(true)
   const [collectionsError, setCollectionsError] = useState('')
-  const [downloadingReceiptId, setDownloadingReceiptId] = useState('')
   const [voidTarget, setVoidTarget] = useState(null)
   const [isVoiding, setIsVoiding] = useState(false)
   const [voidError, setVoidError] = useState('')
@@ -390,6 +382,10 @@ export default function CustomerDetail() {
   const [visitsLoaded, setVisitsLoaded] = useState(false)
   const [isLoadingVisits, setIsLoadingVisits] = useState(false)
   const [visitsError, setVisitsError] = useState('')
+  const [isVisitModalOpen, setIsVisitModalOpen] = useState(false)
+  const [visitFormData, setVisitFormData] = useState(emptyVisitFormData)
+  const [visitFormError, setVisitFormError] = useState('')
+  const [isSavingVisit, setIsSavingVisit] = useState(false)
 
   const loadLedger = async (params = {}) => {
     setIsLoadingLedger(true)
@@ -596,6 +592,37 @@ export default function CustomerDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, visitsLoaded, isLoadingVisits])
 
+  const openVisitModal = () => {
+    setVisitFormData(emptyVisitFormData())
+    setVisitFormError('')
+    setIsVisitModalOpen(true)
+  }
+
+  const handleSaveVisit = async () => {
+    setIsSavingVisit(true)
+    setVisitFormError('')
+
+    const result = await createVisit({
+      customerId: id,
+      visitType: visitFormData.visitType,
+      visitDate: `${visitFormData.visitDate}T${visitFormData.visitTime}:00`,
+      purpose: visitFormData.purpose.trim(),
+      notes: visitFormData.notes.trim(),
+    })
+
+    if (!result.success) {
+      setVisitFormError(result.error)
+      setIsSavingVisit(false)
+      return
+    }
+
+    setIsSavingVisit(false)
+    setIsVisitModalOpen(false)
+    // Refetch so the new visit shows up immediately without a manual page reload.
+    loadVisits()
+    showToast({ title: 'Visit recorded', message: 'The visit has been saved to this customer.' })
+  }
+
   const handlePaymentRecorded = async (amount) => {
     setIsRecordPaymentOpen(false)
     loadPayments()
@@ -715,24 +742,6 @@ export default function CustomerDetail() {
     }
 
     navigate(basePath)
-  }
-
-  const handleOpenReceipt = async (payment) => {
-    setPaymentsError('')
-    setDownloadingReceiptId(payment.id)
-
-    const result = await getCustomerPaymentReceipt(customer.id, payment.id)
-
-    setDownloadingReceiptId('')
-
-    if (!result.success) {
-      setPaymentsError(result.error)
-      return
-    }
-
-    if (!openReceiptDocument(result.receipt)) {
-      setPaymentsError('Receipt downloaded, but the response could not be opened.')
-    }
   }
 
   const handleVoidPayment = async () => {
@@ -1287,18 +1296,14 @@ export default function CustomerDetail() {
                         </div>
                       </div>
                     )}
-                    <div className="mt-2 flex justify-end gap-1">
-                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleOpenReceipt(payment)} loading={downloadingReceiptId === payment.id}>
-                        <FileText className="size-3.5" aria-hidden="true" />
-                        Receipt
-                      </Button>
-                      {isAdmin && (
+                    {isAdmin && (
+                      <div className="mt-2 flex justify-end gap-1">
                         <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setVoidTarget(payment)}>
                           <Undo2 className="size-3.5" aria-hidden="true" />
                           Void
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1417,7 +1422,16 @@ export default function CustomerDetail() {
           </Section>
         ) : (
           <div className="space-y-4">
-            <Section title="Visits" icon={MapPin}>
+            <Section
+              title="Visits"
+              icon={MapPin}
+              actions={canCreateVisit && (
+                <Button type="button" variant="outline" size="sm" onClick={openVisitModal}>
+                  <Plus className="mr-1.5 size-3.5" aria-hidden="true" />
+                  Add Visit
+                </Button>
+              )}
+            >
               {visits.length === 0 ? (
                 <p className="py-6 text-center text-sm text-neutral-400">No visits recorded for this customer yet.</p>
               ) : (
@@ -1674,6 +1688,62 @@ export default function CustomerDetail() {
               Void Payment
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isVisitModalOpen}
+        onClose={() => { if (!isSavingVisit) setIsVisitModalOpen(false) }}
+        title="Add Visit"
+        className="max-w-lg"
+      >
+        <div className="space-y-4">
+          {visitFormError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{visitFormError}</div>
+          )}
+          <div className="rounded-xl border border-primary-100 bg-primary-50/60 px-3.5 py-3 text-sm">
+            <p className="text-xs text-neutral-500">Customer</p>
+            <p className="font-medium text-neutral-900">{customer?.businessName || customer?.name}</p>
+          </div>
+          <Select
+            label="Visit Type"
+            options={VISIT_TYPE_OPTIONS}
+            value={visitFormData.visitType}
+            onChange={(event) => setVisitFormData((current) => ({ ...current, visitType: event.target.value }))}
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Visit Date"
+              type="date"
+              value={visitFormData.visitDate}
+              onChange={(event) => setVisitFormData((current) => ({ ...current, visitDate: event.target.value }))}
+              required
+            />
+            <Input
+              label="Visit Time"
+              type="time"
+              value={visitFormData.visitTime}
+              onChange={(event) => setVisitFormData((current) => ({ ...current, visitTime: event.target.value }))}
+              required
+            />
+          </div>
+          <Input
+            label="Purpose"
+            value={visitFormData.purpose}
+            onChange={(event) => setVisitFormData((current) => ({ ...current, purpose: event.target.value }))}
+            placeholder="e.g. Requirement check"
+          />
+          <Input
+            as="textarea"
+            label="Notes"
+            value={visitFormData.notes}
+            onChange={(event) => setVisitFormData((current) => ({ ...current, notes: event.target.value }))}
+            inputClassName="min-h-20"
+          />
+        </div>
+        <div className="mt-4 flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
+          <Button type="button" variant="secondary" disabled={isSavingVisit} onClick={() => setIsVisitModalOpen(false)}>Cancel</Button>
+          <Button type="button" loading={isSavingVisit} onClick={handleSaveVisit}>Save Visit</Button>
         </div>
       </Modal>
 

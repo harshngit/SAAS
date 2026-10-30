@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { phoneConflictFields } from '../utils/phoneConflict'
 
 export function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -173,7 +174,9 @@ export async function createSuperAdmin(payload) {
       'Unable to create superadmin. Please try again.',
     )
 
-    return { success: false, error: message }
+    // 409 "Email already registered" - one login email across every firm and platform account,
+    // any casing. See crm_changes15.md "Email uniqueness made reliable".
+    return { success: false, error: message, fieldErrors: phoneConflictFields(error.response?.status, message) }
   }
 }
 
@@ -188,7 +191,7 @@ export async function updateSuperAdmin(adminId, payload) {
       'Unable to update superadmin. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, error: message, fieldErrors: phoneConflictFields(error.response?.status, message) }
   }
 }
 

@@ -2674,6 +2674,7 @@ export default function CompanySettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [accountEmailError, setAccountEmailError] = useState("");
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -2927,6 +2928,7 @@ export default function CompanySettings() {
     const { name, type, checked, value } = e.target;
     const nextValue = type === "checkbox" ? checked : value;
     setSaveError("");
+    setAccountEmailError("");
     setCompanyData((prev) => ({ ...prev, [name]: nextValue }));
   };
 
@@ -3307,6 +3309,7 @@ export default function CompanySettings() {
   const handleSave = async () => {
     setIsSaving(true);
     setSaveError("");
+    setAccountEmailError("");
     setLogoUploadError("");
     setSignatureUploadError("");
 
@@ -3394,7 +3397,14 @@ export default function CompanySettings() {
 
     if (!result.success) {
       setIsSaving(false);
-      setSaveError(result.error);
+      // 409 "Email already registered" (any casing, any firm/platform account - see
+      // crm_changes15.md "Email uniqueness made reliable") belongs on the Email field itself,
+      // not the generic banner, and nothing else in that request was saved.
+      if (activeTab === "account" && result.fieldErrors?.email) {
+        setAccountEmailError(result.fieldErrors.email);
+      } else {
+        setSaveError(result.error);
+      }
       return;
     }
 
@@ -3735,9 +3745,11 @@ export default function CompanySettings() {
                       label="Email"
                       name="adminEmail"
                       type="email"
+                      autoCapitalize="none"
                       value={companyData.adminEmail}
                       onChange={handleChange}
                       disabled={!isActiveSectionEditing}
+                      error={accountEmailError}
                       required
                     /></ConfiguredField>
                     <ConfiguredField module="company" name="profilePhotoUrl"><FileUploadField

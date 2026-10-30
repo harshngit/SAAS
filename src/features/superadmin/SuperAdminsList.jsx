@@ -29,7 +29,7 @@ const normalizeSuperAdmin = (admin) => ({
 
 const emptyForm = { name: '', email: '', phone: '', password: '', isActive: true }
 
-function SuperAdminForm({ admin, isSelf, saving, formError, onClose, onSave }) {
+function SuperAdminForm({ admin, isSelf, saving, formError, externalFieldErrors, onClose, onSave }) {
   const [formData, setFormData] = useState(emptyForm)
   const [errors, setErrors] = useState({})
 
@@ -73,10 +73,11 @@ function SuperAdminForm({ admin, isSelf, saving, formError, onClose, onSave }) {
       <Input
         label="Email"
         type="email"
+        autoCapitalize="none"
         placeholder="Enter email address"
         value={formData.email}
-        onChange={(event) => setFormData((current) => ({ ...current, email: event.target.value }))}
-        error={errors.email}
+        onChange={(event) => { setErrors((current) => ({ ...current, email: '' })); setFormData((current) => ({ ...current, email: event.target.value })) }}
+        error={errors.email || externalFieldErrors?.email}
         required
       />
       <Input
@@ -132,6 +133,7 @@ export default function SuperAdminsList() {
   const [editingAdmin, setEditingAdmin] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [formFieldErrors, setFormFieldErrors] = useState({})
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -163,6 +165,7 @@ export default function SuperAdminsList() {
   const openForm = (admin = null) => {
     setEditingAdmin(admin)
     setFormError('')
+    setFormFieldErrors({})
     setIsFormOpen(true)
   }
 
@@ -171,18 +174,23 @@ export default function SuperAdminsList() {
     setIsFormOpen(false)
     setEditingAdmin(null)
     setFormError('')
+    setFormFieldErrors({})
   }
 
   const handleSaveAdmin = async (formData) => {
     setIsSaving(true)
     setFormError('')
+    setFormFieldErrors({})
 
     const result = editingAdmin
       ? await updateSuperAdmin(editingAdmin.id, formData)
       : await createSuperAdmin(formData)
 
     if (!result.success) {
-      setFormError(result.error)
+      // 409 "Email already registered" belongs on the Email field itself, not the generic
+      // banner - see crm_changes15.md "Email uniqueness made reliable".
+      if (result.fieldErrors?.email) setFormFieldErrors(result.fieldErrors)
+      else setFormError(result.error)
       setIsSaving(false)
       return
     }
@@ -317,6 +325,7 @@ export default function SuperAdminsList() {
           isSelf={editingAdmin?.id === currentUser?.id}
           saving={isSaving}
           formError={formError}
+          externalFieldErrors={formFieldErrors}
           onClose={closeForm}
           onSave={handleSaveAdmin}
         />

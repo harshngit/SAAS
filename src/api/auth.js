@@ -213,6 +213,83 @@ export async function getCurrentProfile() {
   }
 }
 
+// PATCH /auth/me - every signed-in user's own self-service profile (name/contact/address/
+// preferences). The user always comes from the access token, never an id. Read-only fields
+// (login email, mobile number, role, organization, status, employee id, designation, payroll,
+// password, profile_photo, ...) answer 422 if sent - see crm_changes15.md "everyone edits their
+// own profile". Response is the bare updated user object (NOT wrapped in {user: ...} like
+// GET /auth/me), so callers should refresh the session via getCurrentProfile() after a save
+// rather than feeding this response straight into setAuthenticatedSession.
+export async function updateMyProfile(payload) {
+  try {
+    const { data } = await apiClient.patch('/auth/me', payload, {
+      headers: authHeader(),
+    })
+
+    return { success: true, user: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to update profile. Please try again.',
+    )
+
+    const fieldErrors = {}
+    if (Array.isArray(errorData?.detail)) {
+      for (const issue of errorData.detail) {
+        const key = issue.loc?.filter((part) => part !== 'body').at(-1)
+        if (key) fieldErrors[key] = issue.msg
+      }
+    }
+
+    return { success: false, status: error.response?.status, error: message, fieldErrors }
+  }
+}
+
+// POST /auth/me/photo - multipart, JPEG/PNG/WebP, max 5MB. Available to every signed-in user,
+// not just admins (unlike PATCH /users/{id}, which only the firm admin can call).
+export async function uploadMyProfilePhoto(file) {
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const { data } = await apiClient.post('/auth/me/photo', formData, {
+      headers: {
+        ...authHeader(),
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+
+    return { success: true, user: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to upload photo. Please try again.',
+    )
+
+    return { success: false, status: error.response?.status, error: message }
+  }
+}
+
+export async function removeMyProfilePhoto() {
+  try {
+    const { data } = await apiClient.delete('/auth/me/photo', {
+      headers: authHeader(),
+    })
+
+    return { success: true, user: data }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to remove photo. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
 export async function logout() {
   const { authTokens } = useAuthStore.getState()
 

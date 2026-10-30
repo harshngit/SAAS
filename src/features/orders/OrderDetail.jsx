@@ -421,6 +421,10 @@ export default function OrderDetail() {
   const fulfilmentLabel = getFulfilmentLabel(order)
   const stateMismatch = hasOrderStateMismatch(order)
   const hasDeliveredQuantity = order.items.some((item) => (item.deliveredQuantity || 0) > 0)
+  // GET /orders/{id} doesn't always nest the warehouse object (warehouseName), only warehouse_id -
+  // resolve the name from the same org-scoped warehouse list already loaded for delivery planning.
+  const resolvedWarehouseName = order.warehouseName || warehouses.find((w) => w.id === order.warehouseId)?.name || ''
+  const orderForView = resolvedWarehouseName === order.warehouseName ? order : { ...order, warehouseName: resolvedWarehouseName }
 
   // Demo-only: per-line stock shortages (availableStock is null on real orders).
   const demoShortages = order.items
@@ -979,7 +983,7 @@ export default function OrderDetail() {
   return (
     <div>
       <OrderDetailView
-        order={order}
+        order={orderForView}
         creator={creator}
         creatorRole={creator?.role ? roleName(creator.role) : ''}
         delivery={delivery}

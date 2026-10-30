@@ -36,6 +36,11 @@ async function list(path, key, params = {}) {
 export const listPlatformStaff = params => list('/staff', 'staff', params)
 export const createPlatformStaff = body => platformRequest('post', '/staff', { body })
 export const updatePlatformStaff = (id, body) => platformRequest('patch', `/staff/${idPath(id)}`, { body })
+// Permanent delete (Super Admin only) - 204 on success, 404 if the id is not platform staff
+// (already deleted, or a Super Admin/tenant id, which this route never touches).
+export const deletePlatformStaff = id => platformRequest('delete', `/staff/${idPath(id)}`)
+// All-or-nothing: a 404 here means NONE of the ids were deleted (detail.ids lists the bad ones).
+export const bulkDeletePlatformStaff = ids => platformRequest('post', '/staff/bulk-delete', { body: { ids } })
 export const listPlatformOrganizations = params => list('/organizations', 'organizations', { page_size: 100, ...params })
 export async function getPlatformOrganization(id) {
   const result = await platformRequest('get', `/organizations/${idPath(id)}`)

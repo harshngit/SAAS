@@ -78,7 +78,9 @@ export default function PlatformRequests({ kind = 'upgrade', organizationId, onC
   }), [summaryRequests])
   const featureLabel = row => featureName(features.find(feature => featureKey(feature) === row.entitlement_key) || {})
   const organizationName = row => row.organization?.name ?? row.organization_name ?? 'Organization unavailable'
-  const person = row => row.requested_by?.name ?? row.requested_by?.email ?? row.requested_by_name ?? 'Not available'
+  // requested_by can now be null (the platform staff member who raised it was deleted - the
+  // request itself is kept) - see crm_changes15.md "Delete platform staff".
+  const person = row => row.requested_by?.name ?? row.requested_by?.email ?? row.requested_by_name ?? 'Deleted user'
   const columns = [
     { key: 'organization', header: 'Organization', render: organizationName },
     ...(kind === 'upgrade' ? [

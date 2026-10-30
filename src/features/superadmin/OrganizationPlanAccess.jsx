@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, RefreshCw, RotateCcw } from 'lucide-react'
+import { Plus, RefreshCw, RotateCcw, Unlock } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -68,6 +68,10 @@ export default function OrganizationPlanAccess({ orgId }) {
 
   const [isResetAllOpen, setIsResetAllOpen] = useState(false)
   const [isResettingAll, setIsResettingAll] = useState(false)
+
+  const [isGrantAllOpen, setIsGrantAllOpen] = useState(false)
+  const [isGrantingAll, setIsGrantingAll] = useState(false)
+  const [grantAllProgress, setGrantAllProgress] = useState(null) // { done, total }
 
   // Kept independent from the main entitlements `load()` so a storage-usage failure never blocks
   // the Plan & Access / Overrides sections above, and vice versa.
@@ -147,6 +151,53 @@ export default function OrganizationPlanAccess({ orgId }) {
     await Promise.all(tasks)
   }
 
+  // There is no bulk "grant everything" endpoint on the backend - only per-feature/per-limit
+  // upsert routes (plus a bulk /overrides/reset-all, the one precedent for a server-side bulk
+  // action here). Until that exists, this loops every known feature + limit key through the
+  // same upsert calls the "Add Override"/"Set Override" modal already uses, in small concurrent
+  // batches so ~60 individual requests don't either serialize into a long wait or all fire at
+  // once. Each call is independent, so a mid-way failure still leaves everything up to that
+  // point applied - load() afterwards always reflects the real resulting state either way.
+  const allFeatureKeys = ENTITLEMENT_GROUPS.flatMap((group) => group.keys)
+  const allLimitKeys = Object.values(LIMIT_KEYS)
+
+  const runInBatches = async (items, worker, batchSize = 8) => {
+    const results = []
+    for (let index = 0; index < items.length; index += batchSize) {
+      const batch = items.slice(index, index + batchSize)
+      const batchResults = await Promise.all(batch.map(worker))
+      results.push(...batchResults)
+      setGrantAllProgress((previous) => ({ done: (previous?.done || 0) + batch.length, total: previous?.total }))
+    }
+    return results
+  }
+
+  const handleGrantFullAccess = async () => {
+    setIsGrantingAll(true)
+    setActionError('')
+    setGrantAllProgress({ done: 0, total: allFeatureKeys.length + allLimitKeys.length })
+
+    const featureResults = await runInBatches(allFeatureKeys, (key) =>
+      upsertFeatureOverride(orgId, { entitlementKey: key, effect: 'ALLOW', reason: 'Granted full access (Super Admin)' }),
+    )
+    const limitResults = await runInBatches(allLimitKeys, (key) =>
+      upsertLimitOverride(orgId, { limitKey: key, value: null, reason: 'Granted full access (Super Admin)' }),
+    )
+
+    setIsGrantingAll(false)
+    setGrantAllProgress(null)
+    setIsGrantAllOpen(false)
+
+    const failures = [...featureResults, ...limitResults].filter((result) => !result.success)
+    if (failures.length > 0) {
+      showToast({ title: `Granted full access with ${failures.length} error(s)`, message: failures[0].error, variant: 'error' })
+    } else {
+      showToast({ title: 'Full access granted', message: 'Every feature is now Allowed and every limit is Unlimited for this organization.' })
+    }
+
+    await Promise.all([load(), loadStorageUsage()])
+  }
+
   const handleResetAll = async () => {
     setIsResettingAll(true)
     setActionError('')
@@ -189,7 +240,16 @@ export default function OrganizationPlanAccess({ orgId }) {
 
   return (
     <div className="space-y-4">
-      <Card title="Plan & Access" subtitle="Effective entitlements for this organization - plan defaults plus any active overrides.">
+      <Card
+        title="Plan & Access"
+        subtitle="Effective entitlements for this organization - plan defaults plus any active overrides."
+        actions={
+          <Button size="sm" onClick={() => setIsGrantAllOpen(true)}>
+            <Unlock className="size-4" aria-hidden="true" />
+            Grant Full Access
+          </Button>
+        }
+      >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <p className="text-xs font-medium text-neutral-400">Current Plan</p>
@@ -427,6 +487,24 @@ export default function OrganizationPlanAccess({ orgId }) {
           <div className="flex justify-end gap-3">
             <Button type="button" variant="secondary" onClick={() => setResetTarget(null)} disabled={isResetting}>Cancel</Button>
             <Button type="button" variant="danger" loading={isResetting} onClick={handleResetOne}>Reset</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isGrantAllOpen} onClose={() => !isGrantingAll && setIsGrantAllOpen(false)} title="Grant Full Access">
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-neutral-600">
+            Set every feature ({allFeatureKeys.length}) to <span className="font-semibold text-neutral-900">Allow</span> and
+            every limit ({allLimitKeys.length}) to <span className="font-semibold text-neutral-900">Unlimited</span> for{' '}
+            <span className="font-semibold text-neutral-900">this organization only</span> - overriding its plan, not changing
+            the plan itself. Use "Reset All" above to undo this later.
+          </p>
+          {isGrantingAll && grantAllProgress && (
+            <p className="text-xs font-medium text-neutral-500">Granting access... {grantAllProgress.done} / {grantAllProgress.total}</p>
+          )}
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={() => setIsGrantAllOpen(false)} disabled={isGrantingAll}>Cancel</Button>
+            <Button type="button" loading={isGrantingAll} onClick={handleGrantFullAccess}>Grant Full Access</Button>
           </div>
         </div>
       </Modal>

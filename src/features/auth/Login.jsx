@@ -157,7 +157,7 @@ export default function Login() {
                   </p>
                 ) : (
                   <>
-                    <Input label="Email" type="email" autoComplete="email" placeholder="you@company.com"
+                    <Input label="Email" type="email" autoComplete="email" autoCapitalize="none" placeholder="you@company.com"
                       value={resetEmail} disabled={isResetSubmitting} onChange={(event) => setResetEmail(event.target.value)} error={resetError} />
                     <Button type="submit" className="w-full rounded-xl bg-linear-to-b from-neutral-800 to-neutral-950 shadow-[0_10px_24px_-10px_rgb(17_24_39/0.55)] hover:from-neutral-800 hover:to-neutral-900" loading={isResetSubmitting}>
                       Send Reset Link
@@ -186,6 +186,7 @@ export default function Login() {
                 <Input
                   label="Email"
                   type="email"
+                  autoCapitalize="none"
                   placeholder="you@company.com"
                   error={errors.email?.message}
                   {...register("email")}

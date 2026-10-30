@@ -261,6 +261,7 @@ export default function UserEdit() {
   const [isSavingAccountStatus, setIsSavingAccountStatus] = useState(false)
   const [error, setError] = useState('')
   const [phoneError, setPhoneError] = useState('')
+  const [emailError, setEmailError] = useState('')
   const [profilePictureFile, setProfilePictureFile] = useState(null)
   const [profilePictureRemoved, setProfilePictureRemoved] = useState(false)
   const [profilePicturePreviewUrl, setProfilePicturePreviewUrl] = useState('')
@@ -481,6 +482,7 @@ export default function UserEdit() {
   const handleSubmit = async (event) => {
     event.preventDefault()
     setPhoneError('')
+    setEmailError('')
     setError('')
 
     if (!userProfileChanged) {
@@ -538,6 +540,7 @@ export default function UserEdit() {
     if (!updateResult.success) {
       setIsSaving(false)
       if (updateResult.fieldErrors?.phone) { setPhoneError(updateResult.fieldErrors.phone); setActiveSection('2') }
+      else if (updateResult.fieldErrors?.email) { setEmailError(updateResult.fieldErrors.email); setActiveSection('2') }
       else setError(updateResult.error)
       return
     }
@@ -800,9 +803,11 @@ export default function UserEdit() {
                 <Input
                   label="Official Email"
                   type="email"
+                  autoCapitalize="none"
                   required
+                  error={emailError}
                   value={formData.email}
-                  onChange={(event) => setFormData({ ...formData, email: event.target.value })}
+                  onChange={(event) => { setEmailError(''); setFormData({ ...formData, email: event.target.value }) }}
                 />
                 <Input
                   label="Emergency Contact Name"

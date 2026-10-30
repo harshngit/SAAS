@@ -251,18 +251,10 @@ export const roleMenus = {
       ],
     },
     {
-      // Intentionally duplicates 4 items from Finance Management (client requirement) - every
-      // duplicate below points at the exact same path/module/feature as its Finance Management
-      // twin, so both are the same canonical page/permission/entitlement, never a second
-      // implementation.
       section: 'Invoice Management',
       items: [
         { label: 'Sales Invoices', path: '/admin/invoices', icon: FileText, module: 'invoices', feature: ENTITLEMENT_KEYS.INVOICE_SALES_INVOICES },
         { label: 'Supplier Invoices', path: '/admin/supplier-invoices', icon: Receipt, module: 'invoices', feature: ENTITLEMENT_KEYS.INVOICE_SUPPLIER_INVOICES },
-        { label: 'Receivables', path: '/admin/receivables', icon: IndianRupee, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_RECEIVABLES },
-        { label: 'Accounts Payable', path: '/admin/payables', icon: Wallet, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_ACCOUNTS_PAYABLE },
-        { label: 'Supplier Payments', path: '/admin/supplier-payments', icon: Wallet, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_SUPPLIER_PAYMENTS },
-        { label: 'Collection Reconciliation', path: '/admin/collections', icon: HandCoins, module: 'payments', feature: ENTITLEMENT_KEYS.FINANCE_COLLECTION_RECONCILIATION },
       ],
     },
     {

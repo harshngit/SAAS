@@ -8,7 +8,7 @@ import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
 import DataTable from '../../components/ui/DataTable'
 import { useToast } from '../../components/ui/toastContext'
-import { listPlatformStaff, createPlatformStaff, updatePlatformStaff, changedStaffFields } from '../../api/platform'
+import { listPlatformStaff, createPlatformStaff, updatePlatformStaff, deletePlatformStaff, bulkDeletePlatformStaff, changedStaffFields } from '../../api/platform'
 import SuperAdminPageHeader from './SuperAdminPageHeader'
 import { dateLabel } from './platformHelpers'
 import { PlatformError } from './platformPresentation'
@@ -28,6 +28,10 @@ export default function PlatformStaff() {
   const [saving, setSaving] = useState(false)
   const [target, setTarget] = useState(null)
   const [formError, setFormError] = useState('')
+  const [selectedIds, setSelectedIds] = useState([])
+  const [deleteConfirm, setDeleteConfirm] = useState(null) // { mode: 'single', row } | { mode: 'bulk', ids }
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const refresh = useCallback(() => setTick(value => value + 1), [])
   useEffect(() => {
     let active = true
@@ -41,6 +45,7 @@ export default function PlatformStaff() {
     }, 250)
     return () => { active = false; clearTimeout(timer) }
   }, [search, status, tick])
+  useEffect(() => { setSelectedIds([]) }, [search, status])
   function edit(row) {
     setEditor(row || {})
     setDraft(row ? { name: row.name || '', email: row.email || '', phone: row.phone || '', role: 'sales_manager', password: '' } : { ...blank })
@@ -71,7 +76,53 @@ export default function PlatformStaff() {
     if (!result.success) { setFormError(result.error); return }
     setTarget(null); refresh(); showToast({ title: 'Staff status updated' })
   }
+  async function confirmDelete() {
+    setDeleting(true); setDeleteError('')
+    const result = deleteConfirm.mode === 'bulk'
+      ? await bulkDeletePlatformStaff(deleteConfirm.ids)
+      : await deletePlatformStaff(deleteConfirm.row.id)
+    setDeleting(false)
+    if (!result.success) {
+      // 404 means the row(s) were already gone (someone else deleted them, or - for bulk - one id
+      // in the batch wasn't platform staff, which rolls back the WHOLE request) - refresh so the
+      // list matches reality instead of leaving stale rows on screen.
+      if (result.status === 404) {
+        setDeleteConfirm(null); setSelectedIds([]); refresh()
+        showToast({ title: deleteConfirm.mode === 'bulk' ? 'Some selected staff no longer exist' : 'Already removed', message: 'The list has been refreshed.', variant: 'error' })
+        return
+      }
+      setDeleteError(result.error)
+      return
+    }
+    const count = deleteConfirm.mode === 'bulk' ? deleteConfirm.ids.length : 1
+    setDeleteConfirm(null); setSelectedIds([]); refresh()
+    showToast({ title: count === 1 ? 'Staff member deleted' : `${count} staff members deleted` })
+  }
+  const allSelected = rows.length > 0 && selectedIds.length === rows.length
   const columns = [
+    {
+      key: '_select',
+      header: (
+        <input
+          type="checkbox"
+          checked={allSelected}
+          ref={el => { if (el) el.indeterminate = selectedIds.length > 0 && !allSelected }}
+          onChange={() => setSelectedIds(allSelected ? [] : rows.map(row => row.id))}
+          aria-label="Select all staff"
+          className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500/20"
+        />
+      ),
+      render: row => (
+        <input
+          type="checkbox"
+          checked={selectedIds.includes(row.id)}
+          onChange={() => setSelectedIds(current => current.includes(row.id) ? current.filter(id => id !== row.id) : [...current, row.id])}
+          onClick={event => event.stopPropagation()}
+          aria-label={`Select ${row.name}`}
+          className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500/20"
+        />
+      ),
+    },
     { key: 'name', header: 'Name', sortable: true },
     { key: 'email', header: 'Email', sortable: true },
     { key: 'phone', header: 'Phone', sortable: true, render: row => row.phone || 'Not provided' },
@@ -83,6 +134,24 @@ export default function PlatformStaff() {
     <SuperAdminPageHeader title="Platform Staff" subtitle="Manage internal staff who can assist with organizations and customer requests." actions={<Button onClick={() => edit(null)}>+ Add Staff</Button>} />
     <Card>
       <PlatformError error={error} retry={refresh} />
+      {selectedIds.length > 0 && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-primary-50 px-4 py-2.5">
+          <p className="text-sm font-medium text-primary-900">{selectedIds.length} selected</p>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-red-200 text-red-600 hover:bg-red-50"
+              onClick={() => { setDeleteConfirm({ mode: 'bulk', ids: selectedIds }); setDeleteError('') }}
+            >
+              Delete selected
+            </Button>
+            <button type="button" onClick={() => setSelectedIds([])} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
       <DataTable
         columns={columns}
         data={rows}
@@ -116,7 +185,11 @@ export default function PlatformStaff() {
             </div>
           </div>
         )}
-        actions={row => [{ label: 'Edit', onClick: () => edit(row) }, { label: row.is_active ? 'Deactivate' : 'Activate', onClick: () => { setTarget(row); setFormError('') } }]}
+        actions={row => [
+          { label: 'Edit', onClick: () => edit(row) },
+          { label: row.is_active ? 'Deactivate' : 'Activate', onClick: () => { setTarget(row); setFormError('') } },
+          { label: 'Delete', danger: true, onClick: () => { setDeleteConfirm({ mode: 'single', row }); setDeleteError('') } },
+        ]}
       />
     </Card>
     <Modal isOpen={editor !== null} onClose={() => !saving && setEditor(null)} title={editor?.id ? 'Edit Staff' : 'Add Staff'} footer={<><Button variant="outline" disabled={saving} onClick={() => setEditor(null)}>Cancel</Button><Button type="submit" form="platform-staff-form" loading={saving}>Save Staff</Button></>}>
@@ -124,6 +197,15 @@ export default function PlatformStaff() {
     </Modal>
     <Modal isOpen={!!target} onClose={() => !saving && setTarget(null)} title={target?.is_active ? 'Deactivate this staff member?' : 'Activate this staff member?'} footer={<><Button variant="outline" disabled={saving} onClick={() => setTarget(null)}>Cancel</Button><Button loading={saving} onClick={toggle}>Confirm</Button></>}>
       <PlatformError error={formError} /><p>{target?.is_active ? 'They will be signed out and will no longer be able to access Platform Operations.' : 'They will be able to sign in to Platform Operations again.'}</p>
+    </Modal>
+    <Modal
+      isOpen={!!deleteConfirm}
+      onClose={() => !deleting && setDeleteConfirm(null)}
+      title={deleteConfirm?.mode === 'bulk' ? `Permanently delete ${deleteConfirm.ids.length} staff members?` : `Permanently delete ${deleteConfirm?.row?.name}?`}
+      footer={<><Button variant="outline" disabled={deleting} onClick={() => setDeleteConfirm(null)}>Cancel</Button><Button variant="danger" loading={deleting} onClick={confirmDelete}>Delete permanently</Button></>}
+    >
+      <PlatformError error={deleteError} />
+      <p>They are signed out immediately and this can&apos;t be undone. Upgrade and feature requests they raised are kept, shown as "Deleted user".</p>
     </Modal>
   </div>
 }

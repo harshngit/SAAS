@@ -1,18 +1,100 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bell, BellOff, Building2, Calendar, Camera, CreditCard, Hash, Mail, MapPin, Phone, ShieldCheck } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Bell, BellOff, Building2, Calendar, Camera, CreditCard, Hash, Mail, MapPin, Pencil, Phone, ShieldCheck, Trash2 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import Select from '../../components/ui/Select'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
 import { roleLabels } from '../../auth/roles'
-import { getCurrentProfile } from '../../api/auth'
+import { changePassword, getCurrentProfile, logout as logoutApi, removeMyProfilePhoto, updateMyProfile, uploadMyProfilePhoto } from '../../api/auth'
 import { updateUser } from '../../api/users'
-import { getFileUrl, uploadFile } from '../../api/files'
+import { getFileUrl } from '../../api/files'
 import { sendTestPush } from '../../api/pushDevices'
 import { disablePush, enablePush, getPushStatus, isPushAvailable } from '../../push/pushService'
+
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024
+const ALLOWED_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+]
+const MARITAL_STATUS_OPTIONS = [
+  { value: 'single', label: 'Single' },
+  { value: 'married', label: 'Married' },
+  { value: 'divorced', label: 'Divorced' },
+  { value: 'widowed', label: 'Widowed' },
+]
+const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map((value) => ({ value, label: value }))
+const LANGUAGE_OPTIONS = [
+  { value: 'en', label: 'English' },
+  { value: 'hi', label: 'Hindi' },
+  { value: 'mr', label: 'Marathi' },
+  { value: 'ta', label: 'Tamil' },
+  { value: 'te', label: 'Telugu' },
+]
+const TIME_ZONE_OPTIONS = [
+  { value: 'Asia/Kolkata', label: 'Asia/Kolkata' },
+  { value: 'UTC', label: 'UTC' },
+  { value: 'America/New_York', label: 'America/New_York' },
+  { value: 'Europe/London', label: 'Europe/London' },
+  { value: 'Asia/Dubai', label: 'Asia/Dubai' },
+]
+
+// Every field PATCH /auth/me accepts, for every signed-in role (tenant staff/admin, Sales
+// Manager, Super Admin) - see crm_changes15.md "everyone edits their own profile". `name` is
+// deliberately left out of this editable set: the backend rebuilds it from first_name/last_name
+// whenever either changes, so a separate raw `name` field here would just race that rule.
+const PROFILE_FIELD_GROUPS = [
+  {
+    label: 'Personal',
+    fields: [
+      { key: 'first_name', label: 'First Name' },
+      { key: 'last_name', label: 'Last Name' },
+      { key: 'display_name', label: 'Display Name' },
+      { key: 'gender', label: 'Gender', kind: 'select', options: GENDER_OPTIONS },
+      { key: 'date_of_birth', label: 'Date of Birth', type: 'date' },
+      { key: 'marital_status', label: 'Marital Status', kind: 'select', options: MARITAL_STATUS_OPTIONS },
+      { key: 'blood_group', label: 'Blood Group', kind: 'select', options: BLOOD_GROUP_OPTIONS },
+      { key: 'nationality', label: 'Nationality' },
+    ],
+  },
+  {
+    label: 'Contact',
+    fields: [
+      { key: 'alternate_mobile_number', label: 'Alternate Mobile Number', type: 'tel' },
+      { key: 'personal_email', label: 'Personal Email', type: 'email' },
+      { key: 'emergency_contact_name', label: 'Emergency Contact Name' },
+      { key: 'emergency_contact_number', label: 'Emergency Contact Number', type: 'tel' },
+      { key: 'emergency_contact_relationship', label: 'Emergency Contact Relationship' },
+    ],
+  },
+  {
+    label: 'Address',
+    fields: [
+      { key: 'current_address', label: 'Current Address', kind: 'textarea' },
+      { key: 'permanent_address', label: 'Permanent Address', kind: 'textarea' },
+      { key: 'city', label: 'City' },
+      { key: 'state', label: 'State' },
+      { key: 'country', label: 'Country' },
+      { key: 'pin_zip_code', label: 'PIN/ZIP Code' },
+    ],
+  },
+  {
+    label: 'Preferences',
+    fields: [
+      { key: 'language', label: 'Language', kind: 'select', options: LANGUAGE_OPTIONS },
+      { key: 'time_zone', label: 'Time Zone', kind: 'select', options: TIME_ZONE_OPTIONS },
+    ],
+  },
+]
+const PROFILE_FIELD_KEYS = PROFILE_FIELD_GROUPS.flatMap((group) => group.fields.map((field) => field.key))
 
 const PUSH_STATUS_META = {
   unsupported: { label: 'Not supported', badge: 'neutral' },
@@ -78,17 +160,28 @@ export default function Profile() {
   const currentUser = useAuthStore((state) => state.currentUser)
   const currentOrganization = useAuthStore((state) => state.currentOrganization)
   const { showToast } = useToast()
+  const navigate = useNavigate()
   // PATCH /users/{id} is admin-only on the backend, regardless of what the permissions matrix
   // grants a custom role - fullAccess is this app's existing signal for "is actually Admin" (see
   // usePermission.js: full_access short-circuits every permission check the same way the backend
-  // does). A non-admin role must never see the upload affordance and then eat an avoidable 403.
-  const { fullAccess: canEditOwnPhoto } = usePermission()
+  // does). Mobile number is read-only on PATCH /auth/me for every role (see PROFILE_FIELD_GROUPS'
+  // comment), so changing it still only ever goes through the admin-only /users/{id} route -
+  // unrelated to the photo/details sections below, which now use /auth/me and are open to everyone.
+  const { fullAccess } = usePermission()
+  const canEditOwnPhoneViaAdminRoute = fullAccess
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [photoLoadFailed, setPhotoLoadFailed] = useState(false)
   const [editingPhone, setEditingPhone] = useState(false)
   const [phoneDraft, setPhoneDraft] = useState('')
   const [phoneError, setPhoneError] = useState('')
   const [savingPhone, setSavingPhone] = useState(false)
+  const [editingDetails, setEditingDetails] = useState(false)
+  const [detailsDraft, setDetailsDraft] = useState({})
+  const [detailsErrors, setDetailsErrors] = useState({})
+  const [savingDetails, setSavingDetails] = useState(false)
+  const [passwordDraft, setPasswordDraft] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [passwordError, setPasswordError] = useState('')
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
   // null while unresolved (and the whole card stays hidden) - pushAvailable is a build-time
   // config check (no Firebase env vars = feature doesn't exist for this deployment, never shown);
   // pushStatus is the actual per-browser status, resolved async since it depends on an
@@ -196,34 +289,53 @@ export default function Profile() {
   const photoUrl = rawProfilePhoto ? getFileUrl(rawProfilePhoto) : ''
   const showPhoto = Boolean(photoUrl) && !photoLoadFailed
 
+  // POST /auth/me/photo - available to every signed-in role now (not just admins, unlike the
+  // old /users/{id} route), see crm_changes15.md "everyone edits their own profile".
   const handlePhotoChange = async (event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (!file || !currentUser?.id || !canEditOwnPhoto) return
+    if (!file || !currentUser?.id) return
+
+    if (!ALLOWED_PHOTO_TYPES.has(file.type)) {
+      showToast({ title: 'Unsupported file', message: 'Profile photo must be a JPEG, PNG or WebP image.', variant: 'error' })
+      return
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      showToast({ title: 'File too large', message: 'Profile photo must be 5 MB or smaller.', variant: 'error' })
+      return
+    }
 
     setIsUploadingPhoto(true)
-    const uploadResult = await uploadFile(file)
+    const uploadResult = await uploadMyProfilePhoto(file)
     if (!uploadResult.success) {
       setIsUploadingPhoto(false)
       showToast({ title: 'Upload failed', message: uploadResult.error, variant: 'error' })
       return
     }
 
-    const updateResult = await updateUser(currentUser.id, { profilePhotoUrl: uploadResult.file.url })
-    setIsUploadingPhoto(false)
-    if (!updateResult.success) {
-      showToast({ title: 'Could not update photo', message: updateResult.error, variant: 'error' })
-      return
-    }
-
     setPhotoLoadFailed(false)
     await getCurrentProfile()
+    setIsUploadingPhoto(false)
     showToast({ title: 'Photo updated', message: 'Your profile photo has been changed.' })
+  }
+
+  const handleRemovePhoto = async () => {
+    if (!currentUser?.id || isUploadingPhoto) return
+    setIsUploadingPhoto(true)
+    const result = await removeMyProfilePhoto()
+    if (!result.success) {
+      setIsUploadingPhoto(false)
+      showToast({ title: 'Could not remove photo', message: result.error, variant: 'error' })
+      return
+    }
+    await getCurrentProfile()
+    setIsUploadingPhoto(false)
+    showToast({ title: 'Photo removed' })
   }
 
   const savePhone = async (event) => {
     event.preventDefault()
-    if (!canEditOwnPhoto || !currentUser?.id || savingPhone) return
+    if (!canEditOwnPhoneViaAdminRoute || !currentUser?.id || savingPhone) return
     setPhoneError('')
     if (!/^\+?[0-9][0-9\s-]{9,14}$/.test(phoneDraft.trim())) {
       setPhoneError('Enter a valid phone number')
@@ -243,6 +355,84 @@ export default function Profile() {
     showToast({ title: 'Phone number updated.' })
   }
 
+  const startEditDetails = () => {
+    const draft = {}
+    for (const key of PROFILE_FIELD_KEYS) draft[key] = currentUser?.[key] ?? ''
+    setDetailsDraft(draft)
+    setDetailsErrors({})
+    setEditingDetails(true)
+  }
+
+  const saveDetails = async (event) => {
+    event.preventDefault()
+    if (savingDetails) return
+
+    const payload = {}
+    for (const key of PROFILE_FIELD_KEYS) {
+      const nextValue = (detailsDraft[key] ?? '').toString()
+      const currentValue = (currentUser?.[key] ?? '').toString()
+      if (nextValue !== currentValue) payload[key] = nextValue
+    }
+
+    if (Object.keys(payload).length === 0) {
+      setEditingDetails(false)
+      return
+    }
+
+    setSavingDetails(true)
+    setDetailsErrors({})
+    const result = await updateMyProfile(payload)
+    if (!result.success) {
+      setSavingDetails(false)
+      if (Object.keys(result.fieldErrors || {}).length > 0) setDetailsErrors(result.fieldErrors)
+      else showToast({ title: 'Could not save details', message: result.error, variant: 'error' })
+      return
+    }
+
+    const profile = await getCurrentProfile()
+    setSavingDetails(false)
+    if (!profile.success) {
+      showToast({ title: 'Saved, but could not refresh profile', message: profile.error, variant: 'error' })
+      return
+    }
+    setEditingDetails(false)
+    showToast({ title: 'Profile updated' })
+  }
+
+  const savePassword = async (event) => {
+    event.preventDefault()
+    setPasswordError('')
+
+    if (!passwordDraft.currentPassword.trim()) {
+      setPasswordError('Current password is required.')
+      return
+    }
+    if (passwordDraft.newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters.')
+      return
+    }
+    if (passwordDraft.newPassword !== passwordDraft.confirmPassword) {
+      setPasswordError('New password and confirm password must match.')
+      return
+    }
+
+    setIsChangingPassword(true)
+    const result = await changePassword({ currentPassword: passwordDraft.currentPassword, newPassword: passwordDraft.newPassword })
+    setIsChangingPassword(false)
+
+    if (!result.success) {
+      setPasswordError(result.error)
+      return
+    }
+
+    // Every other session's refresh token is revoked by this call, including this one's - stay
+    // signed in locally would just mean failing on the next silent refresh, so sign out now
+    // while the message is still on screen (see crm_changes15.md "Change password").
+    showToast({ title: 'Password changed', message: 'Please log in again.' })
+    await logoutApi()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -252,40 +442,36 @@ export default function Profile() {
 
       <section className="grid grid-cols-1 gap-5 lg:grid-cols-[20rem_1fr]">
         <Card bodyClassName="flex flex-col items-center text-center">
-          {canEditOwnPhoto ? (
-            <label
-              className={`group relative flex size-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full ring-4 ring-primary-50 transition-all ${
-                showPhoto ? '' : 'bg-linear-to-br from-primary-500 to-primary-700'
-              }`}
-            >
-              {showPhoto ? (
-                <img src={photoUrl} alt={currentUser?.name} className="absolute inset-0 size-full object-cover" onError={() => setPhotoLoadFailed(true)} />
-              ) : (
-                <span className="font-(--font-display) text-2xl font-semibold text-white">{initials}</span>
-              )}
-              <div className="absolute inset-0 flex items-center justify-center bg-neutral-900/0 opacity-0 transition-all group-hover:bg-neutral-900/55 group-hover:opacity-100">
-                <Camera className="size-5 text-white" aria-hidden="true" />
-              </div>
-              <input type="file" accept="image/*" className="sr-only" disabled={isUploadingPhoto} onChange={handlePhotoChange} />
-            </label>
-          ) : (
-            // Read-only: this role can't call PATCH /users/{id} (admin-only on the backend), so
-            // no hover/camera upload affordance - just the plain avatar.
-            <div
-              className={`flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full ring-4 ring-primary-50 ${
-                showPhoto ? '' : 'bg-linear-to-br from-primary-500 to-primary-700'
-              }`}
-            >
-              {showPhoto ? (
-                <img src={photoUrl} alt={currentUser?.name} className="size-full object-cover" onError={() => setPhotoLoadFailed(true)} />
-              ) : (
-                <span className="font-(--font-display) text-2xl font-semibold text-white">{initials}</span>
-              )}
+          {/* Photo is now self-service for every signed-in role via POST/DELETE /auth/me/photo -
+              not gated to admins any more (that gate only ever applied to the old /users/{id}
+              route). See crm_changes15.md "everyone edits their own profile". */}
+          <label
+            className={`group relative flex size-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full ring-4 ring-primary-50 transition-all ${
+              showPhoto ? '' : 'bg-linear-to-br from-primary-500 to-primary-700'
+            }`}
+          >
+            {showPhoto ? (
+              <img src={photoUrl} alt={currentUser?.name} className="absolute inset-0 size-full object-cover" onError={() => setPhotoLoadFailed(true)} />
+            ) : (
+              <span className="font-(--font-display) text-2xl font-semibold text-white">{initials}</span>
+            )}
+            <div className="absolute inset-0 flex items-center justify-center bg-neutral-900/0 opacity-0 transition-all group-hover:bg-neutral-900/55 group-hover:opacity-100">
+              <Camera className="size-5 text-white" aria-hidden="true" />
             </div>
-          )}
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={isUploadingPhoto} onChange={handlePhotoChange} />
+          </label>
           {isUploadingPhoto && <p className="mt-2 text-xs font-medium text-primary-600">Uploading...</p>}
+          {!isUploadingPhoto && showPhoto && (
+            <button type="button" onClick={handleRemovePhoto} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-neutral-400 hover:text-red-600">
+              <Trash2 className="size-3" aria-hidden="true" />
+              Remove photo
+            </button>
+          )}
           <h2 className="mt-4 text-lg font-semibold text-neutral-950">{currentUser?.name || 'User'}</h2>
           <p className="mt-1 text-sm text-neutral-500">{currentUser?.email}</p>
+          <p className="mt-0.5 text-xs text-neutral-400">
+            {fullAccess ? 'Change your login email from Company Settings → Account.' : 'Ask your admin to change your login email.'}
+          </p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Badge variant={currentUser?.is_active === false ? 'danger' : 'success'} dot>
               {currentUser?.is_active === false ? 'Inactive' : 'Active'}
@@ -309,7 +495,7 @@ export default function Profile() {
               ) : (
                 <>
                   <DetailItem icon={Phone} label="Phone" value={currentUser?.phone} verified={currentUser?.phone_verified === true} />
-                  {canEditOwnPhoto && <button type="button" className="ml-11 mt-1 text-xs font-medium text-primary-600 hover:underline"
+                  {canEditOwnPhoneViaAdminRoute && <button type="button" className="ml-11 mt-1 text-xs font-medium text-primary-600 hover:underline"
                     onClick={() => { setPhoneDraft(currentUser?.phone || ''); setPhoneError(''); setEditingPhone(true) }}>Edit phone</button>}
                 </>
               )}
@@ -320,6 +506,106 @@ export default function Profile() {
           </div>
         </Card>
       </section>
+
+      <Card
+        title="Additional Details"
+        actions={!editingDetails && (
+          <Button type="button" size="sm" variant="outline" onClick={startEditDetails}>
+            <Pencil className="size-3.5" aria-hidden="true" />
+            Edit
+          </Button>
+        )}
+      >
+        {editingDetails ? (
+          <form onSubmit={saveDetails} className="space-y-6">
+            {PROFILE_FIELD_GROUPS.map((group) => (
+              <div key={group.label}>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-400">{group.label}</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {group.fields.map((field) =>
+                    field.kind === 'select' ? (
+                      <Select
+                        key={field.key}
+                        label={field.label}
+                        placeholder={`Select ${field.label.toLowerCase()}`}
+                        options={field.options}
+                        value={detailsDraft[field.key] || ''}
+                        error={detailsErrors[field.key]}
+                        onChange={(event) => setDetailsDraft((value) => ({ ...value, [field.key]: event.target.value }))}
+                      />
+                    ) : field.kind === 'textarea' ? (
+                      <div key={field.key} className="flex flex-col gap-1.5 sm:col-span-2">
+                        <label className="text-sm font-medium text-fg">{field.label}</label>
+                        <textarea
+                          rows={2}
+                          value={detailsDraft[field.key] || ''}
+                          onChange={(event) => setDetailsDraft((value) => ({ ...value, [field.key]: event.target.value }))}
+                          className="w-full rounded-xl border border-surface-border bg-(--input-bg) px-3.5 py-2.5 text-sm text-fg transition-all focus:border-primary-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                        />
+                        {detailsErrors[field.key] && <span className="text-xs text-red-600">{detailsErrors[field.key]}</span>}
+                      </div>
+                    ) : (
+                      <Input
+                        key={field.key}
+                        label={field.label}
+                        type={field.type || 'text'}
+                        value={detailsDraft[field.key] || ''}
+                        error={detailsErrors[field.key]}
+                        onChange={(event) => setDetailsDraft((value) => ({ ...value, [field.key]: event.target.value }))}
+                      />
+                    ),
+                  )}
+                </div>
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" loading={savingDetails}>Save Details</Button>
+              <Button type="button" size="sm" variant="ghost" disabled={savingDetails} onClick={() => setEditingDetails(false)}>Cancel</Button>
+            </div>
+          </form>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {PROFILE_FIELD_GROUPS.flatMap((group) => group.fields).map((field) => (
+              <DetailItem
+                key={field.key}
+                label={field.label}
+                value={field.kind === 'select' ? field.options.find((option) => option.value === currentUser?.[field.key])?.label || currentUser?.[field.key] : currentUser?.[field.key]}
+              />
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card title="Change Password">
+        <form onSubmit={savePassword} className="grid max-w-md grid-cols-1 gap-4">
+          {passwordError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{passwordError}</p>}
+          <Input
+            label="Current Password"
+            type="password"
+            autoComplete="current-password"
+            value={passwordDraft.currentPassword}
+            disabled={isChangingPassword}
+            onChange={(event) => setPasswordDraft((value) => ({ ...value, currentPassword: event.target.value }))}
+          />
+          <Input
+            label="New Password"
+            type="password"
+            autoComplete="new-password"
+            value={passwordDraft.newPassword}
+            disabled={isChangingPassword}
+            onChange={(event) => setPasswordDraft((value) => ({ ...value, newPassword: event.target.value }))}
+          />
+          <Input
+            label="Confirm New Password"
+            type="password"
+            autoComplete="new-password"
+            value={passwordDraft.confirmPassword}
+            disabled={isChangingPassword}
+            onChange={(event) => setPasswordDraft((value) => ({ ...value, confirmPassword: event.target.value }))}
+          />
+          <Button type="submit" size="sm" className="w-fit" loading={isChangingPassword}>Change Password</Button>
+        </form>
+      </Card>
 
       <Card title="Organization">
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
