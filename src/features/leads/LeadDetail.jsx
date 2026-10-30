@@ -497,13 +497,16 @@ export default function LeadDetail() {
     [assignableStaff],
   )
 
-  const isConverted = Boolean(lead?.convertedCustomerId)
+  // A lead can be pre-linked to a customer_id/converted_customer_id at creation WITHOUT ever
+  // having been converted (crm_changes15.md) - only isConverted (backend-computed) or
+  // lead_status === 'won' mean an actual conversion happened.
+  const isConverted = Boolean(lead?.isConverted) || lead?.leadStatus === 'won'
   // A Lost lead cannot convert straight to a customer - the rep must first re-open it
   // (Edit Lead -> status Contacted / Qualified). Recovery activity stays available.
   const isLost = lead?.leadStatus === 'lost'
   // A converted lead is read-only server-side: PATCH / DELETE on the lead return 400
   // (spec §10.6). Editing, notes, status and delete are hidden; activity history stays.
-  const isReadOnlyLead = isConverted || lead?.leadStatus === 'won'
+  const isReadOnlyLead = isConverted
 
   const journeyState = useMemo(() => getLeadJourneyState(lead), [lead])
 
@@ -863,6 +866,18 @@ export default function LeadDetail() {
               {lead.name || lead.customerName || 'New prospect'}
             </h1>
             <Badge variant={statusVariant[lead.leadStatus] || 'neutral'}>{formatLeadStatus(lead.leadStatus)}</Badge>
+            {/* Pre-linked (customer_id set at creation) but not yet actually converted - show the
+                link without implying conversion happened; Convert stays available below. */}
+            {lead.customerId && !isConverted && (
+              <button
+                type="button"
+                onClick={() => navigate(`${customerBasePath}/${lead.customerId}`)}
+                className="inline-flex items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100"
+              >
+                Linked to {lead.customerName || 'Customer'}
+                <ArrowRightCircle className="size-3.5" aria-hidden="true" />
+              </button>
+            )}
           </div>
           <p className="mt-1 text-sm text-neutral-500">
             {lead.leadId}
@@ -885,7 +900,7 @@ export default function LeadDetail() {
             Schedule Visit
           </Button>
           {isConverted ? (
-            <Button size="sm" onClick={() => navigate(`${customerBasePath}/${lead.convertedCustomerId}`)}>
+            <Button size="sm" onClick={() => navigate(`${customerBasePath}/${lead.convertedCustomerId || lead.customerId}`)}>
               <ArrowRightCircle className="size-4" aria-hidden="true" />
               View Customer
             </Button>

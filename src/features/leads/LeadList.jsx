@@ -474,6 +474,10 @@ export default function LeadList() {
                 ) : (
                   visibleLeads.map((lead, index) => {
                     const nextFollowUp = getNextFollowUpSummary(nextFollowUpByLeadId[lead.id])
+                    // A lead can be pre-linked to a customer_id at creation without ever having
+                    // been converted (crm_changes15.md) - only isConverted/lead_status === 'won'
+                    // mean an actual conversion happened; customerId alone does not.
+                    const isLeadConverted = Boolean(lead.isConverted) || lead.leadStatus === 'won'
                     return (
                     <tr
                       key={lead.id}
@@ -527,11 +531,18 @@ export default function LeadList() {
                           items={[
                             { label: 'View Details', icon: Eye, onClick: () => navigate(`${leadBasePath}/${lead.id}`) },
                             { label: 'Edit', icon: Edit, onClick: () => setEditingLead(lead) },
-                            ...(lead.convertedCustomerId
-                              ? [{ label: 'View Customer', icon: ArrowRightCircle, onClick: () => navigate(`/admin/customers/${lead.convertedCustomerId}`) }]
-                              : lead.leadStatus === 'won' || lead.leadStatus === 'lost'
-                                ? []
-                                : [{ label: 'Convert to Customer', icon: ArrowRightCircle, onClick: () => setConvertTarget(lead) }]),
+                            ...(isLeadConverted
+                              ? [{ label: 'View Customer', icon: ArrowRightCircle, onClick: () => navigate(`/admin/customers/${lead.convertedCustomerId || lead.customerId}`) }]
+                              : [
+                                  // Pre-linked but not yet converted - keep both: the link and
+                                  // the Convert action (crm_changes15.md).
+                                  ...(lead.customerId
+                                    ? [{ label: 'View Customer', icon: ArrowRightCircle, onClick: () => navigate(`/admin/customers/${lead.customerId}`) }]
+                                    : []),
+                                  ...(lead.leadStatus === 'lost'
+                                    ? []
+                                    : [{ label: 'Convert to Customer', icon: ArrowRightCircle, onClick: () => setConvertTarget(lead) }]),
+                                ]),
                             { label: 'Delete', icon: Trash2, danger: true, onClick: () => setDeleteTarget(lead) },
                           ]}
                         />

@@ -206,6 +206,10 @@ function normalizeLead(lead) {
     customerName: customer?.name || customer?.customer_name || '',
     convertedCustomerId: lead.converted_customer_id || '',
     convertedAt: lead.converted_at || null,
+    // Backend-computed (crm_changes15.md): true only after a real convert. A lead can be
+    // pre-linked to a customer_id/converted_customer_id at creation WITHOUT being converted -
+    // never derive "converted" from those fields alone, only from this flag or lead_status === 'won'.
+    isConverted: Boolean(lead.is_converted),
     assignedSalespersonId: lead.assigned_salesperson_id || salesperson?.id || '',
     assignedSalespersonName: salesperson?.name || '',
     createdAt: lead.created_at,

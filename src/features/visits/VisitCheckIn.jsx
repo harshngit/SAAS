@@ -39,6 +39,13 @@ function labelize(value = '') {
   return String(value).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+// A visit can carry BOTH a leadId and a customerId at once (crm_changes15.md) - never assume
+// one or the other when labelling the party.
+function visitPartyLabel(visit) {
+  if (visit.leadId && visit.customerId) return 'Lead + Customer'
+  return visit.leadId ? 'Lead' : 'Customer'
+}
+
 // The single most relevant next action for a completed visit, based on its outcome.
 function visitNextAction(visit, lead, readyToConvertHint) {
   if (visit.status !== 'completed' || !visit.leadId) return null
@@ -231,7 +238,7 @@ function VisitCheckoutForm({ visit, assigneeOptions, isLoadingOptions, submittin
 function VisitInfoBody({ visit, visitStatus, followUpRequired, canAddFollowUp, onAddFollowUp, nextAction, taskError, onRunNextAction, onRetryTask }) {
   const facts = [
     ['Customer / Lead', visit.customerName || visit.leadName || (visit.leadId ? 'Lead visit' : '—')],
-    ['Party', visit.leadId ? 'Lead' : 'Customer'],
+    ['Party', visitPartyLabel(visit)],
     ['Visit Type', labelize(visit.visitType)],
     ['Visit Date / Time', formatVisitDateTime(visit.visitDate)],
     ...(visit.checkedInAt ? [['Checked In', formatVisitDateTime(visit.checkedInAt)]] : []),
@@ -547,11 +554,13 @@ export default function VisitCheckIn() {
 
   const applyLeadConverted = ({ leadId, customerId }) => {
     if (isDemoRecord(leadId)) {
-      setDemoLeadOverrides((current) => ({ ...current, [leadId]: { leadStatus: 'won', convertedCustomerId: customerId } }))
+      setDemoLeadOverrides((current) => ({ ...current, [leadId]: { leadStatus: 'won', isConverted: true, convertedCustomerId: customerId } }))
     } else {
       setLeads((current) =>
         current.map((lead) =>
-          lead.id === leadId ? { ...lead, leadStatus: 'won', convertedCustomerId: customerId || lead.convertedCustomerId } : lead,
+          lead.id === leadId
+            ? { ...lead, leadStatus: 'won', isConverted: true, convertedCustomerId: customerId || lead.convertedCustomerId }
+            : lead,
         ),
       )
     }
@@ -1045,7 +1054,7 @@ export default function VisitCheckIn() {
                               )}
                             </p>
                             <span className="mt-0.5 inline-block rounded-md bg-neutral-100 px-2 py-0.5 text-[0.7rem] font-medium text-neutral-500">
-                              {visit.leadId ? 'Lead' : 'Customer'}
+                              {visitPartyLabel(visit)}
                             </span>
                           </td>
                           <td className="whitespace-nowrap px-4 py-3.5 text-neutral-600">{formatVisitDateTime(visit.visitDate)}</td>
@@ -1124,7 +1133,7 @@ export default function VisitCheckIn() {
                               <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
                             )}
                           </p>
-                          <p className="text-xs text-neutral-500">{formatVisitDateTime(visit.visitDate)} · {labelize(visit.visitType)} · {visit.leadId ? 'Lead' : 'Customer'}</p>
+                          <p className="text-xs text-neutral-500">{formatVisitDateTime(visit.visitDate)} · {labelize(visit.visitType)} · {visitPartyLabel(visit)}</p>
                         </div>
                         <Badge variant={visitStatus.variant} dot>{visitStatus.label}</Badge>
                       </div>

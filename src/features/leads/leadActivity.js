@@ -279,7 +279,10 @@ export function buildLeadTimeline({ lead, visits = [], localFollowUps = [] }) {
 
   localFollowUps.forEach((task) => pushFollowUpEvents(task, 'followup'))
 
-  if (lead.convertedAt || lead.convertedCustomerId || lead.leadStatus === 'won') {
+  // A Lead can be pre-linked to a Customer (customer_id set) without ever having been
+  // converted - convertedAt/convertedCustomerId alone don't mean converted. isConverted
+  // (backend-computed) or lead_status === 'won' are the only trustworthy signals.
+  if (lead.isConverted || lead.leadStatus === 'won') {
     events.push({
       id: 'converted',
       icon: ShoppingBag,

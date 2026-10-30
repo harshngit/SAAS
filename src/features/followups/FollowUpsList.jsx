@@ -34,7 +34,9 @@ import { DEMO_RECORDS_ENABLED, demoFollowUps, demoLeads, isDemoRecord } from '..
 // Convert/View-Customer only apply to Leads (never Customers, never Lost/Converted leads).
 function followUpNextAction(followUp, contact) {
   if (followUp.status !== 'completed') return null
-  const isLead = contact.kind === 'Lead'
+  // Keyed off leadId specifically, not contact.kind (display label) - a row can carry both
+  // a lead_id and a customer_id at once (crm_changes15.md), and is still a Lead for this.
+  const isLead = Boolean(contact.leadId)
 
   if (isLead && (contact.convertedCustomerId || contact.leadStatus === 'won')) {
     return contact.convertedCustomerId
@@ -75,6 +77,12 @@ const PRIORITY_VARIANT = { low: 'neutral', medium: 'info', high: 'warning', urge
 
 function titleCase(value = '') {
   return String(value).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+// A visit/follow-up row can carry BOTH a lead_id and a customer_id at once (crm_changes15.md) -
+// `kind` is a display-only label, never used to decide which id(s) the row actually has.
+function contactKind(leadId, customerId) {
+  return leadId && customerId ? 'Lead + Customer' : leadId ? 'Lead' : customerId ? 'Customer' : null
 }
 
 function FollowUpRow({ followUp, contact, visitOrigin, actingId, onComplete, onEdit, onDelete }) {
@@ -264,7 +272,7 @@ export default function FollowUpsList() {
     visits.forEach((visit) => {
       map.set(visit.id, {
         name: visit.customerName || visit.leadName || (visit.leadId ? 'Lead' : 'Customer'),
-        kind: visit.leadId ? 'Lead' : 'Customer',
+        kind: contactKind(visit.leadId, visit.customerId),
         leadId: visit.leadId || '',
         customerId: visit.customerId || '',
         visitType: visit.visitType || '',
@@ -277,10 +285,12 @@ export default function FollowUpsList() {
   const resolveContact = useCallback(
     (followUp) => {
       let base
-      if (followUp.customerName) {
-        base = { name: followUp.customerName, kind: 'Customer', leadId: '', customerId: followUp.customerId }
-      } else if (followUp.leadId) {
-        base = { name: followUp.leadName || 'Lead', kind: 'Lead', leadId: followUp.leadId, customerId: '' }
+      if (followUp.leadId || followUp.customerId) {
+        base = {
+          name: followUp.customerName || followUp.leadName || '',
+          leadId: followUp.leadId || '',
+          customerId: followUp.customerId || '',
+        }
       } else if (followUp.visitId && visitIndex.has(followUp.visitId)) {
         base = { ...visitIndex.get(followUp.visitId) }
       } else {
@@ -290,7 +300,8 @@ export default function FollowUpsList() {
       const lead = base.leadId ? leadIndex.get(base.leadId) : null
       return {
         ...base,
-        name: lead?.name || base.name,
+        name: lead?.name || base.name || (base.leadId ? 'Lead' : 'Customer'),
+        kind: contactKind(base.leadId, base.customerId),
         leadStatus: lead?.leadStatus || '',
         convertedCustomerId: lead?.convertedCustomerId || '',
       }
@@ -507,7 +518,7 @@ export default function FollowUpsList() {
     } else if (action.kind === 'logVisit') {
       navigate('/sales/visits')
     } else if (action.kind === 'addFollowUp') {
-      if (contact.kind === 'Lead' && contact.leadId) {
+      if (contact.leadId) {
         navigate(`/sales/leads/${contact.leadId}`)
       } else {
         handleAddFollowUp()
@@ -520,11 +531,13 @@ export default function FollowUpsList() {
   // Convert -> View Customer without a full refetch.
   const applyLeadConverted = ({ leadId, customerId }) => {
     if (isDemoRecord(leadId)) {
-      setDemoLeadOverrides((current) => ({ ...current, [leadId]: { leadStatus: 'won', convertedCustomerId: customerId } }))
+      setDemoLeadOverrides((current) => ({ ...current, [leadId]: { leadStatus: 'won', isConverted: true, convertedCustomerId: customerId } }))
     } else {
       setLeads((current) =>
         current.map((lead) =>
-          lead.id === leadId ? { ...lead, leadStatus: 'won', convertedCustomerId: customerId || lead.convertedCustomerId } : lead,
+          lead.id === leadId
+            ? { ...lead, leadStatus: 'won', isConverted: true, convertedCustomerId: customerId || lead.convertedCustomerId }
+            : lead,
         ),
       )
     }
