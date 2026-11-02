@@ -50,16 +50,27 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
-// Status-aware so the drawer shows the truthful backend reason (spec §27).
+// Status-aware so the drawer shows the truthful backend reason (spec §27). Returns
+// { error, code? } - a coded 409 (e.g. DAY_END_CLOSED) is distinguishable from a
+// generic error without re-parsing the message text.
 function collectionError(error, fallback) {
   const status = error.response?.status
   const detail = error.response?.data?.detail || error.response?.data?.message || error.response?.data?.error || error.response?.data
-  if (status === 403) return 'You do not have permission to record collections.'
-  if (status === 404 || status === 405) {
-    return 'Collecting an outstanding payment isn’t available on the server yet. Nothing was recorded — the amount stays due for the accounts team to collect.'
+  if (detail && typeof detail === 'object' && detail.code === 'DAY_END_CLOSED') {
+    return {
+      code: 'DAY_END_CLOSED',
+      error: formatApiError(
+        detail.message,
+        'This delivery partner\'s day has already been submitted or closed. Collections for this day can no longer be changed.',
+      ),
+    }
   }
-  if (status === 409) return formatApiError(detail, 'This collection could not be recorded — it may already exist.')
-  return formatApiError(detail, fallback)
+  if (status === 403) return { error: 'You do not have permission to record collections.' }
+  if (status === 404 || status === 405) {
+    return { error: 'Collecting an outstanding payment isn’t available on the server yet. Nothing was recorded — the amount stays due for the accounts team to collect.' }
+  }
+  if (status === 409) return { error: formatApiError(detail, 'This collection could not be recorded — it may already exist.') }
+  return { error: formatApiError(detail, fallback) }
 }
 
 // -----------------------------------------------------------------------------
@@ -136,6 +147,6 @@ export async function recordCustomerCollection(payload) {
     })
     return { success: true, collection: data }
   } catch (error) {
-    return { success: false, error: collectionError(error, 'Unable to record this collection. Please try again.') }
+    return { success: false, ...collectionError(error, 'Unable to record this collection. Please try again.') }
   }
 }

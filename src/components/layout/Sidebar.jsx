@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
+import { getNavigationGuard } from '../../hooks/navigationGuardStore'
 import { roleMenus, roleLabels, ROLES, resolveWorkspaceRole } from '../../auth/roles'
 import { usePermission } from '../../auth/usePermission'
 import { useEntitlements } from '../../entitlements/EntitlementsContext'
@@ -206,6 +207,19 @@ export default function Sidebar({
     onCloseMobile()
   }
 
+  // If the current page registered an unsaved-changes guard (useUnsavedChangesGuard), reuse its
+  // own confirm step instead of navigating straight away - see hooks/navigationGuardStore.js.
+  const navigateGuarded = (event, to, afterNavigate) => {
+    const guard = getNavigationGuard()
+    if (!guard) return false
+    event.preventDefault()
+    guard(() => {
+      navigate(to)
+      afterNavigate?.()
+    })
+    return true
+  }
+
   return (
     <>
       {isMobileOpen && (
@@ -286,7 +300,10 @@ export default function Sidebar({
                 {useCollapsedSectionNav && SectionIcon && (
                   <NavLink
                     to={sectionPath}
-                    onClick={() => handleCollapsedSectionClick(group.section)}
+                    onClick={(event) => {
+                      if (navigateGuarded(event, sectionPath, () => handleCollapsedSectionClick(group.section))) return
+                      handleCollapsedSectionClick(group.section)
+                    }}
                     aria-label={group.section}
                     title={group.section}
                     className={`group relative hidden items-center justify-center rounded-2xl py-2.5 text-sm font-medium transition-all duration-150 md:flex ${
@@ -368,7 +385,10 @@ export default function Sidebar({
                       <NavLink
                         key={item.path}
                         to={item.path}
-                        onClick={onCloseMobile}
+                        onClick={(event) => {
+                          if (navigateGuarded(event, item.path, onCloseMobile)) return
+                          onCloseMobile()
+                        }}
                         aria-label={!isExpanded ? item.label : undefined}
                         title={!isExpanded ? item.label : undefined}
                           className={({ isActive }) => {

@@ -2,17 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import {
-  AlertCircle,
   Bell,
   CheckCheck,
-  CheckCircle,
   ChevronLeft,
   ChevronRight,
   Download,
-  Info,
   RotateCw,
   Search,
   SlidersHorizontal,
+  Trash2,
   X,
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
@@ -26,18 +24,18 @@ import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { exportRowsToExcel } from '../../utils/exportToExcel'
-import { listNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notifications'
+import {
+  clearReadNotifications,
+  deleteNotification,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '../../api/notifications'
 import { useAuthStore } from '../../store/authStore'
-import { resolveNotificationDestination } from '../../utils/notificationNavigation'
-
-const TYPE_ICON = { success: CheckCircle, alert: AlertCircle, warning: AlertCircle, info: Info }
-const TYPE_BADGE_VARIANT = { success: 'success', alert: 'danger', warning: 'warning', info: 'info' }
-const TYPE_COLOR_CLASS = {
-  success: 'text-green-600 bg-green-50',
-  alert: 'text-red-600 bg-red-50',
-  warning: 'text-amber-600 bg-amber-50',
-  info: 'text-blue-600 bg-blue-50',
-}
+import { usePermission } from '../../auth/usePermission'
+import { hasPlatformAccess } from '../../auth/platformRoles'
+import { isPlatformNotification, resolveNotificationDestination } from '../../utils/notificationNavigation'
+import { NOTIFICATION_TYPE_BADGE_VARIANT as TYPE_BADGE_VARIANT, NOTIFICATION_TYPE_COLOR_CLASS as TYPE_COLOR_CLASS, notificationTypeIcon } from './notificationTypes'
 
 const READ_STATUS_OPTIONS = [
   { value: '', label: 'All' },
@@ -53,7 +51,10 @@ const ROWS_PER_PAGE_OPTIONS = [
 
 function typeLabel(type) {
   if (!type) return 'Info'
-  return type.charAt(0).toUpperCase() + type.slice(1)
+  return type
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
 }
 
 function formatTimestamp(value) {
@@ -72,11 +73,14 @@ function exportNotifications(rows) {
 export default function NotificationsList() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
+  const { role } = usePermission()
 
   const [notifications, setNotifications] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isMarkingAll, setIsMarkingAll] = useState(false)
+  const [isClearingRead, setIsClearingRead] = useState(false)
+  const [deletingId, setDeletingId] = useState('')
 
   const [searchTerm, setSearchTerm] = useState('')
   const [showFilters, setShowFilters] = useState(false)
@@ -101,7 +105,7 @@ export default function NotificationsList() {
     setIsLoading(true)
     setLoadError('')
 
-    const result = await listNotifications()
+    const result = await listNotifications({ pageSize: 100 })
 
     if (!result.success) {
       setNotifications([])
@@ -110,20 +114,28 @@ export default function NotificationsList() {
       return
     }
 
-    setNotifications(result.notifications)
+    // Platform-scoped and organization-scoped notifications never mix into each other's context
+    // (§11) - this page is reached from the Admin shell, so a platform-scoped row (which an
+    // Admin should never receive anyway, per backend recipient selection) is defensively dropped
+    // rather than shown.
+    const isPlatformViewer = hasPlatformAccess(currentUser)
+    setNotifications(result.notifications.filter((n) => isPlatformNotification(n) === isPlatformViewer))
     setIsLoading(false)
   }
 
   useEffect(() => {
     loadNotifications()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const markAsRead = async (notification) => {
+  const markAsRead = (notification) => {
     if (notification.isRead) return
-    const result = await markNotificationRead(notification.id)
-    if (result.success) {
-      setNotifications((current) => current.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)))
-    }
+    // Fire-and-forget - a failed mark-read must never block the click-through navigation (§4).
+    markNotificationRead(notification.id).then((result) => {
+      if (result.success) {
+        setNotifications((current) => current.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)))
+      }
+    })
   }
 
   const handleMarkAllRead = async () => {
@@ -135,13 +147,34 @@ export default function NotificationsList() {
     }
   }
 
+  const handleDelete = async (event, notification) => {
+    event.stopPropagation()
+    if (deletingId) return
+    setDeletingId(notification.id)
+    const result = await deleteNotification(notification.id)
+    setDeletingId('')
+    if (result.success) {
+      setNotifications((current) => current.filter((n) => n.id !== notification.id))
+    }
+  }
+
+  const handleClearRead = async () => {
+    setIsClearingRead(true)
+    const result = await clearReadNotifications()
+    setIsClearingRead(false)
+    if (result.success) {
+      setNotifications((current) => current.filter((n) => !n.isRead))
+    }
+  }
+
   const handleRowClick = (notification) => {
     markAsRead(notification)
-    const destination = resolveNotificationDestination(notification, currentUser)
+    const destination = resolveNotificationDestination(notification, { currentUser, role })
     if (destination) navigate(destination)
   }
 
   const unreadCount = notifications.filter((n) => !n.isRead).length
+  const hasReadNotifications = notifications.some((n) => n.isRead)
 
   const openFilters = () => {
     setDraftType(typeFilter)
@@ -261,6 +294,12 @@ export default function NotificationsList() {
                 <Download className="size-4" aria-hidden="true" />
                 Export
               </Button>
+              {hasReadNotifications && (
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" loading={isClearingRead} onClick={handleClearRead}>
+                  <Trash2 className="size-4" aria-hidden="true" />
+                  Clear read
+                </Button>
+              )}
               {unreadCount > 0 && (
                 <Button type="button" size="sm" className="h-9 rounded-xl px-3.5" loading={isMarkingAll} onClick={handleMarkAllRead}>
                   <CheckCheck className="size-4" aria-hidden="true" />
@@ -324,7 +363,7 @@ export default function NotificationsList() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto bg-surface px-0 py-0">
           {isLoading ? (
-            <LoadingSpinner variant="table" minWidth="min-w-[48rem]" columns={["Notification", "Type", "Status", "Date"]} label="Loading notifications..." />
+            <LoadingSpinner variant="table" minWidth="min-w-[48rem]" columns={["Notification", "Type", "Status", "Date", ""]} label="Loading notifications..." />
           ) : loadError ? (
             <div className="p-6 text-center">
               <p className="text-sm text-red-600">{loadError}</p>
@@ -348,11 +387,12 @@ export default function NotificationsList() {
                   <SortableHeaderCell label="Type" sortKey="type" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
                   <th className="px-6 py-6">Status</th>
                   <SortableHeaderCell label="Date" sortKey="createdAt" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} className="px-6 py-6" />
+                  <th className="px-6 py-6" aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
                 {paginatedNotifications.map((notification) => {
-                  const Icon = TYPE_ICON[notification.type] || Info
+                  const Icon = notificationTypeIcon(notification.type)
                   const colorClass = TYPE_COLOR_CLASS[notification.type] || 'text-neutral-600 bg-neutral-50'
                   return (
                     <tr
@@ -378,6 +418,17 @@ export default function NotificationsList() {
                         <Badge variant={notification.isRead ? 'neutral' : 'primary'} dot>{notification.isRead ? 'Read' : 'Unread'}</Badge>
                       </td>
                       <td className="px-6 py-5 whitespace-nowrap text-neutral-600">{formatTimestamp(notification.createdAt)}</td>
+                      <td className="px-6 py-5 text-right">
+                        <button
+                          type="button"
+                          onClick={(event) => handleDelete(event, notification)}
+                          disabled={deletingId === notification.id}
+                          aria-label="Delete notification"
+                          className="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}

@@ -25,7 +25,8 @@ import {
   updateExpense,
   uploadExpenseReceipt,
 } from '../../api/expenses'
-import { getFileUrl } from '../../api/files'
+import ExpenseProof from './ExpenseProof'
+import ExpenseHistory from './ExpenseHistory'
 import { usePermission } from '../../auth/usePermission'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/format'
@@ -47,9 +48,13 @@ const STATUS_VARIANT = {
   Reimbursed: 'primary',
   'Clarification Required': 'info',
 }
-// An approved claim that has been paid reads as "Reimbursed" to the employee.
+// An approved claim that has been paid reads as "Reimbursed" to the employee. lifecycleStatus
+// (new source of truth) is checked first; the old inference stays as a fallback for any row
+// that somehow doesn't carry it.
 const claimStatus = (expense) =>
-  expense.approvalStatus === 'Approved' && expense.paymentStatus === 'Paid' ? 'Reimbursed' : expense.approvalStatus
+  expense.lifecycleStatus === 'reimbursed' || (expense.approvalStatus === 'Approved' && expense.paymentStatus === 'Paid')
+    ? 'Reimbursed'
+    : expense.approvalStatus
 const needsClarification = (expense) =>
   expense.statusKey === 'clarification_requested' || expense.approvalStatus === 'Clarification Required'
 const FILTERS = [
@@ -72,11 +77,6 @@ const emptyForm = () => ({
   expenseDate: todayIso(),
   paymentMode: '',
 })
-
-function receiptHrefOf(expense) {
-  if (!expense.receiptUrl) return ''
-  return expense.isDemo ? expense.receiptUrl : getFileUrl(expense.receiptUrl)
-}
 
 function DetailModal({ expense, onClose, onUpdate, canEdit }) {
   const showUpdate = expense && needsClarification(expense) && canEdit
@@ -109,24 +109,10 @@ function DetailModal({ expense, onClose, onUpdate, canEdit }) {
             <Field label="Submitted At" value={expense.createdAt ? formatDateTime(expense.createdAt) : '—'} />
           </div>
           <Field label="Description" value={expense.description || '—'} />
-          <Field
-            label="Receipt"
-            value={
-              receiptHrefOf(expense) ? (
-                <a
-                  href={receiptHrefOf(expense)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-medium text-primary-700 hover:underline"
-                >
-                  <FileText className="size-3.5" aria-hidden="true" />
-                  View receipt
-                </a>
-              ) : (
-                'No receipt'
-              )
-            }
-          />
+          <div>
+            <p className="text-[0.7rem] text-neutral-400">Receipt</p>
+            {expense.receiptUrl ? <div className="mt-1"><ExpenseProof expense={expense} /></div> : <p className="font-medium text-neutral-900">No receipt</p>}
+          </div>
           {expense.approvalStatus !== 'Pending' && (
             <div className="grid grid-cols-2 gap-3">
               <Field label="Reviewed By" value={friendly(expense.approverName) || '—'} />
@@ -135,6 +121,13 @@ function DetailModal({ expense, onClose, onUpdate, canEdit }) {
           )}
           {expense.approvalStatus === 'Approved' && (
             <Field label="Reimbursement" value={expense.paymentStatus === 'Paid' ? 'Paid' : 'Pending'} />
+          )}
+          {expense.lifecycleStatus === 'reimbursed' && (
+            <div className="grid grid-cols-2 gap-3 rounded-xl border border-primary-100 bg-primary-50/60 p-3.5">
+              <Field label="Reimbursed On" value={expense.reimbursedAt ? formatDateTime(expense.reimbursedAt) : '—'} />
+              <Field label="Method" value={expense.reimbursementMethod || '—'} />
+              {expense.reimbursementReference && <Field label="Reference" value={expense.reimbursementReference} />}
+            </div>
           )}
           {needsClarification(expense) && expense.clarificationNote && (
             <div className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
@@ -146,6 +139,10 @@ function DetailModal({ expense, onClose, onUpdate, canEdit }) {
               <span className="font-semibold">Rejection reason:</span> {expense.clarificationNote}
             </div>
           )}
+          <div className="border-t border-neutral-100 pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">History</p>
+            <ExpenseHistory expense={expense} />
+          </div>
         </div>
       )}
     </Modal>
@@ -660,7 +657,7 @@ export default function MyExpenses() {
             required
           /></ConfiguredField>
           <ConfiguredField module="expense" name="receiptUrl"><div>
-            <label className="mb-1 block text-sm font-medium text-neutral-700">Receipt / Proof (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-fg">Receipt / Proof (optional)</label>
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-300 p-4 text-center transition-colors hover:border-primary-500">
               <Upload className="size-7 text-neutral-400" aria-hidden="true" />
               <p className="text-sm text-neutral-500">{receiptFile ? receiptFile.name : 'Click to upload an image or PDF'}</p>

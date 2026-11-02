@@ -84,6 +84,8 @@ import ExpenseApprovalQueue from '../features/expenses/ExpenseApprovalQueue'
 import CashReconciliation from '../features/reconciliation/CashReconciliation'
 import ReceivablesPayables from '../features/outstanding/ReceivablesPayables'
 import CollectionReconciliation from '../features/collections/CollectionReconciliation'
+import DayEndClose from '../features/deliveries/DayEndClose'
+import DayEndApprovals from '../features/deliveries/DayEndApprovals'
 import FinancialReports from '../features/reports/FinancialReports'
 import OrganizationsList from '../features/superadmin/OrganizationsList'
 import OrganizationDetail from '../features/superadmin/OrganizationDetail'
@@ -689,6 +691,14 @@ export default function AppRoutes() {
             }
           />
           <Route
+            path="/admin/day-end-approvals"
+            element={
+              <RequirePermissionRoute module="payments" action="view">
+                <DayEndApprovals />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
             path="/admin/sales-returns"
             element={
               <RequirePermissionRoute module="sales_returns" action="view">
@@ -1040,6 +1050,14 @@ export default function AppRoutes() {
             }
           />
           <Route
+            path="/delivery/day-end"
+            element={
+              <RequirePermissionRoute module="delivery_collections" action="view">
+                <DayEndClose />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
             path="/delivery/attendance"
             element={
               <RequirePermissionRoute module="attendance" action="view">
@@ -1192,6 +1210,14 @@ export default function AppRoutes() {
             element={
               <RequirePermissionRoute module="payments" action="view">
                 <CollectionReconciliation />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
+            path="/accounts/day-end-approvals"
+            element={
+              <RequirePermissionRoute module="payments" action="view">
+                <DayEndApprovals />
               </RequirePermissionRoute>
             }
           />

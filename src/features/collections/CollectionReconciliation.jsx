@@ -117,6 +117,9 @@ export default function CollectionReconciliation() {
     setIsActing(false)
     if (!result.success) {
       setActionError(result.error)
+      // Collections state didn't change, but the day-end that now blocks this row did -
+      // re-sync the list in the background so a stale "Reconcile" action doesn't linger.
+      if (result.code === 'DAY_END_CLOSED') load()
       return
     }
     showToast({
@@ -138,6 +141,7 @@ export default function CollectionReconciliation() {
     setIsActing(false)
     if (!result.success) {
       setActionError(result.error)
+      if (result.code === 'DAY_END_CLOSED') load()
       return
     }
     showToast({ title: 'Collection voided', message: `${voidTarget.collectionNumber} was voided.` })

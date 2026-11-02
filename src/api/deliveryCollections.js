@@ -50,17 +50,29 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
-// Status-aware message so the queue can show the truthful reason (§27).
+// Status-aware message so the queue can show the truthful reason (§27). Returns
+// { error, code? } - callers spread this into their result so a coded 409 (e.g.
+// DAY_END_CLOSED, once the partner's day is submitted/approved) is distinguishable
+// from a generic error without re-parsing the message text.
 function collectionError(error, fallback) {
   const status = error.response?.status
   const data = error.response?.data
   const detail = data?.detail || data?.message || data?.error || data
-  if (status === 404) {
-    return 'The delivery collections service did not respond (404). Nothing was changed — please retry.'
+  if (detail && typeof detail === 'object' && detail.code === 'DAY_END_CLOSED') {
+    return {
+      code: 'DAY_END_CLOSED',
+      error: formatApiError(
+        detail.message,
+        'This delivery partner\'s day has already been submitted or closed. Collections for this day can no longer be changed.',
+      ),
+    }
   }
-  if (status === 403) return 'You do not have permission to perform this action.'
-  if (status === 409) return formatApiError(detail, 'This collection has already been reconciled or voided.')
-  return formatApiError(detail, fallback)
+  if (status === 404) {
+    return { error: 'The delivery collections service did not respond (404). Nothing was changed — please retry.' }
+  }
+  if (status === 403) return { error: 'You do not have permission to perform this action.' }
+  if (status === 409) return { error: formatApiError(detail, 'This collection has already been reconciled or voided.') }
+  return { error: formatApiError(detail, fallback) }
 }
 
 function normalizeCollection(raw) {
@@ -138,7 +150,7 @@ export async function createDeliveryCollection(deliveryId, payload) {
     })
     return { success: true, collection: normalizeCollection(data) }
   } catch (error) {
-    return { success: false, error: collectionError(error, 'Unable to record this collection. Please try again.') }
+    return { success: false, ...collectionError(error, 'Unable to record this collection. Please try again.') }
   }
 }
 
@@ -152,7 +164,7 @@ export async function listDeliveryCollections(deliveryId) {
   } catch (error) {
     // A missing endpoint here should not break the Delivery Detail page - report it,
     // let the caller render the "not available" note.
-    return { success: false, error: collectionError(error, 'Unable to load collections for this delivery.') }
+    return { success: false, ...collectionError(error, 'Unable to load collections for this delivery.') }
   }
 }
 
@@ -169,7 +181,7 @@ export async function listCollections(params = {}) {
     const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
     return { success: true, collections: rows.map(normalizeCollection), total: data?.total ?? rows.length }
   } catch (error) {
-    return { success: false, error: collectionError(error, 'Unable to load collections. Please try again.') }
+    return { success: false, ...collectionError(error, 'Unable to load collections. Please try again.') }
   }
 }
 
@@ -183,7 +195,7 @@ export async function getCollection(collectionId) {
     const { data } = await apiClient.get(`/deliveries/collections/${collectionId}`, { headers: authHeader() })
     return { success: true, collection: normalizeCollection(data) }
   } catch (error) {
-    return { success: false, error: collectionError(error, 'Unable to load this collection.') }
+    return { success: false, ...collectionError(error, 'Unable to load this collection.') }
   }
 }
 
@@ -198,7 +210,7 @@ export async function reconcileCollection(collectionId) {
     })
     return { success: true, collection: normalizeCollection(data) }
   } catch (error) {
-    return { success: false, error: collectionError(error, 'Unable to reconcile this collection. Please try again.') }
+    return { success: false, ...collectionError(error, 'Unable to reconcile this collection. Please try again.') }
   }
 }
 
@@ -210,6 +222,6 @@ export async function voidCollection(collectionId, reason) {
     const { data } = await apiClient.post(`/deliveries/collections/${collectionId}/void`, body, { headers: authHeader() })
     return { success: true, collection: normalizeCollection(data) }
   } catch (error) {
-    return { success: false, error: collectionError(error, 'Unable to void this collection. Please try again.') }
+    return { success: false, ...collectionError(error, 'Unable to void this collection. Please try again.') }
   }
 }

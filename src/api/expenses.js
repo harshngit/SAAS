@@ -60,6 +60,33 @@ export function toExpenseStatusParam(value) {
   return v // 'pending' | 'approved' | 'rejected' | 'clarification_requested'
 }
 
+// ---- Lifecycle status (NEW source of truth for reimbursement-aware UI) --------------------
+// Backend now also returns `lifecycle_status`: pending_approval | approved | rejected |
+// reimbursed. This is distinct from the legacy `status` vocabulary above (which still drives
+// the separate clarification-request flow, untouched by this). Action-visibility decisions
+// (which buttons render) use lifecycleStatus; clarification handling stays on statusKey.
+const LIFECYCLE_STATUS_LABEL = {
+  pending_approval: 'Pending Approval',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  reimbursed: 'Reimbursed',
+}
+
+export function expenseLifecycleStatusLabel(rawLifecycleStatus) {
+  const key = String(rawLifecycleStatus || 'pending_approval').toLowerCase()
+  return LIFECYCLE_STATUS_LABEL[key] || key.replace(/_/g, ' ')
+}
+
+// Fallback for a response that only has the legacy `status` (+ `payment_status`) field - keeps
+// older/demo data working the same way real lifecycle_status-bearing data does.
+function deriveLifecycleStatus(legacyStatusKey, paymentStatus) {
+  if (legacyStatusKey === 'approved' && paymentStatus === 'Paid') return 'reimbursed'
+  if (legacyStatusKey === 'approved') return 'approved'
+  if (legacyStatusKey === 'rejected') return 'rejected'
+  // 'pending' and 'clarification_requested' both still await a decision.
+  return 'pending_approval'
+}
+
 function buildExpenseBody(payload) {
   const body = {
     category: payload.category || '',
@@ -77,6 +104,10 @@ function buildExpenseBody(payload) {
 function normalizeExpense(expense) {
   if (!expense) return expense
 
+  const statusKey = String(expense.status || expense.approval_status || 'pending').toLowerCase()
+  const paymentStatus = expense.payment_status || 'Pending'
+  const lifecycleStatus = String(expense.lifecycle_status || deriveLifecycleStatus(statusKey, paymentStatus)).toLowerCase()
+
   return {
     id: expense.id,
     expenseId: expense.expense_id || expense.id,
@@ -84,16 +115,23 @@ function normalizeExpense(expense) {
     category: expense.category || '',
     description: expense.description || '',
     amount: expense.amount ?? 0,
+    // The reimbursement-eligible amount the backend validates against - read-only basis for
+    // the Reimburse modal's Amount display (net_payable, falling back to amount).
+    netPayable: expense.net_payable ?? expense.amount ?? 0,
     expenseDate: expense.expense_date,
     paymentMode: expense.payment_mode || '',
     receiptUrl: expense.receipt_url || '',
     // Raw lowercase status is the source of truth; label + the legacy `approvalStatus` are
     // derived so existing components keep working.
-    statusKey: String(expense.status || expense.approval_status || 'pending').toLowerCase(),
+    statusKey,
     statusLabel: expenseStatusLabel(expense.status || expense.approval_status),
     expenseStatus: expense.expense_status || 'Submitted',
     approvalStatus: expenseStatusLabel(expense.status || expense.approval_status),
-    paymentStatus: expense.payment_status || 'Pending',
+    paymentStatus,
+    // New source of truth for action-visibility (Approve/Reject/Reimburse) - see
+    // expenseLifecycleStatusLabel() above.
+    lifecycleStatus,
+    lifecycleStatusLabel: expenseLifecycleStatusLabel(lifecycleStatus),
     submittedBy: expense.submitted_by || '',
     submittedByName: expense.submitted_by_user?.name || expense.submitted_by_name || '',
     approvedBy: expense.approved_by || null,
@@ -102,6 +140,13 @@ function normalizeExpense(expense) {
     // Backend field is `reject_reason`; the others are defensive aliases.
     rejectReason: expense.reject_reason || expense.clarification_note || expense.rejection_reason || '',
     clarificationNote: expense.reject_reason || expense.clarification_note || expense.rejection_reason || '',
+    // Reimbursement details - only populated once lifecycleStatus === 'reimbursed'.
+    reimbursedBy: expense.reimbursed_by_user?.name || expense.reimbursed_by || '',
+    reimbursedAt: expense.reimbursed_at || null,
+    reimbursementMethod: expense.reimbursement_method || '',
+    reimbursementReference: expense.reimbursement_reference || '',
+    reimbursementNotes: expense.reimbursement_notes || '',
+    reimbursedAmount: expense.reimbursed_amount ?? null,
     createdAt: expense.created_at,
     updatedAt: expense.updated_at,
   }
@@ -271,9 +316,42 @@ export async function rejectExpense(expenseId, reason) {
   }
 }
 
-// NOTE: there is NO real reimbursement/payment endpoint. Backend PATCH /expenses/{id} only
-// accepts edits while status is pending | clarification_requested, so an approved expense
-// cannot be marked paid from the frontend. Reimbursement stays BACKEND LATER.
+// Canonical reimbursement payment methods (POST /expenses/{id}/reimburse `payment_method`).
+export const REIMBURSEMENT_METHOD_OPTIONS = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'upi', label: 'UPI' },
+  { value: 'cheque', label: 'Cheque' },
+]
+
+// Only an approved expense can be reimbursed; the backend returns 400/403/409 for an invalid
+// transition. `amount` is deliberately not sent - it's an optional validation-only field on the
+// backend (must exactly equal net_payable if sent, partial reimbursement unsupported), so
+// omitting it avoids a false mismatch while the UI still shows the amount read-only.
+export async function reimburseExpense(expenseId, payload = {}) {
+  try {
+    const body = { payment_method: payload.paymentMethod || payload.payment_method }
+    const reference = payload.paymentReference ?? payload.payment_reference
+    if (reference) body.payment_reference = reference
+    const paidAt = payload.paidAt ?? payload.paid_at
+    if (paidAt) body.paid_at = paidAt
+    if (payload.notes) body.notes = payload.notes
+
+    const { data } = await apiClient.post(`/expenses/${expenseId}/reimburse`, body, {
+      headers: authHeader(),
+    })
+
+    return { success: true, expense: normalizeExpense(data) }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to record this reimbursement. Please try again.',
+    )
+
+    return { success: false, error: message, status: error.response?.status }
+  }
+}
 
 export async function requestExpenseClarification(expenseId, reason) {
   try {

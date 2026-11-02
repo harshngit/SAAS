@@ -20,7 +20,7 @@ const field = 'h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px
 // A Collection is money the Delivery Partner physically takes - NOT a payment and NOT a
 // delivery status. The Accountant later reconciles it, and the backend then creates one
 // CustomerPayment. This form only records the raw collection: Amount / Mode / Reference / Notes.
-export default function RecordCollectionModal({ delivery, isOpen, onClose, onRecorded }) {
+export default function RecordCollectionModal({ delivery, isOpen, onClose, onRecorded, onBlocked }) {
   const amountDue = Number(delivery?.amountDue) || 0
   const orderTotal = Number(delivery?.orderTotal ?? delivery?.order?.total) || 0
   const [method, setMethod] = useState('cash')
@@ -79,6 +79,10 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
       setError(result.error)
       setPermissionGap(/permission|forbidden|not allowed|403|not available|access denied|unauthori/i.test(result.error || ''))
       setIsSaving(false)
+      // Nothing was recorded, but the delivery partner's day closed in the background (e.g. the
+      // day-end was approved while this modal was open) - re-sync the page's own data so it
+      // reflects that, without touching anything this modal itself would change.
+      if (result.code === 'DAY_END_CLOSED') onBlocked?.()
       return
     }
 

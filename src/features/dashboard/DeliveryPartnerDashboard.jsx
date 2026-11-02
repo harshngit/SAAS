@@ -662,6 +662,7 @@ export default function DeliveryPartnerDashboard() {
         isOpen={showCollectPayment}
         onClose={() => setShowCollectPayment(false)}
         onRecorded={loadDeliveries}
+        onBlocked={loadDeliveries}
         partner={{ id: currentUser?.id, name: currentUser?.name, role: currentUser?.role }}
       />
     </div>

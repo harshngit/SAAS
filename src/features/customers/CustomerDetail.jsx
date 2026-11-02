@@ -809,7 +809,7 @@ export default function CustomerDetail() {
 
   // Jump to Create Order with this customer pre-selected (see CreateSalesOrder's ?customerId=).
   const orderCreatePath = basePath.replace(/\/customers$/, '/orders/create')
-  const goToCreateOrder = () => navigate(`${orderCreatePath}?customerId=${customer.id}`)
+  const goToCreateOrder = () => navigate(`${orderCreatePath}?customerId=${customer.id}&source=customer-detail`)
 
   return (
     <div className="space-y-5">

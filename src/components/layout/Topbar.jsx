@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Bell, CheckCheck, ChevronDown, FileText, HelpCircle, LogOut, ShieldCheck, UserCircle } from 'lucide-react'
+import { Bell, CheckCheck, ChevronDown, FileText, HelpCircle, LogOut, RotateCw, ShieldCheck, UserCircle } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { ROLES, roleLabels, roleMenus } from '../../auth/roles'
+import { hasPlatformAccess } from '../../auth/platformRoles'
+import { usePermission } from '../../auth/usePermission'
 import { logout } from '../../api/auth'
 import { listNotifications, markAllNotificationsRead, markNotificationRead, getUnreadNotificationCount } from '../../api/notifications'
-import { resolveNotificationDestination } from '../../utils/notificationNavigation'
+import { isPlatformNotification, resolveNotificationDestination } from '../../utils/notificationNavigation'
+import { notificationTypeIcon } from '../../features/notifications/notificationTypes'
 import { Skeleton } from '../ui/Skeleton'
 import UniversalSearch from './UniversalSearch'
 import { getFileUrl } from '../../api/files'
@@ -58,6 +61,7 @@ function usePortalPosition(isOpen, triggerRef, panelWidth) {
 
 export default function Topbar() {
   const currentUser = useAuthStore((state) => state.currentUser)
+  const { role } = usePermission()
   const navigate = useNavigate()
   const location = useLocation()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -71,6 +75,7 @@ export default function Topbar() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [notifications, setNotifications] = useState([])
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false)
+  const [notificationsError, setNotificationsError] = useState('')
   const notificationsTriggerRef = useRef(null)
   const notificationsPanelRef = useRef(null)
 
@@ -144,29 +149,47 @@ export default function Topbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isNotificationsOpen])
 
+  const loadNotificationsPanel = async () => {
+    setIsLoadingNotifications(true)
+    setNotificationsError('')
+    // Capped fetch (not the full 100-row page_size the Notifications page itself tolerates) -
+    // this panel only ever shows a handful of the most recent rows (§15: don't fetch everything
+    // unnecessarily just to display 10).
+    const result = await listNotifications({ pageSize: 10 })
+    if (result.success) {
+      // Platform-scoped and organization-scoped notifications never mix into each other's
+      // context (§11) - this is a defensive client-side filter on top of the backend's own
+      // recipient/scope selection, not a replacement for it.
+      const isPlatformViewer = hasPlatformAccess(currentUser)
+      setNotifications(result.notifications.filter((n) => isPlatformNotification(n) === isPlatformViewer))
+    } else {
+      setNotificationsError(result.error)
+    }
+    setIsLoadingNotifications(false)
+  }
+
   const toggleNotifications = async () => {
     const nextOpen = !isNotificationsOpen
     setIsNotificationsOpen(nextOpen)
 
-    if (nextOpen) {
-      setIsLoadingNotifications(true)
-      const result = await listNotifications()
-      if (result.success) setNotifications(result.notifications)
-      setIsLoadingNotifications(false)
-    }
+    if (nextOpen) await loadNotificationsPanel()
   }
 
   const handleNotificationClick = async (notification) => {
+    setIsNotificationsOpen(false)
+
+    // Navigation must still happen even if marking read fails (§4) - a transient failure here
+    // shouldn't trap the user on an unread item they can clearly see and already clicked.
     if (!notification.isRead) {
-      const result = await markNotificationRead(notification.id)
-      if (result.success) {
-        setNotifications((current) => current.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)))
-        setUnreadCount((count) => Math.max(0, count - 1))
-      }
+      markNotificationRead(notification.id).then((result) => {
+        if (result.success) {
+          setNotifications((current) => current.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)))
+          setUnreadCount((count) => Math.max(0, count - 1))
+        }
+      })
     }
 
-    setIsNotificationsOpen(false)
-    const destination = resolveNotificationDestination(notification, currentUser)
+    const destination = resolveNotificationDestination(notification, { currentUser, role })
     if (destination) navigate(destination)
   }
 
@@ -297,21 +320,41 @@ export default function Topbar() {
                         </div>
                       ))}
                     </div>
+                  ) : notificationsError ? (
+                    <div className="px-4 py-6 text-center">
+                      <p className="text-sm text-red-600">{notificationsError}</p>
+                      <button
+                        type="button"
+                        onClick={loadNotificationsPanel}
+                        className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 hover:underline"
+                      >
+                        <RotateCw className="size-3.5" aria-hidden="true" />
+                        Retry
+                      </button>
+                    </div>
                   ) : notifications.length === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-neutral-400">No notifications yet.</p>
                   ) : (
-                    notifications.slice(0, 10).map((notification) => (
-                      <button
-                        key={notification.id}
-                        type="button"
-                        onClick={() => handleNotificationClick(notification)}
-                        className={`flex w-full flex-col gap-0.5 border-b border-neutral-50 px-4 py-3 text-left transition-colors hover:bg-neutral-50 ${!notification.isRead ? 'bg-primary-50/40' : ''}`}
-                      >
-                        <p className="text-sm font-medium text-fg">{notification.title}</p>
-                        <p className="line-clamp-2 text-xs text-neutral-500">{notification.body}</p>
-                        <p className="mt-0.5 text-[0.65rem] text-neutral-400">{formatNotificationTime(notification.createdAt)}</p>
-                      </button>
-                    ))
+                    notifications.map((notification) => {
+                      const Icon = notificationTypeIcon(notification.type)
+                      return (
+                        <button
+                          key={notification.id}
+                          type="button"
+                          onClick={() => handleNotificationClick(notification)}
+                          className={`flex w-full items-start gap-3 border-b border-neutral-50 px-4 py-3 text-left transition-colors hover:bg-neutral-50 ${!notification.isRead ? 'bg-primary-50/40' : ''}`}
+                        >
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500">
+                            <Icon className="size-4" aria-hidden="true" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-fg">{notification.title}</p>
+                            <p className="line-clamp-2 text-xs text-neutral-500">{notification.body}</p>
+                            <p className="mt-0.5 text-[0.65rem] text-neutral-400">{formatNotificationTime(notification.createdAt)}</p>
+                          </span>
+                        </button>
+                      )
+                    })
                   )}
                 </div>
                 {currentUser.role === ROLES.ADMIN && (

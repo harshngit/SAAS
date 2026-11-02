@@ -58,7 +58,24 @@ function write(value) {
   }
 }
 
+// Mirrors api/expenses.js's deriveLifecycleStatus() so demo rows carry the same new
+// lifecycleStatus/lifecycleStatusLabel fields real API rows get from normalizeExpense().
+const LIFECYCLE_LABEL = { pending_approval: 'Pending Approval', approved: 'Approved', rejected: 'Rejected', reimbursed: 'Reimbursed' }
+function lifecycleFor(statusKey, paymentStatus) {
+  const key =
+    statusKey === 'approved' && paymentStatus === 'Paid'
+      ? 'reimbursed'
+      : statusKey === 'approved'
+        ? 'approved'
+        : statusKey === 'rejected'
+          ? 'rejected'
+          : 'pending_approval'
+  return { lifecycleStatus: key, lifecycleStatusLabel: LIFECYCLE_LABEL[key] }
+}
+
 function expense({ id, category, description, amount, paymentMode, expenseDate, receipt, status, approverName = '', reviewedOffset, rejectionReason = '', paymentStatus = 'Pending', createdOffset }) {
+  const statusKey = String(status).toLowerCase()
+  const resolvedPaymentStatus = status === 'Approved' ? paymentStatus : 'Pending'
   return {
     id,
     expenseId: id,
@@ -66,20 +83,28 @@ function expense({ id, category, description, amount, paymentMode, expenseDate, 
     category,
     description,
     amount,
+    netPayable: amount,
     expenseDate,
     paymentMode,
     receiptUrl: receipt ? DEMO_RECEIPT : '',
     expenseStatus: 'Submitted',
     approvalStatus: status,
-    statusKey: String(status).toLowerCase(),
+    statusKey,
     statusLabel: status,
-    paymentStatus: status === 'Approved' ? paymentStatus : 'Pending',
+    paymentStatus: resolvedPaymentStatus,
+    ...lifecycleFor(statusKey, resolvedPaymentStatus),
     submittedBy: DEMO_USER.id,
     submittedByName: DEMO_USER.name,
     approvedBy: approverName ? 'demo-mgr' : null,
     approverName,
     reviewedAt: status === 'Pending' ? null : stamp(reviewedOffset ?? createdOffset + 1),
     clarificationNote: rejectionReason,
+    reimbursedBy: resolvedPaymentStatus === 'Paid' ? approverName : '',
+    reimbursedAt: resolvedPaymentStatus === 'Paid' ? stamp(reviewedOffset ?? createdOffset + 1) : null,
+    reimbursementMethod: resolvedPaymentStatus === 'Paid' ? paymentMode : '',
+    reimbursementReference: '',
+    reimbursementNotes: '',
+    reimbursedAmount: resolvedPaymentStatus === 'Paid' ? amount : null,
     createdAt: stamp(createdOffset),
     updatedAt: status === 'Pending' ? stamp(createdOffset) : stamp(reviewedOffset ?? createdOffset + 1),
     isDemo: true,
@@ -133,6 +158,8 @@ export function simulateDemoApproveExpense(id) {
     approvalStatus: 'Approved',
     statusKey: 'approved',
     statusLabel: 'Approved',
+    lifecycleStatus: 'approved',
+    lifecycleStatusLabel: 'Approved',
     expenseStatus: 'Approved',
     reviewedAt: now(),
     approverName: 'Operations Manager',
@@ -145,6 +172,8 @@ export function simulateDemoRejectExpense(id, reason) {
     approvalStatus: 'Rejected',
     statusKey: 'rejected',
     statusLabel: 'Rejected',
+    lifecycleStatus: 'rejected',
+    lifecycleStatusLabel: 'Rejected',
     expenseStatus: 'Rejected',
     reviewedAt: now(),
     approverName: 'Operations Manager',
@@ -158,6 +187,8 @@ export function simulateDemoClarifyExpense(id, reason) {
     approvalStatus: 'Clarification Required',
     statusKey: 'clarification_requested',
     statusLabel: 'Clarification Required',
+    lifecycleStatus: 'pending_approval',
+    lifecycleStatusLabel: 'Pending Approval',
     expenseStatus: 'Submitted',
     reviewedAt: now(),
     approverName: 'Operations Manager',
@@ -175,13 +206,23 @@ export function simulateDemoUpdateExpense(id, patch) {
     approvalStatus: 'Pending',
     statusKey: 'pending',
     statusLabel: 'Pending',
+    lifecycleStatus: 'pending_approval',
+    lifecycleStatusLabel: 'Pending Approval',
     clarificationNote: '',
     rejectReason: '',
   })
 }
 
 export function simulateDemoReimburseExpense(id, paymentMode) {
-  return patchOverride(id, { paymentStatus: 'Paid', paymentMode: paymentMode || 'Bank Transfer' })
+  return patchOverride(id, {
+    paymentStatus: 'Paid',
+    paymentMode: paymentMode || 'Bank Transfer',
+    lifecycleStatus: 'reimbursed',
+    lifecycleStatusLabel: 'Reimbursed',
+    reimbursedBy: 'Operations Manager',
+    reimbursedAt: now(),
+    reimbursementMethod: paymentMode || 'Bank Transfer',
+  })
 }
 
 export function simulateDemoCreateExpense({ category, description, amount, paymentMode, expenseDate, hasReceipt }) {

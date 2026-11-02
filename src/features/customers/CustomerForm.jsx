@@ -364,7 +364,7 @@ function CustomerImageField({ value, uploading, error, onSelect, onRemove }) {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-neutral-700">Customer Image</label>
+      <label className="text-sm font-medium text-fg">Customer Image</label>
       <div className="flex items-center gap-4">
         <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-neutral-200 bg-neutral-50">
           {previewUrl ? (
@@ -1101,7 +1101,7 @@ export default function CustomerForm({
 
       return (
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-neutral-700">
+          <label className="text-sm font-medium text-fg">
             {field.label}
             {field.required && <span className="text-red-500"> *</span>}
           </label>

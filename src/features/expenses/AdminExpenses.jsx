@@ -20,13 +20,20 @@ import {
   simulateDemoReimburseExpense,
   simulateDemoRejectExpense,
 } from './expenseDemo'
-import { formatCurrency, formatDate } from '../../utils/format'
+import { formatCurrency, formatDate, formatDateTime } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
+import ExpenseProof from './ExpenseProof'
+import ExpenseHistory from './ExpenseHistory'
+import ReimburseExpenseModal from './ReimburseExpenseModal'
 
 const PAYMENT_MODES = ['Cash', 'UPI', 'Card', 'Bank Transfer']
 
-// A real expense reads "Reimbursed" ONLY when the backend returned payment_status = Paid.
+// lifecycleStatus (new source of truth) drives the displayed status; this falls back to the
+// old inference only for rows that somehow don't carry it yet.
 function effectiveStatus(expense) {
+  if (expense.lifecycleStatus === 'reimbursed') return 'Reimbursed'
+  if (expense.lifecycleStatus === 'approved' || (expense.approvalStatus === 'Approved' && expense.paymentStatus !== 'Paid')) return 'Approved'
+  if (expense.lifecycleStatus === 'rejected') return 'Rejected'
   if (expense.approvalStatus === 'Approved' && expense.paymentStatus === 'Paid') return 'Reimbursed'
   return expense.approvalStatus || 'Pending'
 }
@@ -73,8 +80,9 @@ export default function AdminExpenses() {
 
   const [reviewTarget, setReviewTarget] = useState(null) // { row, mode: 'reject' | 'clarify' }
   const [reviewReason, setReviewReason] = useState('')
-  const [reimburseTarget, setReimburseTarget] = useState(null) // demo only
-  const [reimburseMode, setReimburseMode] = useState('Bank Transfer')
+  const [reimburseTarget, setReimburseTarget] = useState(null) // real reimbursement flow
+  const [demoReimburseTarget, setDemoReimburseTarget] = useState(null)
+  const [demoReimburseMode, setDemoReimburseMode] = useState('Bank Transfer')
   const [detailTarget, setDetailTarget] = useState(null)
   const [isActing, setIsActing] = useState(false)
 
@@ -162,12 +170,18 @@ export default function AdminExpenses() {
   }
 
   const handleDemoReimburse = () => {
-    if (!reimburseTarget) return
+    if (!demoReimburseTarget) return
     setIsActing(true)
-    replace(simulateDemoReimburseExpense(reimburseTarget.id, reimburseMode))
+    replace(simulateDemoReimburseExpense(demoReimburseTarget.id, demoReimburseMode))
     setIsActing(false)
-    showToast({ title: 'Reimbursement recorded (demo)', message: `${reimburseTarget.expenseNumber || reimburseTarget.expenseId} marked reimbursed.` })
+    showToast({ title: 'Reimbursement recorded (demo)', message: `${demoReimburseTarget.expenseNumber || demoReimburseTarget.expenseId} marked reimbursed.` })
+    setDemoReimburseTarget(null)
+  }
+
+  const handleReimbursed = (updatedExpense) => {
+    replace(updatedExpense)
     setReimburseTarget(null)
+    showToast({ title: 'Expense reimbursed', message: `${updatedExpense.expenseNumber || updatedExpense.expenseId} has been marked reimbursed.` })
   }
 
   const stats = useMemo(() => {
@@ -264,27 +278,26 @@ export default function AdminExpenses() {
           onRowClick={(row) => setDetailTarget(row)}
           actions={(row) => {
             const list = [{ label: 'Details', icon: Eye, onClick: () => setDetailTarget(row) }]
-            const reviewable = row.approvalStatus === 'Pending' || row.approvalStatus === 'Clarification Required'
-            if (canApprove && reviewable) {
+            // lifecycle_status drives which actions apply: pending_approval -> Approve/Reject
+            // (+ Request Clarification, a separate pre-existing flow), approved -> Reimburse
+            // only, rejected/reimbursed -> no actions (read-only final states).
+            if (canApprove && row.lifecycleStatus === 'pending_approval') {
               list.push(
                 { label: 'Approve', icon: Check, onClick: () => handleApprove(row) },
                 { label: 'Request Clarification', icon: HelpCircle, onClick: () => { setReviewReason(''); setReviewTarget({ row, mode: 'clarify' }) } },
                 { label: 'Reject', icon: XCircle, onClick: () => { setReviewReason(''); setReviewTarget({ row, mode: 'reject' }) }, danger: true },
               )
             }
-            // Reimbursement is demo-only - there is no real endpoint for it.
-            if (DEMO_EXPENSES_ENABLED && row.approvalStatus === 'Approved' && row.paymentStatus !== 'Paid') {
-              list.push({ label: 'Record Reimbursement (demo)', icon: Wallet, onClick: () => { setReimburseMode('Bank Transfer'); setReimburseTarget(row) } })
+            if (canApprove && row.lifecycleStatus === 'approved') {
+              if (DEMO_EXPENSES_ENABLED) {
+                list.push({ label: 'Record Reimbursement (demo)', icon: Wallet, onClick: () => { setDemoReimburseMode('Bank Transfer'); setDemoReimburseTarget(row) } })
+              } else {
+                list.push({ label: 'Reimburse', icon: Wallet, onClick: () => setReimburseTarget(row) })
+              }
             }
             return list
           }}
         />
-        {!DEMO_EXPENSES_ENABLED && (
-          <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
-            Reimbursement processing will be available after the finance backend is added. Approved expenses stay
-            <span className="font-medium"> Approved · Reimbursement Pending</span> until then.
-          </p>
-        )}
       </Card>
 
       <Modal
@@ -319,19 +332,21 @@ export default function AdminExpenses() {
         </div>
       </Modal>
 
-      <Modal isOpen={Boolean(reimburseTarget)} onClose={() => !isActing && setReimburseTarget(null)} title="Record Reimbursement (demo)">
+      <Modal isOpen={Boolean(demoReimburseTarget)} onClose={() => !isActing && setDemoReimburseTarget(null)} title="Record Reimbursement (demo)">
         <div className="space-y-4">
           <p className="text-sm text-neutral-600">
-            Demo simulation only — there is no real reimbursement endpoint. Marks
-            {' '}{reimburseTarget?.expenseNumber || reimburseTarget?.expenseId} ({formatCurrency(reimburseTarget?.amount || 0)}) as reimbursed.
+            Demo simulation only. Marks
+            {' '}{demoReimburseTarget?.expenseNumber || demoReimburseTarget?.expenseId} ({formatCurrency(demoReimburseTarget?.amount || 0)}) as reimbursed.
           </p>
-          <Select label="Payment Mode" options={PAYMENT_MODES.map((m) => ({ value: m, label: m }))} value={reimburseMode} onChange={(event) => setReimburseMode(event.target.value)} />
+          <Select label="Payment Mode" options={PAYMENT_MODES.map((m) => ({ value: m, label: m }))} value={demoReimburseMode} onChange={(event) => setDemoReimburseMode(event.target.value)} />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setReimburseTarget(null)}>Cancel</Button>
+            <Button type="button" variant="secondary" onClick={() => setDemoReimburseTarget(null)}>Cancel</Button>
             <Button type="button" loading={isActing} onClick={handleDemoReimburse}>Mark Reimbursed</Button>
           </div>
         </div>
       </Modal>
+
+      <ReimburseExpenseModal expense={reimburseTarget} onClose={() => setReimburseTarget(null)} onReimbursed={handleReimbursed} />
 
       <ExpenseDetailModal expense={detailTarget} onClose={() => setDetailTarget(null)} />
     </div>
@@ -354,16 +369,29 @@ function ExpenseDetailModal({ expense, onClose }) {
             <DField label="Submitted On" value={formatDate(expense.createdAt)} />
           </div>
           <DField label="Description" value={expense.description || '—'} />
-          <div className="grid grid-cols-2 gap-3">
-            <DField label="Approval" value={expense.approvalStatus || '—'} />
-            <DField label="Reimbursement" value={expense.paymentStatus === 'Paid' ? 'Paid' : 'Pending'} />
+          <div>
+            <p className="text-[0.7rem] text-neutral-400">Proof</p>
+            {expense.receiptUrl ? <div className="mt-1"><ExpenseProof expense={expense} /></div> : <p className="font-medium text-neutral-900">No receipt</p>}
           </div>
+          {expense.lifecycleStatus === 'reimbursed' && (
+            <div className="grid grid-cols-2 gap-3 rounded-xl border border-primary-100 bg-primary-50/60 p-3.5">
+              <DField label="Reimbursed By" value={expense.reimbursedBy || '—'} />
+              <DField label="Reimbursed On" value={expense.reimbursedAt ? formatDateTime(expense.reimbursedAt) : '—'} />
+              <DField label="Method" value={expense.reimbursementMethod || '—'} />
+              <DField label="Reference" value={expense.reimbursementReference || '—'} />
+              {expense.reimbursementNotes && <DField label="Notes" value={expense.reimbursementNotes} />}
+            </div>
+          )}
           {(expense.approvalStatus === 'Rejected' || expense.approvalStatus === 'Clarification Required') && expense.rejectReason && (
             <div className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
               <span className="font-semibold">{expense.approvalStatus === 'Rejected' ? 'Rejection reason:' : 'Clarification requested:'}</span>{' '}
               {expense.rejectReason}
             </div>
           )}
+          <div className="border-t border-neutral-100 pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">History</p>
+            <ExpenseHistory expense={expense} />
+          </div>
           <p className="rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
             Expense reimbursement is separate from Supplier / Customer payments and does not change inventory.
           </p>

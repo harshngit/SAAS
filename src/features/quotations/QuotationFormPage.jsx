@@ -3,7 +3,7 @@ import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
 import { loadSummaryRows } from '../../utils/listSummary'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileText, Info, UserPlus } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Button from '../../components/ui/Button'
@@ -305,6 +305,56 @@ export default function QuotationFormPage() {
     })
     setErrors((current) => ({ ...current, items: '' }))
   }
+
+  // Prefill items from the selected lead's Interested Products (crm_changes15.md §E) - once per
+  // lead selection, and only when the quotation has no items yet so it never clobbers a loaded
+  // quotation's real items (edit mode) or anything the user already picked themselves. The user
+  // can still edit/remove every prefilled line like any other item.
+  const prefillSeededLeadIdRef = useRef('')
+  useEffect(() => {
+    if (formData.quotationFor !== 'lead' || !formData.leadId) return
+    if (prefillSeededLeadIdRef.current === formData.leadId) return
+    if (formData.items.length > 0) {
+      prefillSeededLeadIdRef.current = formData.leadId
+      return
+    }
+    if (products.length === 0) return // wait for the catalog before deciding there's nothing to seed
+
+    const lead = leads.find((entry) => entry.id === formData.leadId)
+    const interestedIds = lead?.interestedProductIds || []
+    prefillSeededLeadIdRef.current = formData.leadId
+    if (interestedIds.length === 0) return
+
+    const seededItems = []
+    interestedIds.forEach((productId) => {
+      const product = products.find((entry) => entry.id === productId)
+      if (!product) return
+      const selection = selectedProductValues(product)
+      if (!selection) return // has variants but none auto-selectable - user adds it manually instead
+      seededItems.push({
+        productId: product.id,
+        variantId: selection.variantId,
+        variantName: selection.variantName,
+        variantCode: selection.variantCode,
+        productName: product.name,
+        sku: selection.sku,
+        uom: product.sales_unit || product.uom || 'unit',
+        quantity: '1',
+        unitPrice: String(selection.unitPrice ?? ''),
+        discount: '',
+        taxRate: String(product.tax_rate ?? ''),
+      })
+    })
+
+    if (seededItems.length > 0) {
+      setFormData((current) => ({ ...current, items: seededItems }))
+      showToast({
+        title: 'Items prefilled',
+        message: `${seededItems.length} product${seededItems.length === 1 ? '' : 's'} added from this lead's interested products - edit as needed.`,
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.quotationFor, formData.leadId, formData.items.length, products, leads])
 
   const updateItemField = (productId, field, value) => {
     setFormData((current) => ({

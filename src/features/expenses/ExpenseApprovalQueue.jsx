@@ -20,6 +20,7 @@ import {
 } from './expenseDemo'
 import { formatCurrency, formatDate } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
+import ReimburseExpenseModal from './ReimburseExpenseModal'
 
 const STATUS_VARIANT = { Approved: 'success', Pending: 'warning', Rejected: 'danger', 'Clarification Required': 'info' }
 const PAYMENT_MODES = ['Cash', 'UPI', 'Card', 'Bank Transfer']
@@ -39,8 +40,9 @@ export default function ExpenseApprovalQueue() {
 
   const [reviewTarget, setReviewTarget] = useState(null) // { row, mode }
   const [reviewReason, setReviewReason] = useState('')
-  const [reimburseTarget, setReimburseTarget] = useState(null) // demo only
-  const [reimburseMode, setReimburseMode] = useState('Bank Transfer')
+  const [reimburseTarget, setReimburseTarget] = useState(null) // real reimbursement flow
+  const [demoReimburseTarget, setDemoReimburseTarget] = useState(null)
+  const [demoReimburseMode, setDemoReimburseMode] = useState('Bank Transfer')
   const [isActing, setIsActing] = useState(false)
 
   const loadExpenses = useCallback(async () => {
@@ -130,12 +132,18 @@ export default function ExpenseApprovalQueue() {
   }
 
   const handleDemoReimburse = () => {
-    if (!reimburseTarget) return
+    if (!demoReimburseTarget) return
     setIsActing(true)
-    replace(simulateDemoReimburseExpense(reimburseTarget.id, reimburseMode))
+    replace(simulateDemoReimburseExpense(demoReimburseTarget.id, demoReimburseMode))
     setIsActing(false)
-    showToast({ title: 'Reimbursement recorded (demo)', message: `${reimburseTarget.expenseNumber || reimburseTarget.expenseId}` })
+    showToast({ title: 'Reimbursement recorded (demo)', message: `${demoReimburseTarget.expenseNumber || demoReimburseTarget.expenseId}` })
+    setDemoReimburseTarget(null)
+  }
+
+  const handleReimbursed = (updatedExpense) => {
+    replace(updatedExpense)
     setReimburseTarget(null)
+    showToast({ title: 'Expense reimbursed', message: `${updatedExpense.expenseNumber || updatedExpense.expenseId} has been marked reimbursed.` })
   }
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
@@ -211,9 +219,8 @@ export default function ExpenseApprovalQueue() {
               header: 'Status',
               sortable: true,
               render: (row) => (
-                <Badge variant={STATUS_VARIANT[row.approvalStatus] || 'neutral'} dot>
-                  {row.approvalStatus}
-                  {tab === 'approved' && row.paymentStatus === 'Paid' ? ' · Reimbursed' : ''}
+                <Badge variant={row.lifecycleStatus === 'reimbursed' ? 'primary' : STATUS_VARIANT[row.approvalStatus] || 'neutral'} dot>
+                  {row.lifecycleStatus === 'reimbursed' ? 'Reimbursed' : row.approvalStatus}
                 </Badge>
               ),
             },
@@ -245,21 +252,16 @@ export default function ExpenseApprovalQueue() {
                 ? [{ label: 'Reject', icon: XCircle, onClick: () => { setReviewReason(''); setReviewTarget({ row, mode: 'reject' }) }, danger: true }]
                 : []
             }
-            if (DEMO_EXPENSES_ENABLED && row.paymentStatus !== 'Paid') {
-              return [{ label: 'Record Reimbursement (demo)', icon: Wallet, onClick: () => { setReimburseMode('Bank Transfer'); setReimburseTarget(row) } }]
+            if (row.lifecycleStatus !== 'approved') return []
+            if (DEMO_EXPENSES_ENABLED) {
+              return [{ label: 'Record Reimbursement (demo)', icon: Wallet, onClick: () => { setDemoReimburseMode('Bank Transfer'); setDemoReimburseTarget(row) } }]
             }
-            return []
+            return canApprove ? [{ label: 'Reimburse', icon: Wallet, onClick: () => setReimburseTarget(row) }] : []
           }}
         />
         {tab === 'clarification' && (
           <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
             These expenses are waiting on the submitter. They return to <span className="font-medium">Awaiting Review</span> once corrected.
-          </p>
-        )}
-        {tab === 'approved' && !DEMO_EXPENSES_ENABLED && (
-          <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
-            Reimbursement processing will be available after the finance backend is added. These expenses stay
-            <span className="font-medium"> Approved · Reimbursement Pending</span>.
           </p>
         )}
       </Card>
@@ -291,19 +293,21 @@ export default function ExpenseApprovalQueue() {
         </div>
       </Modal>
 
-      <Modal isOpen={Boolean(reimburseTarget)} onClose={() => !isActing && setReimburseTarget(null)} title="Record Reimbursement (demo)">
+      <Modal isOpen={Boolean(demoReimburseTarget)} onClose={() => !isActing && setDemoReimburseTarget(null)} title="Record Reimbursement (demo)">
         <div className="space-y-4">
           <p className="text-sm text-neutral-600">
-            Demo simulation only — there is no real reimbursement endpoint. Marks
-            {' '}{reimburseTarget?.expenseNumber || reimburseTarget?.expenseId} ({formatCurrency(reimburseTarget?.amount || 0)}) as reimbursed.
+            Demo simulation only. Marks
+            {' '}{demoReimburseTarget?.expenseNumber || demoReimburseTarget?.expenseId} ({formatCurrency(demoReimburseTarget?.amount || 0)}) as reimbursed.
           </p>
-          <Select label="Payment Mode" options={PAYMENT_MODES.map((m) => ({ value: m, label: m }))} value={reimburseMode} onChange={(event) => setReimburseMode(event.target.value)} />
+          <Select label="Payment Mode" options={PAYMENT_MODES.map((m) => ({ value: m, label: m }))} value={demoReimburseMode} onChange={(event) => setDemoReimburseMode(event.target.value)} />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setReimburseTarget(null)}>Cancel</Button>
+            <Button type="button" variant="secondary" onClick={() => setDemoReimburseTarget(null)}>Cancel</Button>
             <Button type="button" loading={isActing} onClick={handleDemoReimburse}>Mark Reimbursed</Button>
           </div>
         </div>
       </Modal>
+
+      <ReimburseExpenseModal expense={reimburseTarget} onClose={() => setReimburseTarget(null)} onReimbursed={handleReimbursed} />
     </div>
   )
 }

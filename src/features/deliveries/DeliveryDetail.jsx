@@ -1845,6 +1845,7 @@ export default function DeliveryDetail() {
         delivery={delivery}
         isOpen={isCollectionModalOpen}
         onClose={() => setIsCollectionModalOpen(false)}
+        onBlocked={loadCollections}
         onRecorded={(collection) => {
           // A recorded collection is NOT a payment - it does not touch the delivery's amount
           // due. It waits in the reconciliation queue for the accounts team.

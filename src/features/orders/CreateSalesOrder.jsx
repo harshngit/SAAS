@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
+  ArrowLeft,
   Banknote,
   CreditCard,
   Eye,
@@ -27,6 +28,8 @@ import Button from '../../components/ui/Button'
 import DatePicker from '../../components/ui/DatePicker'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import UnsavedChangesModal from '../../components/ui/UnsavedChangesModal'
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard'
 import { ROLES, roleHomePath } from '../../auth/roles'
 import { listProducts } from '../../api/products'
 import { listCustomers } from '../../api/customers'
@@ -42,6 +45,7 @@ import { formatCurrency } from '../../utils/format'
 import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
 import { useToast } from '../../components/ui/toastContext'
 import ProductPickerList from './ProductPickerList'
+import { customerBasePathByRole } from '../customers/customerConstants'
 
 const paymentOptions = [
   { value: 'upi', label: 'UPI', icon: Smartphone },
@@ -99,8 +103,15 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const [searchParams] = useSearchParams()
   const { id: editOrderId } = useParams()
   const isEditMode = Boolean(editOrderId)
+  const ordersBase = currentUser?.role === ROLES.ADMIN ? '/admin/orders' : '/sales/orders'
+  const customerDetailBasePath = customerBasePathByRole[currentUser?.role] || '/sales/customers'
   // Pre-selected customer when arriving from the Customer Detail page ("Create Order" button).
   const preselectedCustomerId = searchParams.get('customerId') || searchParams.get('customer_id') || ''
+  // Explicit source marker (set by CustomerDetail.jsx's "Create Order" button) - used only to
+  // decide where a successful create/Back should return to. Never inferred from customerId
+  // alone, since other entry points may one day also prefill a customer without meaning
+  // "came from that customer's detail page".
+  const cameFromCustomerDetail = searchParams.get('source') === 'customer-detail' && Boolean(preselectedCustomerId)
   // Order source: a quotation this order is being created from (read-only banner + createOrder link).
   const sourceQuotationId = searchParams.get('quotationId') || searchParams.get('quotation_id') || ''
   // Duplicate: prefill from an existing order but save a brand new draft.
@@ -476,6 +487,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     const nextErrors = {}
 
     if (!selectedCustomer) nextErrors.customer = 'Select an existing customer or quick add a new one.'
+    if (!warehouseId) nextErrors.warehouseId = 'Select a warehouse.'
     if (!deliveryDate) nextErrors.deliveryDate = 'Delivery date is required.'
     if (orderItems.length === 0) nextErrors.items = 'Add at least one product to the order.'
     if (orderItems.some((item) => !Number(item.quantity) || Number(item.quantity) < 1)) {
@@ -690,7 +702,12 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       navigate(roleHomePath[currentUser?.role] || '/')
       return
     }
-    const ordersBase = currentUser?.role === ROLES.ADMIN ? '/admin/orders' : '/sales/orders'
+    // Arrived from a specific customer's Create Order shortcut -> return there, preserving
+    // customer context, instead of the generic order destination.
+    if (cameFromCustomerDetail) {
+      navigate(`${customerDetailBasePath}/${preselectedCustomerId}`)
+      return
+    }
     navigate(result.order?.id ? `${ordersBase}/${result.order.id}` : ordersBase)
   }
 
@@ -714,8 +731,40 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const warehouseName = warehouses.find((warehouse) => warehouse.id === warehouseId)?.name || '—'
   const paymentTypeLabel = paymentOptions.find((option) => option.value === paymentMethod)?.label || 'Not selected'
 
+  // Dirty-tracking is scoped to the Create flow for now (an edit always starts pre-filled from
+  // the existing order, so "any field has a value" isn't a meaningful signal there).
+  const isFormDirty =
+    !isEditMode &&
+    (orderItems.length > 0 ||
+      orderNotes.trim() !== '' ||
+      internalNotes.trim() !== '' ||
+      deliveryAddress.trim() !== '' ||
+      Boolean(paymentMethod) ||
+      Boolean(deliveryType) ||
+      (Boolean(selectedCustomerId) && selectedCustomerId !== preselectedCustomerId))
+  const { isLeaveModalOpen, guardLeave, confirmLeave, cancelLeave } = useUnsavedChangesGuard({
+    isDirty: isFormDirty,
+    isSaving: isSubmitting,
+  })
+  const backDestination = cameFromCustomerDetail
+    ? `${customerDetailBasePath}/${preselectedCustomerId}`
+    : isEditMode
+      ? `${ordersBase}/${editOrderId}`
+      : ordersBase
+  const handleBack = () => guardLeave(() => navigate(backDestination))
+
   return (
     <div className="space-y-5">
+      <button
+        type="button"
+        onClick={handleBack}
+        disabled={isSubmitting}
+        className="flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <ArrowLeft className="size-4" aria-hidden="true" />
+        {cameFromCustomerDetail ? 'Back to Customer' : isEditMode ? 'Back to Order' : 'Back to Orders'}
+      </button>
+
       <div>
         <h1 className="text-2xl font-bold text-neutral-900">{isEditMode ? 'Edit Order' : 'Create Order'}</h1>
         <p className="text-sm text-neutral-500">
@@ -840,13 +889,13 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <ConfiguredField module="sales_order" name="orderDate"><div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-neutral-700">Order Date</label>
+                  <label className="text-sm font-medium text-fg">Order Date</label>
                   <div className="flex h-11 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 text-sm text-neutral-600">
                     {new Date(orderDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </div>
                 </div></ConfiguredField>
                 <ConfiguredField module="sales_order" name="deliveryDate"><div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-neutral-700">
+                  <label className="text-sm font-medium text-fg">
                     {deliveryType === 'pickup' ? 'Pickup Date' : 'Delivery Date'}
                     {deliveryType !== 'pickup' && <span className="text-red-500"> *</span>}
                   </label>
@@ -864,13 +913,14 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     .filter((warehouse) => warehouse.isActive !== false || warehouse.id === warehouseId)
                     .map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
                   value={warehouseId}
-                  onChange={(event) => setWarehouseId(event.target.value)}
+                  onChange={(event) => { setWarehouseId(event.target.value); setErrors((current) => ({ ...current, warehouseId: '' })) }}
                   placeholder={isLoadingOptions ? 'Loading...' : 'Select warehouse'}
                   disabled={isLoadingOptions}
+                  error={errors.warehouseId}
                 /></ConfiguredField>
 
                 <ConfiguredField module="sales_order" name="paymentMethod"><div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-neutral-700">
+                  <label className="text-sm font-medium text-fg">
                     Payment Type<span className="text-red-500"> *</span>
                   </label>
                   <Select
@@ -1031,7 +1081,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
                     <ConfiguredField module="sales_order" name="deliveryAddress"><div className="flex flex-col gap-1.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <label htmlFor="order-delivery-address" className="text-sm font-medium text-neutral-700">
+                        <label htmlFor="order-delivery-address" className="text-sm font-medium text-fg">
                           Delivery Address <span className="text-red-500">*</span>
                         </label>
                         {savedCustomerAddress && deliveryAddress.trim() !== savedCustomerAddress && (
@@ -1109,7 +1159,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <ConfiguredField module="sales_order" name="orderNotes"><div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-neutral-700">Order Notes</label>
+                <label className="text-sm font-medium text-fg">Order Notes</label>
                 <textarea
                   value={orderNotes}
                   maxLength={250}
@@ -1119,7 +1169,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 <p className="text-right text-xs text-neutral-400">{orderNotes.length} / 250</p>
               </div></ConfiguredField>
               <ConfiguredField module="sales_order" name="orderNotes"><div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-neutral-700">Internal Notes</label>
+                <label className="text-sm font-medium text-fg">Internal Notes</label>
                 <textarea
                   value={internalNotes}
                   maxLength={250}
@@ -1540,6 +1590,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
           </div>
         </div>
       </Modal>
+
+      <UnsavedChangesModal isOpen={isLeaveModalOpen} onStay={cancelLeave} onLeave={confirmLeave} />
     </div>
   )
 }

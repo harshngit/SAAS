@@ -44,7 +44,6 @@ import {
   UserCircle,
   Scale,
   HelpCircle,
-  Calculator,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -194,9 +193,9 @@ export const roleMenus = {
         { label: 'Accounts Payable', path: '/admin/payables', icon: Wallet, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_ACCOUNTS_PAYABLE },
         { label: 'Supplier Payments', path: '/admin/supplier-payments', icon: Wallet, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_SUPPLIER_PAYMENTS },
         { label: 'Collection Reconciliation', path: '/admin/collections', icon: HandCoins, module: 'payments', feature: ENTITLEMENT_KEYS.FINANCE_COLLECTION_RECONCILIATION },
-        // Separate feature from Collection Reconciliation above - day-close cash/drawer
-        // reconciliation against GET /cash-reconciliation, not delivery-collection matching.
-        { label: 'Cash Reconciliation', path: '/admin/reconciliation/cash', icon: Calculator, module: 'payments' },
+        // Cash Reconciliation nav entry removed (crm_changes15.md §V) - superseded by the
+        // Delivery Day-End workflow below. Route/component/API are untouched, just hidden from nav.
+        { label: 'Day-End Approvals', path: '/admin/day-end-approvals', icon: HandCoins, module: 'payments' },
         { label: 'Expenses', path: '/admin/expenses', icon: Receipt, module: 'expenses', feature: ENTITLEMENT_KEYS.FINANCE_EXPENSES },
         {
           label: 'Reports',
@@ -327,6 +326,7 @@ export const roleMenus = {
         { label: 'Vehicle Loading', path: '/delivery/vehicle-loading', icon: PackageCheck, module: 'vehicle_stock', feature: ENTITLEMENT_KEYS.SALES_VEHICLE_STOCK },
         { label: 'Vehicle Stock', path: '/delivery/vehicle-stock', icon: Warehouse, module: 'vehicle_stock', feature: ENTITLEMENT_KEYS.SALES_VEHICLE_STOCK },
         { label: 'End of Day Return', path: '/delivery/end-of-day', icon: PackageX, module: 'vehicle_stock', feature: ENTITLEMENT_KEYS.SALES_VEHICLE_STOCK },
+        { label: 'Close My Day', path: '/delivery/day-end', icon: HandCoins, module: 'delivery_collections' },
       ],
     },
     {
@@ -349,7 +349,9 @@ export const roleMenus = {
         { label: 'Sales Invoices', path: '/accounts/invoices/sales', icon: ShoppingCart, module: 'invoices', feature: ENTITLEMENT_KEYS.INVOICE_SALES_INVOICES },
         { label: 'Receivables', path: '/accounts/receivables', icon: TrendingUp, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_RECEIVABLES },
         { label: 'Collection Reconciliation', path: '/accounts/collections', icon: HandCoins, module: 'payments', feature: ENTITLEMENT_KEYS.FINANCE_COLLECTION_RECONCILIATION },
-        { label: 'Cash Reconciliation', path: '/accounts/reconciliation/cash', icon: Calculator, module: 'payments' },
+        // Cash Reconciliation nav entry removed (crm_changes15.md §V) - superseded by the
+        // Delivery Day-End workflow below. Route/component/API are untouched, just hidden from nav.
+        { label: 'Day-End Approvals', path: '/accounts/day-end-approvals', icon: HandCoins, module: 'payments' },
         { label: 'Expense Approval', path: '/accounts/expenses/approval', icon: Receipt, module: 'expenses', action: 'approve', feature: ENTITLEMENT_KEYS.FINANCE_EXPENSES },
         { label: 'Leaves', path: '/accounts/leaves', icon: CalendarClock, module: 'leaves', feature: ENTITLEMENT_KEYS.EMPLOYEE_LEAVES },
         { label: 'GST Summary', path: '/accounts/gst', icon: FileCheck, module: 'gst', feature: ENTITLEMENT_KEYS.REPORT_GST_FILING },

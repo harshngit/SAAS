@@ -1258,6 +1258,7 @@ export default function OrderDetail() {
           loadOrder()
           loadOrderPayments(order.customerId)
         }}
+        onBlocked={loadOrder}
         initialCustomer={{ id: order.customerId, name: order.customerName, outstandingBalance: order.remainingAmount || 0 }}
         partner={{ id: currentUser?.id, name: currentUser?.name, role: currentUser?.role }}
       />

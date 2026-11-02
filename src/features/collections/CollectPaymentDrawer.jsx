@@ -29,7 +29,7 @@ const money = (value) => Math.round((Number(value) || 0) * 100) / 100
 // the customer (e.g. Order Detail's "Record Payment"), pass { id, name, phone,
 // outstandingBalance } to skip the search step and land straight on the payment form. The
 // outstanding balance is still refreshed from the backend before the form is usable.
-export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, partner, initialCustomer }) {
+export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, onBlocked, partner, initialCustomer }) {
   const { showToast } = useToast()
 
   const [shouldRender, setShouldRender] = useState(false)
@@ -175,6 +175,9 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, part
 
     if (!result.success) {
       setFormError(result.error)
+      // Nothing was recorded, but the collector's day-end state moved in the background -
+      // re-sync whatever page opened this drawer so it reflects that.
+      if (result.code === 'DAY_END_CLOSED') onBlocked?.()
       return
     }
 
