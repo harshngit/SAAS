@@ -47,6 +47,23 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
+// An AbortController-cancelled request (route change / filter change superseding an in-flight
+// call) is not a failure - the caller already moved on, so it must never surface an error toast.
+function isRequestCancelled(error) {
+  return error.code === 'ERR_CANCELED' || error.name === 'CanceledError'
+}
+
+// A 503 here means the backend's own request-timeout guard stopped a query that was taking too
+// long - distinct from a normal 4xx/5xx error, so it gets a specific, retry-oriented message
+// instead of whatever generic detail text the backend attaches.
+function resolveErrorMessage(error, fallbackMessage) {
+  if (error.response?.status === 503) {
+    return 'Taking too long, try again'
+  }
+  const errorData = error.response?.data
+  return formatApiError(errorData?.detail || errorData?.message || errorData?.error || errorData, fallbackMessage)
+}
+
 function extractShortages(errorData) {
   const detail = errorData?.detail && typeof errorData.detail === 'object' ? errorData.detail : errorData
 
@@ -309,24 +326,63 @@ export async function listOrders(params = {}) {
     if (params.customer_id) queryParams.customer_id = params.customer_id
     if (params.assigned_delivery_partner_id) queryParams.assigned_delivery_partner_id = params.assigned_delivery_partner_id
     if (params.search) queryParams.search = params.search
+    if (params.source) queryParams.source = params.source
+    if (params.date_from) queryParams.date_from = params.date_from
+    if (params.date_to) queryParams.date_to = params.date_to
     if (params.sort_by) queryParams.sort_by = params.sort_by
     if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/orders', {
       headers: authHeader(),
       params: queryParams,
+      signal: params.signal,
     })
 
     const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
     return { success: true, orders: rows.map(normalizeOrder), total: data?.total ?? rows.length }
   } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to load orders. Please try again.',
-    )
+    if (isRequestCancelled(error)) return { success: false, cancelled: true }
+    return { success: false, error: resolveErrorMessage(error, 'Unable to load orders. Please try again.') }
+  }
+}
 
-    return { success: false, error: message }
+// GET /orders/summary - org-wide (filtered) counts/values, independent of whichever page the
+// list is currently showing. Sent with the SAME filters as the list (status, date_from,
+// date_to, source, customer_id, search) so the two always agree.
+export async function getOrdersSummary(params = {}) {
+  try {
+    const queryParams = {}
+    if (params.status) queryParams.status = params.status
+    if (params.date_from) queryParams.date_from = params.date_from
+    if (params.date_to) queryParams.date_to = params.date_to
+    if (params.source) queryParams.source = params.source
+    if (params.customer_id) queryParams.customer_id = params.customer_id
+    if (params.search) queryParams.search = params.search
+
+    const { data } = await apiClient.get('/orders/summary', {
+      headers: authHeader(),
+      params: queryParams,
+      signal: params.signal,
+    })
+
+    return {
+      success: true,
+      summary: {
+        total: data?.total ?? 0,
+        draft: data?.draft ?? 0,
+        confirmed: data?.confirmed ?? 0,
+        completed: data?.completed ?? 0,
+        cancelled: data?.cancelled ?? 0,
+        totalValue: data?.total_value ?? 0,
+        draftValue: data?.draft_value ?? 0,
+        confirmedValue: data?.confirmed_value ?? 0,
+        completedValue: data?.completed_value ?? 0,
+        cancelledValue: data?.cancelled_value ?? 0,
+      },
+    }
+  } catch (error) {
+    if (isRequestCancelled(error)) return { success: false, cancelled: true }
+    return { success: false, error: resolveErrorMessage(error, 'Unable to load order summary. Please try again.') }
   }
 }
 

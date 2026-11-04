@@ -38,6 +38,13 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
+// Machine-readable error code (e.g. IDEMPOTENCY_KEY_REUSED, PAID_BEFORE_APPROVAL), wherever the
+// backend put it, so callers can branch on it instead of parsing the human message.
+function errorCode(error) {
+  const data = error.response?.data
+  return data?.code || (typeof data?.detail === 'object' ? data.detail?.code : undefined)
+}
+
 // ---- Status normalization (ONE boundary) --------------------------------------------------
 // Backend Expense.status is lowercase: pending | approved | rejected | clarification_requested.
 // The UI shows human labels; these two helpers are the only place raw <-> label is mapped.
@@ -133,15 +140,18 @@ function normalizeExpense(expense) {
     lifecycleStatus,
     lifecycleStatusLabel: expenseLifecycleStatusLabel(lifecycleStatus),
     submittedBy: expense.submitted_by || '',
-    submittedByName: expense.submitted_by_user?.name || expense.submitted_by_name || '',
+    // crm_changes17: backend now sends flat *_name fields directly - preferred over the nested
+    // *_user.name shape. Never falls back to the raw id (that was the bug: a UUID rendered
+    // straight into the UI when no name was available).
+    submittedByName: expense.submitted_by_name || expense.submitted_by_user?.name || '',
     approvedBy: expense.approved_by || null,
-    approverName: expense.approved_by_user?.name || expense.approver?.name || expense.approved_by_name || '',
+    approverName: expense.approved_by_name || expense.approved_by_user?.name || expense.approver?.name || '',
     reviewedAt: expense.reviewed_at || expense.approved_at || null,
     // Backend field is `reject_reason`; the others are defensive aliases.
     rejectReason: expense.reject_reason || expense.clarification_note || expense.rejection_reason || '',
     clarificationNote: expense.reject_reason || expense.clarification_note || expense.rejection_reason || '',
     // Reimbursement details - only populated once lifecycleStatus === 'reimbursed'.
-    reimbursedBy: expense.reimbursed_by_user?.name || expense.reimbursed_by || '',
+    reimbursedBy: expense.reimbursed_by_name || expense.reimbursed_by_user?.name || '',
     reimbursedAt: expense.reimbursed_at || null,
     reimbursementMethod: expense.reimbursement_method || '',
     reimbursementReference: expense.reimbursement_reference || '',
@@ -216,21 +226,31 @@ export async function getExpense(expenseId) {
   }
 }
 
-export async function createExpense(payload) {
+// `idempotencyKey` - generated once by the caller when the Add Expense form opens and reused
+// across retries/timeouts of that SAME save (never for a different expense) - see
+// IDEMPOTENCY_KEY_REUSED below. Sent as a header, never part of the body.
+export async function createExpense(payload, idempotencyKey) {
   try {
     const { data } = await apiClient.post('/expenses', buildExpenseBody(payload), {
-      headers: authHeader(),
+      headers: {
+        ...authHeader(),
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      },
     })
 
     return { success: true, expense: normalizeExpense(data) }
   } catch (error) {
+    const code = errorCode(error)
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to submit expense. Please try again.',
     )
 
-    return { success: false, error: message }
+    // The same Idempotency-Key was sent for what the backend considers a different request
+    // (should only happen if the caller's key-reuse discipline slips) - the caller must
+    // generate a fresh key before the next attempt, or every retry will just 409 again.
+    return { success: false, error: message, code }
   }
 }
 
@@ -349,7 +369,7 @@ export async function reimburseExpense(expenseId, payload = {}) {
       'Unable to record this reimbursement. Please try again.',
     )
 
-    return { success: false, error: message, status: error.response?.status }
+    return { success: false, error: message, status: error.response?.status, code: errorCode(error) }
   }
 }
 

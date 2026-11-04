@@ -3,7 +3,7 @@ import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { ListOverview, ListStatCard, ListSummary } from '../../components/ui/ListPresentation'
 import ActionMenu from '../../components/ui/ActionMenu'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Eye, FileText, Plus, Upload } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -289,11 +289,18 @@ export default function MyExpenses() {
     )
   }, [expenses, formData])
 
+  // One key per NEW claim (not an edit/resubmit, which is a PATCH), generated when the form
+  // opens and reused across retries of that same save - see createExpense's own comment for
+  // why. A fresh key is generated for the next claim, and immediately on a 409
+  // (IDEMPOTENCY_KEY_REUSED) so the next attempt isn't stuck reusing it.
+  const createIdempotencyKeyRef = useRef(null)
+
   const openForm = () => {
     setEditTarget(null)
     setFormData(emptyForm())
     setReceiptFile(null)
     setFormError('')
+    createIdempotencyKeyRef.current = crypto.randomUUID()
     setShowForm(true)
   }
 
@@ -387,8 +394,9 @@ export default function MyExpenses() {
       amount,
       expenseDate: formData.expenseDate,
       paymentMode: formData.paymentMode,
-    })
+    }, createIdempotencyKeyRef.current)
     if (!result.success) {
+      if (result.code === 'IDEMPOTENCY_KEY_REUSED') createIdempotencyKeyRef.current = crypto.randomUUID()
       setFormError(result.error)
       setIsSubmitting(false)
       return

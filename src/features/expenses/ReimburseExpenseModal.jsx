@@ -18,6 +18,7 @@ export default function ReimburseExpenseModal({ expense, onClose, onReimbursed }
   const [notes, setNotes] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
+  const [dateError, setDateError] = useState('')
 
   useEffect(() => {
     if (!expense) return
@@ -26,6 +27,7 @@ export default function ReimburseExpenseModal({ expense, onClose, onReimbursed }
     setReference('')
     setNotes('')
     setError('')
+    setDateError('')
   }, [expense])
 
   const handleSubmit = async () => {
@@ -36,17 +38,25 @@ export default function ReimburseExpenseModal({ expense, onClose, onReimbursed }
     }
     setIsSaving(true)
     setError('')
+    setDateError('')
 
     const result = await reimburseExpense(expense.id, {
       paymentMethod,
-      paidAt: paidAt ? `${paidAt}T00:00:00` : undefined,
+      // Plain yyyy-MM-dd, exactly as picked - never a timestamp/toISOString(), which would
+      // shift the day by the viewer's UTC offset and let the backend store it as midnight UTC
+      // instead of the real action time.
+      paidAt: paidAt || undefined,
       paymentReference: reference.trim() || undefined,
       notes: notes.trim() || undefined,
     })
 
     setIsSaving(false)
     if (!result.success) {
-      setError(result.error)
+      if (result.code === 'PAID_BEFORE_APPROVAL') {
+        setDateError(result.error)
+      } else {
+        setError(result.error)
+      }
       return
     }
     onReimbursed(result.expense)
@@ -61,7 +71,7 @@ export default function ReimburseExpenseModal({ expense, onClose, onReimbursed }
             <p className="text-xs text-neutral-400">Amount</p>
             <p className="text-lg font-semibold text-neutral-900">{formatCurrency(expense.netPayable ?? expense.amount)}</p>
           </div>
-          <Input label="Payment Date" type="date" value={paidAt} onChange={(event) => setPaidAt(event.target.value)} />
+          <Input label="Payment Date" type="date" value={paidAt} onChange={(event) => { setPaidAt(event.target.value); setDateError('') }} error={dateError} />
           <Select
             label="Payment Method"
             required

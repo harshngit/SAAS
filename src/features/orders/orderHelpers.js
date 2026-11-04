@@ -70,10 +70,14 @@ export const ORDER_TABS = [
   { value: 'cancelled', label: 'Cancelled', apiStatus: 'cancelled' },
 ]
 
+// Matches the backend's GET /orders?source= vocabulary (crm_changes17) exactly - a real
+// server-side filter now, not inferred client-side from quotationId.
 export const ORDER_SOURCE_OPTIONS = [
   { value: 'all', label: 'All Sources' },
   { value: 'direct', label: 'Direct' },
   { value: 'quotation', label: 'From Quotation' },
+  { value: 'office', label: 'Office' },
+  { value: 'delivery_vehicle', label: 'Delivery Vehicle' },
 ]
 
 // -----------------------------------------------------------------------------

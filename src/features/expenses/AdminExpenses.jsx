@@ -1,7 +1,7 @@
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { ListOverview, ListSummary, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Receipt, Clock, CheckCircle2, XCircle, Check, Wallet, Eye, HelpCircle, Plus, Upload } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
@@ -160,10 +160,17 @@ export default function AdminExpenses() {
 
   const replace = (updated) => setExpenseList((list) => list.map((e) => (e.id === updated.id ? updated : e)))
 
+  // One key per NEW expense, generated when the form opens and reused across retries of that
+  // same save (including after a timeout) so the backend can tell a retry from a genuine
+  // second submission. A fresh key is generated for the next expense, and immediately if the
+  // backend ever 409s (IDEMPOTENCY_KEY_REUSED) so the next attempt isn't stuck reusing it.
+  const createIdempotencyKeyRef = useRef(null)
+
   const openAddForm = () => {
     setFormData(emptyForm())
     setReceiptFile(null)
     setFormError('')
+    createIdempotencyKeyRef.current = crypto.randomUUID()
     setShowAddForm(true)
   }
 
@@ -204,8 +211,9 @@ export default function AdminExpenses() {
       amount,
       expenseDate: formData.expenseDate,
       paymentMode: formData.paymentMode,
-    })
+    }, createIdempotencyKeyRef.current)
     if (!result.success) {
+      if (result.code === 'IDEMPOTENCY_KEY_REUSED') createIdempotencyKeyRef.current = crypto.randomUUID()
       setFormError(result.error)
       setIsSubmitting(false)
       return
