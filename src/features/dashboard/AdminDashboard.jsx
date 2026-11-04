@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatBytes, formatCompactCurrency, formatCurrency, formatStoragePercent } from '../../utils/format'
-import { loadDashboardOptions, validateDashboardDates } from './dashboardFilters'
+import { validateDashboardDates } from './dashboardFilters'
 import { getAdminDashboard } from '../../api/dashboard'
 import { getMyStorageUsage } from '../../api/entitlements'
 import { getExpenseCategories } from '../../api/expenses'
-import { cancelOrder, listOrders } from '../../api/orders'
+import { cancelOrder } from '../../api/orders'
 import { listWarehouses } from '../../api/warehouses'
 import { listCustomers } from '../../api/customers'
 import { listSuppliers } from '../../api/suppliers'
 import { listCompanies } from '../../api/companies'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
-import { demoOrdersResolved } from '../orders/orderDemoData'
 import { DEMO_EXPENSE_CATEGORIES } from '../expenses/expenseDemo'
 import { ORDER_STATUS_VARIANT, formatOrderStatus } from '../orders/orderHelpers'
+import { useAuthStore } from '../../store/authStore'
+import { resolveHomePath } from '../../auth/roles'
+import { showGlobalToast } from '../../components/ui/toastContext'
 import {
   Ban,
   ChevronRight,
@@ -171,8 +173,12 @@ function formatCashflowDateLabel(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
+// parseLocalDate (not `new Date(value)`) - `recent_orders[].date` is a server date string and
+// must render exactly as sent, not get UTC-midnight-parsed and then shifted a day by the
+// browser's own local timezone (same fix already applied to the chart/cashflow date labels
+// below - this one was the one date formatter in this file still doing it the old way).
 function formatOrderDate(value) {
-  const date = new Date(value)
+  const date = parseLocalDate(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-GB')
 }
 
@@ -286,52 +292,24 @@ function ProfitSummaryCard({ grossProfit, netProfit, onClick }) {
   )
 }
 
-function getOrderAmountSplit(order) {
-  const total = Number(order?.total) || 0
-  const items = Array.isArray(order?.items) ? order.items : []
-
-  let deliveredAmount = 0
-  let pendingAmount = 0
-  let hasDeliveryData = false
-
-  items.forEach((item) => {
-    const lineTotal = Number(item?.lineTotal ?? item?.line_total) || 0
-    const orderedQuantity = Number(item?.orderedQuantity ?? item?.ordered_quantity ?? item?.quantity) || 0
-    const deliveredQuantity = Number(item?.deliveredQuantity ?? item?.delivered_quantity)
-
-    if (orderedQuantity > 0 && Number.isFinite(deliveredQuantity) && deliveredQuantity >= 0 && deliveredQuantity <= orderedQuantity) {
-      const deliveredShare = lineTotal * (deliveredQuantity / orderedQuantity)
-      deliveredAmount += deliveredShare
-      pendingAmount += lineTotal - deliveredShare
-      hasDeliveryData = true
-    }
-  })
-
-  if (!hasDeliveryData) {
-    const status = String(order?.status || '').toLowerCase()
-    const fulfilmentStatus = String(order?.fulfilmentStatus || order?.fulfilment_status || '').toLowerCase()
-    const isDelivered = status === 'completed' || fulfilmentStatus === 'delivered' || fulfilmentStatus === 'partially_delivered'
-
-    return {
-      deliveredAmount: isDelivered ? total : 0,
-      pendingAmount: isDelivered ? 0 : total,
-    }
-  }
-
-  return {
-    deliveredAmount: Math.min(total, deliveredAmount),
-    pendingAmount: Math.max(total - deliveredAmount, 0),
-  }
-}
-
 function FeaturedSalesCard({
   salesAmount,
   scoped = false,
+  ordersCount = 0,
+  // delivered_orders/pending_orders/delivered_amount/pending_amount aren't on the backend's
+  // dashboard.today block yet - this card shows only the total (orders count + sales amount)
+  // until they are, rather than guessing a delivered/pending split from data that isn't there.
+  hasDeliveryBreakdown = false,
   receivedAmount = 0,
   pendingAmount = 0,
-  ordersCount = 0,
   deliveredCount = 0,
   pendingOrdersCount = 0,
+  // scoped-state content - real, already-computed values (the applied period label + any
+  // Company/Warehouse/Customer/Supplier filters), not placeholder text. Keeps this card's two
+  // states (Today's Sales vs a selected period) at matching visual weight instead of one looking
+  // finished and the other looking like it's missing content.
+  rangeLabel = '',
+  appliedScopeLabels = [],
 }) {
   const navigate = useNavigate()
   const formatCount = (value) => new Intl.NumberFormat('en-IN').format(Number(value) || 0)
@@ -357,7 +335,7 @@ function FeaturedSalesCard({
         </p>
       </div>
 
-      {!scoped && <div className="relative mt-10 grid grid-cols-2 gap-x-8 gap-y-2">
+      {!scoped && hasDeliveryBreakdown && <div className="relative mt-10 grid grid-cols-2 gap-x-8 gap-y-2">
         <div className="min-w-0">
           <p className="text-[0.92rem] font-semibold leading-none text-white/90">Received</p>
           <p className="mt-1 truncate text-[1.50rem] font-semibold leading-none tracking-tight text-white">
@@ -371,24 +349,48 @@ function FeaturedSalesCard({
           </p>
         </div>
       </div>}
-      {scoped && <p className="mt-5 text-sm text-white/90">For the applied dates and filters.</p>}
+      {scoped && (
+        <div className="relative mt-10 min-w-0">
+          <p className="text-[0.92rem] font-semibold leading-none text-white/90">Applied filters</p>
+          <p className="mt-2 text-sm leading-snug text-white/75">
+            {appliedScopeLabels.length > 0
+              ? appliedScopeLabels.join(' · ')
+              : 'Across the whole organization - no company, warehouse, customer or supplier filter applied.'}
+          </p>
+        </div>
+      )}
 
       <div className="flex-1" />
 
-      {!scoped && <div className="mb-4 grid grid-cols-3 divide-x divide-white/25 text-left">
-        <div className="pr-3">
-          <p className="text-[0.78rem] font-semibold leading-none text-white/88">Orders</p>
-          <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
+      {!scoped && (
+        hasDeliveryBreakdown ? (
+          <div className="mb-4 grid grid-cols-3 divide-x divide-white/25 text-left">
+            <div className="pr-3">
+              <p className="text-[0.78rem] font-semibold leading-none text-white/88">Orders</p>
+              <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
+            </div>
+            <div className="px-3">
+              <p className="text-[0.78rem] font-semibold leading-none text-white/88">Delivered</p>
+              <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(deliveredCount)}</p>
+            </div>
+            <div className="pl-3">
+              <p className="text-[0.78rem] font-semibold leading-none text-white/88">Pending</p>
+              <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(pendingOrdersCount)}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-4 text-left">
+            <p className="text-[0.78rem] font-semibold leading-none text-white/88">Orders</p>
+            <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
+          </div>
+        )
+      )}
+      {scoped && (
+        <div className="mb-4 text-left">
+          <p className="text-[0.78rem] font-semibold leading-none text-white/88">Period</p>
+          <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{rangeLabel}</p>
         </div>
-        <div className="px-3">
-          <p className="text-[0.78rem] font-semibold leading-none text-white/88">Delivered</p>
-          <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(deliveredCount)}</p>
-        </div>
-        <div className="pl-3">
-          <p className="text-[0.78rem] font-semibold leading-none text-white/88">Pending</p>
-          <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(pendingOrdersCount)}</p>
-        </div>
-      </div>}
+      )}
 
       <div className="mt-auto flex items-end justify-end pt-3 text-[0.92rem] font-semibold leading-4 text-white/90">
         <span className="inline-flex items-center gap-1.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-white">
@@ -489,6 +491,9 @@ const DEFAULT_EXPENSE_CATEGORIES = ['Salaries', 'Rent & Utilities', 'Purchase Re
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
+  const currentUser = useAuthStore((state) => state.currentUser)
+  const fullAccess = useAuthStore((state) => state.fullAccess)
+  const role = useAuthStore((state) => state.role)
   // Real storage usage - GET /organizations/me/storage-usage (files_documents_bytes/
   // stored_reports_bytes/application_data_bytes/total_used_bytes/effective_limit_bytes/
   // percentage_used/is_unlimited/is_over_limit, already resolved by the backend). Independent
@@ -513,47 +518,49 @@ export default function AdminDashboard() {
   const [recentOrdersSearch, setRecentOrdersSearch] = useState('')
   const [topProductsMetric, setTopProductsMetric] = useState('amount')
   const [dashboard, setDashboard] = useState(null)
-  const [orders, setOrders] = useState([])
   const [expenseCategoryNames, setExpenseCategoryNames] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
 
   const loadDashboard = useCallback(async (preset, range, scope = {}) => {
-    const scoped = preset !== 'this_month' || Object.values(scope).some(Boolean)
     const request = ++dashboardRequest.current
     setIsLoading(true)
     setError('')
 
-    // Demo mode: the dashboard shape comes from getAdminDashboard's demo branch; the extra
-    // orders list (Today's Sales card) comes from the demo order store - no real /orders call.
-    const [dashboardResult, ordersResult] = await Promise.all([
-      getAdminDashboard({
-        ...resolveDateRange(preset, range),
-        ...(scope.companyId ? { company_id: scope.companyId } : {}),
-        ...(scope.warehouseId ? { warehouse_id: scope.warehouseId } : {}),
-        ...(scope.customerId ? { customer_id: scope.customerId } : {}),
-        ...(scope.supplierId ? { supplier_id: scope.supplierId } : {}),
-      }),
-      scoped
-        ? Promise.resolve({ success: true, orders: [] })
-        : DEMO_MODE
-        ? Promise.resolve({ success: true, orders: DEMO_EMPTY ? [] : demoOrdersResolved() })
-        : loadDashboardOptions(listOrders, 'orders'),
-    ])
+    // Today's Sales card now reads straight off this same response's `today` block (see below) -
+    // no separate /orders call needed at all.
+    const dashboardResult = await getAdminDashboard({
+      ...resolveDateRange(preset, range),
+      ...(scope.companyId ? { company_id: scope.companyId } : {}),
+      ...(scope.warehouseId ? { warehouse_id: scope.warehouseId } : {}),
+      ...(scope.customerId ? { customer_id: scope.customerId } : {}),
+      ...(scope.supplierId ? { supplier_id: scope.supplierId } : {}),
+    })
 
     if (request !== dashboardRequest.current) return
     setIsLoading(false)
 
     if (!dashboardResult.success) {
+      // A 403 here means access was revoked/downgraded mid-session (role changed by another
+      // admin, session desynced, ...) - retrying this same call would just 403 again forever, so
+      // this sends the user home with a friendly explanation instead of stranding them on a
+      // blank/broken dashboard.
+      if (dashboardResult.status === 403) {
+        showGlobalToast({
+          title: 'Access changed',
+          message: "You no longer have access to this dashboard. Taking you to your home page.",
+          variant: 'error',
+        })
+        navigate(resolveHomePath({ fullAccess, role, currentUser }), { replace: true })
+        return
+      }
       setError(dashboardResult.error)
       return
     }
 
     setAppliedFilters({ preset, range: { ...range }, scope: { ...scope } })
     setDashboard(dashboardResult.dashboard)
-    setOrders(ordersResult.success ? ordersResult.orders : [])
-    if (!ordersResult.success) setError(ordersResult.error || 'Unable to load today’s orders.')
-  }, [])
+  }, [navigate, fullAccess, role, currentUser])
 
   const applyFilters = useCallback(() => {
     const validation = validateDashboardDates(datePreset, customRange)
@@ -590,9 +597,14 @@ export default function AdminDashboard() {
     if (DEMO_MODE) return
     setOptionsLoading(true)
     setOptionsError('')
+    // Customers/Suppliers used to walk every page via loadDashboardOptions just to fill this
+    // scope-filter dropdown - same "fetch everything" pattern as the orders timeout fixed
+    // elsewhere in this file. A single capped page (the backend's own page_size max) instead -
+    // an org with more than 100 of either only sees the first 100 here, which is the same
+    // tradeoff already accepted for Today's Sales, not a search-as-you-type picker.
     const results = await Promise.all([
       listCompanies({ active: true }), listWarehouses(),
-      loadDashboardOptions(listCustomers, 'customers'), loadDashboardOptions(listSuppliers, 'suppliers'),
+      listCustomers({ page_size: 100 }), listSuppliers({ page_size: 100 }),
     ])
     const [co, w, c, s] = results
     setFilterOptions((current) => ({
@@ -772,34 +784,24 @@ export default function AdminDashboard() {
     total: row.total,
     orderDate: formatOrderDate(row.date),
   }))
-  // "TODAY'S SALES" card is strictly today's orders - amount, received (delivered value),
-  // pending (undelivered value), and the 3 order counts all derive from the same
-  // todaysOrders list below, not from all-time/period summaries (ordersSummary/recentOrders
-  // are separate, period-scoped data used elsewhere on this dashboard, e.g. Order
-  // Cancellations and the Recent Orders table).
-  const today = localIso(new Date())
-  const todaysOrders = orders.filter(
-    (order) => (order.orderDate || order.createdAt || '').slice(0, 10) === today && order.status !== 'cancelled',
+  // "TODAY'S SALES" card - straight off the backend's dashboard.today block (org-timezone
+  // "today", decided server-side), not a browser-local date filtered over a client-fetched
+  // order list (ordersSummary/recentOrders below are separate, period-scoped data used
+  // elsewhere on this dashboard, e.g. Order Cancellations and the Recent Orders table).
+  // delivered_orders/pending_orders/delivered_amount/pending_amount aren't in that block yet -
+  // hasDeliveryBreakdown is false until the backend adds them, and the card hides that specific
+  // breakdown rather than estimating it from anything else.
+  const todaysSalesAmount = Number(dashboard?.today?.sales) || 0
+  const featuredOrdersCount = Number(dashboard?.today?.orders) || 0
+  const hasDeliveryBreakdown = ['delivered_orders', 'pending_orders', 'delivered_amount', 'pending_amount'].every(
+    (key) => dashboard?.today?.[key] !== undefined,
   )
-  const todaysSalesAmount = todaysOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0)
-  const isOrderFullyDelivered = (order) => {
-    const status = String(order?.status || '').toLowerCase()
-    const fulfilmentStatus = String(order?.fulfilmentStatus || order?.fulfilment_status || '').toLowerCase()
-    return status === 'completed' || fulfilmentStatus === 'delivered'
+  const featuredDeliveredCount = Number(dashboard?.today?.delivered_orders) || 0
+  const featuredPendingCount = Number(dashboard?.today?.pending_orders) || 0
+  const orderAmounts = {
+    deliveredAmount: Number(dashboard?.today?.delivered_amount) || 0,
+    pendingAmount: Number(dashboard?.today?.pending_amount) || 0,
   }
-  const featuredOrdersCount = todaysOrders.length
-  const featuredDeliveredCount = todaysOrders.filter(isOrderFullyDelivered).length
-  const featuredPendingCount = Math.max(featuredOrdersCount - featuredDeliveredCount, 0)
-  const orderAmounts = todaysOrders.reduce(
-    (totals, order) => {
-      const { deliveredAmount, pendingAmount } = getOrderAmountSplit(order)
-      return {
-        deliveredAmount: totals.deliveredAmount + deliveredAmount,
-        pendingAmount: totals.pendingAmount + pendingAmount,
-      }
-    },
-    { deliveredAmount: 0, pendingAmount: 0 },
-  )
   const rangeLabel = appliedFilters.preset === 'custom'
     ? `${formatRangeLabel(appliedFilters.range.from)} / ${formatRangeLabel(appliedFilters.range.to)}`
     : dateRangePresets.find((preset) => preset.value === appliedFilters.preset)?.label
@@ -974,7 +976,9 @@ export default function AdminDashboard() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">{error}</div>
+        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+          {error} <button type="button" onClick={applyFilters} disabled={isLoading} className="underline">Retry</button>
+        </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
@@ -982,11 +986,14 @@ export default function AdminDashboard() {
           <FeaturedSalesCard
             scoped={scopedSales}
             salesAmount={scopedSales ? periodSales : todaysSalesAmount}
+            ordersCount={featuredOrdersCount}
+            hasDeliveryBreakdown={hasDeliveryBreakdown}
             receivedAmount={orderAmounts.deliveredAmount}
             pendingAmount={orderAmounts.pendingAmount}
-            ordersCount={featuredOrdersCount}
             deliveredCount={featuredDeliveredCount}
             pendingOrdersCount={featuredPendingCount}
+            rangeLabel={rangeLabel}
+            appliedScopeLabels={appliedScopeLabels}
           />
         </div>
         <div

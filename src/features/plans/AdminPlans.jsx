@@ -233,7 +233,7 @@ export default function AdminPlans() {
     // effective entitlements (sidebar/route gates read stale data otherwise until next reload).
     setOrganizationState(result.organization)
     setRequestedPlanId(null)
-    getCurrentProfile()
+    getCurrentProfile({ force: true })
     refreshEntitlements()
     showToast({
       title: 'Plan activated',

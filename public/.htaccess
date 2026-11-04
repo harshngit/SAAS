@@ -11,6 +11,14 @@
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
+  # A missing build asset (stale chunk after a redeploy, typo'd path, etc.) must 404, never
+  # silently fall back to index.html - an HTML page served with a .js/.css content type breaks
+  # the browser's module loader with a confusing "Unexpected token '<'" instead of a clean,
+  # detectable network error. ChunkErrorBoundary.jsx specifically looks for a failed dynamic
+  # import to show its "a new version is available" message - that detection only works if a
+  # missing chunk actually 404s instead of silently resolving to index.html's markup.
+  RewriteRule ^assets/.*\.(js|css|map)$ - [R=404,L]
+
   # Everything else falls back to index.html so React Router can handle the route.
   RewriteRule ^ index.html [L]
 </IfModule>

@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import PageWrapper from './PageWrapper'
 import AdminTrialPopup from '../../features/plans/AdminTrialPopup'
+import ChunkErrorBoundary from './ChunkErrorBoundary'
+import { PageSkeleton } from '../ui/Skeleton'
 import { getCurrentProfile } from '../../api/auth'
 import { useTheme } from '../../theme/useTheme'
 import { resolveGlassSurfaceStyle } from '../../theme/themeConfig'
@@ -135,7 +137,17 @@ export default function Layout() {
           )}
           <main ref={mainRef} className={`flex-1 overflow-y-auto rounded-b-2xl ${shouldHideTopbar ? 'bg-(--app-bg)' : 'bg-surface'}`}>
             <PageWrapper>
-              <Outlet />
+              {/* key={pathname} - a route change remounts this fresh (clearing any stuck
+                  error) instead of the error boundary needing its own reset logic. */}
+              <ChunkErrorBoundary key={location.pathname}>
+                {/* Suspense scoped to just the Outlet (not the whole route tree in
+                    AppRoutes.jsx) - a lazy page chunk loading only swaps this spot for the
+                    skeleton, Sidebar/Topbar above stay mounted instead of flashing away on
+                    every single in-app navigation. */}
+                <Suspense fallback={<PageSkeleton label="Loading..." className="p-6" />}>
+                  <Outlet />
+                </Suspense>
+              </ChunkErrorBoundary>
             </PageWrapper>
           </main>
         </div>

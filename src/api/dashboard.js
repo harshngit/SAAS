@@ -71,6 +71,6 @@ export async function getAdminDashboard(params = {}) {
       'Unable to load the dashboard. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, error: message, status: error.response?.status }
   }
 }

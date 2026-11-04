@@ -1,8 +1,18 @@
-import { deleteToken, getToken, onMessage } from 'firebase/messaging'
 import { firebaseConfig, getMessagingInstance, isPushConfigured, isPushSupportedInBrowser } from './firebase'
 import { deletePushDevice, registerPushDevice } from '../api/pushDevices'
 import { useAuthStore } from '../store/authStore'
 import { showGlobalToast } from '../components/ui/toastContext'
+
+// Dynamically imported (not a static top-level import) - this file is reached from api/auth.js,
+// which nearly every page touches, so a static `firebase/messaging` import here would pull the
+// whole Firebase SDK into the main bundle for every visitor regardless of whether push is even
+// configured for this deployment. Loaded once a function below actually needs deleteToken/
+// getToken/onMessage, not at module load.
+let messagingModulePromise = null
+function loadMessagingModule() {
+  if (!messagingModulePromise) messagingModulePromise = import('firebase/messaging')
+  return messagingModulePromise
+}
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || ''
 const SW_PATH = '/firebase-messaging-sw.js'
@@ -150,6 +160,7 @@ async function ensureForegroundListener() {
   const messaging = await getMessagingInstance()
   if (!messaging) return
 
+  const { onMessage } = await loadMessagingModule()
   foregroundListenerAttached = true
   onMessage(messaging, (payload) => {
     const title = payload.notification?.title || payload.data?.title || 'New notification'
@@ -169,6 +180,7 @@ async function requestTokenAndRegister(userId, { retrying = false } = {}) {
     const registration = await getServiceWorkerRegistration()
     if (!registration) return null
 
+    const { getToken, deleteToken } = await loadMessagingModule()
     const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration })
     if (!token) return null
 
@@ -249,6 +261,7 @@ export async function syncPushToken() {
     const registration = await getServiceWorkerRegistration()
     if (!registration) return
 
+    const { getToken, deleteToken } = await loadMessagingModule()
     const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration })
     if (!token) return
 
@@ -314,6 +327,7 @@ async function disablePushInternal() {
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       const messaging = await getMessagingInstance()
       if (messaging && VAPID_KEY) {
+        const { getToken, deleteToken } = await loadMessagingModule()
         const registration = await getServiceWorkerRegistration()
         if (registration) {
           await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration }).catch(() => {})

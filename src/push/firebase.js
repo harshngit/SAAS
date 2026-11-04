@@ -1,5 +1,19 @@
-import { getApp, getApps, initializeApp } from 'firebase/app'
-import { getMessaging, isSupported } from 'firebase/messaging'
+// firebase/app and firebase/messaging are dynamically imported below, not statically imported
+// here - this module used to pull the whole Firebase SDK into the main bundle for every visitor
+// (push/pushService.js, which every page touches indirectly via api/auth.js, imported this file
+// at the top level), even on a deployment where push isn't configured at all or a user who never
+// touches it. Deferred to the first call that actually needs it instead.
+let firebaseAppModulePromise = null
+function loadFirebaseAppModule() {
+  if (!firebaseAppModulePromise) firebaseAppModulePromise = import('firebase/app')
+  return firebaseAppModulePromise
+}
+
+let firebaseMessagingModulePromise = null
+function loadFirebaseMessagingModule() {
+  if (!firebaseMessagingModulePromise) firebaseMessagingModulePromise = import('firebase/messaging')
+  return firebaseMessagingModulePromise
+}
 
 // Public, build-time-baked values only (Firebase web config is not a secret - it identifies the
 // project, not a credential). Never add a service-account/private key here or anywhere else in
@@ -30,9 +44,10 @@ export function isPushConfigured() {
 
 let appInstance = null
 
-function getFirebaseApp() {
+async function getFirebaseApp() {
   if (!isPushConfigured()) return null
   if (!appInstance) {
+    const { getApp, getApps, initializeApp } = await loadFirebaseAppModule()
     // Reuse an already-initialized app of the same name if one exists (StrictMode double-invoke,
     // or another part of the app initializing Firebase first) rather than throwing on a second
     // initializeApp() call.
@@ -51,6 +66,8 @@ let messagingInstance = null
 export async function getMessagingInstance() {
   if (!isPushConfigured()) return null
 
+  const { isSupported, getMessaging } = await loadFirebaseMessagingModule()
+
   if (!supportedPromise) {
     supportedPromise = isSupported().catch(() => false)
   }
@@ -58,7 +75,7 @@ export async function getMessagingInstance() {
   if (!supported) return null
 
   if (!messagingInstance) {
-    const app = getFirebaseApp()
+    const app = await getFirebaseApp()
     if (!app) return null
     messagingInstance = getMessaging(app)
   }
@@ -72,6 +89,7 @@ export async function isPushSupportedInBrowser() {
   if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
     return false
   }
+  const { isSupported } = await loadFirebaseMessagingModule()
   if (!supportedPromise) {
     supportedPromise = isSupported().catch(() => false)
   }

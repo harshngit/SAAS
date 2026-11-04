@@ -112,24 +112,38 @@ export default function Topbar() {
     }
   }, [isMenuOpen])
 
+  // Keyed on currentUser?.id, not the whole currentUser object - every /auth/me refresh
+  // (Layout, AdminTrialPopup, PlatformGuard, ...) replaces that object with a new reference for
+  // the same user, which used to tear down and restart this effect (and fire an extra poll)
+  // every single time. getUnreadNotificationCount's own short dedup cache absorbs any poll that
+  // still lands close to another caller's request.
   useEffect(() => {
     if (!currentUser) return undefined
 
     let isMounted = true
 
     const pollUnreadCount = async () => {
+      if (document.hidden) return
       const result = await getUnreadNotificationCount()
       if (isMounted && result.success) setUnreadCount(result.unread)
     }
 
     pollUnreadCount()
     const interval = setInterval(pollUnreadCount, 60000)
+    // A background tab's timers get throttled/suspended anyway, but this also re-polls
+    // immediately on return instead of waiting out whatever's left of the 60s interval.
+    const handleVisibilityChange = () => {
+      if (!document.hidden) pollUnreadCount()
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       isMounted = false
       clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [currentUser])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id])
 
   useEffect(() => {
     if (!isNotificationsOpen) return undefined

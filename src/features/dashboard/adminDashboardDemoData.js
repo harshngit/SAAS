@@ -36,6 +36,11 @@ const EMPTY_DASHBOARD = {
     sales_growth_percentage: 0,
   },
   orders: {},
+  // Mirrors the real /dashboard/admin `today` block as it exists today (date/orders/sales only -
+  // delivered_orders/pending_orders/delivered_amount/pending_amount aren't backend-provided yet
+  // anywhere, demo included, so AdminDashboard.jsx's Featured Sales card hides that breakdown the
+  // same way in both demo and real mode rather than faking it here).
+  today: { date: '', orders: 0, sales: 0 },
   cashflow: [],
   receivables_payables: { receivables: 0, payables: 0, overdue_receivables: 0, overdue_payables: 0 },
   top_customers: [],
@@ -66,6 +71,12 @@ export function buildDemoAdminDashboard() {
 
   const periodSales = committed.reduce((sum, order) => sum + (Number(order.total) || 0), 0)
   const expenseTotal = expenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
+
+  const todayIso = toLocalDateString()
+  const todaysOrders = orders.filter(
+    (order) => (order.orderDate || order.createdAt || '').slice(0, 10) === todayIso && order.status !== 'cancelled',
+  )
+  const todaysSales = todaysOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0)
 
   // cashflow: inflow = demo receipts by day; outflow = demo (paid) expenses by day.
   const flow = new Map()
@@ -125,6 +136,7 @@ export function buildDemoAdminDashboard() {
       sales_growth_percentage: 0,
     },
     orders: {},
+    today: { date: todayIso, orders: todaysOrders.length, sales: todaysSales },
     cashflow: byDate(flow),
     receivables_payables: {
       receivables: open.reduce((sum, invoice) => sum + (Number(invoice.outstandingAmount) || 0), 0),

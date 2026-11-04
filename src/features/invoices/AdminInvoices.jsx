@@ -75,7 +75,7 @@ function SalesInvoicesPanel({ header }) {
     // Demo mode: demo invoices already carry their order number - no real /orders call.
     const [result, ordersResult] = await Promise.all([
       listInvoices(),
-      INVOICE_DEMO_ENABLED ? Promise.resolve({ success: false }) : listOrders(),
+      INVOICE_DEMO_ENABLED ? Promise.resolve({ success: false }) : listOrders({ page_size: 100, sort_by: 'created_at', sort_order: 'desc' }),
     ])
 
     if (!result.success) {

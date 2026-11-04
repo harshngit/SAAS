@@ -39,3 +39,22 @@ export default function RequirePermissionRoute({ module, action = 'view', featur
 
   return children
 }
+
+// /admin/dashboard specific - GET /dashboard/admin is an org-wide, unscoped aggregate, so a
+// viewer without real org-wide access must never even reach the component that fires it (not
+// just get a 403 back from it). Allowed when full_access is set (Admin), or when the signed-in
+// role was explicitly granted the dashboard module AND an "all" data scope - own/team-scoped
+// custom roles that happen to land in the admin shell still redirect home, same as any other
+// permission-denied route.
+export function RequireFullOrgDashboardRoute({ children }) {
+  const { can, fullAccess, dataScope } = usePermission()
+  const currentUser = useAuthStore((state) => state.currentUser)
+  const role = useAuthStore((state) => state.role)
+
+  const allowed = fullAccess || (can('dashboard', 'view') && dataScope === 'all')
+  if (!allowed) {
+    return <Navigate to={resolveHomePath({ fullAccess, role, currentUser })} replace />
+  }
+
+  return children
+}

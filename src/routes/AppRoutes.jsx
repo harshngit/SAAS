@@ -1,123 +1,129 @@
-import PlatformGuard from '../auth/PlatformGuard'
-import PlatformStaff from '../features/superadmin/PlatformStaff'
-import FeatureRequests from '../features/superadmin/FeatureRequests'
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from '../components/layout/Layout'
 import StorageLimitModal from '../components/ui/StorageLimitModal'
 import ProtectedRoute from '../auth/ProtectedRoute'
-import RequirePermissionRoute from '../auth/RequirePermission'
+import RequirePermissionRoute, { RequireFullOrgDashboardRoute } from '../auth/RequirePermission'
+import PlatformGuard from '../auth/PlatformGuard'
 import { ENTITLEMENT_KEYS } from '../entitlements/entitlementKeys'
-import Login from '../features/auth/Login'
-import ResetPassword from '../features/auth/ResetPassword'
-import Register from '../auth/Register'
-import GoogleAuthCallback from '../features/auth/GoogleAuthCallback'
-import GoogleRegister from '../features/auth/GoogleRegister'
-import SuperAdminDashboard from '../features/dashboard/SuperAdminDashboard'
-import AdminDashboard from '../features/dashboard/AdminDashboard'
-import SalesOfficerDashboard from '../features/dashboard/SalesOfficerDashboard'
-import DeliveryPartnerDashboard from '../features/dashboard/DeliveryPartnerDashboard'
-import AccountantDashboard from '../features/dashboard/AccountantDashboard'
 import { useAuthStore } from '../store/authStore'
 import { ROLES, resolveHomePath } from '../auth/roles'
-import CompanySettings from '../features/company/CompanySettings'
-import UserManagement from '../features/users/UserManagement'
-import UserDetail from '../features/users/UserDetail'
-import UserEdit from '../features/users/UserEdit'
-import RolesList from '../features/roles/RolesList'
-import RoleForm from '../features/roles/RoleForm'
-import ProductList from '../features/products/ProductList'
-import ProductDetail from '../features/products/ProductDetail'
-import StockBoard from '../features/inventory/StockBoard'
-import StockDetail from '../features/inventory/StockDetail'
-import VehicleStockOverview from '../features/vehicleStock/VehicleStockOverview'
-import WarehouseList from '../features/warehouses/WarehouseList'
-import WarehouseDetail from '../features/warehouses/WarehouseDetail'
-import VehicleList from '../features/vehicles/VehicleList'
-import VehicleDetail from '../features/vehicles/VehicleDetail'
-import PurchaseInvoiceList from '../features/purchases/PurchaseInvoiceList'
-import PurchaseInvoiceForm from '../features/purchases/PurchaseInvoiceForm'
-import PurchaseInvoiceDetail from '../features/purchases/PurchaseInvoiceDetail'
-import PurchaseReturnList from '../features/purchaseReturns/PurchaseReturnList'
-import PurchaseReturnDetail from '../features/purchaseReturns/PurchaseReturnDetail'
-import PurchaseReturnFormPage from '../features/purchaseReturns/PurchaseReturnFormPage'
-import SupplierInvoiceList from '../features/supplierInvoices/SupplierInvoiceList'
-import SupplierInvoiceForm from '../features/supplierInvoices/SupplierInvoiceForm'
-import SupplierInvoiceDetail from '../features/supplierInvoices/SupplierInvoiceDetail'
-import PayablesList from '../features/payables/PayablesList'
-import SupplierPaymentsList from '../features/supplierPayments/SupplierPaymentsList'
-import ReportsHub from '../features/reports/ReportsHub'
-import SalesOverview from '../features/sales/SalesOverview'
-import NotificationsList from '../features/notifications/NotificationsList'
-import AuditLogList from '../features/auditLogs/AuditLogList'
-import CustomerList from '../features/customers/CustomerList'
-import CustomerDetail from '../features/customers/CustomerDetail'
-import CustomerEdit from '../features/customers/CustomerEdit'
-import LeadList from '../features/leads/LeadList'
-import LeadFormPage from '../features/leads/LeadFormPage'
-import LeadDetail from '../features/leads/LeadDetail'
-import QuotationList from '../features/quotations/QuotationList'
-import QuotationFormPage from '../features/quotations/QuotationFormPage'
-import QuotationDetail from '../features/quotations/QuotationDetail'
-import SupplierList from '../features/suppliers/SupplierList'
-import SupplierDetail from '../features/suppliers/SupplierDetail'
-import CategoryList from '../features/categories/CategoryList'
-import CategoryFormPage from '../features/categories/CategoryFormPage'
-import BrandList from '../features/brands/BrandList'
-import CreateSalesOrder from '../features/orders/CreateSalesOrder'
-import OrderList from '../features/orders/OrderList'
-import OrderDetail from '../features/orders/OrderDetail'
-import VisitCheckIn from '../features/visits/VisitCheckIn'
-import FollowUpsList from '../features/followups/FollowUpsList'
-import MyTargets from '../features/performance/MyTargets'
-import VehicleLoading from '../features/vehicleStock/VehicleLoading'
-import AssignedDeliveries from '../features/deliveries/AssignedDeliveries'
-import DeliveryDetail from '../features/deliveries/DeliveryDetail'
-import MyExpenses from '../features/expenses/MyExpenses'
-import MyLeaves from '../features/leaves/MyLeaves'
-import LeaveApprovalQueue from '../features/leaves/LeaveApprovalQueue'
-import EndOfDayReturn from '../features/vehicleStock/EndOfDayReturn'
-import MyAttendance from '../features/attendance/MyAttendance'
-import PurchaseInvoices from '../features/invoices/PurchaseInvoices'
-import SalesInvoices from '../features/invoices/SalesInvoices'
-import RecordPayment from '../features/payments/RecordPayment'
-import ExpenseApprovalQueue from '../features/expenses/ExpenseApprovalQueue'
-import CashReconciliation from '../features/reconciliation/CashReconciliation'
-import ReceivablesPayables from '../features/outstanding/ReceivablesPayables'
-import CollectionReconciliation from '../features/collections/CollectionReconciliation'
-import DayEndClose from '../features/deliveries/DayEndClose'
-import DayEndApprovals from '../features/deliveries/DayEndApprovals'
-import FinancialReports from '../features/reports/FinancialReports'
-import OrganizationsList from '../features/superadmin/OrganizationsList'
-import OrganizationDetail from '../features/superadmin/OrganizationDetail'
-import UpgradeRequests from '../features/superadmin/UpgradeRequests'
-import SubscriptionPlans from '../features/superadmin/SubscriptionPlans'
-import PlatformAnalytics from '../features/superadmin/PlatformAnalytics'
-import SuperAdminsList from '../features/superadmin/SuperAdminsList'
-import AdminPlans from '../features/plans/AdminPlans'
-import BillingHistory from '../features/plans/BillingHistory'
-import AdminDeliveries from '../features/deliveries/AdminDeliveries'
-import AdminExpenses from '../features/expenses/AdminExpenses'
-import AdminInvoices from '../features/invoices/AdminInvoices'
-import CreateSalesInvoice from '../features/invoices/CreateSalesInvoice'
-import InvoiceDetail from '../features/invoices/InvoiceDetail'
+import { PageSkeleton } from '../components/ui/Skeleton'
+import Login from '../features/auth/Login'
+// InvoicePrintView stays eager - it's the headless-render target a backend job (Puppeteer or
+// similar) navigates to directly to generate a PDF, with no human-driven navigation beforehand
+// to have already warmed a lazy chunk. Every other route below is on-demand: route-level code
+// splitting cut the 3.66MB single-bundle initial load down to only what the current page needs.
 import InvoicePrintView from '../features/invoices/InvoicePrintView'
-import InvoiceSettings from '../features/invoices/InvoiceSettings'
-import ThemeSettings from '../features/settings/ThemeSettings'
-import OnlinePayments from '../features/settings/OnlinePayments'
-import ObjectFieldsSettings from '../features/settings/ObjectFieldsSettings'
-import AdminAttendance from '../features/attendance/AdminAttendance'
-import AttendanceDetail from '../features/attendance/AttendanceDetail'
-import Profile from '../features/profile/Profile'
-import SalesReturnList from '../features/salesReturns/SalesReturnList'
-import SalesReturnFormPage from '../features/salesReturns/SalesReturnFormPage'
-import SalesReturnDetail from '../features/salesReturns/SalesReturnDetail'
-import HelpFaq from '../features/legal/HelpFaq'
-import PrivacyPolicy from '../features/legal/PrivacyPolicy'
-import TermsOfService from '../features/legal/TermsOfService'
-import RefundPolicy from '../features/legal/RefundPolicy'
-import AcceptableUsePolicy from '../features/legal/AcceptableUsePolicy'
-import ContactSupport from '../features/legal/ContactSupport'
-import LegalIndex from '../features/legal/LegalIndex'
+
+const ResetPassword = lazy(() => import('../features/auth/ResetPassword'))
+const Register = lazy(() => import('../auth/Register'))
+const GoogleAuthCallback = lazy(() => import('../features/auth/GoogleAuthCallback'))
+const GoogleRegister = lazy(() => import('../features/auth/GoogleRegister'))
+const SuperAdminDashboard = lazy(() => import('../features/dashboard/SuperAdminDashboard'))
+const AdminDashboard = lazy(() => import('../features/dashboard/AdminDashboard'))
+const SalesOfficerDashboard = lazy(() => import('../features/dashboard/SalesOfficerDashboard'))
+const DeliveryPartnerDashboard = lazy(() => import('../features/dashboard/DeliveryPartnerDashboard'))
+const AccountantDashboard = lazy(() => import('../features/dashboard/AccountantDashboard'))
+const CompanySettings = lazy(() => import('../features/company/CompanySettings'))
+const UserManagement = lazy(() => import('../features/users/UserManagement'))
+const UserDetail = lazy(() => import('../features/users/UserDetail'))
+const UserEdit = lazy(() => import('../features/users/UserEdit'))
+const RolesList = lazy(() => import('../features/roles/RolesList'))
+const RoleForm = lazy(() => import('../features/roles/RoleForm'))
+const ProductList = lazy(() => import('../features/products/ProductList'))
+const ProductDetail = lazy(() => import('../features/products/ProductDetail'))
+const StockBoard = lazy(() => import('../features/inventory/StockBoard'))
+const StockDetail = lazy(() => import('../features/inventory/StockDetail'))
+const VehicleStockOverview = lazy(() => import('../features/vehicleStock/VehicleStockOverview'))
+const WarehouseList = lazy(() => import('../features/warehouses/WarehouseList'))
+const WarehouseDetail = lazy(() => import('../features/warehouses/WarehouseDetail'))
+const VehicleList = lazy(() => import('../features/vehicles/VehicleList'))
+const VehicleDetail = lazy(() => import('../features/vehicles/VehicleDetail'))
+const PurchaseInvoiceList = lazy(() => import('../features/purchases/PurchaseInvoiceList'))
+const PurchaseInvoiceForm = lazy(() => import('../features/purchases/PurchaseInvoiceForm'))
+const PurchaseInvoiceDetail = lazy(() => import('../features/purchases/PurchaseInvoiceDetail'))
+const PurchaseReturnList = lazy(() => import('../features/purchaseReturns/PurchaseReturnList'))
+const PurchaseReturnDetail = lazy(() => import('../features/purchaseReturns/PurchaseReturnDetail'))
+const PurchaseReturnFormPage = lazy(() => import('../features/purchaseReturns/PurchaseReturnFormPage'))
+const SupplierInvoiceList = lazy(() => import('../features/supplierInvoices/SupplierInvoiceList'))
+const SupplierInvoiceForm = lazy(() => import('../features/supplierInvoices/SupplierInvoiceForm'))
+const SupplierInvoiceDetail = lazy(() => import('../features/supplierInvoices/SupplierInvoiceDetail'))
+const PayablesList = lazy(() => import('../features/payables/PayablesList'))
+const SupplierPaymentsList = lazy(() => import('../features/supplierPayments/SupplierPaymentsList'))
+const ReportsHub = lazy(() => import('../features/reports/ReportsHub'))
+const SalesOverview = lazy(() => import('../features/sales/SalesOverview'))
+const NotificationsList = lazy(() => import('../features/notifications/NotificationsList'))
+const AuditLogList = lazy(() => import('../features/auditLogs/AuditLogList'))
+const CustomerList = lazy(() => import('../features/customers/CustomerList'))
+const CustomerDetail = lazy(() => import('../features/customers/CustomerDetail'))
+const CustomerEdit = lazy(() => import('../features/customers/CustomerEdit'))
+const LeadList = lazy(() => import('../features/leads/LeadList'))
+const LeadFormPage = lazy(() => import('../features/leads/LeadFormPage'))
+const LeadDetail = lazy(() => import('../features/leads/LeadDetail'))
+const QuotationList = lazy(() => import('../features/quotations/QuotationList'))
+const QuotationFormPage = lazy(() => import('../features/quotations/QuotationFormPage'))
+const QuotationDetail = lazy(() => import('../features/quotations/QuotationDetail'))
+const SupplierList = lazy(() => import('../features/suppliers/SupplierList'))
+const SupplierDetail = lazy(() => import('../features/suppliers/SupplierDetail'))
+const CategoryList = lazy(() => import('../features/categories/CategoryList'))
+const CategoryFormPage = lazy(() => import('../features/categories/CategoryFormPage'))
+const BrandList = lazy(() => import('../features/brands/BrandList'))
+const CreateSalesOrder = lazy(() => import('../features/orders/CreateSalesOrder'))
+const OrderList = lazy(() => import('../features/orders/OrderList'))
+const OrderDetail = lazy(() => import('../features/orders/OrderDetail'))
+const VisitCheckIn = lazy(() => import('../features/visits/VisitCheckIn'))
+const FollowUpsList = lazy(() => import('../features/followups/FollowUpsList'))
+const MyTargets = lazy(() => import('../features/performance/MyTargets'))
+const VehicleLoading = lazy(() => import('../features/vehicleStock/VehicleLoading'))
+const AssignedDeliveries = lazy(() => import('../features/deliveries/AssignedDeliveries'))
+const DeliveryDetail = lazy(() => import('../features/deliveries/DeliveryDetail'))
+const MyExpenses = lazy(() => import('../features/expenses/MyExpenses'))
+const MyLeaves = lazy(() => import('../features/leaves/MyLeaves'))
+const LeaveApprovalQueue = lazy(() => import('../features/leaves/LeaveApprovalQueue'))
+const EndOfDayReturn = lazy(() => import('../features/vehicleStock/EndOfDayReturn'))
+const MyAttendance = lazy(() => import('../features/attendance/MyAttendance'))
+const PurchaseInvoices = lazy(() => import('../features/invoices/PurchaseInvoices'))
+const SalesInvoices = lazy(() => import('../features/invoices/SalesInvoices'))
+const RecordPayment = lazy(() => import('../features/payments/RecordPayment'))
+const ExpenseApprovalQueue = lazy(() => import('../features/expenses/ExpenseApprovalQueue'))
+const ReceivablesPayables = lazy(() => import('../features/outstanding/ReceivablesPayables'))
+const CollectionReconciliation = lazy(() => import('../features/collections/CollectionReconciliation'))
+const DayEndClose = lazy(() => import('../features/deliveries/DayEndClose'))
+const DayEndApprovals = lazy(() => import('../features/deliveries/DayEndApprovals'))
+const FinancialReports = lazy(() => import('../features/reports/FinancialReports'))
+const OrganizationsList = lazy(() => import('../features/superadmin/OrganizationsList'))
+const OrganizationDetail = lazy(() => import('../features/superadmin/OrganizationDetail'))
+const UpgradeRequests = lazy(() => import('../features/superadmin/UpgradeRequests'))
+const SubscriptionPlans = lazy(() => import('../features/superadmin/SubscriptionPlans'))
+const PlatformAnalytics = lazy(() => import('../features/superadmin/PlatformAnalytics'))
+const SuperAdminsList = lazy(() => import('../features/superadmin/SuperAdminsList'))
+const AdminPlans = lazy(() => import('../features/plans/AdminPlans'))
+const BillingHistory = lazy(() => import('../features/plans/BillingHistory'))
+const AdminDeliveries = lazy(() => import('../features/deliveries/AdminDeliveries'))
+const AdminExpenses = lazy(() => import('../features/expenses/AdminExpenses'))
+const AdminInvoices = lazy(() => import('../features/invoices/AdminInvoices'))
+const CreateSalesInvoice = lazy(() => import('../features/invoices/CreateSalesInvoice'))
+const InvoiceDetail = lazy(() => import('../features/invoices/InvoiceDetail'))
+const InvoiceSettings = lazy(() => import('../features/invoices/InvoiceSettings'))
+const ThemeSettings = lazy(() => import('../features/settings/ThemeSettings'))
+const OnlinePayments = lazy(() => import('../features/settings/OnlinePayments'))
+const ObjectFieldsSettings = lazy(() => import('../features/settings/ObjectFieldsSettings'))
+const AdminAttendance = lazy(() => import('../features/attendance/AdminAttendance'))
+const AttendanceDetail = lazy(() => import('../features/attendance/AttendanceDetail'))
+const Profile = lazy(() => import('../features/profile/Profile'))
+const SalesReturnList = lazy(() => import('../features/salesReturns/SalesReturnList'))
+const SalesReturnFormPage = lazy(() => import('../features/salesReturns/SalesReturnFormPage'))
+const SalesReturnDetail = lazy(() => import('../features/salesReturns/SalesReturnDetail'))
+const HelpFaq = lazy(() => import('../features/legal/HelpFaq'))
+const PrivacyPolicy = lazy(() => import('../features/legal/PrivacyPolicy'))
+const TermsOfService = lazy(() => import('../features/legal/TermsOfService'))
+const RefundPolicy = lazy(() => import('../features/legal/RefundPolicy'))
+const AcceptableUsePolicy = lazy(() => import('../features/legal/AcceptableUsePolicy'))
+const ContactSupport = lazy(() => import('../features/legal/ContactSupport'))
+const LegalIndex = lazy(() => import('../features/legal/LegalIndex'))
+const PlatformStaff = lazy(() => import('../features/superadmin/PlatformStaff'))
+const FeatureRequests = lazy(() => import('../features/superadmin/FeatureRequests'))
 
 function RootRedirect() {
   const currentUser = useAuthStore((state) => state.currentUser)
@@ -131,6 +137,7 @@ export default function AppRoutes() {
   return (
     <BrowserRouter>
       <StorageLimitModal />
+      <Suspense fallback={<PageSkeleton label="Loading..." className="p-6" />}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -197,7 +204,14 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         >
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <RequireFullOrgDashboardRoute>
+                <AdminDashboard />
+              </RequireFullOrgDashboardRoute>
+            }
+          />
           <Route
             path="/admin/orders"
             element={
@@ -682,14 +696,10 @@ export default function AppRoutes() {
               </RequirePermissionRoute>
             }
           />
-          <Route
-            path="/admin/reconciliation/cash"
-            element={
-              <RequirePermissionRoute module="payments" action="view">
-                <CashReconciliation />
-              </RequirePermissionRoute>
-            }
-          />
+          {/* Cash Reconciliation superseded by the Delivery Day-End workflow (crm_changes15.md
+              §V) - already removed from nav; the direct URL now redirects too instead of still
+              rendering the orphaned page. */}
+          <Route path="/admin/reconciliation/cash" element={<Navigate to="/admin/day-end-approvals" replace />} />
           <Route
             path="/admin/day-end-approvals"
             element={
@@ -1180,6 +1190,14 @@ export default function AppRoutes() {
             }
           />
           <Route
+            path="/accounts/expenses"
+            element={
+              <RequirePermissionRoute module="expenses" action="view">
+                <MyExpenses />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
             path="/accounts/leaves"
             element={
               <RequirePermissionRoute module="leaves" action="view">
@@ -1187,14 +1205,8 @@ export default function AppRoutes() {
               </RequirePermissionRoute>
             }
           />
-          <Route
-            path="/accounts/reconciliation/cash"
-            element={
-              <RequirePermissionRoute module="payments" action="view">
-                <CashReconciliation />
-              </RequirePermissionRoute>
-            }
-          />
+          {/* See the matching comment on /admin/reconciliation/cash above. */}
+          <Route path="/accounts/reconciliation/cash" element={<Navigate to="/accounts/day-end-approvals" replace />} />
           <Route
             path="/accounts/receivables"
             element={
@@ -1246,6 +1258,7 @@ export default function AppRoutes() {
         <Route path="/" element={<RootRedirect />} />
         <Route path="*" element={<RootRedirect />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

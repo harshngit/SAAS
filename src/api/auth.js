@@ -2,6 +2,10 @@ import { useAuthStore } from '../store/authStore'
 import { apiClient, API_BASE_URL, normalizeTokens } from './client'
 import { disablePushForLogout, syncPushToken } from '../push/pushService'
 import { phoneConflictFields } from '../utils/phoneConflict'
+import { dedupeRequest, invalidateRequest } from '../utils/requestCache'
+import { UNREAD_COUNT_CACHE_KEY } from './notifications'
+
+const PROFILE_CACHE_KEY = 'auth:me'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -57,7 +61,8 @@ export async function login({ email, password }) {
 
     useAuthStore.getState().setAuthTokens(tokens)
 
-    const profileResult = await getCurrentProfile()
+    // force: true - never reuse a previous session's cached /auth/me result for a new login.
+    const profileResult = await getCurrentProfile({ force: true })
 
     if (!profileResult.success) {
       return profileResult
@@ -93,7 +98,7 @@ export async function loginWithPhoneOtp({ phone, code }) {
     const tokens = normalizeTokens(data)
     if (!tokens?.access_token) return { success: false, error: 'Unable to sign in. Please try again.' }
     useAuthStore.getState().setAuthTokens(tokens)
-    const profileResult = await getCurrentProfile()
+    const profileResult = await getCurrentProfile({ force: true })
     if (!profileResult.success) return profileResult
     syncPushToken()
     return { success: true, ...profileResult }
@@ -194,23 +199,32 @@ export async function changePassword({ currentPassword, newPassword }) {
   }
 }
 
-export async function getCurrentProfile() {
-  try {
-    const { data } = await apiClient.get('/auth/me', {
-      headers: authHeader(),
-    })
-    useAuthStore.getState().setAuthenticatedSession(data)
-    return { success: true, ...data }
-  } catch (error) {
-    if (error.response?.status === 401) useAuthStore.getState().logout()
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to load profile details. Please try again.',
-    )
+// Several independent components (Layout, AdminTrialPopup, PlatformGuard, ...) each call this
+// on their own mount/interval with no shared state, which used to fire 2-3 real /auth/me
+// requests back to back on a single page load. Deduped/cached here (30s staleTime) so they
+// share one in-flight request and one short-lived result instead. Callers that just mutated the
+// profile and need the fresh value right away (Profile.jsx, AdminPlans.jsx) pass `force: true`.
+export async function getCurrentProfile({ force = false } = {}) {
+  if (force) invalidateRequest(PROFILE_CACHE_KEY)
 
-    return { success: false, status: error.response?.status, error: message }
-  }
+  return dedupeRequest(PROFILE_CACHE_KEY, async () => {
+    try {
+      const { data } = await apiClient.get('/auth/me', {
+        headers: authHeader(),
+      })
+      useAuthStore.getState().setAuthenticatedSession(data)
+      return { success: true, ...data }
+    } catch (error) {
+      if (error.response?.status === 401) useAuthStore.getState().logout()
+      const errorData = error.response?.data
+      const message = formatApiError(
+        errorData?.detail || errorData?.message || errorData?.error || errorData,
+        'Unable to load profile details. Please try again.',
+      )
+
+      return { success: false, status: error.response?.status, error: message }
+    }
+  })
 }
 
 // PATCH /auth/me - every signed-in user's own self-service profile (name/contact/address/
@@ -316,6 +330,9 @@ export async function logout() {
 
     return { success: false, error: message }
   } finally {
+    // Neither cached value may carry over to whoever signs in next on this browser.
+    invalidateRequest(PROFILE_CACHE_KEY)
+    invalidateRequest(UNREAD_COUNT_CACHE_KEY)
     useAuthStore.getState().logout()
   }
 }

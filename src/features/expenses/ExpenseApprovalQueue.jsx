@@ -21,6 +21,7 @@ import {
 import { formatCurrency, formatDate } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
 import ReimburseExpenseModal from './ReimburseExpenseModal'
+import ExpenseDetailModal from './ExpenseDetailModal'
 
 const STATUS_VARIANT = { Approved: 'success', Pending: 'warning', Rejected: 'danger', 'Clarification Required': 'info' }
 const PAYMENT_MODES = ['Cash', 'UPI', 'Card', 'Bank Transfer']
@@ -44,6 +45,7 @@ export default function ExpenseApprovalQueue() {
   const [demoReimburseTarget, setDemoReimburseTarget] = useState(null)
   const [demoReimburseMode, setDemoReimburseMode] = useState('Bank Transfer')
   const [isActing, setIsActing] = useState(false)
+  const [detailTarget, setDetailTarget] = useState(null)
 
   const loadExpenses = useCallback(async () => {
     setIsLoading(true)
@@ -228,6 +230,7 @@ export default function ExpenseApprovalQueue() {
           data={rows}
           searchKeys={['expenseNumber', 'expenseId', 'category', 'description', 'submittedByName']}
           searchPlaceholder="Search expenses..."
+          onRowClick={(row) => setDetailTarget(row)}
           emptyTitle={
             tab === 'review'
               ? 'No expenses waiting for approval.'
@@ -308,6 +311,21 @@ export default function ExpenseApprovalQueue() {
       </Modal>
 
       <ReimburseExpenseModal expense={reimburseTarget} onClose={() => setReimburseTarget(null)} onReimbursed={handleReimbursed} />
+
+      <ExpenseDetailModal
+        expense={detailTarget}
+        onClose={() => setDetailTarget(null)}
+        canApprove={canApprove}
+        isActing={isActing}
+        onApprove={(row) => handleApprove(row)}
+        onRequestClarification={(row) => { setDetailTarget(null); setReviewReason(''); setReviewTarget({ row, mode: 'clarify' }) }}
+        onReject={(row) => { setDetailTarget(null); setReviewReason(''); setReviewTarget({ row, mode: 'reject' }) }}
+        onReimburse={(row) => {
+          setDetailTarget(null)
+          if (DEMO_EXPENSES_ENABLED) { setDemoReimburseMode('Bank Transfer'); setDemoReimburseTarget(row) }
+          else setReimburseTarget(row)
+        }}
+      />
     </div>
   )
 }

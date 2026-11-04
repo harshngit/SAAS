@@ -353,6 +353,7 @@ export const roleMenus = {
         // Delivery Day-End workflow below. Route/component/API are untouched, just hidden from nav.
         { label: 'Day-End Approvals', path: '/accounts/day-end-approvals', icon: HandCoins, module: 'payments' },
         { label: 'Expense Approval', path: '/accounts/expenses/approval', icon: Receipt, module: 'expenses', action: 'approve', feature: ENTITLEMENT_KEYS.FINANCE_EXPENSES },
+        { label: 'My Expenses', path: '/accounts/expenses', icon: Receipt, module: 'expenses', feature: ENTITLEMENT_KEYS.FINANCE_EXPENSES },
         { label: 'Leaves', path: '/accounts/leaves', icon: CalendarClock, module: 'leaves', feature: ENTITLEMENT_KEYS.EMPLOYEE_LEAVES },
         { label: 'GST Summary', path: '/accounts/gst', icon: FileCheck, module: 'gst', feature: ENTITLEMENT_KEYS.REPORT_GST_FILING },
         { label: 'Financial Reports', path: '/accounts/reports', icon: FileSpreadsheet, module: 'reports', feature: ENTITLEMENT_KEYS.FINANCE_REPORTS },

@@ -314,7 +314,7 @@ export default function Profile() {
     }
 
     setPhotoLoadFailed(false)
-    await getCurrentProfile()
+    await getCurrentProfile({ force: true })
     setIsUploadingPhoto(false)
     showToast({ title: 'Photo updated', message: 'Your profile photo has been changed.' })
   }
@@ -328,7 +328,7 @@ export default function Profile() {
       showToast({ title: 'Could not remove photo', message: result.error, variant: 'error' })
       return
     }
-    await getCurrentProfile()
+    await getCurrentProfile({ force: true })
     setIsUploadingPhoto(false)
     showToast({ title: 'Photo removed' })
   }
@@ -348,7 +348,7 @@ export default function Profile() {
       setPhoneError(result.fieldErrors?.phone || result.error)
       return
     }
-    const profile = await getCurrentProfile()
+    const profile = await getCurrentProfile({ force: true })
     setSavingPhone(false)
     if (!profile.success) { setPhoneError(profile.error); return }
     setEditingPhone(false)
@@ -389,7 +389,7 @@ export default function Profile() {
       return
     }
 
-    const profile = await getCurrentProfile()
+    const profile = await getCurrentProfile({ force: true })
     setSavingDetails(false)
     if (!profile.success) {
       showToast({ title: 'Saved, but could not refresh profile', message: profile.error, variant: 'error' })

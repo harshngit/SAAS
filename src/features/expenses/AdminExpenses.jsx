@@ -1,9 +1,12 @@
+import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
+import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { ListOverview, ListSummary, ListDataTable as DataTable, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Receipt, Clock, CheckCircle2, XCircle, Check, Wallet, Eye, HelpCircle } from 'lucide-react'
+import { Receipt, Clock, CheckCircle2, XCircle, Check, Wallet, Eye, HelpCircle, Plus, Upload } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
@@ -11,22 +14,33 @@ import ListFilterPanel from '../../components/ui/ListFilterPanel'
 import { usePermission } from '../../auth/usePermission'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { uniqueOptions } from '../../utils/filterOptions'
-import { approveExpense, listExpenses, rejectExpense, requestExpenseClarification } from '../../api/expenses'
+import {
+  approveExpense,
+  createExpense,
+  getExpenseCategories,
+  listExpenses,
+  rejectExpense,
+  requestExpenseClarification,
+  uploadExpenseReceipt,
+} from '../../api/expenses'
 import {
   DEMO_EXPENSES_ENABLED,
+  DEMO_EXPENSE_CATEGORIES,
   demoExpensesResolved,
   simulateDemoApproveExpense,
   simulateDemoClarifyExpense,
+  simulateDemoCreateExpense,
   simulateDemoReimburseExpense,
   simulateDemoRejectExpense,
 } from './expenseDemo'
-import { formatCurrency, formatDate, formatDateTime } from '../../utils/format'
+import { formatCurrency, formatDate } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
-import ExpenseProof from './ExpenseProof'
-import ExpenseHistory from './ExpenseHistory'
 import ReimburseExpenseModal from './ReimburseExpenseModal'
+import ExpenseDetailModal from './ExpenseDetailModal'
 
 const PAYMENT_MODES = ['Cash', 'UPI', 'Card', 'Bank Transfer']
+const todayIso = () => new Date().toISOString().slice(0, 10)
+const emptyForm = () => ({ category: '', description: '', amount: '', expenseDate: todayIso(), paymentMode: '' })
 
 // lifecycleStatus (new source of truth) drives the displayed status; this falls back to the
 // old inference only for rows that somehow don't carry it yet.
@@ -57,6 +71,8 @@ export default function AdminExpenses() {
   const { showToast } = useToast()
   const { can } = usePermission()
   const canApprove = can('expenses', 'approve')
+  const canCreate = can('expenses', 'create')
+  const { visible: fieldVisible } = useFormFieldSettings('expense')
 
   const [expenseList, setExpenseList] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -86,6 +102,14 @@ export default function AdminExpenses() {
   const [detailTarget, setDetailTarget] = useState(null)
   const [isActing, setIsActing] = useState(false)
 
+  const [categories, setCategories] = useState([])
+  const [categoryNotice, setCategoryNotice] = useState('')
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [formData, setFormData] = useState(emptyForm)
+  const [receiptFile, setReceiptFile] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
+
   const loadExpenses = useCallback(async () => {
     setIsLoading(true)
     setError('')
@@ -109,7 +133,94 @@ export default function AdminExpenses() {
     loadExpenses()
   }, [loadExpenses])
 
+  // Categories are only needed once Add Expense is actually used - fetched the same way
+  // MyExpenses.jsx does it (demo categories in demo mode, real API otherwise, no demo fallback
+  // for a real-mode failure).
+  useEffect(() => {
+    if (DEMO_EXPENSES_ENABLED) {
+      setCategories(DEMO_EXPENSE_CATEGORIES)
+      setCategoryNotice('')
+      return
+    }
+    getExpenseCategories().then((result) => {
+      if (!result.success) {
+        setCategories([])
+        setCategoryNotice(result.error)
+        return
+      }
+      if (result.categories.length === 0) {
+        setCategories([])
+        setCategoryNotice('Expense categories are not available. Please try again later.')
+        return
+      }
+      setCategories(result.categories)
+      setCategoryNotice('')
+    })
+  }, [])
+
   const replace = (updated) => setExpenseList((list) => list.map((e) => (e.id === updated.id ? updated : e)))
+
+  const openAddForm = () => {
+    setFormData(emptyForm())
+    setReceiptFile(null)
+    setFormError('')
+    setShowAddForm(true)
+  }
+
+  // Admin-created expenses come back from the backend already approved (the Admin is the
+  // approver, so there is no one else to review it) - the toast reflects whatever lifecycleStatus
+  // the create response actually carries rather than assuming it, so this stays correct even if
+  // that backend rule ever changes.
+  const handleAddExpense = async (event) => {
+    event.preventDefault()
+    const amount = Math.round(Number(formData.amount))
+    if (!formData.category) return setFormError('Choose an expense category.')
+    if (!(amount > 0)) return setFormError('Enter an amount greater than zero.')
+    if (fieldVisible('expenseDate') && !formData.expenseDate) return setFormError('Choose the expense date.')
+    if (fieldVisible('expenseDate') && formData.expenseDate > todayIso()) return setFormError('The expense date cannot be in the future.')
+    if (fieldVisible('description') && !formData.description.trim()) return setFormError('Add a short description of the expense.')
+
+    setIsSubmitting(true)
+    setFormError('')
+
+    if (DEMO_EXPENSES_ENABLED) {
+      simulateDemoCreateExpense({ ...formData, amount, hasReceipt: Boolean(receiptFile) })
+      setExpenseList(demoExpensesResolved())
+      setIsSubmitting(false)
+      setShowAddForm(false)
+      showToast({ title: 'Expense added', message: 'The expense has been recorded.' })
+      return
+    }
+
+    if (categories.length === 0) {
+      setFormError('Expense categories are not available yet — cannot submit.')
+      setIsSubmitting(false)
+      return
+    }
+
+    const result = await createExpense({
+      category: formData.category,
+      description: formData.description,
+      amount,
+      expenseDate: formData.expenseDate,
+      paymentMode: formData.paymentMode,
+    })
+    if (!result.success) {
+      setFormError(result.error)
+      setIsSubmitting(false)
+      return
+    }
+
+    if (receiptFile) await uploadExpenseReceipt(result.expense.id, receiptFile)
+
+    setIsSubmitting(false)
+    setShowAddForm(false)
+    showToast({
+      title: 'Expense added',
+      message: result.expense.lifecycleStatus === 'approved' ? 'Added and approved.' : 'The expense has been recorded.',
+    })
+    loadExpenses()
+  }
 
   const handleApprove = async (row) => {
     setIsActing(true)
@@ -212,8 +323,14 @@ export default function AdminExpenses() {
 
   return (
     <div className="listing-page space-y-4">
-      <div>
+      <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Expenses</h1>
+        {canCreate && (
+          <Button type="button" onClick={openAddForm}>
+            <Plus className="size-4" aria-hidden="true" />
+            Add Expense
+          </Button>
+        )}
       </div>
 
       <ListOverview>
@@ -348,64 +465,86 @@ export default function AdminExpenses() {
 
       <ReimburseExpenseModal expense={reimburseTarget} onClose={() => setReimburseTarget(null)} onReimbursed={handleReimbursed} />
 
-      <ExpenseDetailModal expense={detailTarget} onClose={() => setDetailTarget(null)} />
-    </div>
-  )
-}
+      <ExpenseDetailModal
+        expense={detailTarget}
+        onClose={() => setDetailTarget(null)}
+        canApprove={canApprove}
+        isActing={isActing}
+        onApprove={(row) => handleApprove(row)}
+        onRequestClarification={(row) => { setDetailTarget(null); setReviewReason(''); setReviewTarget({ row, mode: 'clarify' }) }}
+        onReject={(row) => { setDetailTarget(null); setReviewReason(''); setReviewTarget({ row, mode: 'reject' }) }}
+        onReimburse={(row) => {
+          setDetailTarget(null)
+          if (DEMO_EXPENSES_ENABLED) { setDemoReimburseMode('Bank Transfer'); setDemoReimburseTarget(row) }
+          else setReimburseTarget(row)
+        }}
+      />
 
-function ExpenseDetailModal({ expense, onClose }) {
-  return (
-    <Modal isOpen={Boolean(expense)} onClose={onClose} title="Expense" size="lg">
-      {expense && (
-        <div className="space-y-4 text-sm">
-          <div className="grid grid-cols-2 gap-3">
-            <DField label="Expense #" value={expense.expenseNumber || expense.expenseId || '—'} />
-            <DField label="Status" value={<Badge variant={STATUS_VARIANT[effectiveStatus(expense)] || 'neutral'} dot>{effectiveStatus(expense)}</Badge>} />
-            <DField label="Category" value={expense.category || '—'} />
-            <DField label="Amount" value={formatCurrency(expense.amount)} />
-            <DField label="Expense Date" value={formatDate(expense.expenseDate)} />
-            <DField label="Payment Mode" value={expense.paymentMode || '—'} />
-            <DField label="Submitted By" value={expense.submittedByName || '—'} />
-            <DField label="Submitted On" value={formatDate(expense.createdAt)} />
-          </div>
-          <DField label="Description" value={expense.description || '—'} />
-          <div>
-            <p className="text-[0.7rem] text-neutral-400">Proof</p>
-            {expense.receiptUrl ? <div className="mt-1"><ExpenseProof expense={expense} /></div> : <p className="font-medium text-neutral-900">No receipt</p>}
-          </div>
-          {expense.lifecycleStatus === 'reimbursed' && (
-            <div className="grid grid-cols-2 gap-3 rounded-xl border border-primary-100 bg-primary-50/60 p-3.5">
-              <DField label="Reimbursed By" value={expense.reimbursedBy || '—'} />
-              <DField label="Reimbursed On" value={expense.reimbursedAt ? formatDateTime(expense.reimbursedAt) : '—'} />
-              <DField label="Method" value={expense.reimbursementMethod || '—'} />
-              <DField label="Reference" value={expense.reimbursementReference || '—'} />
-              {expense.reimbursementNotes && <DField label="Notes" value={expense.reimbursementNotes} />}
-            </div>
+      {/* Add Expense - create-only (no clarification/resubmit flow here, that's the
+          submitter's own MyExpenses.jsx). Admin-created expenses come back already approved
+          per the backend's own rule - this form never assumes that, it just shows whatever
+          lifecycleStatus the create response actually returns. */}
+      <Modal isOpen={showAddForm} onClose={() => { if (!isSubmitting) setShowAddForm(false) }} title="Add Expense">
+        <form onSubmit={handleAddExpense} className="space-y-4">
+          {formError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
+          {!DEMO_EXPENSES_ENABLED && categoryNotice && (
+            <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">{categoryNotice}</div>
           )}
-          {(expense.approvalStatus === 'Rejected' || expense.approvalStatus === 'Clarification Required') && expense.rejectReason && (
-            <div className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
-              <span className="font-semibold">{expense.approvalStatus === 'Rejected' ? 'Rejection reason:' : 'Clarification requested:'}</span>{' '}
-              {expense.rejectReason}
-            </div>
-          )}
-          <div className="border-t border-neutral-100 pt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">History</p>
-            <ExpenseHistory expense={expense} />
+          <ConfiguredField module="expense" name="category"><Select
+            label="Expense Category"
+            value={formData.category}
+            onChange={(e) => setFormData((c) => ({ ...c, category: e.target.value }))}
+            options={categories.map((cat) => ({ value: cat, label: cat }))}
+            disabled={!DEMO_EXPENSES_ENABLED && categories.length === 0}
+            required
+          /></ConfiguredField>
+          <div className="grid grid-cols-2 gap-4">
+            <ConfiguredField module="expense" name="amount"><Input
+              label="Amount (₹)"
+              type="number"
+              min="1"
+              step="1"
+              value={formData.amount}
+              onChange={(e) => setFormData((c) => ({ ...c, amount: e.target.value }))}
+              required
+            /></ConfiguredField>
+            <ConfiguredField module="expense" name="expenseDate"><Input
+              label="Expense Date"
+              type="date"
+              max={todayIso()}
+              value={formData.expenseDate}
+              onChange={(e) => setFormData((c) => ({ ...c, expenseDate: e.target.value }))}
+              required
+            /></ConfiguredField>
           </div>
-          <p className="rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
-            Expense reimbursement is separate from Supplier / Customer payments and does not change inventory.
-          </p>
-        </div>
-      )}
-    </Modal>
-  )
-}
-
-function DField({ label, value }) {
-  return (
-    <div>
-      <p className="text-[0.7rem] text-neutral-400">{label}</p>
-      <div className="font-medium text-neutral-900">{value}</div>
+          <ConfiguredField module="expense" name="paymentMode"><Select
+            label="Payment Mode"
+            value={formData.paymentMode}
+            onChange={(e) => setFormData((c) => ({ ...c, paymentMode: e.target.value }))}
+            options={PAYMENT_MODES.map((m) => ({ value: m, label: m }))}
+          /></ConfiguredField>
+          <ConfiguredField module="expense" name="description"><Input
+            label="Description / Purpose"
+            as="textarea"
+            value={formData.description}
+            onChange={(e) => setFormData((c) => ({ ...c, description: e.target.value }))}
+            placeholder="What was this expense for?"
+            required
+          /></ConfiguredField>
+          <ConfiguredField module="expense" name="receiptUrl"><div>
+            <label className="mb-1 block text-sm font-medium text-fg">Receipt / Proof (optional)</label>
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-300 p-4 text-center transition-colors hover:border-primary-500">
+              <Upload className="size-7 text-neutral-400" aria-hidden="true" />
+              <p className="text-sm text-neutral-500">{receiptFile ? receiptFile.name : 'Click to upload an image or PDF'}</p>
+              <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => setReceiptFile(e.target.files?.[0] || null)} />
+            </label>
+          </div></ConfiguredField>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setShowAddForm(false)} disabled={isSubmitting}>Cancel</Button>
+            <Button type="submit" loading={isSubmitting} disabled={!DEMO_EXPENSES_ENABLED && categories.length === 0}>Add Expense</Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

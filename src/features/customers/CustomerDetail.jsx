@@ -436,7 +436,7 @@ export default function CustomerDetail() {
         getCustomerPayments(id),
         listCollections({ customer_id: id }),
         usersPromise,
-        listOrders({ customer_id: id }),
+        listOrders({ customer_id: id, page_size: 100 }),
         getCustomerAccountStatement(id),
         listCustomerDocuments(id),
       ])

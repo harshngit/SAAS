@@ -1,5 +1,8 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { dedupeRequest, invalidateRequest } from '../utils/requestCache'
+
+export const UNREAD_COUNT_CACHE_KEY = 'notifications:unread-count'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -98,22 +101,28 @@ export async function listNotifications(params = {}) {
   }
 }
 
+// Deduped/cached (20s) - the Topbar poll, and anything else that checks the unread count, share
+// one in-flight request/result instead of each firing its own. Short staleTime relative to the
+// 60s poll interval - this only absorbs bursts of near-simultaneous calls, it doesn't replace
+// the poll's own cadence.
 export async function getUnreadNotificationCount() {
-  try {
-    const { data } = await apiClient.get('/notifications/unread-count', {
-      headers: authHeader(),
-    })
+  return dedupeRequest(UNREAD_COUNT_CACHE_KEY, async () => {
+    try {
+      const { data } = await apiClient.get('/notifications/unread-count', {
+        headers: authHeader(),
+      })
 
-    return { success: true, unread: data?.unread ?? 0 }
-  } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to load unread notification count.',
-    )
+      return { success: true, unread: data?.unread ?? 0 }
+    } catch (error) {
+      const errorData = error.response?.data
+      const message = formatApiError(
+        errorData?.detail || errorData?.message || errorData?.error || errorData,
+        'Unable to load unread notification count.',
+      )
 
-    return { success: false, error: message, status: error.response?.status }
-  }
+      return { success: false, error: message, status: error.response?.status }
+    }
+  }, { staleTime: 20000 })
 }
 
 export async function markNotificationRead(notificationId) {
@@ -122,6 +131,10 @@ export async function markNotificationRead(notificationId) {
       headers: authHeader(),
     })
 
+    // The cached unread-count is now stale (one fewer unread) - clear it so the next read
+    // (Topbar's own optimistic update covers the visible badge immediately; this just stops a
+    // DIFFERENT caller from reading the stale cached number back for up to 20s) gets a real one.
+    invalidateRequest(UNREAD_COUNT_CACHE_KEY)
     return { success: true, notification: normalizeNotification(data) }
   } catch (error) {
     const errorData = error.response?.data
@@ -140,6 +153,7 @@ export async function markAllNotificationsRead() {
       headers: authHeader(),
     })
 
+    invalidateRequest(UNREAD_COUNT_CACHE_KEY)
     return { success: true, detail: data?.detail || '' }
   } catch (error) {
     const errorData = error.response?.data
@@ -157,9 +171,14 @@ export async function markAllNotificationsRead() {
 export async function deleteNotification(notificationId) {
   try {
     await apiClient.delete(`/notifications/${notificationId}`, { headers: authHeader() })
+    // The deleted row might have been unread - the cached count can't be trusted anymore.
+    invalidateRequest(UNREAD_COUNT_CACHE_KEY)
     return { success: true }
   } catch (error) {
-    if (error.response?.status === 404) return { success: true }
+    if (error.response?.status === 404) {
+      invalidateRequest(UNREAD_COUNT_CACHE_KEY)
+      return { success: true }
+    }
     const errorData = error.response?.data
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
@@ -173,6 +192,7 @@ export async function deleteNotification(notificationId) {
 export async function bulkDeleteNotifications(notificationIds) {
   try {
     await apiClient.post('/notifications/bulk-delete', { ids: notificationIds }, { headers: authHeader() })
+    invalidateRequest(UNREAD_COUNT_CACHE_KEY)
     return { success: true }
   } catch (error) {
     const errorData = error.response?.data
@@ -188,6 +208,7 @@ export async function bulkDeleteNotifications(notificationIds) {
 export async function clearReadNotifications() {
   try {
     await apiClient.post('/notifications/clear-read', {}, { headers: authHeader() })
+    invalidateRequest(UNREAD_COUNT_CACHE_KEY)
     return { success: true }
   } catch (error) {
     const errorData = error.response?.data

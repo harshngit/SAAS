@@ -185,7 +185,7 @@ export default function SalesOfficerDashboard() {
         ]
       : await Promise.all([
           listCustomers(),
-          listOrders(),
+          listOrders({ page_size: 100 }),
           listQuotations(),
           currentUser?.id ? listVisits({ userId: currentUser.id }) : listVisits(),
         ])

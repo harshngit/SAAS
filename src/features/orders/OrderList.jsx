@@ -1,5 +1,5 @@
-import { SkeletonValue } from '../../components/ui/Skeleton'
 import { loadSummaryRows } from '../../utils/listSummary'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -18,12 +18,13 @@ import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { RequirePermission } from '../../auth/RequirePermission'
+import { useToast } from '../../components/ui/toastContext'
 import { deleteOrder, listOrders } from '../../api/orders'
+import { listCustomers } from '../../api/customers'
 import { exportRowsToExcel } from '../../utils/exportToExcel'
 import { listDeliveryPartners } from '../../api/deliveries'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
-import { uniqueOptions } from '../../utils/filterOptions'
 import {
   ORDER_SOURCE_OPTIONS,
   ORDER_STATUS_VARIANT,
@@ -47,44 +48,68 @@ const formatDate = (value) => {
   }
 }
 
-function OrderSummaryCard({ label, value, detail, index, loading }) {
+const PAGE_SIZE_OPTIONS = [{ value: '20', label: '20' }, { value: '25', label: '25' }, { value: '50', label: '50' }]
+
+function OrderSummaryCard({ label, value, detail, index }) {
   return (
     <div className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-medium text-fg-muted">{label}</p>
         <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted" aria-hidden="true"><MoreHorizontal className="size-4" /></span>
       </div>
-      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={loading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
-      <p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={loading} className="h-3 w-28">{detail}</SkeletonValue></p>
+      <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg">{value}</p>
+      <p className="mt-2 text-xs font-medium text-neutral-400">{detail}</p>
     </div>
   )
 }
 
+function buildExportRows(list) {
+  return [
+    ['Order Number', 'Customer', 'Order Date', 'Items', 'Total', 'Order Status', 'Payment Status', 'Fulfilment', 'Delivery Partner', 'Source'],
+    ...list.map((order) => [
+      order.orderNumber,
+      order.customerName,
+      formatDate(order.orderDate),
+      order.items.length,
+      formatCurrency(order.total),
+      formatOrderStatus(order.status),
+      formatPaymentStatus(order.paymentStatus),
+      getFulfilmentLabel(order),
+      order.assignedDeliveryPartnerName || 'Unassigned',
+      order.quotationId ? 'Quotation' : 'Direct',
+    ]),
+  ]
+}
+
 export default function OrderList() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const isSalesPath = window.location.pathname.startsWith('/sales')
   const basePath = isSalesPath ? '/sales/orders' : window.location.pathname.startsWith('/delivery') ? '/delivery/orders' : '/admin/orders'
   const quotationsBasePath = isSalesPath ? '/sales/quotations' : '/admin/quotations'
 
   const [orders, setOrders] = useState([])
-  const [summaryOrders, setSummaryOrders] = useState([])
-  const updateOrders = (updater) => {
-    setOrders(updater)
-    setSummaryOrders(updater)
-  }
+  const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [deliveryPartners, setDeliveryPartners] = useState([])
+  const [customers, setCustomers] = useState([])
 
   const [statusTab, setStatusTab] = useState('all')
   const [deliveryPartnerFilter, setDeliveryPartnerFilter] = useState('all')
+  // Source and Order Date aren't filterable server-side (GET /orders only supports status,
+  // fulfilment_status, customer_id, assigned_delivery_partner_id, search) - applied client-side
+  // on top of whichever page is currently loaded, not across the whole dataset. The "page-local
+  // filter" note in the filter panel and the Showing-count below are both honest about that
+  // rather than presenting a partial result as if it were the full matching set.
   const [sourceFilter, setSourceFilter] = useState('all')
-  const [customerFilter, setCustomerFilter] = useState('all')
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const [customerFilter, setCustomerFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
-  const [pageSize, setPageSize] = useState('10')
+  const debouncedSearch = useDebouncedValue(searchTerm, 350)
+  const [pageSize, setPageSize] = useState('20')
   const [page, setPage] = useState(1)
   const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
 
@@ -98,33 +123,63 @@ export default function OrderList() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [isExporting, setIsExporting] = useState(false)
 
+  const pageLocalFiltersActive = sourceFilter !== 'all' || datePreset !== 'all'
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
+  const serverParams = useMemo(() => {
+    const tab = ORDER_TABS.find((t) => t.value === statusTab)
+    return {
+      ...(tab?.apiStatus ? { status: tab.apiStatus } : {}),
+      ...(deliveryPartnerFilter !== 'all' ? { assigned_delivery_partner_id: deliveryPartnerFilter } : {}),
+      ...(customerFilter !== 'all' ? { customer_id: customerFilter } : {}),
+      ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+      ...sortParams,
+    }
+  }, [statusTab, deliveryPartnerFilter, customerFilter, debouncedSearch, sortParams])
+
+  // One list call per page load - the KPI cards above no longer walk every page just to compute
+  // Total/Draft/Confirmed/Order Value (that was a second heavy call on top of this one). They
+  // show a placeholder until a backend summary endpoint exists; see the cards below.
   const loadOrders = useCallback(async () => {
     setIsLoading(true)
     setListError('')
 
-    const [result, summaryResult] = await Promise.all([
-      listOrders(sortParams),
-      loadSummaryRows(listOrders, 'orders'),
-    ])
-    const demoRows = DEMO_ORDERS_ENABLED ? demoOrdersResolved() : []
-    if (summaryResult.success) setSummaryOrders([...summaryResult.orders, ...demoRows])
+    const result = await listOrders({ page, page_size: Number(pageSize), ...serverParams })
+    const demoRows = DEMO_ORDERS_ENABLED && page === 1 ? demoOrdersResolved() : []
 
     if (!result.success) {
       setOrders(demoRows)
-      if (!summaryResult.success) setSummaryOrders((current) => current.length ? current : demoRows)
+      setTotal(demoRows.length)
       setListError(demoRows.length ? '' : result.error)
       setIsLoading(false)
       return
     }
 
-    setOrders([...result.orders, ...demoRows])
+    setOrders([...demoRows, ...result.orders])
+    setTotal(result.total)
     setIsLoading(false)
-  }, [sortParams])
+  }, [page, pageSize, serverParams])
 
   useEffect(() => {
     loadOrders()
   }, [loadOrders])
+
+  // A debounced search change resets to page 1 the same way every other filter's onChange
+  // already does inline below - this one can't do it inline since it only "settles" after the
+  // debounce, not on every keystroke.
+  useEffect(() => {
+    setPage(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch])
+
+  // Selections are tied to currently-visible rows - once the page or any filter changes those
+  // exact rows are no longer loaded, so a stale selected id would have no way to be shown or
+  // exported.
+  useEffect(() => {
+    setSelectedIds([])
+  }, [page, pageSize, statusTab, deliveryPartnerFilter, customerFilter, debouncedSearch])
 
   useEffect(() => {
     let isMounted = true
@@ -135,71 +190,73 @@ export default function OrderList() {
     return () => { isMounted = false }
   }, [])
 
+  // Capped at the backend's own page_size max (same tradeoff already accepted for the Admin
+  // Dashboard's scope filters) - an org with more than 100 customers only sees the first 100
+  // here, not a search-as-you-type picker.
+  useEffect(() => {
+    let isMounted = true
+    listCustomers({ page_size: 100 }).then((result) => {
+      if (!isMounted || !result.success) return
+      setCustomers(result.customers)
+    })
+    return () => { isMounted = false }
+  }, [])
+
   const deliveryPartnerOptions = useMemo(
     () => [{ value: 'all', label: 'All delivery partners' }, ...deliveryPartners.map((partner) => ({ value: partner.id, label: partner.name }))],
     [deliveryPartners],
   )
-
-  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
-  const customerOptions = useMemo(() => uniqueOptions(orders, 'customerName', 'All customers'), [orders])
-
-  const filteredOrders = useMemo(() => {
-    const search = searchTerm.trim().toLowerCase()
-    const tab = ORDER_TABS.find((t) => t.value === statusTab)
-    return orders.filter((order) => {
-      if (tab?.apiStatus && order.status !== tab.apiStatus) return false
-      if (deliveryPartnerFilter !== 'all' && order.assignedDeliveryPartnerId !== deliveryPartnerFilter) return false
-      if (sourceFilter === 'direct' && order.quotationId) return false
-      if (sourceFilter === 'quotation' && !order.quotationId) return false
-      if (customerFilter !== 'all' && order.customerName !== customerFilter) return false
-      if (!isWithinDateRange(order.orderDate, dateFrom, dateTo)) return false
-      if (search && ![order.orderNumber, order.customerName].filter(Boolean).some((v) => String(v).toLowerCase().includes(search))) return false
-      return true
-    })
-  }, [orders, statusTab, deliveryPartnerFilter, sourceFilter, customerFilter, dateFrom, dateTo, searchTerm])
-
-  const stats = useMemo(
-    () => ({
-      total: summaryOrders.length,
-      draft: summaryOrders.filter((o) => o.status === 'draft').length,
-      confirmed: summaryOrders.filter((o) => o.status === 'confirmed').length,
-      cancelled: summaryOrders.filter((o) => o.status === 'cancelled').length,
-      value: summaryOrders.filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + o.total, 0),
-    }),
-    [summaryOrders],
+  const customerOptions = useMemo(
+    () => [{ value: 'all', label: 'All customers' }, ...customers.map((customer) => ({ value: customer.id, label: customer.name || customer.businessName || customer.id }))],
+    [customers],
   )
 
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / Number(pageSize)))
+  const visibleOrders = useMemo(() => {
+    if (!pageLocalFiltersActive) return orders
+    return orders.filter((order) => {
+      if (sourceFilter === 'direct' && order.quotationId) return false
+      if (sourceFilter === 'quotation' && !order.quotationId) return false
+      if (!isWithinDateRange(order.orderDate, dateFrom, dateTo)) return false
+      return true
+    })
+  }, [orders, pageLocalFiltersActive, sourceFilter, dateFrom, dateTo])
+
+  const totalPages = Math.max(1, Math.ceil(total / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
-  const paginatedOrders = filteredOrders.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize))
-  const rangeStart = filteredOrders.length === 0 ? 0 : (currentPage - 1) * Number(pageSize) + 1
-  const rangeEnd = Math.min(filteredOrders.length, currentPage * Number(pageSize))
-  const allVisibleSelected = paginatedOrders.length > 0 && paginatedOrders.every((order) => selectedIds.includes(order.id))
+  const rangeStart = total === 0 ? 0 : (currentPage - 1) * Number(pageSize) + 1
+  const rangeEnd = Math.min(total, currentPage * Number(pageSize))
+  const allVisibleSelected = visibleOrders.length > 0 && visibleOrders.every((order) => selectedIds.includes(order.id))
 
   const toggleAllVisible = () => {
     setSelectedIds((current) => allVisibleSelected
-      ? current.filter((id) => !paginatedOrders.some((order) => order.id === id))
-      : [...new Set([...current, ...paginatedOrders.map((order) => order.id)])])
+      ? current.filter((id) => !visibleOrders.some((order) => order.id === id))
+      : [...new Set([...current, ...visibleOrders.map((order) => order.id)])])
   }
 
-  const exportOrders = (onlySelected = false) => {
-    const ordersToExport = onlySelected ? filteredOrders.filter((order) => selectedIds.includes(order.id)) : filteredOrders
-    const rows = [
-      ['Order Number', 'Customer', 'Order Date', 'Items', 'Total', 'Order Status', 'Payment Status', 'Fulfilment', 'Delivery Partner', 'Source'],
-      ...ordersToExport.map((order) => [
-        order.orderNumber,
-        order.customerName,
-        formatDate(order.orderDate),
-        order.items.length,
-        formatCurrency(order.total),
-        formatOrderStatus(order.status),
-        formatPaymentStatus(order.paymentStatus),
-        getFulfilmentLabel(order),
-        order.assignedDeliveryPartnerName || 'Unassigned',
-        order.quotationId ? 'Quotation' : 'Direct',
-      ]),
-    ]
-    exportRowsToExcel('orders', rows)
+  const exportOrders = async (onlySelected = false) => {
+    if (onlySelected) {
+      exportRowsToExcel('orders', buildExportRows(visibleOrders.filter((order) => selectedIds.includes(order.id))))
+      return
+    }
+
+    // Explicit, user-triggered action - not something that runs on page load. Walks every page
+    // matching the current server-side filters (status/delivery partner/customer/search); the
+    // page-local Source/Order Date filters are re-applied over that full set afterwards.
+    setIsExporting(true)
+    const result = await loadSummaryRows(listOrders, 'orders', serverParams)
+    setIsExporting(false)
+    if (!result.success) {
+      showToast({ title: 'Export failed', message: result.error, variant: 'error' })
+      return
+    }
+    const rows = pageLocalFiltersActive
+      ? result.orders.filter((order) => {
+          if (sourceFilter === 'direct' && order.quotationId) return false
+          if (sourceFilter === 'quotation' && !order.quotationId) return false
+          return isWithinDateRange(order.orderDate, dateFrom, dateTo)
+        })
+      : result.orders
+    exportRowsToExcel('orders', buildExportRows(rows))
   }
 
   const handleDeleteOrder = async (order) => {
@@ -212,7 +269,7 @@ export default function OrderList() {
     setIsDeleting(true)
     setDeleteError('')
     if (isDemoOrder(deleteTarget.id)) {
-      updateOrders((current) => current.filter((item) => item.id !== deleteTarget.id))
+      setOrders((current) => current.filter((item) => item.id !== deleteTarget.id))
       setDeleteTarget(null)
       setIsDeleting(false)
       return
@@ -223,9 +280,11 @@ export default function OrderList() {
       setIsDeleting(false)
       return
     }
-    updateOrders((current) => current.filter((item) => item.id !== deleteTarget.id))
     setDeleteTarget(null)
     setIsDeleting(false)
+    // Reload rather than splice locally - `orders` is exactly one server page now, so deleting a
+    // row needs the next row (if any) pulled in from the server, not just a shorter local array.
+    loadOrders()
   }
 
   return (
@@ -234,12 +293,16 @@ export default function OrderList() {
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Orders</h1>
       </div>
 
+      {/* Total/Draft/Confirmed/Order Value need an org-wide aggregate independent of whatever
+          page/filter is currently loaded - computing that client-side would mean walking every
+          page again (the exact pattern just removed). Placeholder until a backend summary
+          endpoint exists; wiring it in once it does is a small, isolated change here. */}
       <Card className="overflow-hidden p-0">
         <div className="grid grid-cols-2 lg:grid-cols-4">
-          <OrderSummaryCard index={0} label="Total Orders" value={stats.total} detail={`${stats.confirmed} confirmed`} loading={isLoading} />
-          <OrderSummaryCard index={1} label="Draft Orders" value={stats.draft} detail="needs attention" loading={isLoading} />
-          <OrderSummaryCard index={2} label="Confirmed Orders" value={stats.confirmed} detail={`${stats.cancelled} cancelled`} loading={isLoading} />
-          <OrderSummaryCard index={3} label="Order Value" value={formatCurrency(stats.value)} detail="current total" loading={isLoading} />
+          <OrderSummaryCard index={0} label="Total Orders" value="—" detail="Summary endpoint pending" />
+          <OrderSummaryCard index={1} label="Draft Orders" value="—" detail="Summary endpoint pending" />
+          <OrderSummaryCard index={2} label="Confirmed Orders" value="—" detail="Summary endpoint pending" />
+          <OrderSummaryCard index={3} label="Order Value" value="—" detail="Summary endpoint pending" />
         </div>
       </Card>
 
@@ -257,11 +320,11 @@ export default function OrderList() {
         <div className="border-b border-neutral-100 px-5 py-5">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div><h2 className="text-xl font-semibold tracking-tight text-neutral-900">Orders</h2><p className="mt-1 text-xs text-neutral-400">{filteredOrders.length} orders in view</p></div>
+              <div><h2 className="text-xl font-semibold tracking-tight text-neutral-900">Orders</h2><p className="mt-1 text-xs text-neutral-400">{pageLocalFiltersActive ? `${visibleOrders.length} of this page` : `${total} orders`}</p></div>
               <div className="flex flex-wrap items-center justify-end gap-2">
-                <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search orders..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
+                <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search orders..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" aria-hidden="true" />Filter</Button>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportOrders()}><Download className="size-4" aria-hidden="true" />Export</Button>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" loading={isExporting} onClick={() => exportOrders()}><Download className="size-4" aria-hidden="true" />Export</Button>
                 <RequirePermission module="sales_orders" action="create"><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" aria-hidden="true" />Bulk Import</Button></RequirePermission>
                 <RequirePermission module="sales_orders" action="create"><Button size="sm" onClick={() => navigate(`${basePath}/create`)} className="h-9 rounded-2xl px-3.5"><Plus className="size-4" aria-hidden="true" />New Order</Button></RequirePermission>
               </div>
@@ -279,7 +342,7 @@ export default function OrderList() {
             </div>
           ) : isLoading ? (
             <LoadingSpinner variant="table" minWidth="min-w-7xl" columns={["", "Order #", "Customer", "Order Date", "Items", "Total", "Order Status", "Payment", "Fulfilment", "Delivery Status", "Delivery Partner", "Source", "Actions"]} checkboxColumn={0} label="Loading orders..." />
-          ) : paginatedOrders.length === 0 ? (
+          ) : visibleOrders.length === 0 ? (
             <EmptyState icon={ShoppingCart} title="No orders match these filters" description="Try a different tab, source, or delivery partner." />
           ) : (
             <table className="listing-table w-full min-w-7xl text-left text-sm">
@@ -302,7 +365,7 @@ export default function OrderList() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedOrders.map((order) => {
+                {visibleOrders.map((order) => {
                   const delivery = getDeliveryStatus(order)
                   const takeaway = isTakeawayOrder(order)
                   const actions = getOrderActions(order, { invoices: order.invoiceId ? [{ id: order.invoiceId }] : [] })
@@ -397,10 +460,14 @@ export default function OrderList() {
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-4">
           <div className="flex items-center gap-3 text-xs text-fg-muted">
-            <span>Showing <span className="font-semibold text-fg">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-fg">{filteredOrders.length}</span></span>
+            {pageLocalFiltersActive ? (
+              <span>Showing <span className="font-semibold text-fg">{visibleOrders.length}</span> on this page (Source/Order Date filter only the loaded page)</span>
+            ) : (
+              <span>Showing <span className="font-semibold text-fg">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-fg">{total}</span></span>
+            )}
             <span className="hidden text-neutral-300 sm:inline">|</span>
             <label className="flex items-center gap-2">Rows per page
-              <Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" />
+              <Select options={PAGE_SIZE_OPTIONS} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" />
             </label>
           </div>
           <div className="flex items-center gap-1.5">
@@ -437,13 +504,17 @@ export default function OrderList() {
             </div>
             <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Delivery partner<Select options={deliveryPartnerOptions} value={deliveryPartnerFilter} onChange={(event) => { setDeliveryPartnerFilter(event.target.value); setPage(1) }} /></label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Source<Select options={ORDER_SOURCE_OPTIONS} value={sourceFilter} onChange={(event) => { setSourceFilter(event.target.value); setPage(1) }} /></label>
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
                 <Select options={ORDER_TABS.map((tab) => ({ value: tab.value, label: tab.label }))} value={statusTab} onChange={(event) => { setStatusTab(event.target.value); setPage(1) }} />
               </label>
               <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Customer<Select options={customerOptions} value={customerFilter} onChange={(event) => { setCustomerFilter(event.target.value); setPage(1) }} /></label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Order Date
-                <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} />
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+                Source<span className="font-normal text-neutral-400"> (this page only)</span>
+                <Select options={ORDER_SOURCE_OPTIONS} value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+                Order Date<span className="font-normal text-neutral-400"> (this page only)</span>
+                <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
               </label>
             </div>
             <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setDeliveryPartnerFilter('all'); setSourceFilter('all'); setStatusTab('all'); setCustomerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
