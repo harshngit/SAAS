@@ -72,11 +72,7 @@ function SalesInvoicesPanel({ header }) {
     setIsLoading(true)
     setListError('')
 
-    // Demo mode: demo invoices already carry their order number - no real /orders call.
-    const [result, ordersResult] = await Promise.all([
-      listInvoices(),
-      INVOICE_DEMO_ENABLED ? Promise.resolve({ success: false }) : listOrders({ page_size: 100, sort_by: 'created_at', sort_order: 'desc' }),
-    ])
+    const result = await listInvoices()
 
     if (!result.success) {
       setInvoices([])
@@ -86,12 +82,20 @@ function SalesInvoicesPanel({ header }) {
     }
 
     setInvoices(result.invoices)
-    if (ordersResult.success) {
-      setOrderNumbersById(Object.fromEntries(ordersResult.orders.map((order) => [order.id, order.orderNumber])))
-    } else if (INVOICE_DEMO_ENABLED) {
+
+    if (INVOICE_DEMO_ENABLED) {
+      // Demo invoices already carry their order number - no real /orders call.
       setOrderNumbersById(
         Object.fromEntries(result.invoices.filter((invoice) => invoice.orderId).map((invoice) => [invoice.orderId, invoice.orderNumber])),
       )
+    } else if (result.invoices.some((invoice) => invoice.orderId)) {
+      // Only hit /orders when at least one loaded invoice actually links to an order - this
+      // call is a display-only lookup (the "View Order" link's label), so a miss here just
+      // falls back to that generic label instead of the real order number, never wrong data.
+      const ordersResult = await listOrders({ page_size: 50, sort_by: 'created_at', sort_order: 'desc' })
+      if (ordersResult.success) {
+        setOrderNumbersById(Object.fromEntries(ordersResult.orders.map((order) => [order.id, order.orderNumber])))
+      }
     }
     setIsLoading(false)
   }, [])

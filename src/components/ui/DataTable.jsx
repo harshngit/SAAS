@@ -26,6 +26,15 @@ export default function DataTable({
   emptyTitle = 'No records found',
   emptyDescription,
   renderToolbar,
+  // Opt-in server-side pagination: when set, `data` is treated as just the current page
+  // (already fetched at `pageSize` from the server) and is shown as-is instead of being
+  // sliced again client-side. `page`/`totalPages` drive the footer, `onPageChange` requests
+  // a different page from the caller. Every other caller of DataTable is unaffected.
+  serverPagination = false,
+  page: serverPage = 1,
+  totalPages: serverTotalPages = 1,
+  onPageChange,
+  totalCount,
 }) {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState({ key: null, direction: 'asc' })
@@ -51,10 +60,19 @@ export default function DataTable({
     return copy
   }, [filtered, sort])
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize))
-  const currentPage = Math.min(page, totalPages)
-  const paginated = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const totalPages = serverPagination ? Math.max(1, serverTotalPages) : Math.max(1, Math.ceil(sorted.length / pageSize))
+  const currentPage = serverPagination ? serverPage : Math.min(page, totalPages)
+  const paginated = serverPagination ? sorted : sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const resultCount = serverPagination ? (totalCount ?? sorted.length) : sorted.length
   const colSpan = columns.length + (actions ? 1 : 0)
+
+  const goToPage = (updater) => {
+    if (serverPagination) {
+      onPageChange?.(updater(currentPage))
+    } else {
+      setPage(updater)
+    }
+  }
 
   const handleSearchChange = (event) => {
     setSearch(event.target.value)
@@ -74,7 +92,7 @@ export default function DataTable({
 
   return (
     <div>
-      {renderToolbar ? renderToolbar({ search, onSearchChange: handleSearchChange, resultCount: sorted.length, searchable }) : searchable && (
+      {renderToolbar ? renderToolbar({ search, onSearchChange: handleSearchChange, resultCount, searchable }) : searchable && (
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full max-w-xs">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
@@ -171,7 +189,7 @@ export default function DataTable({
             <button
               type="button"
               disabled={currentPage === 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => goToPage((p) => Math.max(1, p - 1))}
               className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent"
               aria-label="Previous page"
             >
@@ -180,7 +198,7 @@ export default function DataTable({
             <button
               type="button"
               disabled={currentPage === totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => goToPage((p) => Math.min(totalPages, p + 1))}
               className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent"
               aria-label="Next page"
             >
