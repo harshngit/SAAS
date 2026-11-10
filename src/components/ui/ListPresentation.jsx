@@ -76,7 +76,9 @@ export function ListTableToolbar({ title, subtitle, search, onSearchChange, sear
               className="h-9 w-full rounded-xl border border-neutral-200 bg-surface py-1.5 pl-9 pr-3 text-xs text-neutral-700 shadow-(--shadow-xs) transition-colors placeholder:text-neutral-400 hover:border-neutral-300 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
           </div>
         )}
-        {actions && <div className="w-full shrink-0 sm:w-44">{actions}</div>}
+        {/* Content-sized, not a fixed width - a single Filter button and a Filter+Add-record
+            button group both need to fit here without wrapping or crowding. */}
+        {actions && <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">{actions}</div>}
       </div>
     </div>
   )

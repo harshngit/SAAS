@@ -22,6 +22,10 @@ const Select = forwardRef(function Select(
     // Lets the user commit whatever they typed as the value even when it matches no option -
     // e.g. a free-text UOM/tag field that also offers common picks. No effect unless searchable.
     creatable = false,
+    // Opt-in: `value`/`onChange` carry an array instead of a single value, the menu stays open
+    // across picks (toggling membership) instead of closing after one, and the trigger shows
+    // "N selected" instead of a single label. Every other Select consumer is unaffected.
+    multiple = false,
     ...rest
   },
   ref,
@@ -31,11 +35,23 @@ const Select = forwardRef(function Select(
   const menuRef = useRef(null)
   const [isOpen, setIsOpen] = useState(false)
   const [menuStyle, setMenuStyle] = useState(null)
-  const [selectedValue, setSelectedValue] = useState(value ?? defaultValue ?? '')
+  const [selectedValue, setSelectedValue] = useState(() => {
+    if (multiple) return Array.isArray(value) ? value : []
+    return value ?? defaultValue ?? ''
+  })
   const [searchQuery, setSearchQuery] = useState('')
-  const selectedOption =
-    options.find((option) => option.value === selectedValue) ||
-    (creatable && selectedValue ? { value: selectedValue, label: selectedValue } : undefined)
+  const selectedOptions = multiple
+    ? options.filter((option) => (Array.isArray(selectedValue) ? selectedValue : []).includes(option.value))
+    : []
+  const selectedOption = multiple
+    ? undefined
+    : options.find((option) => option.value === selectedValue) ||
+      (creatable && selectedValue ? { value: selectedValue, label: selectedValue } : undefined)
+  const multiTriggerLabel = selectedOptions.length === 0
+    ? ''
+    : selectedOptions.length === 1
+      ? selectedOptions[0].label
+      : `${selectedOptions.length} selected`
   const visibleOptions = useMemo(() => {
     if (!searchable) return options
 
@@ -54,18 +70,25 @@ const Select = forwardRef(function Select(
   const menuRowCount = visibleOptions.length + (showCreateOption ? 1 : 0)
 
   useEffect(() => {
-    if (value !== undefined) {
+    if (value === undefined) return
+    if (multiple) {
+      setSelectedValue(Array.isArray(value) ? value : [])
+    } else {
       setSelectedValue(value)
     }
-  }, [value])
+  }, [value, multiple])
 
   // Searchable field text: while CLOSED it mirrors the selected option's label (so the trigger
   // reads like a normal select); while OPEN it is cleared so the user can type a fresh query and
   // the `placeholder` (e.g. "Search customers...") shows instead of the current selection.
   useEffect(() => {
     if (!searchable) return
+    if (multiple) {
+      setSearchQuery(isOpen ? '' : multiTriggerLabel)
+      return
+    }
     setSearchQuery(isOpen ? '' : selectedOption?.label || '')
-  }, [searchable, isOpen, selectedOption?.label])
+  }, [searchable, isOpen, selectedOption?.label, multiple, multiTriggerLabel])
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -119,6 +142,15 @@ const Select = forwardRef(function Select(
   const handleSelect = (nextValue) => {
     if (disabled) return
 
+    if (multiple) {
+      const current = Array.isArray(selectedValue) ? selectedValue : []
+      const nextArray = current.includes(nextValue) ? current.filter((v) => v !== nextValue) : [...current, nextValue]
+      setSelectedValue(nextArray)
+      if (searchable) setSearchQuery('')
+      emitChange(nextArray)
+      return
+    }
+
     setSelectedValue(nextValue)
     const nextOption = options.find((option) => option.value === nextValue)
     if (searchable) {
@@ -135,6 +167,11 @@ const Select = forwardRef(function Select(
       event.preventDefault()
       const trimmedQuery = searchQuery.trim()
       const exactMatch = options.find((option) => option.label.trim().toLowerCase() === trimmedQuery.toLowerCase())
+      if (multiple) {
+        if (exactMatch) handleSelect(exactMatch.value)
+        else if (visibleOptions[0]) handleSelect(visibleOptions[0].value)
+        return
+      }
       if (exactMatch) {
         handleSelect(exactMatch.value)
         return
@@ -215,6 +252,11 @@ const Select = forwardRef(function Select(
                 onBlur?.(event)
                 window.setTimeout(() => {
                   if (!wrapperRef.current?.contains(document.activeElement)) {
+                    if (multiple) {
+                      setSearchQuery(multiTriggerLabel)
+                      setIsOpen(false)
+                      return
+                    }
                     const trimmedQuery = searchQuery.trim()
                     const exactMatch = options.find(
                       (option) => option.label.trim().toLowerCase() === trimmedQuery.toLowerCase(),
@@ -230,7 +272,7 @@ const Select = forwardRef(function Select(
                   }
                 }, 80)
               }}
-              placeholder={isOpen ? placeholder : selectedOption?.label || placeholder}
+              placeholder={isOpen ? placeholder : (multiple ? multiTriggerLabel : selectedOption?.label) || placeholder}
               disabled={disabled}
               className="w-full bg-transparent text-sm text-fg placeholder:text-neutral-400 focus:outline-none"
             />
@@ -256,8 +298,8 @@ const Select = forwardRef(function Select(
                 : 'border-surface-border focus:border-primary-400 focus:ring-primary-500/12'
             } ${disabled ? 'cursor-not-allowed opacity-60' : ''} ${triggerClassName}`}
           >
-            <span className={selectedOption ? 'truncate' : 'truncate text-neutral-400'}>
-              {selectedOption?.label || placeholder}
+            <span className={(multiple ? multiTriggerLabel : selectedOption?.label) ? 'truncate' : 'truncate text-neutral-400'}>
+              {(multiple ? multiTriggerLabel : selectedOption?.label) || placeholder}
             </span>
             <ChevronDown
               className={`size-4 shrink-0 text-neutral-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -288,7 +330,9 @@ const Select = forwardRef(function Select(
             ) : (
               <>
                 {visibleOptions.map((option) => {
-                  const isSelected = option.value === selectedValue
+                  const isSelected = multiple
+                    ? (Array.isArray(selectedValue) ? selectedValue : []).includes(option.value)
+                    : option.value === selectedValue
 
                   return (
                     <div

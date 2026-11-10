@@ -1,5 +1,3 @@
-import { Droplet } from 'lucide-react'
-
 export default function AuthShowcase() {
   return (
     <aside className="relative hidden min-h-0 w-1/2 overflow-hidden rounded-2xl border border-neutral-200 bg-surface shadow-(--shadow-popover) lg:block">
@@ -13,10 +11,7 @@ export default function AuthShowcase() {
 
       <div className="relative flex h-full flex-col justify-between p-8 xl:p-10">
         <div className="flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-linear-to-br from-primary-500 to-primary-700 text-white shadow-(--shadow-glow-primary)">
-            <Droplet className="size-5" />
-          </div>
-          <span className="font-(--font-display) text-lg font-semibold tracking-tight text-neutral-900">Beas Suite</span>
+          <img src="/image/sass-logo.png" alt="Beas Suite" className="h-20 w-auto object-contain" />
         </div>
       </div>
     </aside>

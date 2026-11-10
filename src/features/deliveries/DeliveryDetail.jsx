@@ -1146,7 +1146,7 @@ export default function DeliveryDetail() {
                   <p className="text-sm text-neutral-500">Planned Qty: {item.plannedQuantity}</p>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-neutral-500">Picked Qty</label>
+                  <label className="text-sm font-medium text-neutral-700">Picked Qty</label>
                   <NumericInput
                     type="number"
                     min="0"

@@ -17,6 +17,7 @@ import { uniqueOptions } from '../../utils/filterOptions'
 import {
   approveExpense,
   createExpense,
+  deleteExpense,
   getExpenseCategories,
   listExpenses,
   rejectExpense,
@@ -28,6 +29,7 @@ import {
   DEMO_EXPENSE_CATEGORIES,
   demoExpensesResolved,
   simulateDemoApproveExpense,
+  simulateDemoCancelExpense,
   simulateDemoClarifyExpense,
   simulateDemoCreateExpense,
   simulateDemoReimburseExpense,
@@ -35,6 +37,7 @@ import {
 } from './expenseDemo'
 import { formatCurrency, formatDate } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
+import { useAuthStore } from '../../store/authStore'
 import ReimburseExpenseModal from './ReimburseExpenseModal'
 import ExpenseDetailModal from './ExpenseDetailModal'
 
@@ -70,6 +73,7 @@ const FILTERS = [
 export default function AdminExpenses() {
   const { showToast } = useToast()
   const { can } = usePermission()
+  const currentUser = useAuthStore((state) => state.currentUser)
   const canApprove = can('expenses', 'approve')
   const canCreate = can('expenses', 'create')
   const { visible: fieldVisible } = useFormFieldSettings('expense')
@@ -101,6 +105,8 @@ export default function AdminExpenses() {
   const [demoReimburseMode, setDemoReimburseMode] = useState('Bank Transfer')
   const [detailTarget, setDetailTarget] = useState(null)
   const [isActing, setIsActing] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState(null)
+  const [isCancelling, setIsCancelling] = useState(false)
 
   const [categories, setCategories] = useState([])
   const [categoryNotice, setCategoryNotice] = useState('')
@@ -248,6 +254,29 @@ export default function AdminExpenses() {
     showToast({ title: 'Expense approved', message: `${row.expenseNumber || row.expenseId} has been approved.` })
   }
 
+  // Submitter cancelling their OWN still-pending expense - same action MyExpenses.jsx offers,
+  // surfaced here too since an admin's own submitted expense also shows up in this org-wide list.
+  const handleCancel = async () => {
+    if (!cancelTarget) return
+    setIsCancelling(true)
+    if (DEMO_EXPENSES_ENABLED) {
+      simulateDemoCancelExpense(cancelTarget.id)
+      setExpenseList(demoExpensesResolved())
+      setIsCancelling(false)
+      setCancelTarget(null)
+      return
+    }
+    const result = await deleteExpense(cancelTarget.id)
+    setIsCancelling(false)
+    if (!result.success) {
+      showToast({ title: 'Cancel failed', message: result.error, variant: 'error' })
+      return
+    }
+    setExpenseList((current) => current.filter((e) => e.id !== cancelTarget.id))
+    setCancelTarget(null)
+    showToast({ title: 'Expense cancelled', message: `${cancelTarget.expenseNumber || cancelTarget.expenseId} was withdrawn.` })
+  }
+
   const submitReview = async () => {
     if (!reviewTarget) return
     if (!reviewReason.trim()) {
@@ -331,14 +360,8 @@ export default function AdminExpenses() {
 
   return (
     <div className="listing-page space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div>
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Expenses</h1>
-        {canCreate && (
-          <Button type="button" onClick={openAddForm}>
-            <Plus className="size-4" aria-hidden="true" />
-            Add Expense
-          </Button>
-        )}
       </div>
 
       <ListOverview>
@@ -359,23 +382,31 @@ export default function AdminExpenses() {
           title="All Expenses"
           subtitle="Organization-wide expenses submitted by admin, sales, delivery, and staff teams"
           toolbarActions={
-            <ListFilterPanel title="Filter Expenses">
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
-                <Select options={FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category
-                <Select options={categoryOptions} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Submitted By
-                <Select options={submittedByOptions} value={submittedByFilter} onChange={(event) => setSubmittedByFilter(event.target.value)} />
-              </label>
-              <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Expense Date
-                <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-              </div>
-              {hasActiveFilters && (
-                <button type="button" onClick={clearFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+            <>
+              <ListFilterPanel title="Filter Expenses">
+                <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                  <Select options={FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
+                </label>
+                <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category
+                  <Select options={categoryOptions} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} />
+                </label>
+                <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Submitted By
+                  <Select options={submittedByOptions} value={submittedByFilter} onChange={(event) => setSubmittedByFilter(event.target.value)} />
+                </label>
+                <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Expense Date
+                  <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+                </div>
+                {hasActiveFilters && (
+                  <button type="button" onClick={clearFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                )}
+              </ListFilterPanel>
+              {canCreate && (
+                <Button type="button" size="sm" className="h-9 rounded-xl px-3.5" onClick={openAddForm}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  Add Expense
+                </Button>
               )}
-            </ListFilterPanel>
+            </>
           }
           emptyTitle={hasActiveFilters ? 'No expenses match these filters' : 'No expenses found'}
           emptyDescription={hasActiveFilters ? 'Try widening the date range or clearing filters.' : undefined}
@@ -477,6 +508,7 @@ export default function AdminExpenses() {
         expense={detailTarget}
         onClose={() => setDetailTarget(null)}
         canApprove={canApprove}
+        canCancel={Boolean(currentUser?.id) && detailTarget?.submittedBy === currentUser?.id}
         isActing={isActing}
         onApprove={(row) => handleApprove(row)}
         onRequestClarification={(row) => { setDetailTarget(null); setReviewReason(''); setReviewTarget({ row, mode: 'clarify' }) }}
@@ -486,7 +518,22 @@ export default function AdminExpenses() {
           if (DEMO_EXPENSES_ENABLED) { setDemoReimburseMode('Bank Transfer'); setDemoReimburseTarget(row) }
           else setReimburseTarget(row)
         }}
+        onCancel={(row) => { setDetailTarget(null); setCancelTarget(row) }}
       />
+
+      <Modal isOpen={Boolean(cancelTarget)} onClose={() => !isCancelling && setCancelTarget(null)} title="Cancel expense claim" size="md">
+        {cancelTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-neutral-600">
+              Withdraw this {cancelTarget.category} claim for {formatCurrency(cancelTarget.amount)}? This cannot be undone.
+            </p>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button type="button" variant="secondary" onClick={() => setCancelTarget(null)}>Keep Claim</Button>
+              <Button type="button" variant="danger" loading={isCancelling} onClick={handleCancel}>Cancel Claim</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Add Expense - create-only (no clarification/resubmit flow here, that's the
           submitter's own MyExpenses.jsx). Admin-created expenses come back already approved

@@ -9,11 +9,12 @@ import Select from '../../components/ui/Select'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { usePermission } from '../../auth/usePermission'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
-import { approveExpense, listExpenses, rejectExpense, requestExpenseClarification } from '../../api/expenses'
+import { approveExpense, deleteExpense, listExpenses, rejectExpense, requestExpenseClarification } from '../../api/expenses'
 import {
   DEMO_EXPENSES_ENABLED,
   demoExpensesResolved,
   simulateDemoApproveExpense,
+  simulateDemoCancelExpense,
   simulateDemoClarifyExpense,
   simulateDemoReimburseExpense,
   simulateDemoRejectExpense,
@@ -22,6 +23,7 @@ import { formatCurrency, formatDate } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
 import ReimburseExpenseModal from './ReimburseExpenseModal'
 import ExpenseDetailModal from './ExpenseDetailModal'
+import { useAuthStore } from '../../store/authStore'
 
 const STATUS_VARIANT = { Approved: 'success', Pending: 'warning', Rejected: 'danger', 'Clarification Required': 'info' }
 const PAYMENT_MODES = ['Cash', 'UPI', 'Card', 'Bank Transfer']
@@ -29,6 +31,7 @@ const PAYMENT_MODES = ['Cash', 'UPI', 'Card', 'Bank Transfer']
 export default function ExpenseApprovalQueue() {
   const { showToast } = useToast()
   const { can } = usePermission()
+  const currentUser = useAuthStore((state) => state.currentUser)
   const canApprove = can('expenses', 'approve')
 
   const [expenseList, setExpenseList] = useState([])
@@ -46,6 +49,8 @@ export default function ExpenseApprovalQueue() {
   const [demoReimburseMode, setDemoReimburseMode] = useState('Bank Transfer')
   const [isActing, setIsActing] = useState(false)
   const [detailTarget, setDetailTarget] = useState(null)
+  const [cancelTarget, setCancelTarget] = useState(null)
+  const [isCancelling, setIsCancelling] = useState(false)
 
   const loadExpenses = useCallback(async () => {
     setIsLoading(true)
@@ -131,6 +136,29 @@ export default function ExpenseApprovalQueue() {
     showToast({ title: mode === 'reject' ? 'Expense rejected' : 'Clarification requested', message: `${row.expenseNumber || row.expenseId}` })
     setReviewTarget(null)
     setReviewReason('')
+  }
+
+  // Submitter cancelling their OWN still-pending expense - this queue is review-focused, but a
+  // reviewer's own submitted expense can still show up in "Awaiting Review" / "Clarification".
+  const handleCancel = async () => {
+    if (!cancelTarget) return
+    setIsCancelling(true)
+    if (DEMO_EXPENSES_ENABLED) {
+      simulateDemoCancelExpense(cancelTarget.id)
+      setExpenseList(demoExpensesResolved())
+      setIsCancelling(false)
+      setCancelTarget(null)
+      return
+    }
+    const result = await deleteExpense(cancelTarget.id)
+    setIsCancelling(false)
+    if (!result.success) {
+      showToast({ title: 'Cancel failed', message: result.error, variant: 'error' })
+      return
+    }
+    setExpenseList((current) => current.filter((e) => e.id !== cancelTarget.id))
+    setCancelTarget(null)
+    showToast({ title: 'Expense cancelled', message: `${cancelTarget.expenseNumber || cancelTarget.expenseId} was withdrawn.` })
   }
 
   const handleDemoReimburse = () => {
@@ -316,6 +344,7 @@ export default function ExpenseApprovalQueue() {
         expense={detailTarget}
         onClose={() => setDetailTarget(null)}
         canApprove={canApprove}
+        canCancel={Boolean(currentUser?.id) && detailTarget?.submittedBy === currentUser?.id}
         isActing={isActing}
         onApprove={(row) => handleApprove(row)}
         onRequestClarification={(row) => { setDetailTarget(null); setReviewReason(''); setReviewTarget({ row, mode: 'clarify' }) }}
@@ -325,7 +354,22 @@ export default function ExpenseApprovalQueue() {
           if (DEMO_EXPENSES_ENABLED) { setDemoReimburseMode('Bank Transfer'); setDemoReimburseTarget(row) }
           else setReimburseTarget(row)
         }}
+        onCancel={(row) => { setDetailTarget(null); setCancelTarget(row) }}
       />
+
+      <Modal isOpen={Boolean(cancelTarget)} onClose={() => !isCancelling && setCancelTarget(null)} title="Cancel expense claim" size="md">
+        {cancelTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-neutral-600">
+              Withdraw this {cancelTarget.category} claim for {formatCurrency(cancelTarget.amount)}? This cannot be undone.
+            </p>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button type="button" variant="secondary" onClick={() => setCancelTarget(null)}>Keep Claim</Button>
+              <Button type="button" variant="danger" loading={isCancelling} onClick={handleCancel}>Cancel Claim</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

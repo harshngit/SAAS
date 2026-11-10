@@ -154,9 +154,18 @@ export default function ProductDetail() {
       }
 
       const normalized = normalizeApiProduct(result.product)
+      // Fallback only - normalizeApiProduct already reads the product's own embedded
+      // subcategory.parent_name (crm_changes18/19) and formats "Parent › Sub" itself. This only
+      // fills in when that was missing, and keeps the SAME "Parent › Sub" format when it does.
       if (categoriesResult.success) {
-        normalized.categoryLabel = categoriesResult.categories.find((category) => category.id === normalized.categoryId)?.name || normalized.categoryLabel
-        normalized.subCategory = categoriesResult.categories.find((category) => category.id === normalized.subCategoryId)?.name || normalized.subCategory
+        if (!normalized.categoryLabel) {
+          normalized.categoryLabel = categoriesResult.categories.find((category) => category.id === normalized.categoryId)?.name || normalized.categoryLabel
+        }
+        if (!normalized.subCategory) {
+          const match = categoriesResult.categories.find((category) => category.id === normalized.subCategoryId)
+          const parentMatch = match?.parent_id ? categoriesResult.categories.find((category) => category.id === match.parent_id) : null
+          normalized.subCategory = match ? (parentMatch?.name ? `${parentMatch.name} › ${match.name}` : match.name) : normalized.subCategory
+        }
       }
       setProduct(normalized)
     }

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
-import { Droplet } from 'lucide-react'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import AuthShowcase from '../components/auth/AuthShowcase'
@@ -59,12 +58,7 @@ export default function Register() {
         <main className="flex min-h-0 w-full flex-col items-center overflow-hidden px-4 py-8 lg:w-1/2 lg:px-10">
           <div className="flex h-full min-h-0 w-full max-w-2xl flex-col justify-center">
             <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-linear-to-br from-primary-500 to-primary-700 text-white shadow-(--shadow-glow-primary)">
-                <Droplet className="size-5" />
-              </div>
-              <span className="font-(--font-display) text-lg font-semibold tracking-tight text-primary-700">
-                Beas Suite
-              </span>
+              <img src="/image/sass-logo.png" alt="Beas Suite" className="h-16 w-auto object-contain" />
             </div>
 
             {/* <div className="mb-7 flex justify-center">

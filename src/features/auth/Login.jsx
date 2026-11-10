@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Droplet } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
@@ -121,12 +120,7 @@ export default function Login() {
         <main className="flex min-h-full w-full flex-col items-center justify-center overflow-y-auto px-4 py-8 lg:w-1/2 lg:px-10">
           <div className="w-full max-w-md">
             <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-linear-to-br from-primary-500 to-primary-700 text-white shadow-(--shadow-glow-primary)">
-                <Droplet className="size-5" />
-              </div>
-              <span className="font-(--font-display) text-lg font-semibold tracking-tight text-primary-700">
-                Beas Suite
-              </span>
+              <img src="/image/sass-logo.png" alt="Beas Suite" className="h-16 w-auto object-contain" />
             </div>
 
             <h1 className="text-center font-(--font-display) text-2xl font-semibold tracking-tight text-neutral-900">

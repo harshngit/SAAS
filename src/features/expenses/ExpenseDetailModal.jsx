@@ -42,11 +42,13 @@ export default function ExpenseDetailModal({
   expense,
   onClose,
   canApprove = false,
+  canCancel = false,
   isActing = false,
   onApprove,
   onRequestClarification,
   onReject,
   onReimburse,
+  onCancel,
   reimburseLabel = 'Reimburse',
 }) {
   return (
@@ -98,6 +100,12 @@ export default function ExpenseDetailModal({
               {expense.lifecycleStatus === 'approved' && onReimburse && (
                 <Button type="button" size="sm" loading={isActing} onClick={() => onReimburse(expense)}>{reimburseLabel}</Button>
               )}
+            </div>
+          )}
+
+          {canCancel && onCancel && expense.lifecycleStatus === 'pending_approval' && (
+            <div className="flex items-center gap-2 border-t border-neutral-100 pt-4">
+              <Button type="button" size="sm" variant="danger" disabled={isActing} onClick={() => onCancel(expense)}>Cancel Claim</Button>
             </div>
           )}
 

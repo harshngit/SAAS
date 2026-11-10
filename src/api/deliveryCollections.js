@@ -173,6 +173,7 @@ export async function listCollections(params = {}) {
 
   try {
     const queryParams = { page_size: params.page_size || 100 }
+    if (params.page !== undefined) queryParams.page = params.page
     if (params.status && params.status !== 'all') queryParams.status = params.status
     if (params.search) queryParams.search = params.search
     if (params.customer_id) queryParams.customer_id = params.customer_id

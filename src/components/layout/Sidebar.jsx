@@ -9,7 +9,6 @@ import {
   ArrowRight,
   ClipboardCheck,
   Crown,
-  Droplet,
   FileText,
   LayoutDashboard,
   Package,
@@ -24,7 +23,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { getNavigationGuard } from '../../hooks/navigationGuardStore'
-import { roleMenus, roleLabels, ROLES, resolveWorkspaceRole } from '../../auth/roles'
+import { roleMenus, ROLES, resolveWorkspaceRole } from '../../auth/roles'
 import { usePermission } from '../../auth/usePermission'
 import { useEntitlements } from '../../entitlements/EntitlementsContext'
 import { listPlatformRequests } from '../../api/platform'
@@ -177,9 +176,6 @@ export default function Sidebar({
 
   if (!currentUser) return null
 
-  const labelVisibilityClass = isExpanded
-    ? 'visible max-w-48 opacity-100 delay-150'
-    : 'invisible max-w-0 opacity-0 delay-0'
   const desktopLabelVisibilityClass = isExpanded
     ? 'md:visible md:max-w-48 md:opacity-100 md:delay-150'
     : 'md:invisible md:max-w-0 md:opacity-0 md:delay-0'
@@ -253,35 +249,29 @@ export default function Sidebar({
   )}
 </button>
 
-        <div className={`relative flex items-center px-4 pb-4 pt-5 ${isExpanded ? 'justify-between' : 'md:justify-center'}`}>
+        <div className="relative flex items-center justify-center px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-700 text-white shadow-[0_10px_24px_-16px_rgb(0_9_42/0.55)]">
-              <Droplet className="size-5" aria-hidden="true" />
-            </div>
-            <div className={`hidden min-w-0 flex-col overflow-hidden transition-all duration-150 md:flex ${labelVisibilityClass}`}>
-              <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-fg">
-                Beas Suite
-              </span>
-              <span className="app-role-label truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
-            </div>
-            <div className="flex min-w-0 flex-col md:hidden">
-              <span className="truncate font-(--font-display) text-[1.05rem] font-semibold tracking-tight text-fg">
-                Beas Suite
-              </span>
-              <span className="app-role-label truncate text-xs font-medium text-primary-600">{roleLabels[currentUser.role]}</span>
-            </div>
+            {/* Mobile is always full-width regardless of `isExpanded` (that only gates the
+                desktop rail's collapsed width) - size-16 is the base so mobile always gets the
+                bigger logo; the md: override only shrinks it when the DESKTOP rail is collapsed
+                (4.75rem - size-16 would overflow that narrow rail). */}
+            <img
+              src="/image/sass-logo.png"
+              alt="Beas Suite"
+              className={`size-16 shrink-0 object-contain ${isExpanded ? 'md:size-16' : 'md:size-11'}`}
+            />
           </div>
 
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={onCloseMobile}
-              className="rounded-xl p-2 text-neutral-600 transition-colors hover:bg-neutral-100 md:hidden"
-              aria-label="Close sidebar"
-            >
-              <X className="size-5 text-neutral-600" />
-            </button>
-          </div>
+          {/* Pulled out of the centering flow (absolute) so the logo stays centered - this
+              button is mobile-only anyway (md:hidden). */}
+          <button
+            type="button"
+            onClick={onCloseMobile}
+            className="absolute right-4 top-1/2 -translate-y-1/2 rounded-xl p-2 text-neutral-600 transition-colors hover:bg-neutral-100 md:hidden"
+            aria-label="Close sidebar"
+          >
+            <X className="size-5 text-neutral-600" />
+          </button>
         </div>
 
         <div className={`${isExpanded ? 'mx-5' : 'mx-3'} hidden h-px bg-neutral-100 transition-all duration-300 md:block`} />

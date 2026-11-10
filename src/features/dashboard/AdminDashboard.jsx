@@ -504,11 +504,12 @@ export default function AdminDashboard() {
   const [storageError, setStorageError] = useState('')
   const [datePreset, setDatePreset] = useState('this_month')
   const [customRange, setCustomRange] = useState({ from: '', to: '' })
-  // Dashboard scope filters - '' means "all". Applied on the Apply button, sent to GET /dashboard/admin.
-  const [companyId, setCompanyId] = useState('')
-  const [warehouseId, setWarehouseId] = useState('')
-  const [customerId, setCustomerId] = useState('')
-  const [supplierId, setSupplierId] = useState('')
+  // Dashboard scope filters - multi-select, each an array of ids ([] means "all"). Applied on
+  // the Apply button, sent to GET /dashboard/admin.
+  const [companyId, setCompanyId] = useState([])
+  const [warehouseId, setWarehouseId] = useState([])
+  const [customerId, setCustomerId] = useState([])
+  const [supplierId, setSupplierId] = useState([])
   const [filterOptions, setFilterOptions] = useState({ companies: [], warehouses: [], customers: [], suppliers: [] })
   const [appliedFilters, setAppliedFilters] = useState({ preset: 'this_month', range: { from: '', to: '' }, scope: {} })
   const [dateError, setDateError] = useState('')
@@ -531,10 +532,10 @@ export default function AdminDashboard() {
     // no separate /orders call needed at all.
     const dashboardResult = await getAdminDashboard({
       ...resolveDateRange(preset, range),
-      ...(scope.companyId ? { company_id: scope.companyId } : {}),
-      ...(scope.warehouseId ? { warehouse_id: scope.warehouseId } : {}),
-      ...(scope.customerId ? { customer_id: scope.customerId } : {}),
-      ...(scope.supplierId ? { supplier_id: scope.supplierId } : {}),
+      ...(scope.companyId?.length ? { company_id: scope.companyId } : {}),
+      ...(scope.warehouseId?.length ? { warehouse_id: scope.warehouseId } : {}),
+      ...(scope.customerId?.length ? { customer_id: scope.customerId } : {}),
+      ...(scope.supplierId?.length ? { supplier_id: scope.supplierId } : {}),
     })
 
     if (request !== dashboardRequest.current) return
@@ -805,15 +806,18 @@ export default function AdminDashboard() {
   const rangeLabel = appliedFilters.preset === 'custom'
     ? `${formatRangeLabel(appliedFilters.range.from)} / ${formatRangeLabel(appliedFilters.range.to)}`
     : dateRangePresets.find((preset) => preset.value === appliedFilters.preset)?.label
-  const scopedSales = appliedFilters.preset !== 'this_month' || Object.values(appliedFilters.scope).some(Boolean)
+  const scopedSales = appliedFilters.preset !== 'this_month' || Object.values(appliedFilters.scope).some((ids) => ids?.length)
   const appliedScopeLabels = [
     ['companyId', 'companies', 'Company'], ['warehouseId', 'warehouses', 'Warehouse'],
     ['customerId', 'customers', 'Customer'], ['supplierId', 'suppliers', 'Supplier'],
   ].flatMap(([key, optionsKey, label]) => {
-    const id = appliedFilters.scope[key]
-    if (!id) return []
-    const row = filterOptions[optionsKey].find((option) => option.id === id)
-    return [`${label}: ${row?.name || row?.business_name || id}`]
+    const ids = appliedFilters.scope[key]
+    if (!ids?.length) return []
+    const names = ids.map((id) => {
+      const row = filterOptions[optionsKey].find((option) => option.id === id)
+      return row?.name || row?.business_name || id
+    })
+    return [`${label}: ${names.join(', ')}`]
   })
 
   const recentOrdersSearchTerm = recentOrdersSearch.trim().toLowerCase()
@@ -878,13 +882,11 @@ export default function AdminDashboard() {
               id="dashboard-company"
               disabled={optionsLoading}
               searchable
-              options={[
-                { value: '', label: 'All Companies' },
-                ...filterOptions.companies.map((company) => ({ value: company.id, label: company.name })),
-              ]}
+              multiple
+              options={filterOptions.companies.map((company) => ({ value: company.id, label: company.name }))}
               value={companyId}
               onChange={(event) => setCompanyId(event.target.value)}
-              placeholder="Search companies…"
+              placeholder="All Companies"
               triggerClassName="h-10 !bg-surface"
             />
           </FilterField>
@@ -893,13 +895,11 @@ export default function AdminDashboard() {
               id="dashboard-warehouse"
               disabled={optionsLoading}
               searchable
-              options={[
-                { value: '', label: 'All Warehouses' },
-                ...filterOptions.warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name })),
-              ]}
+              multiple
+              options={filterOptions.warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
               value={warehouseId}
               onChange={(event) => setWarehouseId(event.target.value)}
-              placeholder="Search warehouses…"
+              placeholder="All Warehouses"
               triggerClassName="h-10 !bg-surface"
             />
           </FilterField>
@@ -908,13 +908,11 @@ export default function AdminDashboard() {
               id="dashboard-customer"
               disabled={optionsLoading}
               searchable
-              options={[
-                { value: '', label: 'All Customers' },
-                ...filterOptions.customers.map((customer) => ({ value: customer.id, label: customer.name || customer.business_name || customer.email || customer.phone || customer.id, searchText: [customer.business_name, customer.email, customer.phone, customer.mobile].filter(Boolean).join(' ') })),
-              ]}
+              multiple
+              options={filterOptions.customers.map((customer) => ({ value: customer.id, label: customer.name || customer.business_name || customer.email || customer.phone || customer.id, searchText: [customer.business_name, customer.email, customer.phone, customer.mobile].filter(Boolean).join(' ') }))}
               value={customerId}
               onChange={(event) => setCustomerId(event.target.value)}
-              placeholder="Search customers…"
+              placeholder="All Customers"
               triggerClassName="h-10 !bg-surface"
             />
           </FilterField>
@@ -923,13 +921,11 @@ export default function AdminDashboard() {
               id="dashboard-supplier"
               disabled={optionsLoading}
               searchable
-              options={[
-                { value: '', label: 'All Suppliers' },
-                ...filterOptions.suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name || supplier.business_name || supplier.email || supplier.phone || supplier.id, searchText: [supplier.business_name, supplier.email, supplier.phone, supplier.mobile].filter(Boolean).join(' ') })),
-              ]}
+              multiple
+              options={filterOptions.suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name || supplier.business_name || supplier.email || supplier.phone || supplier.id, searchText: [supplier.business_name, supplier.email, supplier.phone, supplier.mobile].filter(Boolean).join(' ') }))}
               value={supplierId}
               onChange={(event) => setSupplierId(event.target.value)}
-              placeholder="Search suppliers…"
+              placeholder="All Suppliers"
               triggerClassName="h-10 !bg-surface"
             />
           </FilterField>
@@ -969,7 +965,7 @@ export default function AdminDashboard() {
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
           <span>Showing: {[rangeLabel, ...appliedScopeLabels].join(' / ')}. Select filters, then press Apply.</span>
           <button type="button" disabled={isLoading} className="text-primary-600 underline" onClick={() => {
-            setDatePreset('this_month'); setCustomRange({ from: '', to: '' }); setCompanyId(''); setWarehouseId(''); setCustomerId(''); setSupplierId(''); setDateError('')
+            setDatePreset('this_month'); setCustomRange({ from: '', to: '' }); setCompanyId([]); setWarehouseId([]); setCustomerId([]); setSupplierId([]); setDateError('')
             loadDashboard('this_month', { from: '', to: '' })
           }}>Reset filters</button>
         </div>

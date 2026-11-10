@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { Droplet } from 'lucide-react'
 import AuthShowcase from '../../components/auth/AuthShowcase'
 import AuthFooterLinks from '../../components/auth/AuthFooterLinks'
 import Input from '../../components/ui/Input'
@@ -53,8 +52,7 @@ export default function ResetPassword() {
         <main className="flex min-h-full w-full flex-col items-center justify-center overflow-y-auto px-4 py-8 lg:w-1/2 lg:px-10">
           <div className="w-full max-w-md">
             <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-primary-700 text-white"><Droplet className="size-5" aria-hidden="true" /></span>
-              <span className="font-(--font-display) text-lg font-semibold text-primary-700">Beas Suite</span>
+              <img src="/image/sass-logo.png" alt="Beas Suite" className="h-16 w-auto object-contain" />
             </div>
             <h1 className="text-center font-(--font-display) text-2xl font-semibold tracking-tight text-neutral-900">{token ? 'Set a new password' : 'Invalid reset link'}</h1>
             {!token ? (

@@ -24,13 +24,16 @@ function splitInterestedProductNames(value) {
     .filter(Boolean)
 }
 
-// Multi-product picker for a lead's "Interested Products".
+// Multi-product picker for a lead's "Interested Products" - a checkbox list of the catalog
+// (with product images) instead of a search-and-add combobox, so a rep can scan and tick
+// everything the prospect is interested in without retyping each name.
 //
 // Backend contract (crm_changes addendum §1): the lead now has a normalized
 // `interested_product_ids` relation plus `interested_products` briefs, and still keeps the
 // legacy `interested_product` text field. This field works in { id, name, sku } objects:
 //   - real catalog matches carry an `id` -> sent as `interested_product_ids`
-//   - free-text entries have `id: null` -> preserved only in the legacy text string
+//   - free-text entries have `id: null` -> preserved only in the legacy text string (still
+//     supported for a product not in the catalog, via the "Add" row below the checklist)
 // The parent derives both payload fields from the emitted list.
 export default function InterestedProductsField({
   selected = [],
@@ -41,8 +44,7 @@ export default function InterestedProductsField({
 }) {
   const [products, setProducts] = useState([])
   const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const boxRef = useRef(null)
+  const [customText, setCustomText] = useState('')
   const seededRef = useRef(false)
 
   useEffect(() => {
@@ -90,30 +92,29 @@ export default function InterestedProductsField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products])
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (boxRef.current && !boxRef.current.contains(event.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const addEntry = (entry) => {
-    const name = String(entry.name || '').trim()
-    if (!name) return
-    if (selected.some((p) => (entry.id && p.id === entry.id) || p.name.toLowerCase() === name.toLowerCase())) {
-      setQuery('')
-      setOpen(false)
+  const toggleProduct = (product) => {
+    const isSelected = selected.some((p) => p.id === product.id)
+    if (isSelected) {
+      onChange(selected.filter((p) => p.id !== product.id))
       return
     }
-    onChange([...selected, { id: entry.id ?? null, name, sku: entry.sku || '', image: entry.image || '' }])
-    setQuery('')
-    setOpen(false)
+    onChange([...selected, { id: product.id, name: product.name, sku: product.sku, image: product.image }])
   }
 
   const removeEntry = (target) => onChange(selected.filter((p) => p !== target))
 
-  const suggestions = useMemo(() => {
+  const addFreeText = () => {
+    const name = customText.trim()
+    if (!name) return
+    if (selected.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+      setCustomText('')
+      return
+    }
+    onChange([...selected, { id: null, name, sku: '' }])
+    setCustomText('')
+  }
+
+  const catalogRows = useMemo(() => {
     const q = query.trim().toLowerCase()
     return products
       .map((product) => ({
@@ -124,99 +125,113 @@ export default function InterestedProductsField({
       }))
       .filter((product) => {
         if (!product.name) return false
-        if (selected.some((p) => p.id === product.id || p.name.toLowerCase() === product.name.toLowerCase())) return false
         if (!q) return true
         return product.name.toLowerCase().includes(q) || product.sku.toLowerCase().includes(q)
       })
-      .slice(0, 8)
-  }, [products, query, selected])
+  }, [products, query])
 
-  const canAddFreeText =
-    query.trim() && !suggestions.some((product) => product.name.toLowerCase() === query.trim().toLowerCase())
+  const freeTextEntries = selected.filter((entry) => !entry.id)
 
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`} ref={boxRef}>
+    <div className={`flex flex-col gap-1.5 ${className}`}>
       <label className="text-sm font-medium text-neutral-700">{label}</label>
-      <div className="relative rounded-xl border border-neutral-200 bg-neutral-50 p-2 transition-all focus-within:border-primary-400 focus-within:bg-surface focus-within:ring-4 focus-within:ring-primary-500/12">
-        {selected.length > 0 && (
-          <div className="mb-1.5 flex flex-wrap gap-1.5">
-            {selected.map((product, index) => (
-              <span
-                key={product.id || `${product.name}-${index}`}
-                className="inline-flex items-center gap-1.5 rounded-full bg-primary-100 py-1 pl-1.5 pr-1 text-xs font-medium text-primary-700"
-              >
-                {product.image ? (
-                  <img src={product.image} alt="" className="size-4 shrink-0 rounded-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none' }} />
-                ) : (
-                  <Package className="size-3.5 shrink-0 text-primary-500" aria-hidden="true" />
-                )}
-                {product.name}
-                {!product.id && <span className="text-[0.62rem] text-primary-500">(text)</span>}
-                <button
-                  type="button"
-                  onClick={() => removeEntry(product)}
-                  className="rounded-full p-0.5 text-primary-600 transition-colors hover:bg-primary-200"
-                  aria-label={`Remove ${product.name}`}
-                >
-                  <X className="size-3" aria-hidden="true" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
 
-        <div className="flex items-center gap-2">
+      {freeTextEntries.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {freeTextEntries.map((product, index) => (
+            <span
+              key={`${product.name}-${index}`}
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary-100 py-1 pl-2.5 pr-1 text-xs font-medium text-primary-700"
+            >
+              {product.name}
+              <span className="text-[0.62rem] text-primary-500">(text)</span>
+              <button
+                type="button"
+                onClick={() => removeEntry(product)}
+                className="rounded-full p-0.5 text-primary-600 transition-colors hover:bg-primary-200"
+                aria-label={`Remove ${product.name}`}
+              >
+                <X className="size-3" aria-hidden="true" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="rounded-xl border border-neutral-200 bg-neutral-50">
+        <div className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2">
           <Search className="size-4 shrink-0 text-neutral-400" aria-hidden="true" />
           <input
             value={query}
-            onChange={(event) => {
-              setQuery(event.target.value)
-              setOpen(true)
-            }}
-            onFocus={() => setOpen(true)}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search products…"
+            className="h-6 min-w-0 flex-1 bg-transparent text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
+          />
+          {selected.length > 0 && (
+            <span className="shrink-0 text-xs font-medium text-primary-600">{selected.length} selected</span>
+          )}
+        </div>
+        <div className="max-h-64 overflow-y-auto p-1.5">
+          {catalogRows.length === 0 ? (
+            <p className="px-3 py-4 text-center text-sm text-neutral-400">No products match.</p>
+          ) : (
+            catalogRows.map((product) => {
+              const checked = selected.some((p) => p.id === product.id)
+              return (
+                <label
+                  key={product.id}
+                  className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+                    checked ? 'bg-primary-50' : 'hover:bg-surface'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleProduct(product)}
+                    className="size-4 shrink-0 rounded border-neutral-300 text-primary-600 focus:ring-primary-500/30"
+                  />
+                  {product.image ? (
+                    <img
+                      src={product.image}
+                      alt=""
+                      className="size-8 shrink-0 rounded-lg border border-neutral-100 object-cover"
+                      onError={(event) => { event.currentTarget.style.display = 'none' }}
+                    />
+                  ) : (
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
+                      <Package className="size-3.5" aria-hidden="true" />
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-neutral-800">{product.name}</span>
+                  {product.sku && <span className="shrink-0 text-[0.7rem] text-neutral-400">{product.sku}</span>}
+                </label>
+              )
+            })
+          )}
+        </div>
+        <div className="flex items-center gap-2 border-t border-neutral-200 px-3 py-2">
+          <input
+            value={customText}
+            onChange={(event) => setCustomText(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault()
-                if (query.trim()) addEntry({ id: null, name: query })
+                addFreeText()
               }
             }}
-            placeholder={selected.length ? 'Add another product…' : 'Search or type a product…'}
-            className="h-8 min-w-0 flex-1 bg-transparent text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
+            placeholder="Not in catalog? Type a product name…"
+            className="h-7 min-w-0 flex-1 bg-transparent text-xs text-neutral-700 placeholder:text-neutral-400 focus:outline-none"
           />
+          <button
+            type="button"
+            onClick={addFreeText}
+            disabled={!customText.trim()}
+            className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary-600 hover:underline disabled:cursor-not-allowed disabled:text-neutral-300 disabled:no-underline"
+          >
+            <Plus className="size-3" aria-hidden="true" />
+            Add
+          </button>
         </div>
-
-        {open && (suggestions.length > 0 || canAddFreeText) && (
-          <div className="absolute inset-x-0 top-full z-10 mt-1.5 max-h-52 overflow-y-auto rounded-lg border border-neutral-100 bg-surface shadow-md">
-            {suggestions.map((product) => (
-              <button
-                key={product.id || product.name}
-                type="button"
-                onClick={() => addEntry(product)}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-primary-50/60"
-              >
-                {product.image ? (
-                  <img src={product.image} alt="" className="size-8 shrink-0 rounded-lg border border-neutral-100 object-cover" onError={(event) => { event.currentTarget.style.display = 'none' }} />
-                ) : (
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-50 text-neutral-300 ring-1 ring-neutral-100">
-                    <Package className="size-3.5" aria-hidden="true" />
-                  </span>
-                )}
-                <span className="min-w-0 flex-1 truncate text-neutral-800">{product.name}</span>
-                {product.sku && <span className="shrink-0 text-[0.7rem] text-neutral-400">{product.sku}</span>}
-              </button>
-            ))}
-            {canAddFreeText && (
-              <button
-                type="button"
-                onClick={() => addEntry({ id: null, name: query })}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-primary-700 hover:bg-primary-50/60"
-              >
-                <Plus className="size-3.5" aria-hidden="true" />
-                Add “{query.trim()}”
-              </button>
-            )}
-          </div>
-        )}
       </div>
     </div>
   )

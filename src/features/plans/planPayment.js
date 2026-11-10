@@ -28,6 +28,10 @@ export async function payForPlan({ plan, billingCycle, accentColor, onFailed, on
       amount: orderResult.amount,
       currency: orderResult.currency,
       name: 'Beas Suite',
+      // Razorpay's own checkout modal always needs `name` as plain text (it's their field, not
+      // ours to swap for an image) - `image` is the sanctioned way to also show the real logo
+      // alongside it.
+      image: '/image/sass-logo.png',
       description: `${orderResult.planName || plan.name} - ${orderResult.billingCycle || billingCycle}`,
       prefill: orderResult.prefill,
       theme: { color: accentColor || '#00092A' },

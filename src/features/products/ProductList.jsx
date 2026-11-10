@@ -109,12 +109,21 @@ export default function ProductList() {
       return
     }
 
+    // This filter mixes top-level categories and subcategories in one flat list - a bare
+    // subcategory name here has no parent visible nearby (unlike the product rows, where the
+    // category sits right above it), so it gets the "Parent › Sub" prefix for disambiguation.
+    const byId = new Map(result.categories.map((category) => [category.id, category]))
     setCategoryOptions(
       result.categories
-        .map((category) => ({
-          value: String(category.id),
-          label: category.name || category.category_name || '',
-        }))
+        .map((category) => {
+          const name = category.name || category.category_name || ''
+          const parentId = category.parent_id || category.parentId || ''
+          const parentName = category.parent_name || (parentId ? byId.get(parentId)?.name : '') || ''
+          return {
+            value: String(category.id),
+            label: parentId && parentName ? `${parentName} › ${name}` : name,
+          }
+        })
         .filter((option) => option.value && option.label),
     )
   }, [])

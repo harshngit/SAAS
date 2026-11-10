@@ -26,6 +26,15 @@ export function normalizeApiProduct(product, fallback = {}) {
     fallback.categoryLabel ||
     readableClassification(fallback.category) ||
     ''
+  // "Parent › Sub" everywhere a subcategory name is shown on its own (crm_changes18/19) - sub
+  // category names are now only unique per parent, so the bare name alone can be ambiguous.
+  // Read straight off the product's own embedded `subcategory.parent_name` (no separate
+  // categories-list lookup needed); baked in here once so every consumer of this normalizer
+  // (product list, detail, purchase/supplier views) gets it for free.
+  const subCategoryName = readableClassification(
+    product.subcategory?.name || product.sub_category || fallback.subCategory || '',
+  )
+  const subCategoryParentName = product.subcategory?.parent_name || ''
 
   return {
     ...fallback,
@@ -47,7 +56,9 @@ export function normalizeApiProduct(product, fallback = {}) {
     barcode: product.barcode || fallback.barcode || '',
     shortName: product.short_name || fallback.shortName || '',
     modelNumber: product.model_number || fallback.modelNumber || '',
-    subCategory: product.sub_category_id === null || product.sub_category_id === '' ? '' : readableClassification(product.subcategory?.name || product.sub_category || fallback.subCategory || ''),
+    subCategory: product.sub_category_id === null || product.sub_category_id === ''
+      ? ''
+      : subCategoryParentName && subCategoryName ? `${subCategoryParentName} › ${subCategoryName}` : subCategoryName,
     subCategoryId: product.sub_category_id !== undefined ? product.sub_category_id || '' : fallback.subCategoryId || '',
     brandId: product.brand_id || fallback.brandId || '',
     supplierName: product.supplier?.name || fallback.supplierName || '',

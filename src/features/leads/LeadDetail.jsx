@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ClipboardList,
   Clock,
+  FileText,
   Mail,
   MapPin,
   Package,
@@ -314,6 +315,7 @@ export default function LeadDetail() {
   const isSalesOfficer = currentUser?.role === ROLES.SALES_OFFICER
   const leadBasePath = isSalesOfficer ? '/sales/leads' : '/admin/leads'
   const customerBasePath = customerBasePathByRole[currentUser?.role] || '/sales/customers'
+  const quotationBasePath = isSalesOfficer ? '/sales/quotations' : '/admin/quotations'
 
   const [lead, setLead] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -899,6 +901,16 @@ export default function LeadDetail() {
             <MapPin className="size-4" aria-hidden="true" />
             Schedule Visit
           </Button>
+          {!isReadOnlyLead && !isLost && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`${quotationBasePath}/new?leadId=${lead.id}`)}
+            >
+              <FileText className="size-4" aria-hidden="true" />
+              Quotation
+            </Button>
+          )}
           {isConverted ? (
             <Button size="sm" onClick={() => navigate(`${customerBasePath}/${lead.convertedCustomerId || lead.customerId}`)}>
               <ArrowRightCircle className="size-4" aria-hidden="true" />

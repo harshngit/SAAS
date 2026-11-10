@@ -1,6 +1,8 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
 import { getCustomer, listCustomers } from './customers'
+import { listOrders } from './orders'
+import { toLocalDateString } from '../utils/format'
 import {
   COLLECTION_DEMO_ENABLED,
   createDemoGeneralCollection,
@@ -12,9 +14,14 @@ import {
 // General customer-outstanding collection (Delivery Partner -> ANY customer).
 // -----------------------------------------------------------------------------
 // This is the "+ Collect Payment" flow: search a customer, see how much they owe,
-// record the amount collected, submit. It is NOT the delivery-anchored COD flow
+// optionally pick one of THAT customer's orders this payment is for, record the amount
+// collected, submit. It is NOT the delivery-anchored COD flow
 // (that stays on POST /deliveries/{delivery_id}/collections - api/deliveryCollections.js).
 // There is NO invoice-level allocation here - the Accountant allocates at reconciliation.
+//
+// order_id (crm_changes18 §4) - optional, sent only when the collector picked a specific
+// order; it must belong to the same customer_id (enforced server-side). Left out entirely for
+// a true general collection with no specific order, same as before this field existed.
 //
 // Canonical endpoint (backend contract):
 //   POST /customer-payments/collections
@@ -119,18 +126,33 @@ export async function getCustomerOutstanding(customerId) {
 // -----------------------------------------------------------------------------
 
 function buildCollectionBody(payload) {
-  // Customer-based only. NO invoice_id / order_id / allocations / delivery_id / collector_id -
-  // the backend allocates against the customer's invoices at reconciliation and identifies the
-  // collector from the auth token.
-  return {
+  // Customer-based, with an OPTIONAL order_id. Still NO invoice_id / allocations / delivery_id /
+  // collector_id - the backend allocates against the customer's invoices at reconciliation and
+  // identifies the collector from the auth token.
+  const body = {
     customer_id: payload.customerId,
     amount: Number(payload.amount) || 0,
     payment_method: payload.paymentMethod || 'cash',
-    payment_date: payload.paymentDate || new Date().toISOString().slice(0, 10),
+    // LOCAL calendar date (YYYY-MM-DD from the user's own date parts) - NOT
+    // new Date().toISOString().slice(0, 10), which is the UTC date and is wrong between
+    // 00:00-05:30 IST (crm_changes18 fix).
+    payment_date: payload.paymentDate || toLocalDateString(),
     source: 'delivery_partner',
     reference: (payload.reference || '').trim(),
     notes: (payload.notes || '').trim(),
   }
+  if (payload.orderId) body.order_id = payload.orderId
+  return body
+}
+
+// Orders belonging to ONE customer, for the optional "which order is this for?" picker in the
+// Collect Payment drawer - server-side customer_id filter, so there's no way to end up with an
+// order_id that doesn't belong to the selected customer.
+export async function searchCustomerOrders(customerId, query) {
+  if (!customerId) return []
+  const result = await listOrders({ customer_id: customerId, search: query || undefined, page_size: 20 })
+  if (!result.success) return []
+  return (result.orders || []).map((order) => ({ value: order.id, label: order.orderNumber || order.id }))
 }
 
 // Canonical path per the backend contract. If a deployment exposes it elsewhere, change

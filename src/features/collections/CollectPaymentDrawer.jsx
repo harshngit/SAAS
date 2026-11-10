@@ -4,9 +4,10 @@ import { Loader2, Search, Upload, User, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
+import EntitySearchSelect from '../reports/components/EntitySearchSelect'
 import { useToast } from '../../components/ui/toastContext'
-import { formatCurrency } from '../../utils/format'
-import { getCustomerOutstanding, recordCustomerCollection, searchOutstandingCustomers } from '../../api/customerPayments'
+import { formatCurrency, toLocalDateString } from '../../utils/format'
+import { getCustomerOutstanding, recordCustomerCollection, searchCustomerOrders, searchOutstandingCustomers } from '../../api/customerPayments'
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -16,7 +17,9 @@ const PAYMENT_METHODS = [
 ]
 
 const TRANSITION_MS = 300
-const todayIso = () => new Date().toISOString().slice(0, 10)
+// LOCAL calendar date - toISOString().slice(0, 10) gives the UTC date, which is the wrong day
+// between 00:00-05:30 IST (crm_changes18 fix).
+const todayIso = () => toLocalDateString()
 const money = (value) => Math.round((Number(value) || 0) * 100) / 100
 
 // "+ Collect Payment" side drawer for a Delivery Partner (opened from their dashboard).
@@ -49,6 +52,10 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, onBl
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
   const [paymentDate, setPaymentDate] = useState(todayIso())
+  // Which of the customer's own orders this payment is for - optional (crm_changes18 §4).
+  // Left as '' for a true general collection, same as before this existed.
+  const [orderId, setOrderId] = useState('')
+  const [orderLabel, setOrderLabel] = useState('')
 
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -57,7 +64,7 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, onBl
     setQuery(''); setResults([]); setIsSearching(false); setSearchError(''); setSearched(false)
     setCustomer(null); setIsLoadingCustomer(false)
     setAmount(''); setPaymentMethod('cash'); setReference(''); setNotes('')
-    setPaymentDate(todayIso()); setFormError(''); setIsSaving(false)
+    setPaymentDate(todayIso()); setOrderId(''); setOrderLabel(''); setFormError(''); setIsSaving(false)
   }
 
   // Mount a beat before the slide-in and unmount a beat after the slide-out, matching the
@@ -131,6 +138,8 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, onBl
 
   const clearCustomer = () => {
     setCustomer(null)
+    setOrderId('')
+    setOrderLabel('')
     setFormError('')
   }
 
@@ -162,11 +171,12 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, onBl
       reference,
       notes,
       paymentDate,
+      orderId: orderId || undefined,
       // Demo-only context (real backend reads the collector + their role from auth). No
-      // allocation / invoice / order / delivery is sent — the Accountant allocates at
-      // reconciliation. `collectorRole` is never hardcoded to "Delivery Partner" - it's
-      // whoever `partner` actually is (a Delivery Partner from the dashboard, or an
-      // Admin/Sales Officer recording it from Order Detail).
+      // invoice / delivery allocation is sent — the Accountant allocates at reconciliation.
+      // `collectorRole` is never hardcoded to "Delivery Partner" - it's whoever `partner`
+      // actually is (a Delivery Partner from the dashboard, or an Admin/Sales Officer
+      // recording it from Order Detail).
       deliveryPartnerId: partner?.id,
       deliveryPartnerName: partner?.name,
       collectorRole: partner?.role,
@@ -330,6 +340,19 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, onBl
                 value={paymentMethod}
                 onChange={(event) => setPaymentMethod(event.target.value)}
               />
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-fg">Order (optional)</label>
+                <EntitySearchSelect
+                  value={orderId}
+                  selectedLabel={orderLabel}
+                  onChange={(value, label) => { setOrderId(value); setOrderLabel(label) }}
+                  fetchOptions={(query) => searchCustomerOrders(customer.id, query)}
+                  placeholder="Link to one of this customer's orders"
+                  className="w-full"
+                />
+                <p className="text-xs text-neutral-400">Leave blank for a general collection not tied to a specific order.</p>
+              </div>
 
               <Input
                 label="Reference Number (optional)"

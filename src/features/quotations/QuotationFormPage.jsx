@@ -78,6 +78,9 @@ export default function QuotationFormPage() {
   const { id: editId } = useParams()
   const [searchParams] = useSearchParams()
   const fromId = searchParams.get('from') || ''
+  // From the lead detail page's "Quotation" button - preselects this lead as the party, which
+  // then lets the existing interested-products prefill effect below do the rest.
+  const leadIdParam = searchParams.get('leadId') || ''
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
   const isSalesOfficer = currentUser?.role === ROLES.SALES_OFFICER
@@ -90,6 +93,7 @@ export default function QuotationFormPage() {
   const [formData, setFormData] = useState(() => ({
     ...emptyQuotation,
     salespersonId: isSalesOfficer ? currentUser.id : '',
+    ...(leadIdParam && !isEdit && !fromId ? { quotationFor: 'lead', leadId: leadIdParam } : {}),
   }))
   const [errors, setErrors] = useState({})
   const [submitError, setSubmitError] = useState('')
@@ -447,6 +451,7 @@ export default function QuotationFormPage() {
 
     if (!result.success) {
       setSubmitError(result.error)
+      if (result.fieldErrors) setErrors((current) => ({ ...current, ...result.fieldErrors }))
       setIsSubmitting(false)
       return
     }
@@ -581,8 +586,8 @@ export default function QuotationFormPage() {
             <h3 className="text-sm font-semibold text-neutral-900">Terms Details</h3>
           </div>
           <div className="grid gap-3 p-4 sm:grid-cols-2">
-            <ConfiguredField module="quotation" name="paymentTerms"><Select label="Payment Terms" options={paymentTermOptions} value={formData.paymentTerms} onChange={(event) => updateField('paymentTerms', event.target.value)} placeholder="Select payment terms" /></ConfiguredField>
-            <ConfiguredField module="quotation" name="deliveryTerms"><Select label="Delivery Terms" options={deliveryTermOptions} value={formData.deliveryTerms} onChange={(event) => updateField('deliveryTerms', event.target.value)} placeholder="Select delivery terms" /></ConfiguredField>
+            <ConfiguredField module="quotation" name="paymentTerms"><Select label="Payment Terms" options={paymentTermOptions} value={formData.paymentTerms} onChange={(event) => updateField('paymentTerms', event.target.value)} placeholder="Select payment terms" error={errors.paymentTerms} /></ConfiguredField>
+            <ConfiguredField module="quotation" name="deliveryTerms"><Select label="Delivery Terms" options={deliveryTermOptions} value={formData.deliveryTerms} onChange={(event) => updateField('deliveryTerms', event.target.value)} placeholder="Select delivery terms" error={errors.deliveryTerms} /></ConfiguredField>
             <ConfiguredField module="quotation" name="notes"><Input as="textarea" label="Notes" value={formData.notes} onChange={(event) => updateField('notes', event.target.value)} inputClassName="min-h-16" placeholder="Internal remarks — not printed on the quotation" /></ConfiguredField>
             <ConfiguredField module="quotation" name="termsConditions"><Input as="textarea" label="Terms & Conditions" value={formData.termsConditions} onChange={(event) => updateField('termsConditions', event.target.value)} inputClassName="min-h-16" placeholder="Printed on the customer quotation PDF" /></ConfiguredField>
           </div>

@@ -38,6 +38,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import SocialLinks from '../../components/ui/SocialLinks'
+import { ListDataTable } from '../../components/ui/ListPresentation'
 import { useToast } from '../../components/ui/toastContext'
 import { ROLES } from '../../auth/roles'
 import { usePermission } from '../../auth/usePermission'
@@ -131,6 +132,14 @@ const normalizeCustomerPayment = (payment) => ({
   note: payment.note || '',
   receivedOn: payment.received_on,
   createdAt: payment.created_at,
+  // A field collection not yet reconciled by an accountant shows up here too (crm_changes18 §4)
+  // - status is "awaiting_reconciliation", source is "field_collection"/"delivery_cod", and
+  // receipt_number is null since it isn't a real CustomerPayment yet. Not in the customer's
+  // balance/ledger - shown as "Pending reconciliation", never offered Void (nothing to void here).
+  status: payment.status || '',
+  isPendingReconciliation: payment.status === 'awaiting_reconciliation',
+  source: payment.source || '',
+  collectorName: payment.collector?.name || payment.collector || '',
   // 5-part payment snapshot (Order Amount / Previous Pending / Amount Collected / Payment
   // Method / Remaining Receivable) - orderAmount is null for advance/on-account payments.
   orderAmount: payment.order_amount ?? null,
@@ -637,6 +646,22 @@ export default function CustomerDetail() {
       message: `${formatCurrency(amount)} recorded for ${customer?.businessName || customer?.name || 'this customer'}.`,
     })
   }
+
+  // Collection History / Account Statement - same sortable/searchable/paginated DataTable
+  // pattern every other list page uses, instead of a hand-rolled <table> with none of that.
+  const collectionRows = useMemo(() => collections.map((collection) => ({
+    ...collection,
+    _dateLabel: formatDate(collection.recordedAt),
+    _modeLabel: formatCollectionPaymentMode(collection.paymentMode),
+    _sourceLabel: formatCollectionSource(collection.source) || '—',
+    _roleLabel: formatCollectorRole(collection.recordedByRole) || '—',
+  })), [collections])
+
+  const ledgerRows = useMemo(() => (ledger?.transactions || []).map((entry, index) => ({
+    ...entry,
+    _rowId: `${entry.type}-${entry.date}-${index}`,
+    _dateLabel: entry.date ? entry.date.slice(0, 10) : '—',
+  })), [ledger])
 
   if (isLoading) {
     return <LoadingSpinner variant="detail" label="Loading customer details..." />
@@ -1259,13 +1284,18 @@ export default function CustomerDetail() {
                   <div key={payment.id} className="rounded-xl border border-neutral-100 bg-neutral-50 px-3.5 py-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-neutral-900">{formatCurrency(payment.amount)}</p>
-                      <Badge variant="neutral">
-                        {paymentModeOptions.find((option) => option.value === payment.paymentMode)?.label || payment.paymentMode || '-'}
-                      </Badge>
+                      {payment.isPendingReconciliation ? (
+                        <Badge variant="warning">Pending reconciliation</Badge>
+                      ) : (
+                        <Badge variant="neutral">
+                          {paymentModeOptions.find((option) => option.value === payment.paymentMode)?.label || payment.paymentMode || '-'}
+                        </Badge>
+                      )}
                     </div>
                     <p className="mt-1 text-xs text-neutral-400">
                       {payment.receivedOn ? new Date(payment.receivedOn).toLocaleDateString() : '-'}
                       {payment.invoice?.invoice_number || payment.invoiceId ? ` · ${payment.invoice?.invoice_number || payment.invoiceId}` : ''}
+                      {payment.isPendingReconciliation && payment.collectorName ? ` · Collected by ${payment.collectorName}` : ''}
                     </p>
                     {(payment.upiId || payment.cardLastFour || payment.collectionInstructions) && (
                       <p className="mt-1 text-xs text-neutral-500">
@@ -1296,7 +1326,7 @@ export default function CustomerDetail() {
                         </div>
                       </div>
                     )}
-                    {isAdmin && (
+                    {isAdmin && !payment.isPendingReconciliation && (
                       <div className="mt-2 flex justify-end gap-1">
                         <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setVoidTarget(payment)}>
                           <Undo2 className="size-3.5" aria-hidden="true" />
@@ -1322,43 +1352,30 @@ export default function CustomerDetail() {
                 <p className="text-sm text-red-600">{collectionsError}</p>
                 <Button type="button" variant="outline" size="sm" className="mt-3" onClick={loadCollections}>Retry</Button>
               </div>
-            ) : isLoadingCollections ? (
-              <LoadingSpinner variant="table" minWidth="min-w-2xl" columns={["Date", "Amount", "Payment Method", "Source", "Collected By", "Role", "Status"]} label="Loading collection history..." />
-            ) : collections.length === 0 ? (
-              <p className="py-6 text-center text-sm text-neutral-400">No payment collections recorded for this customer yet.</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-neutral-100">
-                <table className="w-full min-w-2xl text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
-                      <th className="whitespace-nowrap px-4 py-2.5">Date</th>
-                      <th className="whitespace-nowrap px-4 py-2.5 text-right">Amount</th>
-                      <th className="whitespace-nowrap px-4 py-2.5">Payment Method</th>
-                      <th className="whitespace-nowrap px-4 py-2.5">Source</th>
-                      <th className="whitespace-nowrap px-4 py-2.5">Collected By</th>
-                      <th className="whitespace-nowrap px-4 py-2.5">Role</th>
-                      <th className="whitespace-nowrap px-4 py-2.5">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-50">
-                    {collections.map((collection) => (
-                      <tr key={collection.id}>
-                        <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatDate(collection.recordedAt)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(collection.amount)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatCollectionPaymentMode(collection.paymentMode)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{formatCollectionSource(collection.source) || '—'}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-neutral-800">{collection.recordedByName || '—'}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{formatCollectorRole(collection.recordedByRole) || '—'}</td>
-                        <td className="whitespace-nowrap px-4 py-3">
-                          <Badge variant={COLLECTION_STATUS_VARIANT[collection.status] || 'neutral'}>
-                            {formatCollectionStatus(collection)}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ListDataTable
+                columns={[
+                  { key: '_dateLabel', header: 'Date', sortable: true },
+                  { key: 'amount', header: 'Amount', align: 'right', sortable: true, render: (r) => formatCurrency(r.amount) },
+                  { key: '_modeLabel', header: 'Payment Method', sortable: true },
+                  { key: '_sourceLabel', header: 'Source', sortable: true },
+                  { key: 'recordedByName', header: 'Collected By', sortable: true, render: (r) => r.recordedByName || '—' },
+                  { key: '_roleLabel', header: 'Role', sortable: true },
+                  {
+                    key: 'status',
+                    header: 'Status',
+                    sortable: true,
+                    render: (r) => (
+                      <Badge variant={COLLECTION_STATUS_VARIANT[r.status] || 'neutral'}>{formatCollectionStatus(r)}</Badge>
+                    ),
+                  },
+                ]}
+                data={collectionRows}
+                loading={isLoadingCollections}
+                searchKeys={['_dateLabel', '_modeLabel', '_sourceLabel', 'recordedByName', '_roleLabel', 'status']}
+                searchPlaceholder="Search collections..."
+                emptyTitle="No payment collections recorded for this customer yet."
+              />
             )}
           </div>
         </Section>
@@ -1585,38 +1602,26 @@ export default function CustomerDetail() {
 
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Transaction History</p>
-              {ledger.transactions.length === 0 ? (
-                <p className="py-6 text-center text-sm text-neutral-400">No ledger transactions recorded yet.</p>
-              ) : (
-                <div className="overflow-x-auto rounded-xl border border-neutral-100">
-                  <table className="w-full min-w-2xl text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
-                        <th className="whitespace-nowrap px-4 py-2.5">Date</th>
-                        <th className="whitespace-nowrap px-4 py-2.5">Type</th>
-                        <th className="whitespace-nowrap px-4 py-2.5">Description</th>
-                        <th className="whitespace-nowrap px-4 py-2.5 text-right">Debit</th>
-                        <th className="whitespace-nowrap px-4 py-2.5 text-right">Credit</th>
-                        <th className="whitespace-nowrap px-4 py-2.5 text-right">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-50">
-                      {ledger.transactions.map((entry, index) => (
-                        <tr key={`${entry.type}-${entry.date}-${index}`}>
-                          <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{entry.date ? entry.date.slice(0, 10) : '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3">
-                            <Badge variant={ledgerTransactionVariant[entry.type] || 'neutral'}>{formatLabel(entry.type)}</Badge>
-                          </td>
-                          <td className="px-4 py-3 text-neutral-600">{entry.description || '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-neutral-700">{entry.debit ? formatCurrency(entry.debit) : '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-neutral-700">{entry.credit ? formatCurrency(entry.credit) : '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-neutral-900">{formatCurrency(entry.balance)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <ListDataTable
+                rowKey="_rowId"
+                columns={[
+                  { key: '_dateLabel', header: 'Date', sortable: true },
+                  {
+                    key: 'type',
+                    header: 'Type',
+                    sortable: true,
+                    render: (r) => <Badge variant={ledgerTransactionVariant[r.type] || 'neutral'}>{formatLabel(r.type)}</Badge>,
+                  },
+                  { key: 'description', header: 'Description', sortable: true, render: (r) => r.description || '—' },
+                  { key: 'debit', header: 'Debit', align: 'right', sortable: true, render: (r) => (r.debit ? formatCurrency(r.debit) : '—') },
+                  { key: 'credit', header: 'Credit', align: 'right', sortable: true, render: (r) => (r.credit ? formatCurrency(r.credit) : '—') },
+                  { key: 'balance', header: 'Balance', align: 'right', sortable: true, render: (r) => formatCurrency(r.balance) },
+                ]}
+                data={ledgerRows}
+                searchKeys={['_dateLabel', 'type', 'description']}
+                searchPlaceholder="Search transactions..."
+                emptyTitle="No ledger transactions recorded yet."
+              />
             </div>
           </div>
         )}

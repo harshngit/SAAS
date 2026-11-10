@@ -32,6 +32,32 @@ function formatApiError(errorData, fallbackMessage = 'Something went wrong. Plea
   return String(errorData)
 }
 
+// Backend snake_case field name -> this form's camelCase state key, for the handful of
+// top-level string fields that can actually 422 on length (payment_terms/delivery_terms/
+// currency/quotation_number). Lets a 422's detail[0].loc point the error at the real field
+// instead of only the generic submit-error banner.
+const QUOTATION_FIELD_NAME_MAP = {
+  payment_terms: 'paymentTerms',
+  delivery_terms: 'deliveryTerms',
+  currency: 'currency',
+  quotation_number: 'quotationNumber',
+}
+
+// Pulls a {formField: message} map out of a FastAPI-style 422 `detail` array (or a single
+// {loc, msg} object) - only for fields this form actually has, so an error on something else
+// (e.g. a line item) still only shows in the generic banner rather than being silently dropped.
+function extractFieldErrors(errorData) {
+  const entries = Array.isArray(errorData) ? errorData : errorData ? [errorData] : []
+  const fieldErrors = {}
+  entries.forEach((entry) => {
+    if (!entry || typeof entry !== 'object' || !Array.isArray(entry.loc) || !entry.msg) return
+    const backendField = entry.loc.filter((part) => part !== 'body').find((part) => typeof part === 'string')
+    const formField = backendField && QUOTATION_FIELD_NAME_MAP[backendField]
+    if (formField) fieldErrors[formField] = entry.msg
+  })
+  return fieldErrors
+}
+
 function authHeader() {
   const accessToken = useAuthStore.getState().authTokens?.access_token
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
@@ -218,12 +244,10 @@ export async function createQuotation(payload) {
     return { success: true, quotation: normalizeQuotation(data) }
   } catch (error) {
     const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to create quotation. Please try again.',
-    )
+    const detail = errorData?.detail || errorData?.message || errorData?.error || errorData
+    const message = formatApiError(detail, 'Unable to create quotation. Please try again.')
 
-    return { success: false, error: message }
+    return { success: false, error: message, fieldErrors: extractFieldErrors(detail) }
   }
 }
 
@@ -236,12 +260,10 @@ export async function updateQuotation(quotationId, payload) {
     return { success: true, quotation: normalizeQuotation(data) }
   } catch (error) {
     const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to update quotation. Please try again.',
-    )
+    const detail = errorData?.detail || errorData?.message || errorData?.error || errorData
+    const message = formatApiError(detail, 'Unable to update quotation. Please try again.')
 
-    return { success: false, error: message }
+    return { success: false, error: message, fieldErrors: extractFieldErrors(detail) }
   }
 }
 

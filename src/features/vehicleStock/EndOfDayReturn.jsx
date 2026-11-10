@@ -232,7 +232,7 @@ function ReturnLines({ lines, editable, onChange, lineErrors }) {
                 ))}
               </div>
               <div className="mt-3 grid grid-cols-3 items-end gap-2">
-                <label className="text-xs text-neutral-500">
+                <label className="text-sm font-medium text-neutral-700">
                   Physical
                   {editable ? (
                     <NumericInput
@@ -246,7 +246,7 @@ function ReturnLines({ lines, editable, onChange, lineErrors }) {
                     <p className="mt-1 font-semibold text-neutral-900">{line.physicalCount}</p>
                   )}
                 </label>
-                <label className="text-xs text-neutral-500">
+                <label className="text-sm font-medium text-neutral-700">
                   Damaged
                   {editable ? (
                     <NumericInput

@@ -2,7 +2,7 @@ import AllowedBrandsField from '../../components/ui/AllowedBrandsField'
 import { useCategoryBrandSelection } from '../../hooks/useCategoryBrandSelection'
 import { usePermission } from '../../auth/usePermission'
 import { useCallback, useEffect, useMemo, useRef, useState, useId } from 'react'
-import { ArrowLeft, ImageIcon, Plus, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, ImageIcon, Plus, RotateCcw, Trash2, Upload, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { createCategory, createSubcategoryVariant, listCategories, setCategoryBrands } from '../../api/categories'
 import Badge from '../../components/ui/Badge'
@@ -195,19 +195,26 @@ export default function CategoryFormPage() {
       saved.current.brandsSaved = true
     }
     if (formData.subcategories.length > 0 && parentId) {
-      const childResults = await Promise.all(formData.subcategories.map(async (subcategory) => {
-        if (saved.current.children[subcategory.id]) return { success: true }
+      // Sequential, not Promise.all - parallel creates under the same parent can race/conflict
+      // on the backend (e.g. a duplicate-name check reading before a sibling's insert commits).
+      const failures = []
+      for (const subcategory of formData.subcategories) {
+        if (saved.current.children[subcategory.id]) continue
         const child = await createCategory({ name: subcategory.name, image: subcategory.image, parentId })
-        if (child.success && child.category?.id) saved.current.children[subcategory.id] = child.category.id
-        else if (child.success) return { success: false }
-        return child
-      }))
-      const failedNames = childResults
-        .map((childResult, index) => (childResult.success ? null : formData.subcategories[index].name))
-        .filter(Boolean)
+        if (child.success && child.category?.id) {
+          saved.current.children[subcategory.id] = child.category.id
+        } else {
+          failures.push({ name: subcategory.name, error: child.success ? 'Unknown error.' : child.error })
+        }
+      }
 
-      if (failedNames.length > 0) {
-        setFormError(`Category saved, but these subcategories could not be created: ${failedNames.join(', ')}.`)
+      if (failures.length > 0) {
+        setFormError(
+          [
+            'The category has already been saved. Retry below only retries the subcategories that failed - it will not create the category again.',
+            ...failures.map((failure) => `• ${failure.name}: ${failure.error}`),
+          ].join('\n'),
+        )
         setIsSaving(false)
         return
       }
@@ -259,7 +266,7 @@ export default function CategoryFormPage() {
       </div>
 
       {formError && (
-        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+        <div className="whitespace-pre-line rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm text-red-700">
           {formError}
         </div>
       )}
@@ -344,8 +351,17 @@ export default function CategoryFormPage() {
             Cancel
           </Button>
           <Button type="submit" size="sm" loading={isSaving} disabled={!hasChanges || Boolean(uploadingImages) || (canSetBrands && (brandSelection.loading || Boolean(brandSelection.error)))}>
-            <Plus className="size-4" aria-hidden="true" />
-            Add Category
+            {saved.current.categoryId ? (
+              <>
+                <RotateCcw className="size-4" aria-hidden="true" />
+                Retry Failed Subcategories
+              </>
+            ) : (
+              <>
+                <Plus className="size-4" aria-hidden="true" />
+                Add Category
+              </>
+            )}
           </Button>
         </div>
       </div>

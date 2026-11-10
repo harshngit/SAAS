@@ -11,11 +11,14 @@ import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import EntitySearchSelect from '../reports/components/EntitySearchSelect'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { uniqueOptions } from '../../utils/filterOptions'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
 import { listCollections, reconcileCollection, voidCollection } from '../../api/deliveryCollections'
+import { listCustomers } from '../../api/customers'
+import { listOrders } from '../../api/orders'
 import { formatCurrency } from '../../utils/format'
 import CollectionDetailDrawer from './CollectionDetailDrawer'
 import {
@@ -36,6 +39,8 @@ function formatDateTime(value) {
     : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
+const PAGE_SIZE = 20
+
 export default function CollectionReconciliation() {
   const { showToast } = useToast()
   const { can } = usePermission()
@@ -44,16 +49,33 @@ export default function CollectionReconciliation() {
   const canReconcile = can('delivery_collections', 'approve')
 
   const [collections, setCollections] = useState([])
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [unavailable, setUnavailable] = useState(false)
+  // Whole-organization data for the summary tiles and the Partner filter's own option list -
+  // a SEPARATE, unfiltered fetch, so applying a status/search/customer/order filter to the table
+  // below never changes what the tiles say (that was the bug: tiles used to be computed from the
+  // same filtered/paginated list the table shows). Capped at the same page_size as any other
+  // single-page fetch in this app - an org with more than that many collections total sees an
+  // undercount here, the same pre-existing limitation the tiles already had before filters existed.
+  const [statsCollections, setStatsCollections] = useState([])
   const [statusFilter, setStatusFilter] = useState('all')
   const [partnerFilter, setPartnerFilter] = useState('all')
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  // Server-side filters (crm_changes18 §4: status/search/customer_id/order_id on
+  // GET /deliveries/collections). Partner + date stay client-side, same as before.
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [customerId, setCustomerId] = useState('')
+  const [customerLabel, setCustomerLabel] = useState('')
+  const [orderId, setOrderId] = useState('')
+  const [orderLabel, setOrderLabel] = useState('')
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
-  const hasExtraFilters = partnerFilter !== 'all' || datePreset !== 'all'
+  const hasExtraFilters = partnerFilter !== 'all' || datePreset !== 'all' || Boolean(customerId) || Boolean(orderId)
 
   const [detail, setDetail] = useState(null)
   const [reconcileTarget, setReconcileTarget] = useState(null)
@@ -62,41 +84,84 @@ export default function CollectionReconciliation() {
   const [actionError, setActionError] = useState('')
   const [isActing, setIsActing] = useState(false)
 
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(searchInput.trim()), 400)
+    return () => clearTimeout(timeout)
+  }, [searchInput])
+
+  // Any server-side filter change goes back to page 1 - only `page` itself, changed via the
+  // table's own Prev/Next, should NOT reset itself.
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, debouncedSearch, customerId, orderId])
+
   const load = useCallback(() => {
     setIsLoading(true)
     setLoadError('')
-    listCollections().then((result) => {
+    listCollections({
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      search: debouncedSearch || undefined,
+      customer_id: customerId || undefined,
+      order_id: orderId || undefined,
+      page,
+      page_size: PAGE_SIZE,
+    }).then((result) => {
       if (!result.success) {
         setCollections([])
+        setTotal(0)
         setLoadError(result.error)
         setUnavailable(/did not respond \(404\)/i.test(result.error || ''))
       } else {
         setUnavailable(false)
         setCollections(result.collections)
+        setTotal(result.total ?? result.collections.length)
       }
       setIsLoading(false)
     })
-  }, [])
+  }, [statusFilter, debouncedSearch, customerId, orderId, page])
 
   useEffect(() => {
     load()
   }, [load])
 
+  const loadStats = useCallback(() => {
+    listCollections({ page_size: 100 }).then((result) => {
+      if (result.success) setStatsCollections(result.collections)
+    })
+  }, [])
+
+  useEffect(() => {
+    loadStats()
+  }, [loadStats])
+
+  const fetchCustomerOptions = useCallback(async (query) => {
+    const result = await listCustomers({ search: query })
+    if (!result.success) return []
+    return (result.customers || []).slice(0, 50).map((c) => ({ value: c.id, label: c.name || c.businessName || c.business_name || 'Customer' }))
+  }, [])
+
+  const fetchOrderOptions = useCallback(async (query) => {
+    const result = await listOrders({ search: query, customer_id: customerId || undefined, page_size: 20 })
+    if (!result.success) return []
+    return (result.orders || []).map((o) => ({ value: o.id, label: o.orderNumber || o.id }))
+  }, [customerId])
+
   const stats = useMemo(() => {
-    const recorded = collections.filter((c) => c.status === 'recorded')
+    const recorded = statsCollections.filter((c) => c.status === 'recorded')
     return {
       recordedCount: recorded.length,
       recordedAmount: recorded.reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
-      reconciledToday: collections.filter((c) => c.status === 'reconciled' && isSameDay(c.reconciledAt)).length,
-      voided: collections.filter((c) => c.status === 'voided').length,
+      reconciledToday: statsCollections.filter((c) => c.status === 'reconciled' && isSameDay(c.reconciledAt)).length,
+      voided: statsCollections.filter((c) => c.status === 'voided').length,
     }
-  }, [collections])
+  }, [statsCollections])
 
-  const partnerOptions = useMemo(() => uniqueOptions(collections, 'deliveryPartnerName', 'All partners'), [collections])
+  const partnerOptions = useMemo(() => uniqueOptions(statsCollections, 'deliveryPartnerName', 'All partners'), [statsCollections])
 
   const rows = useMemo(() => {
+    // statusFilter/search/customerId/orderId are already applied server-side (see `load`) -
+    // only partner + date stay client-side here, same as before.
     const base = collections.filter((c) => {
-      if (statusFilter !== 'all' && c.status !== statusFilter) return false
       if (partnerFilter !== 'all' && c.deliveryPartnerName !== partnerFilter) return false
       if (!isWithinDateRange(c.recordedAt, dateFrom, dateTo)) return false
       return true
@@ -107,7 +172,7 @@ export default function CollectionReconciliation() {
       _recordedAtLabel: formatDateTime(c.recordedAt),
       _modeLabel: formatPaymentMode(c.paymentMode),
     }))
-  }, [collections, statusFilter, partnerFilter, dateFrom, dateTo])
+  }, [collections, partnerFilter, dateFrom, dateTo])
 
   const runReconcile = async (collection) => {
     if (isActing) return
@@ -131,6 +196,7 @@ export default function CollectionReconciliation() {
     setReconcileTarget(null)
     setDetail(null)
     load()
+    loadStats()
   }
 
   const runVoid = async () => {
@@ -149,6 +215,7 @@ export default function CollectionReconciliation() {
     setVoidReason('')
     setDetail(null)
     load()
+    loadStats()
   }
 
   const rowActions = (row) => {
@@ -211,12 +278,20 @@ export default function CollectionReconciliation() {
               {!isLoading && (
                 <ListFilterPanel title="Filter Collections">
                   <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                  <Select label="Delivery Partner" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date
+                  <Select label="Delivery Partner (this page only)" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-neutral-700">Customer</label>
+                    <EntitySearchSelect value={customerId} selectedLabel={customerLabel} onChange={(value, label) => { setCustomerId(value); setCustomerLabel(label) }} fetchOptions={fetchCustomerOptions} placeholder="Any customer" className="w-full" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-neutral-700">Order</label>
+                    <EntitySearchSelect value={orderId} selectedLabel={orderLabel} onChange={(value, label) => { setOrderId(value); setOrderLabel(label) }} fetchOptions={fetchOrderOptions} placeholder="Any order" className="w-full" />
+                  </div>
+                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date (this page only)
                     <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
                   </div>
                   {hasExtraFilters && (
-                    <button type="button" onClick={() => { setPartnerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                    <button type="button" onClick={() => { setPartnerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setCustomerId(''); setCustomerLabel(''); setOrderId(''); setOrderLabel('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
                   )}
                 </ListFilterPanel>
               )}
@@ -232,32 +307,49 @@ export default function CollectionReconciliation() {
                 {/* Desktop / tablet: compact table */}
                 <div className="hidden md:block">
                   <DataTable
-                    key={`${statusFilter}-${partnerFilter}-${datePreset}-${customFrom}-${customTo}`}
-                    renderToolbar={({ search, onSearchChange, resultCount }) => (
+                    key={`${statusFilter}-${partnerFilter}-${datePreset}-${customFrom}-${customTo}-${customerId}-${orderId}`}
+                    serverPagination
+                    page={page}
+                    totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+                    totalCount={total}
+                    onPageChange={setPage}
+                    renderToolbar={() => {
+                      const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+                      const rangeEnd = Math.min(page * PAGE_SIZE, total)
+                      return (
                       <div className="flex flex-col gap-3 border-b border-neutral-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-2">
                           <h3 className="text-base font-semibold tracking-tight text-neutral-900">Collections</h3>
-                          <span className="text-xs text-neutral-400" aria-live="polite">{resultCount} {resultCount === 1 ? 'result' : 'results'}</span>
+                          <span className="text-xs text-neutral-400" aria-live="polite">Showing {rangeStart}-{rangeEnd} of {total}</span>
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <div className="relative w-full sm:w-60">
                             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-                            <input type="search" value={search} onChange={onSearchChange} placeholder="Search collections..." aria-label="Search collections"
+                            <input type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search collections..." aria-label="Search collections"
                               className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
                           </div>
                           <ListFilterPanel title="Filter Collections">
                             <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                            <Select label="Delivery Partner" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                            <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date
+                            <Select label="Delivery Partner (this page only)" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-sm font-medium text-neutral-700">Customer</label>
+                              <EntitySearchSelect value={customerId} selectedLabel={customerLabel} onChange={(value, label) => { setCustomerId(value); setCustomerLabel(label) }} fetchOptions={fetchCustomerOptions} placeholder="Any customer" className="w-full" />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-sm font-medium text-neutral-700">Order</label>
+                              <EntitySearchSelect value={orderId} selectedLabel={orderLabel} onChange={(value, label) => { setOrderId(value); setOrderLabel(label) }} fetchOptions={fetchOrderOptions} placeholder="Any order" className="w-full" />
+                            </div>
+                            <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date (this page only)
                               <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
                             </div>
                             {hasExtraFilters && (
-                              <button type="button" onClick={() => { setPartnerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                              <button type="button" onClick={() => { setPartnerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setCustomerId(''); setCustomerLabel(''); setOrderId(''); setOrderLabel('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
                             )}
                           </ListFilterPanel>
                         </div>
                       </div>
-                    )}
+                      )
+                    }}
                     columns={[
                       { key: 'collectionNumber', header: 'Collection #', sortable: true },
                       { key: 'deliveryNumber', header: 'Delivery #', sortable: true, render: (r) => r.deliveryNumber || '—' },
@@ -277,8 +369,6 @@ export default function CollectionReconciliation() {
                       },
                     ]}
                     data={rows}
-                    searchKeys={['collectionNumber', 'deliveryNumber', 'orderNumber', 'customerName', 'reference']}
-                    searchPlaceholder="Search collections..."
                     onRowClick={(row) => setDetail(row)}
                     emptyTitle={
                       statusFilter === 'recorded'
@@ -326,6 +416,17 @@ export default function CollectionReconciliation() {
                         </div>
                       </div>
                     ))
+                  )}
+                  {total > 0 && (
+                    <div className="flex items-center justify-between pt-1">
+                      <p className="text-xs text-neutral-400">
+                        Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, total)} of {total}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button type="button" variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</Button>
+                        <Button type="button" variant="outline" size="sm" disabled={page >= Math.ceil(total / PAGE_SIZE)} onClick={() => setPage((p) => p + 1)}>Next</Button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </>

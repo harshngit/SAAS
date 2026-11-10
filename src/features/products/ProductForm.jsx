@@ -551,6 +551,7 @@ export default function ProductForm({
             value: String(category.id),
             label: category.name || category.category_name || '',
             parentId: category.parent_id || category.parentId || '',
+            parentName: category.parent_name || category.parentName || '',
           }))
           .filter((option) => option.value && option.label)
 
@@ -609,8 +610,17 @@ export default function ProductForm({
   const brandFieldDisabled = !formData.categoryId || isLoadingCategoryBrands || loadedBrandCategoryId !== formData.categoryId || Boolean(categoryBrandsError)
   const effectiveCategoryOptions = categoryOptions
 
+  // "Parent › Sub" in the dropdown itself (crm_changes18/19 - sub category names are now only
+  // unique per parent) - `bareLabel` keeps the plain name for what actually gets stored/shown
+  // elsewhere (formData.subCategory), so this prefix never leaks into saved data.
   const subCategoryOptions = useMemo(
-    () => subCategoryOptionsAll.filter((option) => option.parentId === formData.category),
+    () => subCategoryOptionsAll
+      .filter((option) => option.parentId === formData.category)
+      .map((option) => ({
+        ...option,
+        bareLabel: option.label,
+        label: option.parentName ? `${option.parentName} › ${option.label}` : option.label,
+      })),
     [subCategoryOptionsAll, formData.category],
   )
 
@@ -1041,7 +1051,7 @@ export default function ProductForm({
               // Product Type's available options are scoped to the selected Subcategory (client
               // spec §4) - whatever was selected under the PREVIOUS Subcategory is no longer
               // necessarily valid, so clear it on every Subcategory change.
-              setFormData((current) => ({ ...current, subCategoryId: event.target.value, subCategory: option?.label || '', productType: '', productTypeId: '' }))
+              setFormData((current) => ({ ...current, subCategoryId: event.target.value, subCategory: option?.bareLabel || option?.label || '', productType: '', productTypeId: '' }))
             }}
             placeholder={formData.category ? 'Select sub category' : 'Select a category first'}
             disabled={!formData.category}

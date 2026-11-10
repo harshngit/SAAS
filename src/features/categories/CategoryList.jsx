@@ -62,35 +62,62 @@ const formatDateLabel = (value) => {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-function CategoryForm({ category, existingCategories, saving, formError, onClose, onSave }) {
+// `parentCategory` - set only when opened via "Add Subcategory" on a top-level row: creates a
+// NEW subcategory under it (parentId fixed, shown read-only). Editing an EXISTING subcategory
+// (`category?.parentId` truthy) instead shows an editable Parent select - the "edit modal cannot
+// change the parent" gap. A top-level category (create or edit) never shows a parent field.
+function CategoryForm({ category, parentCategory, existingCategories, saving, formError, onClose, onSave }) {
   const [formData, setFormData] = useState(emptyForm)
   const { can } = usePermission()
-  const canSetBrands = can('products', 'edit') && !category?.parentId
+  const isSubcategory = Boolean(category?.parentId) || Boolean(parentCategory)
+  const canSetBrands = can('products', 'edit') && !isSubcategory
   const brandSelection = useCategoryBrandSelection(category?.id, canSetBrands)
   const [errors, setErrors] = useState({})
   const [imageError, setImageError] = useState('')
   const [previewFailed, setPreviewFailed] = useState(false)
 
   useEffect(() => {
-    setFormData(category ? { ...emptyForm, ...category } : emptyForm)
+    setFormData(category ? { ...emptyForm, ...category } : { ...emptyForm, parentId: parentCategory?.id || '' })
     setErrors({})
     setImageError('')
     setPreviewFailed(false)
-  }, [category])
+  }, [category, parentCategory])
+
+  // Only an EXISTING subcategory's parent is reassignable here - never lets a top-level category
+  // become a subcategory or vice versa (not asked for, and the UI doesn't show a "none" option).
+  const parentOptions = useMemo(
+    () => existingCategories.filter((item) => !item.parentId).map((item) => ({ value: item.id, label: item.name })),
+    [existingCategories],
+  )
+  const editableParent = Boolean(category?.parentId)
+  const parentName = parentCategory?.name || existingCategories.find((item) => item.id === formData.parentId)?.name || ''
 
   const validate = () => {
     const nextErrors = {}
     const name = formData.name.trim()
-    const duplicate = existingCategories.some(
-      (item) => item.id !== category?.id && item.name.trim().toLowerCase() === name.toLowerCase(),
-    )
+    // Per-parent uniqueness (crm_changes18): a top-level name only clashes with other top-level
+    // categories; a subcategory name only clashes with siblings under the SAME parent - it can
+    // now share a name with a subcategory under a different parent, or with a top-level category.
+    // Uses formData.parentId (the CURRENT selection), not the original category.parentId, so
+    // reassigning the parent validates against the NEW parent's siblings.
+    const duplicate = existingCategories.some((item) => {
+      if (item.id === category?.id) return false
+      if (item.name.trim().toLowerCase() !== name.toLowerCase()) return false
+      return formData.parentId ? item.parentId === formData.parentId : !item.parentId
+    })
 
     if (!name || name === '.') {
       nextErrors.name = 'Enter a valid category name.'
     }
 
+    if (isSubcategory && !formData.parentId) {
+      nextErrors.parentId = 'Choose a parent category.'
+    }
+
     if (duplicate) {
-      nextErrors.name = 'Category name already exists.'
+      nextErrors.name = formData.parentId
+        ? 'This parent already has a subcategory with this name.'
+        : 'A category with this name already exists.'
     }
 
     setErrors(nextErrors)
@@ -117,7 +144,7 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
     event.preventDefault()
     if (!validate()) return
     if (canSetBrands && (brandSelection.loading || brandSelection.error)) return
-    onSave({ ...formData, parentId: category?.parentId || '', allowedBrandIds: canSetBrands ? brandSelection.selectedIds : undefined })
+    onSave({ ...formData, allowedBrandIds: canSetBrands ? brandSelection.selectedIds : undefined })
   }
 
   return (
@@ -136,6 +163,25 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
         error={errors.name}
         required
       />
+
+      {isSubcategory && (
+        editableParent ? (
+          <Select
+            label="Parent Category"
+            required
+            options={parentOptions}
+            value={formData.parentId}
+            onChange={(event) => setFormData((current) => ({ ...current, parentId: event.target.value }))}
+            error={errors.parentId}
+          />
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-neutral-700">Parent Category</label>
+            <p className="rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-600">{parentName || 'Unknown'}</p>
+          </div>
+        )
+      )}
+
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-neutral-700">Category Image</label>
         <p className="text-xs font-medium text-neutral-400">Paste image URL or upload an image</p>
@@ -194,7 +240,7 @@ function CategoryForm({ category, existingCategories, saving, formError, onClose
           ) : (
             <>
               <Check className="size-4" aria-hidden="true" />
-              Save Category
+              {parentCategory ? 'Save Subcategory' : 'Save Category'}
             </>
           )}
         </Button>
@@ -224,6 +270,10 @@ export default function CategoryList() {
   const [page, setPage] = useState(1)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
+  // Set only when the form was opened via "Add Subcategory" on a top-level row/detail - the new
+  // record's fixed parent. Mutually exclusive with editingCategory (openForm/openAddSubcategoryForm
+  // each clear the other).
+  const [subcategoryParent, setSubcategoryParent] = useState(null)
   const [viewCategory, setViewCategory] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -367,6 +417,14 @@ export default function CategoryList() {
 
   const openForm = (category = null) => {
     setEditingCategory(category)
+    setSubcategoryParent(null)
+    setFormError('')
+    setIsFormOpen(true)
+  }
+
+  const openAddSubcategoryForm = (parent) => {
+    setEditingCategory(null)
+    setSubcategoryParent(parent)
     setFormError('')
     setIsFormOpen(true)
   }
@@ -375,6 +433,7 @@ export default function CategoryList() {
     if (isSaving) return
     setIsFormOpen(false)
     setEditingCategory(null)
+    setSubcategoryParent(null)
     setFormError('')
   }
 
@@ -429,6 +488,17 @@ export default function CategoryList() {
     if (!viewCategory) return
 
     setEditingCategory(viewCategory)
+    setSubcategoryParent(null)
+    setViewCategory(null)
+    setDetailsError('')
+    setIsFormOpen(true)
+  }
+
+  const handleAddSubcategoryFromDetails = () => {
+    if (!viewCategory) return
+
+    setEditingCategory(null)
+    setSubcategoryParent(viewCategory)
     setViewCategory(null)
     setDetailsError('')
     setIsFormOpen(true)
@@ -704,6 +774,7 @@ export default function CategoryList() {
                         items={[
                           { label: 'View Details', icon: Eye, onClick: () => handleViewDetails(category) },
                           { label: 'Edit', icon: Edit, onClick: () => openForm(category) },
+                          ...(!category.parentId ? [{ label: 'Add Subcategory', icon: Plus, onClick: () => openAddSubcategoryForm(category) }] : []),
                           {
                             label: 'Delete',
                             icon: Trash2,
@@ -766,11 +837,12 @@ export default function CategoryList() {
       <Modal
         isOpen={isFormOpen}
         onClose={closeForm}
-        title={editingCategory ? 'Edit Category' : 'Add Category'}
+        title={editingCategory ? 'Edit Category' : subcategoryParent ? `Add Subcategory to ${subcategoryParent.name}` : 'Add Category'}
         className="max-w-lg"
       >
         <CategoryForm
           category={editingCategory}
+          parentCategory={subcategoryParent}
           existingCategories={categories}
           saving={isSaving}
           formError={formError}
@@ -893,6 +965,17 @@ export default function CategoryList() {
                 >
                   Close
                 </Button>
+                {viewCategory && !viewCategory.parentId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-md border-neutral-300 bg-transparent px-3 py-2 text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50"
+                    onClick={handleAddSubcategoryFromDetails}
+                  >
+                    <Plus className="size-4" aria-hidden="true" />
+                    Add Subcategory
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"

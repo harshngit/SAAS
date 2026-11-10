@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { Droplet } from 'lucide-react'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -114,12 +113,7 @@ export default function GoogleRegister() {
         <main className="flex min-h-0 w-full flex-col items-center overflow-y-auto px-4 py-8 lg:w-1/2 lg:px-10">
           <div className="flex w-full max-w-2xl flex-col justify-center">
             <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-linear-to-br from-primary-500 to-primary-700 text-white shadow-(--shadow-glow-primary)">
-                <Droplet className="size-5" />
-              </div>
-              <span className="font-(--font-display) text-lg font-semibold tracking-tight text-primary-700">
-                Beas Suite
-              </span>
+              <img src="/image/sass-logo.png" alt="Beas Suite" className="h-16 w-auto object-contain" />
             </div>
 
             <h1 className="text-center font-(--font-display) text-3xl font-semibold tracking-tight text-neutral-950">
