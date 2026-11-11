@@ -202,6 +202,7 @@ export async function listDeliveries(params = {}) {
     const queryParams = { page_size: params.page_size || 100 }
     if (params.page !== undefined) queryParams.page = params.page
     if (params.status) queryParams.status = params.status
+    if (params.search) queryParams.search = params.search
     if (params.order_id) queryParams.order_id = params.order_id
     if (params.delivery_partner_id) queryParams.delivery_partner_id = params.delivery_partner_id
     if (params.open_only !== undefined) queryParams.open_only = params.open_only
