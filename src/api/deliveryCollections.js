@@ -101,7 +101,9 @@ function normalizeCollection(raw) {
     reference: raw.reference || raw.transaction_reference || '',
     note: raw.note || raw.notes || '',
     status: status === 'reconciled' || status === 'voided' ? status : 'recorded',
-    recordedById: raw.recorded_by_id || raw.created_by_id || raw.recorded_by?.id || '',
+    // `collector_id` is the field this endpoint actually sends (confirmed on live data) -
+    // `recorded_by_id`/`created_by_id` are defensive fallbacks for a differently-shaped response.
+    recordedById: raw.recorded_by_id || raw.collector_id || raw.created_by_id || raw.recorded_by?.id || '',
     recordedByName:
       raw.recorded_by_name || raw.collected_by_name || raw.recorded_by?.name || raw.created_by?.name || '',
     recordedByRole:
@@ -178,11 +180,39 @@ export async function listCollections(params = {}) {
     if (params.search) queryParams.search = params.search
     if (params.customer_id) queryParams.customer_id = params.customer_id
     if (params.order_id) queryParams.order_id = params.order_id
+    if (params.date_from) queryParams.date_from = params.date_from
+    if (params.date_to) queryParams.date_to = params.date_to
+    if (params.collected_by_user_id) queryParams.collected_by_user_id = params.collected_by_user_id
     const { data } = await apiClient.get('/deliveries/collections', { headers: authHeader(), params: queryParams })
     const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
     return { success: true, collections: rows.map(normalizeCollection), total: data?.total ?? rows.length }
   } catch (error) {
     return { success: false, ...collectionError(error, 'Unable to load collections. Please try again.') }
+  }
+}
+
+// GET /deliveries/collections/summary -> { total{count,amount}, by_status{awaiting_reconciliation,
+// reconciled,voided}, by_payment_mode{...} }. `total` includes voided - callers that need a
+// "Collected" figure (not-yet-void) should add awaiting_reconciliation + reconciled themselves.
+export async function getCollectionsSummary(params = {}) {
+  if (COLLECTION_DEMO_ENABLED) return { success: false, error: 'Collections summary is not available in demo mode.' }
+
+  try {
+    const queryParams = {}
+    if (params.date_from) queryParams.date_from = params.date_from
+    if (params.date_to) queryParams.date_to = params.date_to
+    if (params.collected_by_user_id) queryParams.collected_by_user_id = params.collected_by_user_id
+    if (params.customer_id) queryParams.customer_id = params.customer_id
+    if (params.order_id) queryParams.order_id = params.order_id
+    const { data } = await apiClient.get('/deliveries/collections/summary', { headers: authHeader(), params: queryParams })
+    return {
+      success: true,
+      total: data?.total || { count: 0, amount: 0 },
+      byStatus: data?.by_status || {},
+      byPaymentMode: data?.by_payment_mode || {},
+    }
+  } catch (error) {
+    return { success: false, ...collectionError(error, 'Unable to load the collections summary. Please try again.') }
   }
 }
 

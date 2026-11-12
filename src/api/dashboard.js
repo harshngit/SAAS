@@ -40,12 +40,32 @@ function authHeader() {
 }
 
 // A scope filter can be a single id (legacy callers) or an array of ids (multi-select) - only
-// sent when non-empty, as repeated query keys for an array (axios' default array serialization,
-// e.g. `warehouse_id=A&warehouse_id=B`) - the backend reads these as its normal list-of-ids query
-// param, the same shape FastAPI expects for `warehouse_id: list[str] = Query([])`.
+// sent when non-empty, as repeated query keys for an array - the same shape FastAPI expects for
+// `warehouse_id: list[str] = Query([])`.
 function scopeParam(value) {
   if (Array.isArray(value)) return value.length > 0 ? value : undefined
   return value || undefined
+}
+
+// axios' ACTUAL default array serialization is `key[]=A&key[]=B` (verified directly against
+// this axios version), NOT the bracket-less `key=A&key=B` FastAPI's list-of-ids query param
+// expects - the backend doesn't recognize `warehouse_id[]` as `warehouse_id` at all, so with 2+
+// values selected the filter was being silently ignored entirely (confirmed live: it returned
+// the full unfiltered org-wide dashboard, not even "one of the selected values"). This serializer
+// produces the correct bracket-less repeated-key format for every param this call sends.
+function serializeDashboardParams(params) {
+  const search = new URLSearchParams()
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value === undefined || value === null) return
+    if (Array.isArray(value)) {
+      value.forEach((entry) => {
+        if (entry !== undefined && entry !== null) search.append(key, entry)
+      })
+    } else {
+      search.append(key, value)
+    }
+  })
+  return search.toString()
 }
 
 // GET /dashboard/admin - 11 blocks: filters, summary, orders, cashflow, receivables_payables,
@@ -74,6 +94,7 @@ export async function getAdminDashboard(params = {}) {
     const { data } = await apiClient.get('/dashboard/admin', {
       headers: authHeader(),
       params: queryParams,
+      paramsSerializer: { serialize: serializeDashboardParams },
     })
 
     return { success: true, dashboard: data }

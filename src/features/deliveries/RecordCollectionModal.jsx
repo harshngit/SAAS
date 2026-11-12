@@ -128,7 +128,7 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-neutral-700">Reference {method === 'cash' ? '(optional)' : ''}</label>
+          <label className="text-sm font-medium text-neutral-700">Reference Number</label>
           <input type="text" value={reference} onChange={(event) => setReference(event.target.value)} className={field} placeholder="Txn / cheque / UPI reference" />
         </div>
 

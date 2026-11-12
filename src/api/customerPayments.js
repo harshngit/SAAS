@@ -152,7 +152,7 @@ export async function searchCustomerOrders(customerId, query) {
   if (!customerId) return []
   const result = await listOrders({ customer_id: customerId, search: query || undefined, page_size: 20 })
   if (!result.success) return []
-  return (result.orders || []).map((order) => ({ value: order.id, label: order.orderNumber || order.id }))
+  return (result.orders || []).map((order) => ({ value: order.id, label: order.orderNumber || 'Order' }))
 }
 
 // Canonical path per the backend contract. If a deployment exposes it elsewhere, change

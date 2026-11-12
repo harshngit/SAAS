@@ -425,11 +425,11 @@ export default function DeliveryDetail() {
   // Backend enforcement is separate; this only stops the partner acting on a dead order.
   const parentOrderCancelled = String(delivery.order?.status || delivery.orderStatus || '').toLowerCase() === 'cancelled'
   const nextAction = parentOrderCancelled ? null : getNextDeliveryAction(delivery, { isAdmin: isAdminView })
-  const canReassign = isAdminView && ['assigned', 'rejected'].includes(stageKey)
-  const canEdit = isAdminView && ['assigned', 'rejected'].includes(stageKey)
+  const canReassign = isAdminView && ['unassigned', 'assigned', 'rejected'].includes(stageKey)
+  const canEdit = isAdminView && ['unassigned', 'assigned', 'rejected'].includes(stageKey)
   // Pre-load only. Once goods are on the vehicle (loaded / in_transit) the backend rejects a
   // plain cancel with a 400 and the real message is surfaced - no local stock reversal.
-  const canCancel = isAdminView && ['assigned', 'accepted', 'picking', 'ready'].includes(stageKey)
+  const canCancel = isAdminView && ['unassigned', 'assigned', 'accepted', 'picking', 'ready'].includes(stageKey)
   // ---- Collection (operational money handling, NOT a delivery status) ----
   // The Delivery Partner records the money actually collected at the customer; the Accountant
   // reconciles it later. Values come straight from the delivery/order response - nothing is

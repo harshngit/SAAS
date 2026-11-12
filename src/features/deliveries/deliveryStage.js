@@ -67,6 +67,11 @@ function stageFromInternalStatus(internal, pickingStatus) {
     case 'ready':
       return withVariant('ready')
     case 'loaded':
+      // The backend collapses BOTH internal `loaded` and `in_transit` into the same public
+      // `status=in_transit` (confirmed on live data: every internal_status=loaded delivery has
+      // status=in_transit, with zero rows ever carrying status=in_transit at the internal_status
+      // level) - so `status` can never be used to disambiguate the two here. internal_status is
+      // the only field that distinguishes "loaded, not yet moving" from "actually in transit".
       return withVariant('loaded')
     case 'in_transit':
       return withVariant('in_transit')
@@ -91,19 +96,19 @@ function loadedTotalOf(delivery) {
   return (delivery.items || []).reduce((sum, item) => sum + (Number(item.loadedQuantity) || 0), 0)
 }
 
-// Returns { key, label, variant, offFlow } for the given normalized delivery.
-export function getDeliveryStage(delivery) {
-  if (!delivery) return { key: 'assigned', label: 'Assigned', variant: 'info' }
-
+function computeStage(delivery) {
   const status = delivery.status || 'pending'
   const pickingStatus = delivery.pickingStatus || 'not_started'
   const dispatched = Boolean(delivery.dispatchedAt)
-  // A delivery whose parent Sales Order was cancelled has left the workflow, regardless of
-  // its own (now stale) operational status. This keeps the client-approved cancelled-order
-  // guard consistent everywhere the stage is read (list / dashboard / detail).
-  const parentCancelled = String(delivery.order?.status || delivery.orderStatus || '').toLowerCase() === 'cancelled'
 
-  if (status === 'cancelled' || parentCancelled) return OFF_FLOW.cancelled
+  if (status === 'cancelled') return OFF_FLOW.cancelled
+
+  // The backend now names an unassigned delivery's own status `unassigned` directly - never
+  // derive this from a missing delivery partner name on the client, and check it before the
+  // internal_status branch below (internal_status tracks the pick/load/transit pipeline only,
+  // not partner assignment, so it would otherwise mis-report an unassigned delivery as
+  // "Assigned" whenever internal_status happens to be "planned").
+  if (status === 'unassigned') return { key: 'unassigned', label: 'Unassigned', variant: 'neutral' }
 
   // (A) NEW contract: when the backend names the exact stage via `internal_status`, trust it
   // directly. Falls through to the legacy derivation below when the field is absent or holds
@@ -131,8 +136,20 @@ export function getDeliveryStage(delivery) {
     return withVariant('accepted')
   }
 
-  // status === 'pending' (or anything unrecognised)
+  // status === 'pending' (partner named, not yet accepted) or anything unrecognised
   return withVariant('assigned')
+}
+
+// Returns { key, label, variant, offFlow, orderCancelled }. `orderCancelled` is true when the
+// parent Sales Order was cancelled but this delivery's OWN status is not - the delivery keeps
+// showing its real, current stage (e.g. "In Transit"), and the caller renders a small separate
+// "Order cancelled" badge alongside it instead of this module silently relabelling it "Cancelled".
+export function getDeliveryStage(delivery) {
+  if (!delivery) return { key: 'assigned', label: 'Assigned', variant: 'info', orderCancelled: false }
+
+  const stage = computeStage(delivery)
+  const parentCancelled = String(delivery.order?.status || delivery.orderStatus || '').toLowerCase() === 'cancelled'
+  return { ...stage, orderCancelled: parentCancelled && stage.key !== 'cancelled' }
 }
 
 function withVariant(key) {
@@ -193,6 +210,7 @@ export function getNextDeliveryAction(delivery, { isAdmin = false } = {}) {
 
 // Options for an admin/list status filter - the 7 lifecycle stages plus the off-flow outcomes.
 export const DELIVERY_STAGE_FILTER_OPTIONS = [
+  { value: 'unassigned', label: 'Unassigned' },
   ...DELIVERY_STAGES.map((stage) => ({ value: stage.key, label: stage.label })),
   { value: 'rejected', label: 'Rejected' },
   { value: 'partially_delivered', label: 'Partially Delivered' },

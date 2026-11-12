@@ -64,13 +64,16 @@ export default function CollectionDetailDrawer({ collection, isOpen, onClose, on
         <div className="flex items-start justify-between border-b border-neutral-100 px-6 py-5">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-neutral-900">{collection.collectionNumber}</h2>
+              {/* No real collection number exists on this record (the backend doesn't send
+                  one) - the customer's name is the meaningful thing to lead with instead of
+                  this collection's own raw id. */}
+              <h2 className="truncate text-lg font-semibold text-neutral-900">{collection.customerName || 'Collection'}</h2>
               <Badge variant={COLLECTION_STATUS_VARIANT[collection.status] || 'neutral'} dot>
                 {formatStatus(collection)}
               </Badge>
             </div>
             <p className="mt-0.5 text-sm text-neutral-500">
-              {formatCurrency(collection.amount)} · {collection.customerName || '—'}
+              {formatCurrency(collection.amount)} · {formatDateTime(collection.recordedAt)}
             </p>
           </div>
           <button

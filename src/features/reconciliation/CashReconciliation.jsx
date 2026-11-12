@@ -1,5 +1,5 @@
 import NumericInput from '../../components/ui/NumericInput'
-import { ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import { ListHeader, ListSummary, ListStatCard as StatCard, ListDataTable } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BadgeCheck, Info, RefreshCw, Scale, Trash2, Wallet } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
@@ -8,10 +8,7 @@ import Card from '../../components/ui/Card'
 import DatePicker from '../../components/ui/DatePicker'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import ActionMenu from '../../components/ui/ActionMenu'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
-import { useSortState } from '../../hooks/useSortState'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
 import {
@@ -48,6 +45,8 @@ const PAYMENT_METHOD_LABELS = { cash: 'Cash', upi: 'UPI', card: 'Card', bank_tra
 function paymentMethodLabel(method) {
   return PAYMENT_METHOD_LABELS[method] || String(method || '').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
+
+const PAGE_SIZE = 20
 
 const todayIso = () => toLocalDateString()
 const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100
@@ -129,12 +128,6 @@ export default function CashReconciliation() {
   const [historyDateFrom, setHistoryDateFrom] = useState('')
   const [historyDateTo, setHistoryDateTo] = useState('')
   const [historyStatus, setHistoryStatus] = useState('')
-  const { sortBy: historySortBy, sortOrder: historySortOrder, toggleSort: toggleHistorySort, sortParams: historySortParams } = useSortState()
-
-  const handleHistorySort = (field) => {
-    toggleHistorySort(field)
-    setHistoryPage(1)
-  }
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const [historyError, setHistoryError] = useState('')
   const [detailRecord, setDetailRecord] = useState(null)
@@ -200,8 +193,7 @@ export default function CashReconciliation() {
       date_to: historyDateTo || undefined,
       status: historyStatus || undefined,
       page: historyPage,
-      page_size: 10,
-      ...historySortParams,
+      page_size: PAGE_SIZE,
     })
     setIsLoadingHistory(false)
     if (!result.success) {
@@ -211,7 +203,7 @@ export default function CashReconciliation() {
     setHistory(result.reconciliations)
     setHistoryTotal(result.total)
     setHistoryTotalPages(result.totalPages || 1)
-  }, [historyDateFrom, historyDateTo, historyStatus, historyPage, historySortParams])
+  }, [historyDateFrom, historyDateTo, historyStatus, historyPage])
 
   useEffect(() => {
     loadForDate(date)
@@ -575,7 +567,6 @@ export default function CashReconciliation() {
       <Card
         title="Reconciliation History"
         className="overflow-hidden p-0"
-        bodyClassName="[&>p]:m-5"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <DatePicker value={historyDateFrom} onChange={(value) => { setHistoryDateFrom(value); setHistoryPage(1) }} placeholder="From date" className="w-36" />
@@ -584,68 +575,50 @@ export default function CashReconciliation() {
           </div>
         }
       >
-        {isLoadingHistory ? (
-          <LoadingSpinner variant="table" minWidth="min-w-4xl" columns={["Date", "Status", "Expected Collections", "Actual Collections", "Collections Variance", "Expected Closing Cash", "Actual Cash", "Cash Balance Variance", "Closed At", ""]} label="Loading history…" />
-        ) : historyError ? (
+        {historyError ? (
           <div className="m-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{historyError}</div>
-        ) : history.length === 0 ? (
-          <p className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
-            No reconciliation history yet.
-          </p>
         ) : (
-          <>
-            <div className="overflow-x-auto rounded-xl border border-neutral-100">
-              <table className="listing-table w-full min-w-4xl text-left text-sm">
-                <thead>
-                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
-                    <SortableHeaderCell label="Date" sortKey="reconciliation_date" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} className="px-4 py-2.5" />
-                    <SortableHeaderCell label="Status" sortKey="status" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} className="px-4 py-2.5" />
-                    <SortableHeaderCell label="Expected Collections" sortKey="total_expected_collections" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
-                    <SortableHeaderCell label="Actual Collections" sortKey="total_actual_collections" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
-                    <SortableHeaderCell label="Collections Variance" sortKey="collections_variance" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
-                    <SortableHeaderCell label="Expected Closing Cash" sortKey="closing_cash" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
-                    <SortableHeaderCell label="Actual Cash" sortKey="actual_cash_on_hand" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
-                    <SortableHeaderCell label="Cash Balance Variance" sortKey="variance" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} align="right" className="px-4 py-2.5" />
-                    <SortableHeaderCell label="Closed At" sortKey="closed_at" sortBy={historySortBy} sortOrder={historySortOrder} onSort={handleHistorySort} className="px-4 py-2.5" />
-                    <th className="px-4 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-50">
-                  {history.map((record) => (
-                    <tr key={record.id}>
-                      <td className="px-4 py-2.5 font-medium text-neutral-800">{formatDate(record.reconciliationDate)}</td>
-                      <td className="px-4 py-2.5">
-                        <Badge variant={record.status === 'closed' ? 'success' : 'warning'}>{record.status === 'closed' ? 'Closed' : 'Draft'}</Badge>
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-neutral-600">{formatCurrency(record.totalExpectedCollections)}</td>
-                      <td className="px-4 py-2.5 text-right text-neutral-600">{formatCurrency(record.totalActualCollections)}</td>
-                      <td className={`px-4 py-2.5 text-right font-medium ${varianceToneClass(record.collectionsVariance)}`}>{signedCurrency(record.collectionsVariance)}</td>
-                      <td className="px-4 py-2.5 text-right text-neutral-600">{formatCurrency(record.expectedClosingCash)}</td>
-                      <td className="px-4 py-2.5 text-right text-neutral-600">{formatCurrency(record.actualCashOnHand)}</td>
-                      <td className={`px-4 py-2.5 text-right font-medium ${varianceToneClass(record.cashBalanceVariance)}`}>{signedCurrency(record.cashBalanceVariance)}</td>
-                      <td className="px-4 py-2.5 text-neutral-500">{record.closedAt ? formatDateTime(record.closedAt) : '—'}</td>
-                      <td className="px-4 py-2.5 text-right">
-                        <ActionMenu items={[{ label: 'Details', onClick: () => setDetailRecord(record) }]} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {historyTotalPages > 1 && (
-              <div className="flex items-center justify-between gap-3 px-5 py-4 text-sm text-neutral-500">
-                <span>
-                  Showing <span className="font-semibold text-neutral-900">{history.length}</span> of{' '}
-                  <span className="font-semibold text-neutral-900">{historyTotal}</span>
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <button type="button" disabled={historyPage <= 1} onClick={() => setHistoryPage((value) => Math.max(1, value - 1))} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-neutral-600 disabled:opacity-40">Previous</button>
-                  <span className="min-w-16 text-center font-medium text-neutral-700">{historyPage} / {historyTotalPages}</span>
-                  <button type="button" disabled={historyPage >= historyTotalPages} onClick={() => setHistoryPage((value) => Math.min(historyTotalPages, value + 1))} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-neutral-600 disabled:opacity-40">Next</button>
-                </div>
-              </div>
-            )}
-          </>
+          <ListDataTable
+            loading={isLoadingHistory}
+            searchable={false}
+            serverPagination
+            page={historyPage}
+            totalPages={historyTotalPages}
+            totalCount={historyTotal}
+            onPageChange={setHistoryPage}
+            rowKey="id"
+            emptyTitle="No reconciliation history yet."
+            columns={[
+              { key: 'reconciliationDate', header: 'Date', sortable: true, render: (record) => formatDate(record.reconciliationDate) },
+              {
+                key: 'status',
+                header: 'Status',
+                sortable: true,
+                render: (record) => <Badge variant={record.status === 'closed' ? 'success' : 'warning'}>{record.status === 'closed' ? 'Closed' : 'Draft'}</Badge>,
+              },
+              { key: 'totalExpectedCollections', header: 'Expected Collections', sortable: true, align: 'right', render: (record) => formatCurrency(record.totalExpectedCollections) },
+              { key: 'totalActualCollections', header: 'Actual Collections', sortable: true, align: 'right', render: (record) => formatCurrency(record.totalActualCollections) },
+              {
+                key: 'collectionsVariance',
+                header: 'Collections Variance',
+                sortable: true,
+                align: 'right',
+                render: (record) => <span className={`font-medium ${varianceToneClass(record.collectionsVariance)}`}>{signedCurrency(record.collectionsVariance)}</span>,
+              },
+              { key: 'expectedClosingCash', header: 'Expected Closing Cash', sortable: true, align: 'right', render: (record) => formatCurrency(record.expectedClosingCash) },
+              { key: 'actualCashOnHand', header: 'Actual Cash', sortable: true, align: 'right', render: (record) => formatCurrency(record.actualCashOnHand) },
+              {
+                key: 'cashBalanceVariance',
+                header: 'Cash Balance Variance',
+                sortable: true,
+                align: 'right',
+                render: (record) => <span className={`font-medium ${varianceToneClass(record.cashBalanceVariance)}`}>{signedCurrency(record.cashBalanceVariance)}</span>,
+              },
+              { key: 'closedAt', header: 'Closed At', sortable: true, render: (record) => (record.closedAt ? formatDateTime(record.closedAt) : '—') },
+            ]}
+            data={history}
+            actions={(record) => [{ label: 'Details', onClick: () => setDetailRecord(record) }]}
+          />
         )}
       </Card>
 

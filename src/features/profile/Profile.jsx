@@ -502,7 +502,6 @@ export default function Profile() {
             </div>
             <DetailItem icon={ShieldCheck} label="Role" value={roleLabels[currentUser?.role] || currentUser?.role} />
             <DetailItem icon={Calendar} label="Joined" value={formatDate(currentUser?.created_at || currentUser?.joinedAt)} />
-            <DetailItem icon={Hash} label="User ID" value={currentUser?.id} />
           </div>
         </Card>
       </section>

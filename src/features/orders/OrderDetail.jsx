@@ -1167,6 +1167,9 @@ export default function OrderDetail() {
           <p className="text-sm leading-6 text-neutral-600">
             This will cancel {order.orderNumber} for {order.customerName}. This action cannot be undone.
           </p>
+          {actionError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
+          )}
           <Select
             label="Reason"
             required

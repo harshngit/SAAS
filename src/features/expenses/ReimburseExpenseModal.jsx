@@ -80,7 +80,7 @@ export default function ReimburseExpenseModal({ expense, onClose, onReimbursed }
             onChange={(event) => setPaymentMethod(event.target.value)}
             placeholder="Select payment method"
           />
-          <Input label="Reference (optional)" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="UTR / cheque number" />
+          <Input label="Reference Number" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="UTR / cheque number" />
           <Input label="Notes (optional)" as="textarea" value={notes} onChange={(event) => setNotes(event.target.value)} />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" disabled={isSaving} onClick={onClose}>Cancel</Button>

@@ -246,7 +246,7 @@ export default function OrderList() {
     [deliveryPartners],
   )
   const customerOptions = useMemo(
-    () => [{ value: 'all', label: 'All customers' }, ...customers.map((customer) => ({ value: customer.id, label: customer.name || customer.businessName || customer.id }))],
+    () => [{ value: 'all', label: 'All customers' }, ...customers.map((customer) => ({ value: customer.id, label: customer.name || customer.businessName || 'Customer' }))],
     [customers],
   )
 

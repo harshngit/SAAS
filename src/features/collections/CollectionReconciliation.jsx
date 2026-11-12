@@ -12,13 +12,14 @@ import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import EntitySearchSelect from '../reports/components/EntitySearchSelect'
-import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { resolveDateRange } from '../../utils/dateRange'
 import { uniqueOptions } from '../../utils/filterOptions'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
-import { listCollections, reconcileCollection, voidCollection } from '../../api/deliveryCollections'
+import { listCollections, getCollectionsSummary, reconcileCollection, voidCollection } from '../../api/deliveryCollections'
 import { listCustomers } from '../../api/customers'
 import { listOrders } from '../../api/orders'
+import { listDeliveryPartners } from '../../api/deliveries'
 import { formatCurrency } from '../../utils/format'
 import CollectionDetailDrawer from './CollectionDetailDrawer'
 import {
@@ -27,7 +28,6 @@ import {
   formatPaymentMode,
   formatStatus,
   isReconcilable,
-  isSameDay,
   isVoidable,
 } from './collectionHelpers'
 
@@ -61,13 +61,25 @@ export default function CollectionReconciliation() {
   // single-page fetch in this app - an org with more than that many collections total sees an
   // undercount here, the same pre-existing limitation the tiles already had before filters existed.
   const [statsCollections, setStatsCollections] = useState([])
+  // The collections API only ever returns bare customer_id/delivery_partner_id - no nested
+  // customer/delivery_partner object, no *_name field at all - so customerName/
+  // deliveryPartnerName off normalizeCollection() are always empty. Resolved client-side here,
+  // ONE lookup of the whole org's customers + delivery partners (both small, bounded lists -
+  // same pattern AdminDeliveries.jsx already uses for its own partner roster), instead of a
+  // per-row call. Used wherever a name is displayed below.
+  const [customerNameById, setCustomerNameById] = useState(new Map())
+  const [partnerNameById, setPartnerNameById] = useState(new Map())
+  const [partners, setPartners] = useState([])
   const [statusFilter, setStatusFilter] = useState('all')
   const [partnerFilter, setPartnerFilter] = useState('all')
+  const [collectedByFilter, setCollectedByFilter] = useState('all')
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-  // Server-side filters (crm_changes18 §4: status/search/customer_id/order_id on
-  // GET /deliveries/collections). Partner + date stay client-side, same as before.
+  // Server-side filters (status/search/customer_id/order_id/date_from/date_to/
+  // collected_by_user_id on GET /deliveries/collections). Only the "Delivery Partner (this page
+  // only)" filter stays client-side - the collections API has no delivery_partner_id filter, only
+  // collected_by_user_id (the collector, wired separately above as its own dropdown).
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [customerId, setCustomerId] = useState('')
@@ -75,7 +87,10 @@ export default function CollectionReconciliation() {
   const [orderId, setOrderId] = useState('')
   const [orderLabel, setOrderLabel] = useState('')
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
-  const hasExtraFilters = partnerFilter !== 'all' || datePreset !== 'all' || Boolean(customerId) || Boolean(orderId)
+  // Only the custom preset lets the two ends be picked independently - every built-in preset
+  // already resolves to a valid from <= to pair.
+  const dateRangeInvalid = datePreset === 'custom' && Boolean(dateFrom) && Boolean(dateTo) && dateFrom > dateTo
+  const hasExtraFilters = partnerFilter !== 'all' || collectedByFilter !== 'all' || datePreset !== 'all' || Boolean(customerId) || Boolean(orderId)
 
   const [detail, setDetail] = useState(null)
   const [reconcileTarget, setReconcileTarget] = useState(null)
@@ -93,7 +108,7 @@ export default function CollectionReconciliation() {
   // table's own Prev/Next, should NOT reset itself.
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, debouncedSearch, customerId, orderId])
+  }, [statusFilter, debouncedSearch, customerId, orderId, collectedByFilter, dateFrom, dateTo])
 
   const load = useCallback(() => {
     setIsLoading(true)
@@ -103,6 +118,11 @@ export default function CollectionReconciliation() {
       search: debouncedSearch || undefined,
       customer_id: customerId || undefined,
       order_id: orderId || undefined,
+      collected_by_user_id: collectedByFilter !== 'all' ? collectedByFilter : undefined,
+      // An invalid custom range (from > to) is never sent - the list falls back to unfiltered
+      // by date rather than silently showing a wrong slice while the user fixes the dates.
+      date_from: !dateRangeInvalid && dateFrom ? dateFrom : undefined,
+      date_to: !dateRangeInvalid && dateTo ? dateTo : undefined,
       page,
       page_size: PAGE_SIZE,
     }).then((result) => {
@@ -118,7 +138,7 @@ export default function CollectionReconciliation() {
       }
       setIsLoading(false)
     })
-  }, [statusFilter, debouncedSearch, customerId, orderId, page])
+  }, [statusFilter, debouncedSearch, customerId, orderId, collectedByFilter, dateFrom, dateTo, dateRangeInvalid, page])
 
   useEffect(() => {
     load()
@@ -134,6 +154,56 @@ export default function CollectionReconciliation() {
     loadStats()
   }, [loadStats])
 
+  useEffect(() => {
+    Promise.all([listCustomers({ page_size: 100 }), listDeliveryPartners()]).then(([customersResult, partnersResult]) => {
+      if (customersResult.success) {
+        setCustomerNameById(new Map(customersResult.customers.map((c) => [c.id, c.name || c.businessName || c.business_name || ''])))
+      }
+      if (partnersResult.success) {
+        setPartnerNameById(new Map(partnersResult.partners.map((p) => [p.id, p.name || ''])))
+        setPartners(partnersResult.partners)
+      }
+    })
+  }, [])
+
+  // Org-wide (within the current date/collected-by/customer/order filters) totals from the
+  // dedicated summary endpoint - never derived from statsCollections' capped page_size=100
+  // sample, so these numbers stay correct no matter how many collections actually exist.
+  const [summary, setSummary] = useState(null)
+  const [isLoadingSummary, setIsLoadingSummary] = useState(true)
+
+  const loadSummary = useCallback(() => {
+    setIsLoadingSummary(true)
+    getCollectionsSummary({
+      customer_id: customerId || undefined,
+      order_id: orderId || undefined,
+      collected_by_user_id: collectedByFilter !== 'all' ? collectedByFilter : undefined,
+      date_from: !dateRangeInvalid && dateFrom ? dateFrom : undefined,
+      date_to: !dateRangeInvalid && dateTo ? dateTo : undefined,
+    }).then((result) => {
+      setSummary(result.success ? result : null)
+      setIsLoadingSummary(false)
+    })
+  }, [customerId, orderId, collectedByFilter, dateFrom, dateTo, dateRangeInvalid])
+
+  useEffect(() => {
+    loadSummary()
+  }, [loadSummary])
+
+  const collectedByOptions = useMemo(
+    () => [{ value: 'all', label: 'All collectors' }, ...partners.map((partner) => ({ value: partner.id, label: partner.name }))],
+    [partners],
+  )
+
+  // Collected = awaiting_reconciliation + reconciled (never includes voided - shown separately).
+  const byStatus = summary?.byStatus || {}
+  const awaitingReconciliation = byStatus.awaiting_reconciliation || { count: 0, amount: 0 }
+  const reconciledStat = byStatus.reconciled || { count: 0, amount: 0 }
+  const voidedStat = byStatus.voided || { count: 0, amount: 0 }
+  const collectedCount = awaitingReconciliation.count + reconciledStat.count
+  const collectedAmount = awaitingReconciliation.amount + reconciledStat.amount
+  const paymentModeEntries = Object.entries(summary?.byPaymentMode || {})
+
   const fetchCustomerOptions = useCallback(async (query) => {
     const result = await listCustomers({ search: query })
     if (!result.success) return []
@@ -143,27 +213,32 @@ export default function CollectionReconciliation() {
   const fetchOrderOptions = useCallback(async (query) => {
     const result = await listOrders({ search: query, customer_id: customerId || undefined, page_size: 20 })
     if (!result.success) return []
-    return (result.orders || []).map((o) => ({ value: o.id, label: o.orderNumber || o.id }))
+    return (result.orders || []).map((o) => ({ value: o.id, label: o.orderNumber || 'Order' }))
   }, [customerId])
 
-  const stats = useMemo(() => {
-    const recorded = statsCollections.filter((c) => c.status === 'recorded')
-    return {
-      recordedCount: recorded.length,
-      recordedAmount: recorded.reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
-      reconciledToday: statsCollections.filter((c) => c.status === 'reconciled' && isSameDay(c.reconciledAt)).length,
-      voided: statsCollections.filter((c) => c.status === 'voided').length,
-    }
-  }, [statsCollections])
-
-  const partnerOptions = useMemo(() => uniqueOptions(statsCollections, 'deliveryPartnerName', 'All partners'), [statsCollections])
+  const partnerOptions = useMemo(() => {
+    const enriched = statsCollections.map((c) => ({
+      ...c,
+      deliveryPartnerName: c.deliveryPartnerName || partnerNameById.get(c.deliveryPartnerId) || '',
+    }))
+    return uniqueOptions(enriched, 'deliveryPartnerName', 'All partners')
+  }, [statsCollections, partnerNameById])
 
   const rows = useMemo(() => {
-    // statusFilter/search/customerId/orderId are already applied server-side (see `load`) -
-    // only partner + date stay client-side here, same as before.
-    const base = collections.filter((c) => {
+    const resolved = collections.map((c) => ({
+      ...c,
+      customerName: c.customerName || customerNameById.get(c.customerId) || '',
+      deliveryPartnerName: c.deliveryPartnerName || partnerNameById.get(c.deliveryPartnerId) || '',
+      // The collector is usually the delivery partner in this flow - same roster, so the same
+      // lookup resolves "Collected By" too (an accountant/admin collector with no match here
+      // just stays blank, same as before).
+      recordedByName: c.recordedByName || partnerNameById.get(c.recordedById) || '',
+    }))
+    // statusFilter/search/customerId/orderId/collectedByFilter/date range are already applied
+    // server-side (see `load`) - only the "Delivery Partner (this page only)" filter stays
+    // client-side here, same as before.
+    const base = resolved.filter((c) => {
       if (partnerFilter !== 'all' && c.deliveryPartnerName !== partnerFilter) return false
-      if (!isWithinDateRange(c.recordedAt, dateFrom, dateTo)) return false
       return true
     })
     return base.map((c) => ({
@@ -172,7 +247,7 @@ export default function CollectionReconciliation() {
       _recordedAtLabel: formatDateTime(c.recordedAt),
       _modeLabel: formatPaymentMode(c.paymentMode),
     }))
-  }, [collections, partnerFilter, dateFrom, dateTo])
+  }, [collections, partnerFilter, customerNameById, partnerNameById])
 
   const runReconcile = async (collection) => {
     if (isActing) return
@@ -197,6 +272,7 @@ export default function CollectionReconciliation() {
     setDetail(null)
     load()
     loadStats()
+    loadSummary()
   }
 
   const runVoid = async () => {
@@ -216,6 +292,7 @@ export default function CollectionReconciliation() {
     setDetail(null)
     load()
     loadStats()
+    loadSummary()
   }
 
   const rowActions = (row) => {
@@ -239,21 +316,31 @@ export default function CollectionReconciliation() {
         <Card className="overflow-hidden p-0">
           <div className="grid grid-cols-2 lg:grid-cols-4">
             {[
-              { label: 'Recorded Collections', value: String(stats.recordedCount), detail: 'awaiting reconciliation', icon: HandCoins },
-              { label: 'Recorded Amount', value: formatCurrency(stats.recordedAmount), detail: 'amount awaiting reconciliation', icon: Wallet },
-              { label: 'Reconciled Today', value: String(stats.reconciledToday), detail: 'collections reconciled today', icon: BadgeCheck },
-              { label: 'Voided', value: String(stats.voided), detail: 'voided collections', icon: Ban },
+              { label: 'Collected', value: summary ? String(collectedCount) : '—', detail: summary ? `${formatCurrency(collectedAmount)} awaiting + reconciled` : '—', icon: HandCoins },
+              { label: 'Awaiting Reconciliation', value: summary ? String(awaitingReconciliation.count) : '—', detail: summary ? formatCurrency(awaitingReconciliation.amount) : '—', icon: Wallet },
+              { label: 'Reconciled', value: summary ? String(reconciledStat.count) : '—', detail: summary ? formatCurrency(reconciledStat.amount) : '—', icon: BadgeCheck },
+              { label: 'Voided', value: summary ? String(voidedStat.count) : '—', detail: summary ? formatCurrency(voidedStat.amount) : '—', icon: Ban },
             ].map(({ label, value, detail, icon: Icon }, index) => (
               <div key={label} className={`min-h-32 border-neutral-100 px-5 py-4 lg:px-6 ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} ${index < 3 ? 'lg:border-r' : ''}`}>
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-xs font-medium text-fg-muted">{label}</p>
                   <span className="flex size-9 items-center justify-center rounded-full bg-surface-muted text-fg-muted"><Icon className="size-4" aria-hidden="true" /></span>
                 </div>
-                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
-                <p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={isLoading} className="h-3 w-28">{detail}</SkeletonValue></p>
+                <p className="mt-4 font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={isLoadingSummary} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
+                <p className="mt-2 text-xs font-medium text-emerald-600"><SkeletonValue loading={isLoadingSummary} className="h-3 w-28">{detail}</SkeletonValue></p>
               </div>
             ))}
           </div>
+          {!isLoadingSummary && paymentModeEntries.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-neutral-100 px-5 py-3">
+              <span className="text-xs font-medium text-neutral-400">By payment mode:</span>
+              {paymentModeEntries.map(([mode, stat]) => (
+                <span key={mode} className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600">
+                  {formatPaymentMode(mode)}: {stat?.count ?? 0} · {formatCurrency(stat?.amount ?? 0)}
+                </span>
+              ))}
+            </div>
+          )}
         </Card>
       )}
 
@@ -279,6 +366,7 @@ export default function CollectionReconciliation() {
                 <ListFilterPanel title="Filter Collections">
                   <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
                   <Select label="Delivery Partner (this page only)" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+                  <Select label="Collected By" options={collectedByOptions} value={collectedByFilter} onChange={(event) => setCollectedByFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-medium text-neutral-700">Customer</label>
                     <EntitySearchSelect value={customerId} selectedLabel={customerLabel} onChange={(value, label) => { setCustomerId(value); setCustomerLabel(label) }} fetchOptions={fetchCustomerOptions} placeholder="Any customer" className="w-full" />
@@ -287,11 +375,12 @@ export default function CollectionReconciliation() {
                     <label className="text-sm font-medium text-neutral-700">Order</label>
                     <EntitySearchSelect value={orderId} selectedLabel={orderLabel} onChange={(value, label) => { setOrderId(value); setOrderLabel(label) }} fetchOptions={fetchOrderOptions} placeholder="Any order" className="w-full" />
                   </div>
-                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date (this page only)
+                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date
                     <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+                    {dateRangeInvalid && <span className="text-xs font-normal text-red-600">From date must be on or before the to date.</span>}
                   </div>
                   {hasExtraFilters && (
-                    <button type="button" onClick={() => { setPartnerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setCustomerId(''); setCustomerLabel(''); setOrderId(''); setOrderLabel('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                    <button type="button" onClick={() => { setPartnerFilter('all'); setCollectedByFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setCustomerId(''); setCustomerLabel(''); setOrderId(''); setOrderLabel('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
                   )}
                 </ListFilterPanel>
               )}
@@ -307,7 +396,7 @@ export default function CollectionReconciliation() {
                 {/* Desktop / tablet: compact table */}
                 <div className="hidden md:block">
                   <DataTable
-                    key={`${statusFilter}-${partnerFilter}-${datePreset}-${customFrom}-${customTo}-${customerId}-${orderId}`}
+                    key={`${statusFilter}-${partnerFilter}-${collectedByFilter}-${datePreset}-${customFrom}-${customTo}-${customerId}-${orderId}`}
                     serverPagination
                     page={page}
                     totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
@@ -331,6 +420,7 @@ export default function CollectionReconciliation() {
                           <ListFilterPanel title="Filter Collections">
                             <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
                             <Select label="Delivery Partner (this page only)" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+                            <Select label="Collected By" options={collectedByOptions} value={collectedByFilter} onChange={(event) => setCollectedByFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
                             <div className="flex flex-col gap-1.5">
                               <label className="text-sm font-medium text-neutral-700">Customer</label>
                               <EntitySearchSelect value={customerId} selectedLabel={customerLabel} onChange={(value, label) => { setCustomerId(value); setCustomerLabel(label) }} fetchOptions={fetchCustomerOptions} placeholder="Any customer" className="w-full" />
@@ -339,11 +429,12 @@ export default function CollectionReconciliation() {
                               <label className="text-sm font-medium text-neutral-700">Order</label>
                               <EntitySearchSelect value={orderId} selectedLabel={orderLabel} onChange={(value, label) => { setOrderId(value); setOrderLabel(label) }} fetchOptions={fetchOrderOptions} placeholder="Any order" className="w-full" />
                             </div>
-                            <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date (this page only)
+                            <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date
                               <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
+                              {dateRangeInvalid && <span className="text-xs font-normal text-red-600">From date must be on or before the to date.</span>}
                             </div>
                             {hasExtraFilters && (
-                              <button type="button" onClick={() => { setPartnerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setCustomerId(''); setCustomerLabel(''); setOrderId(''); setOrderLabel('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                              <button type="button" onClick={() => { setPartnerFilter('all'); setCollectedByFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setCustomerId(''); setCustomerLabel(''); setOrderId(''); setOrderLabel('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
                             )}
                           </ListFilterPanel>
                         </div>
@@ -351,11 +442,10 @@ export default function CollectionReconciliation() {
                       )
                     }}
                     columns={[
-                      { key: 'collectionNumber', header: 'Collection #', sortable: true },
-                      { key: 'deliveryNumber', header: 'Delivery #', sortable: true, render: (r) => r.deliveryNumber || '—' },
-                      { key: 'orderNumber', header: 'Order #', sortable: true, render: (r) => r.orderNumber || '—' },
                       { key: 'customerName', header: 'Customer', sortable: true, render: (r) => r.customerName || '—' },
                       { key: 'deliveryPartnerName', header: 'Delivery Partner', sortable: true, render: (r) => r.deliveryPartnerName || '—' },
+                      { key: 'deliveryNumber', header: 'Delivery #', sortable: true, render: (r) => r.deliveryNumber || '—' },
+                      { key: 'orderNumber', header: 'Order #', sortable: true, render: (r) => r.orderNumber || '—' },
                       { key: '_amount', header: 'Amount', sortable: true, align: 'right', render: (r) => formatCurrency(r._amount) },
                       { key: '_modeLabel', header: 'Payment Mode', sortable: true },
                       { key: '_recordedAtLabel', header: 'Recorded At', sortable: true },
@@ -398,7 +488,7 @@ export default function CollectionReconciliation() {
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-neutral-900">{row.customerName || '—'}</p>
                             <p className="mt-0.5 text-xs text-neutral-400">
-                              {row.collectionNumber} · {row.deliveryNumber || '—'}
+                              {row.deliveryPartnerName || 'Unassigned'}{row.deliveryNumber ? ` · ${row.deliveryNumber}` : ''}
                             </p>
                           </div>
                           <Badge variant={COLLECTION_STATUS_VARIANT[row.status] || 'neutral'} dot>{formatStatus(row)}</Badge>

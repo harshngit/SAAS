@@ -355,7 +355,7 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, onBl
               </div>
 
               <Input
-                label="Reference Number (optional)"
+                label="Reference Number"
                 value={reference}
                 onChange={(event) => setReference(event.target.value)}
                 placeholder="UPI / card / txn reference"

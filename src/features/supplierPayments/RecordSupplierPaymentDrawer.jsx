@@ -241,7 +241,7 @@ export default function RecordSupplierPaymentDrawer({ isOpen, onClose, onRecorde
             <Select label="Supplier" required options={supplierOptions} value={supplierId} onChange={(event) => handleSupplierChange(event.target.value)} disabled={Boolean(preset?.supplierId)} />
             <Input label="Payment Date" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
             <Select label="Payment Method" required options={PAYMENT_MODE_OPTIONS} value={paymentMode} onChange={(event) => setPaymentMode(event.target.value)} />
-            <Input label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="UTR / cheque / UPI ref (optional)" />
+            <Input label="Reference Number" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="UTR / cheque / UPI ref" />
             <Input as="textarea" label="Notes" className="sm:col-span-2" value={notes} onChange={(event) => setNotes(event.target.value)} />
             <Input label="Payment Amount" type="number" min="0" step="1" required value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
           </div>

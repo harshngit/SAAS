@@ -909,7 +909,7 @@ export default function AdminDashboard() {
               disabled={optionsLoading}
               searchable
               multiple
-              options={filterOptions.customers.map((customer) => ({ value: customer.id, label: customer.name || customer.business_name || customer.email || customer.phone || customer.id, searchText: [customer.business_name, customer.email, customer.phone, customer.mobile].filter(Boolean).join(' ') }))}
+              options={filterOptions.customers.map((customer) => ({ value: customer.id, label: customer.name || customer.business_name || customer.email || customer.phone || 'Customer', searchText: [customer.business_name, customer.email, customer.phone, customer.mobile].filter(Boolean).join(' ') }))}
               value={customerId}
               onChange={(event) => setCustomerId(event.target.value)}
               placeholder="All Customers"
@@ -922,7 +922,7 @@ export default function AdminDashboard() {
               disabled={optionsLoading}
               searchable
               multiple
-              options={filterOptions.suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name || supplier.business_name || supplier.email || supplier.phone || supplier.id, searchText: [supplier.business_name, supplier.email, supplier.phone, supplier.mobile].filter(Boolean).join(' ') }))}
+              options={filterOptions.suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name || supplier.business_name || supplier.email || supplier.phone || 'Supplier', searchText: [supplier.business_name, supplier.email, supplier.phone, supplier.mobile].filter(Boolean).join(' ') }))}
               value={supplierId}
               onChange={(event) => setSupplierId(event.target.value)}
               placeholder="All Suppliers"

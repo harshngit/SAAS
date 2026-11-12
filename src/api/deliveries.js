@@ -59,6 +59,7 @@ function authHeader() {
 // the collapsed public status the API returns (pending covers planned/rejected, accepted covers
 // accepted/ready/loaded, returned covers failed).
 export const DELIVERY_STATUS_OPTIONS = [
+  { value: 'unassigned', label: 'Unassigned' },
   { value: 'pending', label: 'Pending' },
   { value: 'planned', label: 'Planned' },
   { value: 'accepted', label: 'Accepted' },
@@ -206,6 +207,8 @@ export async function listDeliveries(params = {}) {
     if (params.order_id) queryParams.order_id = params.order_id
     if (params.delivery_partner_id) queryParams.delivery_partner_id = params.delivery_partner_id
     if (params.open_only !== undefined) queryParams.open_only = params.open_only
+    if (params.picking_status) queryParams.picking_status = params.picking_status
+    if (params.internal_status) queryParams.internal_status = params.internal_status
 
     const { data } = await apiClient.get('/deliveries', {
       headers: authHeader(),
@@ -219,6 +222,37 @@ export async function listDeliveries(params = {}) {
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to load deliveries. Please try again.',
+    )
+
+    return { success: false, error: message }
+  }
+}
+
+// GET /deliveries/summary - one org-wide (or filtered) status breakdown call, replacing the old
+// pattern of N separate page_size=1 listDeliveries() calls just to read back each total.
+export async function getDeliverySummary(params = {}) {
+  try {
+    const queryParams = {}
+    if (params.delivery_partner_id) queryParams.delivery_partner_id = params.delivery_partner_id
+    if (params.order_id) queryParams.order_id = params.order_id
+    if (params.search) queryParams.search = params.search
+
+    const { data } = await apiClient.get('/deliveries/summary', {
+      headers: authHeader(),
+      params: queryParams,
+    })
+
+    return {
+      success: true,
+      total: data?.total ?? 0,
+      byStatus: data?.by_status || {},
+      byInternalStatus: data?.by_internal_status || {},
+    }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load delivery summary. Please try again.',
     )
 
     return { success: false, error: message }
