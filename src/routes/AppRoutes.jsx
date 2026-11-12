@@ -124,6 +124,9 @@ const ContactSupport = lazy(() => import('../features/legal/ContactSupport'))
 const LegalIndex = lazy(() => import('../features/legal/LegalIndex'))
 const PlatformStaff = lazy(() => import('../features/superadmin/PlatformStaff'))
 const FeatureRequests = lazy(() => import('../features/superadmin/FeatureRequests'))
+const TicketDetail = lazy(() => import('../features/support/TicketDetail'))
+const PlatformSupportTickets = lazy(() => import('../features/support/PlatformSupportTickets'))
+const PlatformSupportTicketDetail = lazy(() => import('../features/support/PlatformSupportTicketDetail'))
 
 function RootRedirect() {
   const currentUser = useAuthStore((state) => state.currentUser)
@@ -168,6 +171,11 @@ export default function AppRoutes() {
           }
         >
           <Route path="/profile" element={<Profile />} />
+          {/* Help & FAQ (with ticket raising) and ticket detail are open to every authenticated
+              role, Admin and Staff alike - unlike most /admin/* pages below, which are
+              Admin-only. */}
+          <Route path="/admin/settings/help" element={<HelpFaq embedded />} />
+          <Route path="/support/tickets/:id" element={<TicketDetail />} />
         </Route>
 
         <Route
@@ -181,6 +189,8 @@ export default function AppRoutes() {
           <Route path="/superadmin/organizations" element={<OrganizationsList />} />
           <Route path="/superadmin/organizations/:id" element={<OrganizationDetail />} />
           <Route path="/superadmin/upgrade-requests" element={<UpgradeRequests />} />
+          <Route path="/superadmin/support-tickets" element={<PlatformSupportTickets />} />
+          <Route path="/superadmin/support-tickets/:id" element={<PlatformSupportTicketDetail />} />
           <Route path="/superadmin/staff" element={<PlatformStaff />} />
           <Route path="/superadmin/feature-requests" element={<FeatureRequests />} />
           <Route path="/superadmin/superadmins" element={<SuperAdminsList />} />
@@ -195,6 +205,8 @@ export default function AppRoutes() {
           <Route path="/platform/organizations/:id" element={<OrganizationDetail />} />
           <Route path="/platform/upgrade-requests" element={<UpgradeRequests />} />
           <Route path="/platform/feature-requests" element={<FeatureRequests />} />
+          <Route path="/platform/support-tickets" element={<PlatformSupportTickets />} />
+          <Route path="/platform/support-tickets/:id" element={<PlatformSupportTicketDetail />} />
         </Route>
 
         <Route
@@ -768,13 +780,12 @@ export default function AppRoutes() {
               </RequirePermissionRoute>
             }
           />
-          {/* Authenticated aliases of the public legal pages (/terms, /privacy, /help, /legal) -
-              same content components, embedded=true skips their own standalone page chrome so
+          {/* Authenticated aliases of the public legal pages (/terms, /privacy, /legal) - same
+              content components, embedded=true skips their own standalone page chrome so
               they render inside this Layout's Sidebar/Topbar instead of leaving it. No module
               gate: these aren't permission-scoped anywhere else in the app either. */}
           <Route path="/admin/settings/terms" element={<TermsOfService embedded />} />
           <Route path="/admin/settings/privacy" element={<PrivacyPolicy embedded />} />
-          <Route path="/admin/settings/help" element={<HelpFaq embedded />} />
           <Route path="/admin/settings/policies" element={<LegalIndex embedded />} />
           <Route path="/admin/notifications" element={<NotificationsList />} />
           <Route

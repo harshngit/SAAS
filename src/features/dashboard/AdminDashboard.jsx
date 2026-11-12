@@ -969,6 +969,9 @@ export default function AdminDashboard() {
             loadDashboard('this_month', { from: '', to: '' })
           }}>Reset filters</button>
         </div>
+        <p className="mt-2 text-[0.68rem] text-neutral-400">
+          Warehouse filter applies to Purchases, Overdue Payables and Stock Watch only. Use Customer filter for Sales and Orders.
+        </p>
       </div>
 
       {error && (

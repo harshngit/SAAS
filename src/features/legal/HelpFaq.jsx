@@ -1,5 +1,10 @@
+import { useState } from 'react'
+import { Plus } from 'lucide-react'
 import LegalPageLayout from './LegalPageLayout'
 import FaqSection from './FaqSection'
+import Button from '../../components/ui/Button'
+import RaiseTicketModal from '../support/RaiseTicketModal'
+import TicketsTab from '../support/TicketsTab'
 
 const SECTIONS = [
   {
@@ -207,9 +212,63 @@ const SECTIONS = [
   },
 ]
 
-export default function HelpFaq({ embedded = false }) {
+// Ticket raising/browsing needs a signed-in org user, so it only appears in the authenticated
+// `embedded` version of this page (the /admin/settings/help alias) - the public /help route
+// (reachable while logged out) stays exactly the plain FAQ it always was.
+function TicketsPanel() {
+  const [tab, setTab] = useState('faq')
+  const [isRaiseOpen, setIsRaiseOpen] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
+
   return (
-    <LegalPageLayout title="Help & FAQ" description="Answers to common questions about using Beas Suite." embedded={embedded}>
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1 rounded-xl bg-neutral-100 p-1">
+          <button type="button" onClick={() => setTab('faq')} className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${tab === 'faq' ? 'bg-surface text-neutral-900 shadow-(--shadow-xs)' : 'text-neutral-500 hover:text-neutral-800'}`}>FAQ</button>
+          <button type="button" onClick={() => setTab('tickets')} className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${tab === 'tickets' ? 'bg-surface text-neutral-900 shadow-(--shadow-xs)' : 'text-neutral-500 hover:text-neutral-800'}`}>Tickets</button>
+        </div>
+        <Button type="button" size="sm" onClick={() => setIsRaiseOpen(true)}>
+          <Plus className="size-4" aria-hidden="true" />
+          Raise a Ticket
+        </Button>
+      </div>
+
+      <div className="mt-5">
+        {tab === 'faq' ? (
+          <div className="space-y-6">
+            {SECTIONS.map((section) => (
+              <FaqSection key={section.title} title={section.title} items={section.items} />
+            ))}
+          </div>
+        ) : (
+          <TicketsTab reloadToken={reloadToken} />
+        )}
+      </div>
+
+      <RaiseTicketModal
+        isOpen={isRaiseOpen}
+        onClose={() => setIsRaiseOpen(false)}
+        onCreated={() => {
+          setIsRaiseOpen(false)
+          setTab('tickets')
+          setReloadToken((value) => value + 1)
+        }}
+      />
+    </>
+  )
+}
+
+export default function HelpFaq({ embedded = false }) {
+  if (embedded) {
+    return (
+      <LegalPageLayout title="Help & FAQ" description="Answers to common questions, or raise a support ticket." embedded>
+        <TicketsPanel />
+      </LegalPageLayout>
+    )
+  }
+
+  return (
+    <LegalPageLayout title="Help & FAQ" description="Answers to common questions about using Beas Suite.">
       <div className="space-y-6">
         {SECTIONS.map((section) => (
           <FaqSection key={section.title} title={section.title} items={section.items} />

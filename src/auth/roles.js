@@ -127,6 +127,7 @@ export const roleMenus = {
     { label: 'Organizations', path: '/platform/organizations', icon: Building2 },
     { label: 'Upgrade Requests', path: '/platform/upgrade-requests', icon: TrendingUp },
     { label: 'Feature Requests', path: '/platform/feature-requests', icon: ClipboardList },
+    { label: 'Support Tickets', path: '/platform/support-tickets', icon: HelpCircle },
   ] }],
   [ROLES.SUPER_ADMIN]: [
     {
@@ -136,6 +137,7 @@ export const roleMenus = {
         { label: 'Organizations', path: '/superadmin/organizations', icon: Building2 },
         { label: 'Upgrade Requests', path: '/superadmin/upgrade-requests', icon: TrendingUp },
         { label: 'Feature Requests', path: '/superadmin/feature-requests', icon: ClipboardList },
+        { label: 'Support Tickets', path: '/superadmin/support-tickets', icon: HelpCircle },
         { label: 'Platform Staff', path: '/superadmin/staff', icon: Users },
         { label: 'Plans', path: '/superadmin/plans', icon: CreditCard },
         { label: 'Platform Analytics', path: '/superadmin/analytics', icon: Activity },

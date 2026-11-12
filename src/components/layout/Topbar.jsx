@@ -24,8 +24,23 @@ function formatNotificationTime(value) {
   return date.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
+// A UUID (this app's id format everywhere) or a bare numeric id - never a real word, so it's
+// never shown as a page title. Matters whenever the current route isn't a registered sidebar
+// item (so the fallback below kicks in) and its last segment is a detail page's :id param -
+// e.g. /support/tickets/{uuid} - which used to render the raw id, hyphens and all, as the title.
+const ID_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$|^\d+$/i
+
+// Explicit title for a detail route that isn't itself a registered sidebar item (so
+// activeMenuItem below never matches it) - checked ahead of everything else so it's never at
+// the mercy of menu-matching/role-loading timing, unlike the generic ID-skipping fallback.
+const DETAIL_ROUTE_TITLES = [
+  { re: /^\/support\/tickets(?:\/.*)?$/, title: 'Tickets' },
+  { re: /^\/(?:platform|superadmin)\/support-tickets(?:\/.*)?$/, title: 'Support Tickets' },
+]
+
 function formatPathTitle(pathname) {
-  const segment = pathname.split('/').filter(Boolean).at(-1) || 'dashboard'
+  const segments = pathname.split('/').filter(Boolean)
+  const segment = [...segments].reverse().find((part) => !ID_SEGMENT.test(part)) || 'dashboard'
   return segment
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -221,7 +236,8 @@ export default function Topbar() {
   const activeMenuItem = menuItems
     .filter((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))
     .sort((a, b) => b.path.length - a.path.length)[0]
-  const pageTitle = activeMenuItem?.label || formatPathTitle(location.pathname)
+  const detailRouteTitle = DETAIL_ROUTE_TITLES.find((entry) => entry.re.test(location.pathname))?.title
+  const pageTitle = detailRouteTitle || activeMenuItem?.label || formatPathTitle(location.pathname)
   const pageSubtitle = pageTitle === 'Leads' ? 'Unified feed from WhatsApp, website form & calls' : ''
   const isSuperAdminDashboard = location.pathname === '/superadmin/dashboard'
 
@@ -246,7 +262,10 @@ export default function Topbar() {
 
   const handleHelp = () => {
     setIsMenuOpen(false)
-    navigate('/help')
+    // Org roles (Admin and Staff alike) land on the authenticated alias, which has ticket
+    // raising; a platform user (Super Admin / Sales Manager) isn't an org "customer" who could
+    // raise one, so they keep going to the plain public FAQ.
+    navigate(hasPlatformAccess(currentUser) ? '/help' : '/admin/settings/help')
   }
 
   const handlePrivacyPolicy = () => {

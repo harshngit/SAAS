@@ -75,6 +75,19 @@ function resolveUpgradeRequestDestination(currentUser) {
   return `${platformBaseForUser(currentUser)}/upgrade-requests`
 }
 
+// Org side: one universal detail route, reachable by every authenticated role (Admin and Staff
+// alike) - no per-role table needed, same path the backend's own action_url already uses.
+function resolveSupportTicketDestination(ticketId) {
+  return ticketId ? `/support/tickets/${ticketId}` : '/support/tickets'
+}
+
+// Platform side: same /platform-vs-/superadmin prefix split as every other platform surface.
+function resolvePlatformSupportTicketDestination(currentUser, ticketId) {
+  if (!hasPlatformAccess(currentUser)) return ''
+  const base = `${platformBaseForUser(currentUser)}/support-tickets`
+  return ticketId ? `${base}/${ticketId}` : base
+}
+
 const PATH_MATCHERS = [
   { re: /^\/sales-orders\/([^/]+)$/, resolve: (m, role) => buildFromTable(DETAIL_ROUTES.order, role, m[1]) },
   { re: /^\/deliveries\/([^/]+)$/, resolve: (m, role) => buildFromTable(DETAIL_ROUTES.delivery, role, m[1]) },
@@ -92,6 +105,8 @@ const PATH_MATCHERS = [
   // also accept a bare `/organizations/{id}` / `/upgrade-requests` in case that changes.
   { re: /^(?:\/superadmin)?\/organizations\/([^/]+)$/, resolve: (m, _role, _params, currentUser) => resolveOrganizationDestination(currentUser, m[1]) },
   { re: /^(?:\/platform)?\/upgrade-requests(?:\/[^/]+)?$/, resolve: (m, _role, _params, currentUser) => resolveUpgradeRequestDestination(currentUser) },
+  { re: /^\/support\/tickets\/([^/]+)$/, resolve: (m) => resolveSupportTicketDestination(m[1]) },
+  { re: /^\/platform\/support\/tickets\/([^/]+)$/, resolve: (m, _role, _params, currentUser) => resolvePlatformSupportTicketDestination(currentUser, m[1]) },
 ]
 
 // Entity-based last resort for a notification whose action_url doesn't match any known shape
