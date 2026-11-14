@@ -1,0 +1,21 @@
+// read-only: current state of the R4 purchase (receiving, GRN status, Return Items button, Product D stock)
+const L = require('./lib')
+const H = require('./h')
+;(async () => {
+  const st = L.readState()
+  const browser = await L.launch()
+  const sess = await L.newSession(browser, 'ADMIN')
+  const { page } = sess
+  const r = await L.login(sess, 'ADMIN')
+  if (!r.ok) { console.log('login failed'); await browser.close(); return }
+  await page.goto(L.BASE + st.purchaseUrl, { waitUntil: 'domcontentloaded' }); await L.settle(page, 12000)
+  const body = (await page.locator('main, body').first().innerText()).replace(/\s+/g, ' ')
+  console.log('receiving:', (body.match(/Receiving\s+([A-Za-z ]+?)\s+Amount Paid/) || [])[1])
+  console.log('return btn:', await page.getByRole('button', { name: /^return items$/i }).locator('visible=true').count())
+  await page.getByRole('tab', { name: /goods receipts/i }).click().catch(() => {})
+  await page.waitForTimeout(1200)
+  console.log('grn row:', (await page.locator('tr', { hasText: 'GRN-' }).first().innerText().catch(() => '')).replace(/\s+/g, ' '))
+  await L.shot(sess, 'R4-07b-check')
+  console.log('stock:', await H.stockRow(page, st.productDName))
+  await L.closeSession(sess); await browser.close()
+})().catch((e) => { console.error('SCRIPT ERROR', String(e.message).split('\n')[0]); process.exit(1) })

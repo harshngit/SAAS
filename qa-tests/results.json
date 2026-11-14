@@ -1,0 +1,832 @@
+[
+  {
+    "test": "T0",
+    "what": "Login ADMIN",
+    "expected": "Login works + sidebar visible",
+    "actual": "OK -> /admin/dashboard. Menus (46): Dashboard | Leads | Quotations | Customers | Brands | Categories | Products | Suppliers | Inventory | Warehouses | Purchases | Purchase Returns | Orders | Sales Returns | Deliveries | Sales | Vehicle Stock | Vehicles | Receivables | Accounts Payable | Supplier Payments | Collection Reconciliation | Day-End Approvals | Expenses | Reports | Profit and Loss Sheet | Cash Flow Sheet | GST Filing Sheet | Sales Invoices | Supplier Invoices | Company Settings | Plans | Billing History | Audit Log | My Profile | Staff | Attendance | Leaves | Roles & Permissions | Objects & Fields Settings | Invoice Changes | Appearance & Branding | Terms & Conditions | Privacy Policy | Help & FAQ | View All Policies",
+    "status": "PASS",
+    "screenshot": "shots\\T0-login-ADMIN.png",
+    "failedApis": []
+  },
+  {
+    "test": "T0",
+    "what": "Login SALES",
+    "expected": "Login works + sidebar visible",
+    "actual": "OK -> /sales/dashboard. Menus (13): Dashboard | Customers | Leads | Quotations | Orders | Create Order | Sales Returns | Stock | Visits | Follow-ups | Attendance | Leaves | Expenses",
+    "status": "PASS",
+    "screenshot": "shots\\T0-login-SALES.png",
+    "failedApis": []
+  },
+  {
+    "test": "T0",
+    "what": "Login ACCOUNTANT",
+    "expected": "Login works + sidebar visible",
+    "actual": "OK -> /accounts/dashboard. Menus (12): Dashboard | Supplier Invoices | Accounts Payable | Supplier Payments | Sales Invoices | Receivables | Collection Reconciliation | Day-End Approvals | Expense Approval | My Expenses | GST Summary | Financial Reports",
+    "status": "PASS",
+    "screenshot": "shots\\T0-login-ACCOUNTANT.png",
+    "failedApis": []
+  },
+  {
+    "test": "T0",
+    "what": "Login DELIVERY",
+    "expected": "Login works + sidebar visible",
+    "actual": "OK -> /delivery/dashboard. Menus (8): Dashboard | My Deliveries | Vehicle Loading | Vehicle Stock | End of Day Return | Attendance | Leaves | Expenses",
+    "status": "PASS",
+    "screenshot": "shots\\T0-login-DELIVERY.png",
+    "failedApis": []
+  },
+  {
+    "test": "T0",
+    "what": "Login SUPERADMIN",
+    "expected": "Login works + sidebar visible",
+    "actual": "OK -> /superadmin/dashboard. Menus (9): Dashboard | Organizations | Upgrade Requests | Feature Requests | Support Tickets | Platform Staff | Plans | Platform Analytics | Superadmins",
+    "status": "PASS",
+    "screenshot": "shots\\T0-login-SUPERADMIN.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Dashboard\" (/admin/dashboard)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/dashboard h1=\"Dashboard\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_dashboard.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Leads\" (/admin/leads)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/leads h1=\"Leads\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_leads.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Quotations\" (/admin/quotations)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/quotations h1=\"Quotations\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_quotations.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Customers\" (/admin/customers)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/customers h1=\"Customers\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_customers.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Brands\" (/admin/brands)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/brands h1=\"Brands\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_brands.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Categories\" (/admin/categories)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/categories h1=\"Categories\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_categories.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Products\" (/admin/products)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/products h1=\"Products\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_products.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Suppliers\" (/admin/suppliers)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/suppliers h1=\"Suppliers\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_suppliers.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Inventory\" (/admin/inventory)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/inventory h1=\"Inventory\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_inventory.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Warehouses\" (/admin/warehouses)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/warehouses h1=\"Warehouses\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_warehouses.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Purchases\" (/admin/purchases)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/purchases h1=\"Purchases\" console: Access to XMLHttpRequest at 'https://crm-saas-backend.bsmart.workers.dev/organization/theme' from origin 'https://crm-sa ;; Failed to load resource: net::ERR_FAILED",
+    "status": "PASS (on retry)",
+    "screenshot": "shots\\T1-admin_purchases.png",
+    "failedApis": [],
+    "retry": "Retry: clean (no console error / failed API) -> intermittent backend/network",
+    "classification": "Environment/Backend - intermittent CORS/ERR_FAILED (response without CORS headers)"
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Purchase Returns\" (/admin/purchase-returns)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/purchase-returns h1=\"Purchase Returns\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_purchase_returns.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Orders\" (/admin/orders)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/orders h1=\"Orders\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_orders.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Sales Returns\" (/admin/sales-returns)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/sales-returns h1=\"Sales Returns\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_sales_returns.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Deliveries\" (/admin/deliveries)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/deliveries h1=\"Deliveries\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_deliveries.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Sales\" (/admin/sales-overview)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/sales-overview h1=\"Sales\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_sales_overview.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Vehicle Stock\" (/admin/vehicle-stock)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/vehicle-stock h1=\"Vehicle Stock\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_vehicle_stock.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Vehicles\" (/admin/vehicles)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/vehicles h1=\"Vehicles\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_vehicles.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Receivables\" (/admin/receivables)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/receivables h1=\"Receivables\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_receivables.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Accounts Payable\" (/admin/payables)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/payables h1=\"Accounts Payable\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_payables.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Supplier Payments\" (/admin/supplier-payments)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/supplier-payments h1=\"Supplier Payments\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_supplier_payments.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Collection Reconciliation\" (/admin/collections)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/collections h1=\"Collection Reconciliation\" console: Access to XMLHttpRequest at 'https://crm-saas-backend.bsmart.workers.dev/deliveries/partners' from origin 'https://crm-s ;; Failed to load resource: net::ERR_FAILED",
+    "status": "PASS (on retry)",
+    "screenshot": "shots\\T1-admin_collections.png",
+    "failedApis": [],
+    "retry": "Retry: clean (no console error / failed API) -> intermittent backend/network",
+    "classification": "Environment/Backend - intermittent CORS/ERR_FAILED (response without CORS headers)"
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Day-End Approvals\" (/admin/day-end-approvals)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/day-end-approvals h1=\"Day-End Approvals\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_day_end_approvals.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Expenses\" (/admin/expenses)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/expenses h1=\"Expenses\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_expenses.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Reports\" (/admin/reports)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/reports h1=\"Reports\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_reports.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Profit and Loss Sheet\" (/admin/reports?report=profit-loss)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/reports?report=profit-loss h1=\"Reports\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_reports_report_profit_loss.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Cash Flow Sheet\" (/admin/reports?report=cash-flow-sheet)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/reports?report=cash-flow-sheet h1=\"Reports\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_reports_report_cash_flow_sheet.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"GST Filing Sheet\" (/admin/reports?report=gst-summary)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/reports?report=gst-summary h1=\"Reports\" console: Access to XMLHttpRequest at 'https://crm-saas-backend.bsmart.workers.dev/brands' from origin 'https://crm-saas.asynk.in' ;; Failed to load resource: net::ERR_FAILED",
+    "status": "PASS (on retry)",
+    "screenshot": "shots\\T1-admin_reports_report_gst_summary.png",
+    "failedApis": [],
+    "retry": "Retry: clean (no console error / failed API) -> intermittent backend/network",
+    "classification": "Environment/Backend - intermittent CORS/ERR_FAILED (response without CORS headers)"
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Sales Invoices\" (/admin/invoices)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/invoices h1=\"Sales Invoices\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_invoices.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Supplier Invoices\" (/admin/supplier-invoices)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/supplier-invoices h1=\"Supplier Invoices\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_supplier_invoices.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Company Settings\" (/admin/company-settings)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/company-settings h1=\"Company Settings\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_company_settings.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Audit Log\" (/admin/audit-logs)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/audit-logs h1=\"Audit Log\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_audit_logs.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"My Profile\" (/profile)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/profile h1=\"My Profile\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-profile.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Staff\" (/admin/users)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/users h1=\"Staff\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_users.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Attendance\" (/admin/attendance)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/attendance h1=\"Attendance\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_attendance.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Leaves\" (/admin/leaves)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/leaves h1=\"Leaves\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_leaves.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Roles & Permissions\" (/admin/roles)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/roles h1=\"Roles & Permissions\" console: Access to XMLHttpRequest at 'https://crm-saas-backend.bsmart.workers.dev/auth/me' from origin 'https://crm-saas.asynk.in ;; Failed to load resource: net::ERR_FAILED",
+    "status": "PASS (on retry)",
+    "screenshot": "shots\\T1-admin_roles.png",
+    "failedApis": [],
+    "retry": "Retry: clean (no console error / failed API) -> intermittent backend/network",
+    "classification": "Environment/Backend - intermittent CORS/ERR_FAILED (response without CORS headers)"
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Objects & Fields Settings\" (/admin/object-fields)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/object-fields h1=\"Objects & Fields Settings\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_object_fields.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Invoice Changes\" (/admin/invoices/settings)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/invoices/settings h1=\"Invoice Changes\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_invoices_settings.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Appearance & Branding\" (/admin/theme-settings)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/theme-settings h1=\"Appearance & Branding\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_theme_settings.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Terms & Conditions\" (/admin/settings/terms)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/settings/terms h1=\"Terms & Conditions\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_settings_terms.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Privacy Policy\" (/admin/settings/privacy)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/settings/privacy h1=\"Privacy Policy\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_settings_privacy.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"Help & FAQ\" (/admin/settings/help)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/settings/help h1=\"Help & FAQ\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_settings_help.png",
+    "failedApis": []
+  },
+  {
+    "test": "T1",
+    "what": "Open \"View All Policies\" (/admin/settings/policies)",
+    "expected": "Page loads, no failed API, no console error",
+    "actual": "final=/admin/settings/policies h1=\"View All Policies\"",
+    "status": "PASS",
+    "screenshot": "shots\\T1-admin_settings_policies.png",
+    "failedApis": []
+  },
+  {
+    "test": "T2",
+    "what": "Read green card on default load",
+    "expected": "Shows TODAY sales",
+    "actual": "Card text: \"TODAY’S SALES ₹ 0 Received ₹ 0 Pending ₹ 0 Orders 0 Delivered 0 Pending 0 View Sales\". Filter line: \"Showing: This Month. Select filters, then press Apply.\"",
+    "status": "PASS",
+    "screenshot": "shots\\T2-green-card-default.png",
+    "failedApis": []
+  },
+  {
+    "test": "T2",
+    "what": "Period = Last Month, Apply",
+    "expected": "Green card must NOT change (client: always TODAY sales only)",
+    "actual": "Card before: \"TODAY’S SALES ₹ 0 Received ₹ 0 Pending ₹ 0 Orders 0 Delivered 0 Pending 0 View Sales\" | after: \"SELECTED PERIOD SALES ₹ 47,821 Applied filters Across the whole organization - no company, warehouse, customer or supplier filter applied. Period Last Month View Sales\" | changed=true. Filter line: \"Showing: Last Month. Select filters, then press Apply.\". API: /dashboard/admin?date_from=2026-10-01&date_to=2026-10-31 -> 200",
+    "status": "FAIL",
+    "screenshot": "shots\\T2-green-card-last-month.png",
+    "failedApis": [],
+    "classification": "Frontend (client rule violated by design: card switches to \"Selected Period Sales\")",
+    "cause": "src/features/dashboard/AdminDashboard.jsx:809 scopedSales, :987 salesAmount={scopedSales ? periodSales : todaysSalesAmount}, label switch in FeaturedSalesCard :331"
+  },
+  {
+    "test": "T3",
+    "what": "Fill supplier form + Save Supplier",
+    "expected": "Success message, supplier saved",
+    "actual": "Saved: drawer closed and SUP-0008 appears in list, but NO success message was seen (screenshot T3-03). Code check: SupplierList.jsx only calls showToast for errors (:273, :355), never after a successful save.",
+    "status": "FAIL",
+    "screenshot": "shotsT3-03-after-save-a1.png",
+    "failedApis": [],
+    "classification": "Frontend",
+    "cause": "src/features/suppliers/SupplierList.jsx save handler (~:340-362) shows no success toast; only error toasts exist (:273, :355)."
+  },
+  {
+    "test": "T3",
+    "what": "Supplier appears in list",
+    "expected": "Row with the QA-TEST name",
+    "actual": "Found in list after search",
+    "status": "PASS",
+    "screenshot": "shots\\T3-04-list-search.png",
+    "failedApis": []
+  },
+  {
+    "test": "T3",
+    "what": "Open detail, compare every entered field",
+    "expected": "All entered values visible on detail",
+    "actual": "Not shown on detail (Overview + Documents/Notes tabs): Company Name: MISSING (\"QA-TEST Traders QA-TEST-1411-1436\"). API GET /suppliers/{id}: company_name=\"QA-TEST Traders QA-TEST-1411-1436\", notes=\"QA-TEST QA-TEST-1411-1436 supplier notes\", city=\"Pune\"",
+    "status": "FAIL",
+    "screenshot": "shots\\T3-05-detail.png",
+    "failedApis": [],
+    "classification": "Frontend",
+    "cause": "API returns company_name correctly, but src/features/suppliers/SupplierDetail.jsx never renders companyName (only notes at :1148). Data is saved and mapped (supplierUtils.js:64) - just not displayed."
+  },
+  {
+    "test": "T3",
+    "what": "Console errors during T3",
+    "expected": "none",
+    "actual": "Failed to load resource: the server responded with a status of 403 ()",
+    "status": "PASS",
+    "screenshot": "",
+    "failedApis": []
+  },
+  {
+    "test": "T4",
+    "what": "Fill all tabs + Add Product",
+    "expected": "Success message, product saved",
+    "actual": "Saved (PRD-0005): form closed, product in list and detail. NO success message seen: toast watcher recorded nothing during the save; image upload POST /files/upload -> 201. Fields NOT shown on the form (hidden by org field settings): Barcode, GST/VAT Rate.",
+    "status": "FAIL",
+    "screenshot": "shotsT4-13-after-save-a1.png",
+    "failedApis": [],
+    "classification": "Frontend",
+    "cause": "src/features/products/ProductList.jsx:275 handleSaveProduct - no showToast/success message at all (file has zero toast usage)."
+  },
+  {
+    "test": "T4",
+    "what": "Product appears in list",
+    "expected": "Row with QA-TEST name",
+    "actual": "Found after search",
+    "status": "PASS",
+    "screenshot": "shots\\T4-14-list.png",
+    "failedApis": []
+  },
+  {
+    "test": "T4",
+    "what": "Open detail, compare entered fields",
+    "expected": "All entered values visible on detail",
+    "actual": "Not shown on detail: purchase 100. (GST/VAT Rate was not on the form - hidden by org field settings - so not entered; detail shows GST 0%.) Detail URL /admin/products/e2f52362-8ff8-4637-b30e-c6d2d6f79364",
+    "status": "FAIL",
+    "screenshot": "shots\\T4-15-detail.png",
+    "failedApis": [],
+    "classification": "Frontend (minor / maybe by design)",
+    "cause": "Product detail (src/features/products/ProductDetail.jsx) Pricing block lists MRP, Wholesale, Dealer, Discount and Selling Price but never the Purchase Price (100) that was entered; only Avg. Margin 33% hints at it. GST: not entered (field hidden by org Object Field Settings), so GST 0% is expected - not a bug."
+  },
+  {
+    "test": "T5",
+    "what": "Fill tabs + 2 variants + Add Product",
+    "expected": "Success message, product saved with Red/Blue variants",
+    "actual": "Saved. Toast: \"none seen\". banner: \"none\"",
+    "status": "FAIL",
+    "screenshot": "shots\\T5-07-after-save-a1.png",
+    "failedApis": [],
+    "classification": "Frontend",
+    "cause": "src/features/products/ProductList.jsx:275 handleSaveProduct - no success message"
+  },
+  {
+    "test": "T5",
+    "what": "Variant product appears in list",
+    "expected": "Row with QA-TEST name",
+    "actual": "Found after search",
+    "status": "PASS",
+    "screenshot": "shots\\T5-08-list.png",
+    "failedApis": []
+  },
+  {
+    "test": "T5",
+    "what": "Open detail, compare variants",
+    "expected": "Red + Blue variants with SKU/stock/prices visible",
+    "actual": "Both variants, SKUs, selling prices and attribute Color visible",
+    "status": "PASS",
+    "screenshot": "shots\\T5-09-detail.png",
+    "failedApis": []
+  },
+  {
+    "test": "T5",
+    "what": "Validation repro: variant saved without selling price (nothing saved)",
+    "expected": "Clear message on the variant row / field highlighted",
+    "actual": "Banner only: \"Can't save yet — 1 field needs attention on the \"Variants & Attributes\" tab.\". Exact variant message (\"...enter a selling price\") visible on screen: NO. Red-bordered fields: 1. Product write requests sent: 0.",
+    "status": "FAIL",
+    "screenshot": "shotsT5b-02-after-click-add-product.png",
+    "failedApis": [],
+    "classification": "Frontend",
+    "cause": "src/features/products/ProductForm.jsx - validate() puts every variant problem into nextErrors.variants (:725 no variants, :729 \"Every variant needs a name.\", :730 \"enter a selling price.\", :734 \"enter valid pricing\"), banner built at :852-854 only counts it (\"1 field needs attention on the Variants & Attributes tab\"), but NOTHING renders errors.variants (grep finds no usage; the field renderer for input \"variants\" :1288-1420 has no error output and no red border). So the real message is never shown and no field is highlighted."
+  },
+  {
+    "test": "T5",
+    "what": "Variant name input visible/usable in Variant List",
+    "expected": "Variant name box readable",
+    "actual": "Name input collapses to a ~20px pill next to the image icon (typed \"Red\" is not readable); SKU box is truncated to ~12 chars (w-28).",
+    "status": "FAIL",
+    "screenshot": "shotsT5b-01-variant-no-selling-price.png",
+    "failedApis": [],
+    "classification": "Frontend",
+    "cause": "src/features/products/ProductForm.jsx:1342-1388 - name <input className=\"h-9 w-full min-w-0\"> sits in a flex row (gap-3) inside a td with no min-width, so it shrinks to nothing; SKU input fixed w-28 at :1396."
+  },
+  {
+    "test": "T6",
+    "what": "Inventory: Product A stock BEFORE purchase",
+    "expected": "Row for Product A (opening stock 0)",
+    "actual": "QA-TEST Product A QA-TEST-1411-1436 QA-TEST-1411-1436-A 0 0 Out of Stock",
+    "status": "PASS",
+    "screenshot": "shots\\T6-01-before-inventory.png",
+    "failedApis": [],
+    "tag": "a"
+  },
+  {
+    "test": "T6",
+    "what": "Create purchase: Product A qty 10 x 100, invoice QA-TEST-INV-1",
+    "expected": "Totals 1000, saved as Draft, success message",
+    "actual": "Form totals: Subtotal ₹ 1,000 Item Discount - ₹ 0 Extra Discount - ₹ 0 Tax ₹ 0 Grand Total ₹ 1,000. Redirected to /admin/purchases/605c071b-7a7d-413d-83b3-80a1cc6d1f42. Row text: \"QA-TEST-1411-1436-A Piece ₹ 1,000\". Purchase Type chosen: Purchase Order, warehouse Main Warehouse, date 2026-11-14. Success message seen: NONE (only loader text: \"Loading... || Loading purchase...\")",
+    "status": "FAIL",
+    "screenshot": "shots\\T6-04-after-create.png",
+    "failedApis": [],
+    "classification": "Frontend",
+    "cause": "src/features/purchases/PurchaseInvoiceForm.jsx - the only showToast call is \"Product already added\" (:269); a successful Create Purchase just navigates to the detail page with no success message.",
+    "tag": "b"
+  },
+  {
+    "test": "T6",
+    "what": "Purchase detail vs entered",
+    "expected": "Supplier, invoice no, totals 1,000, Draft, Not Received",
+    "actual": "All match. Purchase # PO-10001-2026-0012",
+    "status": "PASS",
+    "screenshot": "shots\\T6-05-detail-draft.png",
+    "failedApis": [],
+    "tag": "b"
+  },
+  {
+    "test": "T6",
+    "what": "Purchase appears in list",
+    "expected": "Row PO + QA-TEST-INV-1",
+    "actual": "Found",
+    "status": "PASS",
+    "screenshot": "shots\\T6-06-list.png",
+    "failedApis": [],
+    "tag": "b"
+  },
+  {
+    "test": "T6",
+    "what": "Confirm Purchase",
+    "expected": "Status Confirmed, toast, prompt to receive goods, stock still 0 (no stock on confirm)",
+    "actual": "Toast: \"Purchase confirmed This purchase is now Confirmed.\". Prompt shown: true. Status now: Confirmed. Product A inventory row: \"QA-TEST Product A QA-TEST-1411-1436 QA-TEST-1411-1436-A 0 0 Out of Stock\"",
+    "status": "PASS",
+    "screenshot": "shots\\T6-08-after-confirm-inventory.png",
+    "failedApis": [],
+    "tag": "b"
+  },
+  {
+    "test": "T6",
+    "what": "Save Draft GRN (received 10)",
+    "expected": "Draft GRN created, toast, stock unchanged",
+    "actual": "Toast: \"GRN # Receipt Date Warehouse Accepted Qty Damaged Qty Rejected Qty Received By Status Action Loading goods receipts... || Goods receipt saved as Draft Confirm it to receive the goods into the warehouse.\"",
+    "status": "PASS",
+    "screenshot": "shots\\T6-11-grn-draft-saved.png",
+    "failedApis": [],
+    "tag": "c"
+  },
+  {
+    "test": "T6",
+    "what": "Product A stock after DRAFT GRN",
+    "expected": "Still 0 (draft must not add stock)",
+    "actual": "QA-TEST Product A QA-TEST-1411-1436 QA-TEST-1411-1436-A 0 0 Out of Stock",
+    "status": "PASS",
+    "screenshot": "shots\\T6-12-after-draft-grn-inventory.png",
+    "failedApis": [],
+    "tag": "c"
+  },
+  {
+    "test": "T6",
+    "what": "Confirm GRN (10 accepted)",
+    "expected": "GRN Confirmed, purchase Fully Received, Product A stock = 10",
+    "actual": "Toast: \"GRN # Receipt Date Warehouse Accepted Qty Damaged Qty Rejected Qty Received By Status Action Loading goods receipts... || Goods receipt confirmed. Warehouse inventory updated. GRN-10001-2026-1021 accepted quantity has been added to stock.\". GRN status text: Confirmed. Purchase receiving card: Fully Received. Product A inventory row: \"QA-TEST Product A QA-TEST-1411-1436 QA-TEST-1411-1436-A 0 10 In Stock\"",
+    "status": "PASS",
+    "screenshot": "shots\\T6-17-after-grn-confirm-inventory.png",
+    "failedApis": [],
+    "tag": "d"
+  },
+  {
+    "test": "T7",
+    "what": "Create return qty 2 from T6 purchase",
+    "expected": "Form shows Received 10 / Already Returned 0 / Returnable 10; draft created with success message",
+    "actual": "Table before: \"Product Received Already Returned Returnable Return Qty QA-TEST Product A QA-TEST-1411-1436 10 0 10 \". Success message: NONE (only loader text seen). Landed on /admin/purchase-returns/296ac53b-bb2a-423e-aeba-bba7750040e1",
+    "status": "FAIL",
+    "screenshot": "shots\\T7-03-after-create.png",
+    "failedApis": [],
+    "classification": "Frontend",
+    "cause": "src/features/purchaseReturns/PurchaseReturnFormPage.jsx - no showToast usage at all (file has zero toast calls); create just navigates.",
+    "tag": "a"
+  },
+  {
+    "test": "T7",
+    "what": "Draft return state",
+    "expected": "Status Draft, stock unchanged (10)",
+    "actual": "Badges before: [Draft] after: [Draft]. Toast: \"none seen\". Product A inventory (variants / stock / status): \"0 10 In Stock\"",
+    "status": "PASS",
+    "screenshot": "shots\\T7-04-draft.png",
+    "failedApis": [],
+    "tag": "a"
+  },
+  {
+    "test": "T7",
+    "what": "Action: confirm",
+    "expected": "Status moves forward; stock check after confirm",
+    "actual": "Badges before: [Draft] after: [Confirmed]. Success message: NONE (the only status text seen was the page loader \"Loading purchase return...\"). Product A inventory (variants / stock / status): \"0 8 In Stock\"",
+    "status": "FAIL",
+    "screenshot": "shots\\T7-05-confirm.png",
+    "failedApis": [],
+    "tag": "a",
+    "classification": "Frontend",
+    "cause": "src/features/purchaseReturns/PurchaseReturnDetail.jsx - runRealAction (:120) only sets errors; there is no showToast anywhere in the purchase-returns module (0 calls in Detail, Form, List)."
+  },
+  {
+    "test": "T7",
+    "what": "Action: dispatch",
+    "expected": "Status moves forward; stock check after dispatch",
+    "actual": "Badges before: [Confirmed] after: [Dispatched]. Success message: NONE (the only status text seen was the page loader \"Loading purchase return...\"). Product A inventory (variants / stock / status): \"0 8 In Stock\"",
+    "status": "FAIL",
+    "screenshot": "shots\\T7-06-dispatch.png",
+    "failedApis": [],
+    "tag": "a",
+    "classification": "Frontend",
+    "cause": "src/features/purchaseReturns/PurchaseReturnDetail.jsx - runRealAction (:120) only sets errors; there is no showToast anywhere in the purchase-returns module (0 calls in Detail, Form, List)."
+  },
+  {
+    "test": "T7",
+    "what": "Action: complete",
+    "expected": "Status moves forward; stock check after complete",
+    "actual": "Badges before: [Dispatched] after: [Completed]. Success message: NONE (the only status text seen was the page loader \"Loading purchase return...\"). Product A inventory (variants / stock / status): \"0 8 In Stock\"",
+    "status": "FAIL",
+    "screenshot": "shots\\T7-07-complete.png",
+    "failedApis": [],
+    "tag": "a",
+    "classification": "Frontend",
+    "cause": "src/features/purchaseReturns/PurchaseReturnDetail.jsx - runRealAction (:120) only sets errors; there is no showToast anywhere in the purchase-returns module (0 calls in Detail, Form, List)."
+  },
+  {
+    "test": "T7",
+    "what": "New-return form for same purchase AFTER completed return (qty 2)",
+    "expected": "Received 10, Already Returned 2, Returnable 8",
+    "actual": "Table: \"Product Received Already Returned Returnable Return Qty QA-TEST Product A QA-TEST-1411-1436 10 2 8 \"",
+    "status": "PASS",
+    "screenshot": "shots\\T7-08-return-form-after-complete.png",
+    "failedApis": [],
+    "note": "Column is labelled \"Already Returned\" in the UI (not \"Previously Returned\").",
+    "tag": "b"
+  },
+  {
+    "test": "T7",
+    "what": "Purchase detail Items table after return",
+    "expected": "Ordered 10, Received 10, returned 2 shown somewhere",
+    "actual": "Items table: \"\"",
+    "status": "INFO",
+    "screenshot": "shots\\T7-09-purchase-items.png",
+    "failedApis": [],
+    "tag": "b"
+  },
+  {
+    "test": "T7",
+    "what": "Purchase Returns list row",
+    "expected": "Our return listed as Completed",
+    "actual": "First Completed row: \"PR-10001-2026-0004 QA-TEST supplier QA-TEST-1411-1436 PO-10001-2026-0012 1 2 14 Nov 2026 Completed\"",
+    "status": "PASS",
+    "screenshot": "shots\\T7-10-returns-list.png",
+    "failedApis": [],
+    "tag": "b"
+  },
+  {
+    "test": "T8",
+    "what": "Add Expense button position",
+    "expected": "Visible, sensible place (top-right of table header)",
+    "actual": "Button at x=1262, y=297, 131x36 on a 1440x900 viewport (right edge 1393px)",
+    "status": "INFO",
+    "screenshot": "shots\\T8-01-expenses-list-add-button.png",
+    "failedApis": []
+  },
+  {
+    "test": "T8",
+    "what": "Add expense \"QA-TEST expense\" amount 1",
+    "expected": "Saved, success message",
+    "actual": "Saved as EXP-10001-2026-1030 (Approved, amount 1). Success toast NOT observed: 6s after clicking Add the modal button was still spinning (screenshot T8-03), so the script read toasts before the backend answered - POST /expenses is slow. Code does call showToast(\"Expense added\") after a successful create (AdminExpenses.jsx ~:232), so this is a slow-backend observation, not a missing message.",
+    "status": "PASS",
+    "screenshot": "shots\\T8-03-after-save-a1.png",
+    "failedApis": [],
+    "note": "toast unverified (slow POST); backend latency"
+  },
+  {
+    "test": "T8",
+    "what": "Expense appears in list with amount 1",
+    "expected": "Row with description, ₹1, category",
+    "actual": "Row: \"EXP-10001-2026-1030 Petrol/Diesel QA-TEST expense QA-TEST-1411-1436 Rahul Sharma 14 Nov 2026 ₹ 1 Approved \"",
+    "status": "PASS",
+    "screenshot": "shots\\T8-04-list-search.png",
+    "failedApis": []
+  },
+  {
+    "test": "T8",
+    "what": "Open expense detail, compare",
+    "expected": "Category, amount, date, description match",
+    "actual": "Matches. Detail: \"Expense Expense # EXP-10001-2026-1030 Status Approved Category Petrol/Diesel Amount ₹ 1 Expense Date 14 Nov 2026 Payment Mode Cash Submitted By Rahul Sharma Submitted On 14 Nov 2026 Description QA-TEST expense QA-TEST-1411-1436 Proof No receipt Reimburse HISTORY Submitted by Rahul Sharma 14 Nov 2026\"",
+    "status": "PASS",
+    "screenshot": "shots\\T8-05-detail.png",
+    "failedApis": []
+  },
+  {
+    "test": "T9",
+    "what": "Open Vehicle Stock page",
+    "expected": "Page loads with stock or a clean empty state, no errors",
+    "actual": "Header/text: \"Overview CRM ERP Sales & Delivery Management Finance Management Invoice Management Administration Employee Management Settings Vehicle Stock Rahul Sharma Admin Vehicle Stock Stock currently loaded on delivery vehicles. Active session MH02CJ0584 Truck · Driver: delivery Last loaded: 06 Oct 2026 · 5:30 AM Products On Vehicle 6 products with available stock Loaded Units 135 openin\"",
+    "status": "PASS",
+    "screenshot": "shots\\T9-01-vehicle-stock.png",
+    "failedApis": []
+  },
+  {
+    "test": "T9",
+    "what": "Vehicle Stock table: SKU / Variant and UOM columns",
+    "expected": "SKU/variant and UOM filled for each product",
+    "actual": "Every row (6 of 6) shows \"—\" in both columns. API GET /vehicle-stock items only contain: id, product_id, variant_id, product_name, loaded_qty, extra_qty, returned_qty, delivered_qty, remaining_qty, expected_closing_qty - no sku, no uom, no variant name. One line is named just \"Electronics\" (a product_name of that value in the data).",
+    "status": "FAIL",
+    "screenshot": "shotsT9-01-vehicle-stock.png",
+    "failedApis": [],
+    "classification": "Backend (response lacks sku/uom/variant name); Frontend does not enrich",
+    "cause": "GET /vehicle-stock items have no sku/uom fields. UI table renders them blank. Fix either in backend response or by looking up product sku/uom from product_id in the vehicle stock page."
+  },
+  {
+    "test": "T10",
+    "what": "Pages where a date field is the plain browser calendar (live check, read-only)",
+    "expected": "Custom DatePicker everywhere (consistent look)",
+    "actual": "Purchase - Create [/admin/purchases/create]: Purchase Date || Purchase Return - New [/admin/purchase-returns/new]: Return Date || Supplier Invoice - New [/admin/supplier-invoices/new]: Invoice Date, Due Date || Quotation - New [/admin/quotations/new]: Quotation Date, Valid Until || Sales Return - New [/admin/sales-returns/new]: Return Date || Expenses - Add modal [/admin/expenses (Add Expense modal)]: Expense Date || ALSO native date inputs in code (modals/drawers not opened live): Customer form (Customer Since, Date of Birth, Anniversary), CustomerDetail, Collect Payment drawer, Record Payment drawers (invoices, supplier payments, payments), GRN modal (Receipt Date, Expiry Date), Reimburse modal, Delivery detail (2), Lead forms/detail (4), Follow-ups, Visit check-in, Quotation detail, Order detail, My Expenses, My Leaves (2), Users (Date of Birth/Joining/Exit, UserEdit), Company Settings, Product form (Launch Date, End of Life Date), Profile (Date of Birth), Warehouse transfer, Reports \"As Of Date\". Not native (custom DatePicker): Dashboard filters, DateRangeFilter lists, Create Order date, Sales Overview, Financial Reports, Cash Reconciliation.",
+    "status": "FAIL",
+    "screenshot": "shots\\T10-expense-modal-native-date.png",
+    "failedApis": [],
+    "classification": "Frontend",
+    "cause": "src/components/ui/Input.jsx has NO date handling - every <Input type=\"date\"> renders a native <input type=\"date\"> (browser calendar). Only src/components/ui/DatePicker.jsx is the custom calendar, and it is used just in DateRangeFilter, AdminDashboard, CreateSalesOrder, SalesOverview, FinancialReports, CashReconciliation, CustomerDetail, customers/RecordPaymentDrawer, PlatformSupportTickets."
+  }
+]

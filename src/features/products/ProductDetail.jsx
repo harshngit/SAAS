@@ -434,6 +434,7 @@ export default function ProductDetail() {
           <div className="border-t border-neutral-100 pt-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400">Pricing</p>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Field label="Purchase Price" value={product.purchasePrice !== '' && product.purchasePrice != null ? formatCurrency(product.purchasePrice) : ''} />
               <Field label="MRP" value={product.mrp !== '' ? formatCurrency(product.mrp) : ''} />
               <Field label="Wholesale Price" value={product.wholesalePrice !== '' ? formatCurrency(product.wholesalePrice) : ''} />
               <Field label="Dealer Price" value={product.dealerPrice !== '' ? formatCurrency(product.dealerPrice) : ''} />

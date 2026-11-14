@@ -292,27 +292,23 @@ function ProfitSummaryCard({ grossProfit, netProfit, onClick }) {
   )
 }
 
-function FeaturedSalesCard({
-  salesAmount,
-  scoped = false,
-  ordersCount = 0,
-  // delivered_orders/pending_orders/delivered_amount/pending_amount aren't on the backend's
-  // dashboard.today block yet - this card shows only the total (orders count + sales amount)
-  // until they are, rather than guessing a delivered/pending split from data that isn't there.
-  hasDeliveryBreakdown = false,
-  receivedAmount = 0,
-  pendingAmount = 0,
-  deliveredCount = 0,
-  pendingOrdersCount = 0,
-  // scoped-state content - real, already-computed values (the applied period label + any
-  // Company/Warehouse/Customer/Supplier filters), not placeholder text. Keeps this card's two
-  // states (Today's Sales vs a selected period) at matching visual weight instead of one looking
-  // finished and the other looking like it's missing content.
-  rangeLabel = '',
-  appliedScopeLabels = [],
-}) {
+// Always "TODAY'S SALES" - fed only by GET /dashboard/admin `today_overall`, which the backend
+// computes ignoring every dashboard filter (period / company / warehouse / customer / supplier),
+// so this card never changes with Apply. `data` is that block, or null/undefined when the
+// response doesn't carry it - each missing figure renders "—" rather than a fake 0 or a crash.
+//   big amount = sales | Received = received | Orders = orders
+//   Delivered = delivered_orders | Pending (count) = pending_orders
+//   Pending (amount) = pending_amount (today's UNDELIVERED orders, not unpaid)
+function FeaturedSalesCard({ data }) {
   const navigate = useNavigate()
-  const formatCount = (value) => new Intl.NumberFormat('en-IN').format(Number(value) || 0)
+  const numberOrNull = (key) => {
+    const raw = data?.[key]
+    if (raw === undefined || raw === null || raw === '') return null
+    const value = Number(raw)
+    return Number.isFinite(value) ? value : null
+  }
+  const money = (key) => (numberOrNull(key) === null ? '—' : formatCurrency(numberOrNull(key)))
+  const formatCount = (key) => (numberOrNull(key) === null ? '—' : new Intl.NumberFormat('en-IN').format(numberOrNull(key)))
 
   return (
     <button
@@ -328,69 +324,44 @@ function FeaturedSalesCard({
 
       <div className="min-w-0 pr-20">
         <p className="max-w-full whitespace-nowrap text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/78">
-          {scoped ? 'Selected Period Sales' : 'Today’s Sales'}
+          Today’s Sales
         </p>
         <p className="mt-1 font-(--font-display) text-[2.1rem] font-semibold leading-none tracking-tight text-white">
-          {formatCurrency(salesAmount)}
+          {money('sales')}
         </p>
       </div>
 
-      {!scoped && hasDeliveryBreakdown && <div className="relative mt-10 grid grid-cols-2 gap-x-8 gap-y-2">
+      <div className="relative mt-10 grid grid-cols-2 gap-x-8 gap-y-2">
         <div className="min-w-0">
           <p className="text-[0.92rem] font-semibold leading-none text-white/90">Received</p>
           <p className="mt-1 truncate text-[1.50rem] font-semibold leading-none tracking-tight text-white">
-            {formatCurrency(receivedAmount)}
+            {money('received')}
           </p>
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0" title="Amount of today's orders that are not delivered yet">
           <p className="text-[0.92rem] font-semibold leading-none text-white/90">Pending</p>
           <p className="mt-1 truncate text-[1.50rem] font-semibold leading-none tracking-tight text-white">
-            {formatCurrency(pendingAmount)}
+            {money('pending_amount')}
           </p>
         </div>
-      </div>}
-      {scoped && (
-        <div className="relative mt-10 min-w-0">
-          <p className="text-[0.92rem] font-semibold leading-none text-white/90">Applied filters</p>
-          <p className="mt-2 text-sm leading-snug text-white/75">
-            {appliedScopeLabels.length > 0
-              ? appliedScopeLabels.join(' · ')
-              : 'Across the whole organization - no company, warehouse, customer or supplier filter applied.'}
-          </p>
-        </div>
-      )}
+      </div>
 
       <div className="flex-1" />
 
-      {!scoped && (
-        hasDeliveryBreakdown ? (
-          <div className="mb-4 grid grid-cols-3 divide-x divide-white/25 text-left">
-            <div className="pr-3">
-              <p className="text-[0.78rem] font-semibold leading-none text-white/88">Orders</p>
-              <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
-            </div>
-            <div className="px-3">
-              <p className="text-[0.78rem] font-semibold leading-none text-white/88">Delivered</p>
-              <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(deliveredCount)}</p>
-            </div>
-            <div className="pl-3">
-              <p className="text-[0.78rem] font-semibold leading-none text-white/88">Pending</p>
-              <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(pendingOrdersCount)}</p>
-            </div>
-          </div>
-        ) : (
-          <div className="mb-4 text-left">
-            <p className="text-[0.78rem] font-semibold leading-none text-white/88">Orders</p>
-            <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount(ordersCount)}</p>
-          </div>
-        )
-      )}
-      {scoped && (
-        <div className="mb-4 text-left">
-          <p className="text-[0.78rem] font-semibold leading-none text-white/88">Period</p>
-          <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{rangeLabel}</p>
+      <div className="mb-4 grid grid-cols-3 divide-x divide-white/25 text-left">
+        <div className="pr-3">
+          <p className="text-[0.78rem] font-semibold leading-none text-white/88">Orders</p>
+          <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount('orders')}</p>
         </div>
-      )}
+        <div className="px-3">
+          <p className="text-[0.78rem] font-semibold leading-none text-white/88">Delivered</p>
+          <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount('delivered_orders')}</p>
+        </div>
+        <div className="pl-3">
+          <p className="text-[0.78rem] font-semibold leading-none text-white/88">Pending</p>
+          <p className="mt-1 text-[1.35rem] font-semibold leading-none tracking-tight text-white">{formatCount('pending_orders')}</p>
+        </div>
+      </div>
 
       <div className="mt-auto flex items-end justify-end pt-3 text-[0.92rem] font-semibold leading-4 text-white/90">
         <span className="inline-flex items-center gap-1.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-white">
@@ -785,28 +756,12 @@ export default function AdminDashboard() {
     total: row.total,
     orderDate: formatOrderDate(row.date),
   }))
-  // "TODAY'S SALES" card - straight off the backend's dashboard.today block (org-timezone
-  // "today", decided server-side), not a browser-local date filtered over a client-fetched
-  // order list (ordersSummary/recentOrders below are separate, period-scoped data used
-  // elsewhere on this dashboard, e.g. Order Cancellations and the Recent Orders table).
-  // delivered_orders/pending_orders/delivered_amount/pending_amount aren't in that block yet -
-  // hasDeliveryBreakdown is false until the backend adds them, and the card hides that specific
-  // breakdown rather than estimating it from anything else.
-  const todaysSalesAmount = Number(dashboard?.today?.sales) || 0
-  const featuredOrdersCount = Number(dashboard?.today?.orders) || 0
-  const hasDeliveryBreakdown = ['delivered_orders', 'pending_orders', 'delivered_amount', 'pending_amount'].every(
-    (key) => dashboard?.today?.[key] !== undefined,
-  )
-  const featuredDeliveredCount = Number(dashboard?.today?.delivered_orders) || 0
-  const featuredPendingCount = Number(dashboard?.today?.pending_orders) || 0
-  const orderAmounts = {
-    deliveredAmount: Number(dashboard?.today?.delivered_amount) || 0,
-    pendingAmount: Number(dashboard?.today?.pending_amount) || 0,
-  }
+  // "TODAY'S SALES" card - straight off the backend's dashboard.today_overall block (org-timezone
+  // "today", decided server-side, ignores every dashboard filter), never the period KPIs below.
+  const todayOverall = dashboard?.today_overall && typeof dashboard.today_overall === 'object' ? dashboard.today_overall : null
   const rangeLabel = appliedFilters.preset === 'custom'
     ? `${formatRangeLabel(appliedFilters.range.from)} / ${formatRangeLabel(appliedFilters.range.to)}`
     : dateRangePresets.find((preset) => preset.value === appliedFilters.preset)?.label
-  const scopedSales = appliedFilters.preset !== 'this_month' || Object.values(appliedFilters.scope).some((ids) => ids?.length)
   const appliedScopeLabels = [
     ['companyId', 'companies', 'Company'], ['warehouseId', 'warehouses', 'Warehouse'],
     ['customerId', 'customers', 'Customer'], ['supplierId', 'suppliers', 'Supplier'],
@@ -982,18 +937,7 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
         <div className="min-w-0 self-start">
-          <FeaturedSalesCard
-            scoped={scopedSales}
-            salesAmount={scopedSales ? periodSales : todaysSalesAmount}
-            ordersCount={featuredOrdersCount}
-            hasDeliveryBreakdown={hasDeliveryBreakdown}
-            receivedAmount={orderAmounts.deliveredAmount}
-            pendingAmount={orderAmounts.pendingAmount}
-            deliveredCount={featuredDeliveredCount}
-            pendingOrdersCount={featuredPendingCount}
-            rangeLabel={rangeLabel}
-            appliedScopeLabels={appliedScopeLabels}
-          />
+          <FeaturedSalesCard data={todayOverall} />
         </div>
         <div
           className="grid min-w-0 w-full self-start content-start grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6"

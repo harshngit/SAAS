@@ -263,6 +263,8 @@ export default function PurchaseInvoiceDetail() {
     return item.remainingQty ?? Math.max(ordered - (Number(item.receivedQty) || 0), 0)
   }
   const tax = useMemo(() => derivePurchaseTax(purchase), [purchase])
+  // "Return Items" only makes sense once a GRN has been confirmed, i.e. something was received.
+  const hasReceivedGoods = (purchase?.items || []).some((item) => itemQty(item, 'received') > 0)
 
 
   const applyDemo = (partial) => {
@@ -545,7 +547,7 @@ export default function PurchaseInvoiceDetail() {
               Close available once fully received
             </span>
           )}
-          {actions.includes('return') && (
+          {actions.includes('return') && hasReceivedGoods && (
             <Button variant="outline" size="sm" onClick={openReturnModal}>
               <RotateCcw className="size-4" aria-hidden="true" />
               Return Items

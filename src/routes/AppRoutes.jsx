@@ -36,6 +36,8 @@ const ProductDetail = lazy(() => import('../features/products/ProductDetail'))
 const StockBoard = lazy(() => import('../features/inventory/StockBoard'))
 const StockDetail = lazy(() => import('../features/inventory/StockDetail'))
 const VehicleStockOverview = lazy(() => import('../features/vehicleStock/VehicleStockOverview'))
+const VehicleStockList = lazy(() => import('../features/vehicleStock/VehicleStockList'))
+const VehicleStockDetail = lazy(() => import('../features/vehicleStock/VehicleStockDetail'))
 const WarehouseList = lazy(() => import('../features/warehouses/WarehouseList'))
 const WarehouseDetail = lazy(() => import('../features/warehouses/WarehouseDetail'))
 const VehicleList = lazy(() => import('../features/vehicles/VehicleList'))
@@ -504,7 +506,15 @@ export default function AppRoutes() {
             path="/admin/vehicle-stock"
             element={
               <RequirePermissionRoute module="vehicle_stock" action="view" feature={ENTITLEMENT_KEYS.SALES_VEHICLE_STOCK}>
-                <VehicleStockOverview />
+                <VehicleStockList />
+              </RequirePermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/vehicle-stock/:id"
+            element={
+              <RequirePermissionRoute module="vehicle_stock" action="view" feature={ENTITLEMENT_KEYS.SALES_VEHICLE_STOCK}>
+                <VehicleStockDetail />
               </RequirePermissionRoute>
             }
           />

@@ -1,4 +1,5 @@
 import { SkeletonValue } from '../../components/ui/Skeleton'
+import { useToast } from '../../components/ui/toastContext'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -53,6 +54,7 @@ function ProductThumbnail({ src, alt }) {
 
 export default function ProductList() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [products, setProducts] = useState([])
   const [summaryProducts, setSummaryProducts] = useState([])
   const updateProducts = (updater) => {
@@ -297,6 +299,10 @@ export default function ProductList() {
         : [normalizeApiProduct(result.product, productData), ...current],
     )
     setIsFormOpen(false)
+    showToast({
+      title: editingProduct ? 'Product updated' : 'Product created',
+      message: productData.name ? `${productData.name} was saved.` : undefined,
+    })
   }
 
   const handleBarcodeScan = async (event) => {

@@ -16,6 +16,7 @@ import {
   updateDemoPurchaseReturn,
 } from './purchaseReturnDemoData'
 import { getPurchase, listPurchases } from '../../api/purchases'
+import { useToast } from '../../components/ui/toastContext'
 import { createPurchaseReturn, getPurchaseReturn, listPurchaseReturns, updatePurchaseReturn } from '../../api/purchaseReturns'
 import { RETURN_REASONS } from './purchaseReturnHelpers'
 
@@ -109,6 +110,7 @@ async function buildReturnableSource(targetPurchaseId) {
 
 export default function PurchaseReturnFormPage() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const { id: editId } = useParams()
   const [searchParams] = useSearchParams()
   const isEdit = Boolean(editId)
@@ -343,6 +345,7 @@ export default function PurchaseReturnFormPage() {
         return
       }
       navigate(`${basePath}/${encodeURIComponent(editRecord.id)}`)
+      showToast({ title: 'Purchase return updated' })
       return
     }
 
@@ -361,6 +364,10 @@ export default function PurchaseReturnFormPage() {
       return
     }
     navigate(`${basePath}/${encodeURIComponent(result.purchaseReturn.id)}`)
+    showToast({
+      title: 'Draft return created',
+      message: result.purchaseReturn.returnNumber ? `${result.purchaseReturn.returnNumber} was saved as a draft.` : undefined,
+    })
   }
 
   if (PURCHASE_RETURNS_DEMO_ENABLED && isLoadingDemoSource) {

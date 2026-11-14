@@ -764,6 +764,7 @@ export default function SupplierDetail() {
       <Card title="Basic Information">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DetailField label="Supplier ID" value={useDemoSuppliers ? getDemoSupplierDisplayId(supplier.id) : supplier.supplierCode} />
+          <DetailField label="Company Name" value={supplier.companyName} />
           <DetailField label="Supplier Type" value={supplier.category} />
           <DetailField label="Status" value={supplier.status === 'active' ? 'Active' : 'Inactive'} />
           <DetailField label="Created On" value={supplier.createdAt ? formatDateTime(supplier.createdAt) : null} />

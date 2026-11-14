@@ -212,7 +212,7 @@ function findSectionForErrorField(sections, fieldName) {
   if (fieldName === 'productTypeId') fieldName = 'productType'
   if (fieldName === 'brandId') fieldName = 'brand'
   if (fieldName === 'subCategoryId') fieldName = 'subCategory'
-  if (fieldName.startsWith('variantInventory.')) {
+  if (fieldName === 'variants' || fieldName.startsWith('variantRow.') || fieldName.startsWith('variantInventory.')) {
     return sections.find((sectionItem) => sectionItem.id === 'variants-attributes')
   }
 
@@ -722,16 +722,25 @@ export default function ProductForm({
     if (!formData.hasVariants && Number(formData.sellingPrice) < 0) nextErrors.sellingPrice = 'Selling price cannot be negative.'
     if (!formData.hasVariants && !formData.sellingPrice && formData.sellingPrice !== 0) nextErrors.sellingPrice = 'Selling price is required.'
     if (formData.inventoryTracking && !formData.unitOfMeasure) nextErrors.unitOfMeasure = 'UOM is required for inventory-managed products.'
+    // Variant problems are reported per row as variantRow.<key>.<field> -> a readable message such as
+    // "Variant 2 (Blue): enter a selling price." The Variant List shows these above the table, puts a
+    // red border on the offending input, and the top banner quotes the first one.
+    const pricingLabels = { purchasePrice: 'purchase price', sellingPrice: 'selling price', mrp: 'MRP', wholesalePrice: 'wholesale price', dealerPrice: 'dealer price', discountPercent: 'discount' }
     if (formData.hasVariants && !formData.variants.length) nextErrors.variants = 'Add at least one variant or turn off variants.'
     ;(formData.hasVariants ? formData.variants : []).forEach((variant, index) => {
       const inventory = normalizeVariantInventory(variant)
       const variantLabel = getVariantName(variant, index)
-      if (!variant.size.trim()) nextErrors.variants = 'Every variant needs a name.'
-      if (variant.isNew && (variant.sellingPrice === '' || variant.sellingPrice == null)) nextErrors.variants = `${variantLabel}: enter a selling price.`
+      const rowKey = variant.id || index
+      const rowLabel = variant.size?.trim() ? `Variant ${index + 1} (${variant.size.trim()})` : `Variant ${index + 1}`
+      const flagVariant = (field, message) => {
+        nextErrors[`variantRow.${rowKey}.${field}`] = message
+      }
+      if (!variant.size.trim()) flagVariant('size', `${rowLabel}: enter a variant name.`)
+      if (variant.isNew && (variant.sellingPrice === '' || variant.sellingPrice == null)) flagVariant('sellingPrice', `${rowLabel}: enter a selling price.`)
       for (const field of ['purchasePrice', 'sellingPrice', 'mrp', 'wholesalePrice', 'dealerPrice', 'discountPercent']) {
         const value = variant[field]
         if (value !== '' && value != null && (!Number.isFinite(Number(value)) || Number(value) < 0 || (field === 'discountPercent' && Number(value) > 100))) {
-          nextErrors.variants = `${variantLabel}: enter valid pricing (discount must be 0-100%).`
+          flagVariant(field, `${rowLabel}: enter a valid ${pricingLabels[field]}${field === 'discountPercent' ? ' (0-100%)' : ' (0 or more)'}.`)
         }
       }
 
@@ -849,8 +858,11 @@ export default function ProductForm({
         setActiveSection(sectionWithError.id)
       }
 
+      // Quote the real message (first one) instead of only counting fields.
+      const messages = [...new Set(Object.values(nextErrors).filter((value) => typeof value === 'string' && value))]
+      const extra = messages.length - 1
       setValidationBanner(
-        `Can't save yet — ${errorFieldNames.length} field${errorFieldNames.length > 1 ? 's' : ''} need${errorFieldNames.length > 1 ? '' : 's'} attention${sectionWithError ? ` on the "${sectionWithError.title}" tab` : ''}.`,
+        `Can't save yet${sectionWithError ? ` (${sectionWithError.title} tab)` : ''} — ${messages[0] || `${errorFieldNames.length} field${errorFieldNames.length > 1 ? 's' : ''} need${errorFieldNames.length > 1 ? '' : 's'} attention.`}${extra > 0 ? ` (+${extra} more)` : ''}`,
       )
       return
     }
@@ -915,6 +927,10 @@ export default function ProductForm({
           : variant
       )),
     }))
+    setErrors((current) => {
+      const errorKey = `variantRow.${formData.variants[index]?.id || index}.${field === 'inventory' ? 'openingStock' : field}`
+      return current[errorKey] ? { ...current, [errorKey]: '' } : current
+    })
   }
 
   const updateVariantInventory = (variantIndex, field, value) => {
@@ -972,7 +988,9 @@ export default function ProductForm({
       value: formData[field.name] ?? '',
       onChange: (event) => updateField(field.name, event.target.value),
       error: errors[field.name],
-      required: required(field.name, field.required) && !(formData.hasVariants && ['purchasePrice', 'sellingPrice'].includes(field.name)),
+      // validate() always requires Product Code / SKU while it is visible, even though the org
+      // field catalog lists sku as optional - so it always carries the red asterisk.
+      required: (required(field.name, field.required) || field.name === 'productCode') && !(formData.hasVariants && ['purchasePrice', 'sellingPrice'].includes(field.name)),
       maxLength: field.maxLength,
       placeholder: field.placeholder,
     }
@@ -1286,6 +1304,16 @@ export default function ProductForm({
     }
 
     if (field.input === 'variants') {
+      const variantListMessages = [
+        ...(typeof errors.variants === 'string' && errors.variants ? [errors.variants] : []),
+        ...Object.entries(errors).filter(([key, value]) => key.startsWith('variantRow.') && value).map(([, value]) => value),
+      ]
+      const variantRowErrorKey = (variant, index, name) => `variantRow.${variant.id || index}.${name}`
+      const variantInputBorder = (variant, index, name) => (
+        errors[variantRowErrorKey(variant, index, name)]
+          ? 'border-red-400 ring-2 ring-red-500/15 focus:ring-red-500/25'
+          : 'border-neutral-200 focus:ring-primary-500/25'
+      )
       return (
         <div className="rounded-2xl border border-neutral-100 bg-surface shadow-[0_14px_35px_-32px_rgb(15_23_42/0.55)]">
           <div className="flex flex-col gap-4 border-b border-neutral-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -1303,6 +1331,14 @@ export default function ProductForm({
               New Variant
             </Button>
           </div>
+
+          {variantListMessages.length > 0 && (
+            <div role="alert" className="mx-4 mt-3 space-y-1 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 sm:mx-5">
+              {variantListMessages.map((message) => (
+                <p key={message}>{message}</p>
+              ))}
+            </div>
+          )}
 
           {formData.variants.length === 0 ? (
             <div className="p-3 sm:p-4">
@@ -1338,7 +1374,7 @@ export default function ProductForm({
                     return (
                       <tr key={variant.id || index}>
                         <td className="whitespace-nowrap px-5 py-3.5 text-neutral-500">{variant.variantCode || 'Generated on save'}</td>
-                        <td className="px-5 py-3.5">
+                        <td className="min-w-60 px-5 py-3.5">
                           <div className="flex items-center gap-3">
                             <label className="group relative flex size-10 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
                               {variant.imageUrl ? (
@@ -1384,7 +1420,8 @@ export default function ProductForm({
                               value={variant.size}
                               placeholder="e.g. Red / Large"
                               onChange={(event) => updateVariant(index, 'size', event.target.value)}
-                              className="h-9 w-full min-w-0 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                              aria-invalid={Boolean(errors[variantRowErrorKey(variant, index, 'size')])}
+                              className={`h-9 w-full min-w-35 rounded-lg border bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 ${variantInputBorder(variant, index, 'size')}`}
                             />
                           </div>
                         </td>
@@ -1393,7 +1430,7 @@ export default function ProductForm({
                             type="text"
                             value={variant.sku}
                             onChange={(event) => updateVariant(index, 'sku', event.target.value)}
-                            className="h-9 w-28 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                            className="h-9 w-40 min-w-32 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                           />
                         </td>
                         <td className="px-3 py-3.5">
@@ -1413,7 +1450,8 @@ export default function ProductForm({
                             <NumericInput type="number" min="0" max={pricingField === 'discountPercent' ? 100 : undefined} step="any"
                               value={variant[pricingField] ?? ''} aria-label={`${getVariantName(variant, index)} ${pricingField}`}
                               onChange={(event) => updateVariant(index, pricingField, event.target.value)}
-                              className="h-9 w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25" />
+                              aria-invalid={Boolean(errors[variantRowErrorKey(variant, index, pricingField)])}
+                              className={`h-9 w-24 rounded-lg border bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 ${variantInputBorder(variant, index, pricingField)}`} />
                           </td>
                         ))}
                         <td className="px-3 py-3.5">

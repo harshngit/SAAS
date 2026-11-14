@@ -1,0 +1,229 @@
+{
+  "r1ConsoleErrors": 8,
+  "r2Dash": [
+    {
+      "url": "/dashboard/admin?date_from=2026-11-01&date_to=2026-11-14",
+      "status": 200,
+      "today": {
+        "date": "2026-11-14",
+        "timezone": "Asia/Kolkata",
+        "orders": 2,
+        "sales": 9347,
+        "delivered": 4,
+        "delivered_orders": 1,
+        "pending_orders": 1,
+        "delivered_amount": 9197,
+        "pending_amount": 150,
+        "received": 9197
+      }
+    },
+    {
+      "url": "/dashboard/admin?date_from=2026-11-01&date_to=2026-11-14",
+      "status": 200,
+      "today": {
+        "date": "2026-11-14",
+        "timezone": "Asia/Kolkata",
+        "orders": 2,
+        "sales": 9347,
+        "delivered": 4,
+        "delivered_orders": 1,
+        "pending_orders": 1,
+        "delivered_amount": 9197,
+        "pending_amount": 150,
+        "received": 9197
+      }
+    },
+    {
+      "url": "/dashboard/admin?date_from=2026-11-01&date_to=2026-11-14",
+      "status": 200,
+      "today": {
+        "date": "2026-11-14",
+        "timezone": "Asia/Kolkata",
+        "orders": 2,
+        "sales": 9347,
+        "delivered": 4,
+        "delivered_orders": 1,
+        "pending_orders": 1,
+        "delivered_amount": 9197,
+        "pending_amount": 150,
+        "received": 9197
+      }
+    },
+    {
+      "url": "/dashboard/admin?date_from=2026-11-01&date_to=2026-11-14",
+      "status": 200,
+      "today": {
+        "date": "2026-11-14",
+        "timezone": "Asia/Kolkata",
+        "orders": 2,
+        "sales": 9347,
+        "delivered": 4,
+        "delivered_orders": 1,
+        "pending_orders": 1,
+        "delivered_amount": 9197,
+        "pending_amount": 150,
+        "received": 9197
+      }
+    },
+    {
+      "url": "/dashboard/admin?date_from=2026-10-01&date_to=2026-10-31",
+      "status": 200,
+      "today": {
+        "date": "2026-11-14",
+        "timezone": "Asia/Kolkata",
+        "orders": 2,
+        "sales": 9347,
+        "delivered": 4,
+        "delivered_orders": 1,
+        "pending_orders": 1,
+        "delivered_amount": 9197,
+        "pending_amount": 150,
+        "received": 9197
+      }
+    },
+    {
+      "url": "/dashboard/admin?date_from=2026-10-01&date_to=2026-10-31&customer_id=bc41e638-f1ed-46b0-a0f2-234a657f8d86",
+      "status": 200,
+      "today": {
+        "date": "2026-11-14",
+        "timezone": "Asia/Kolkata",
+        "orders": 2,
+        "sales": 9347,
+        "delivered": 4,
+        "delivered_orders": 1,
+        "pending_orders": 1,
+        "delivered_amount": 9197,
+        "pending_amount": 150,
+        "received": 9197
+      }
+    }
+  ],
+  "stamp": "QA-TEST-1411-2012",
+  "created": [
+    {
+      "kind": "Product (variants)",
+      "name": "QA-TEST Product C QA-TEST-1411-2012",
+      "sku": "QA-TEST-1411-2012-C",
+      "at": "2026-11-14T14:43:04.967Z"
+    },
+    {
+      "kind": "Supplier",
+      "name": "QA-TEST supplier QA-TEST-1411-2012",
+      "at": "2026-11-14T14:44:44.313Z"
+    },
+    {
+      "kind": "Product",
+      "name": "QA-TEST Product D QA-TEST-1411-2012",
+      "sku": "QA-TEST-1411-2012-D",
+      "at": "2026-11-14T14:45:22.956Z"
+    },
+    {
+      "kind": "Purchase",
+      "name": "QA-TEST-INV-2",
+      "url": "/admin/purchases/e8efe111-6ccc-402b-bef6-fc7cd421a435",
+      "at": "2026-11-14T14:46:54.818Z"
+    },
+    {
+      "kind": "GRN",
+      "name": "GRN for PO-10001-2026-0014",
+      "at": "2026-11-14T14:47:26.968Z"
+    },
+    {
+      "kind": "Purchase Return",
+      "name": "QA-TEST-1411-2012 qty 1",
+      "url": "/admin/purchase-returns/986d15ed-cc14-4041-88e1-c46d5d408647",
+      "at": "2026-11-14T14:51:45.948Z"
+    },
+    {
+      "kind": "Expense",
+      "name": "QA-TEST expense QA-TEST-1411-2012 date-check",
+      "at": "2026-11-14T14:53:48.192Z"
+    },
+    {
+      "kind": "Customer",
+      "name": "QA-TEST customer QA-TEST-1411-2012",
+      "at": "2026-11-14T14:57:29.116Z"
+    },
+    {
+      "kind": "Quotation",
+      "name": "for QA-TEST customer QA-TEST-1411-2012",
+      "url": "/admin/quotations/adb4ec64-2d13-46dc-b157-781edb47db23",
+      "at": "2026-11-14T14:57:42.288Z"
+    },
+    {
+      "kind": "Supplier Invoice",
+      "name": "QA-TEST-SINV-2012",
+      "url": "/admin/supplier-invoices/f69b7180-5a14-4a62-aa72-cdcfdd32a835",
+      "at": "2026-11-14T14:59:20.896Z"
+    }
+  ],
+  "productCName": "QA-TEST Product C QA-TEST-1411-2012",
+  "supplierName": "QA-TEST supplier QA-TEST-1411-2012",
+  "supplierUrl": "/admin/suppliers/0ffd28f6-1c60-436f-9db3-71674fd9a9c7",
+  "productDName": "QA-TEST Product D QA-TEST-1411-2012",
+  "productDUrl": "/admin/products/54db570b-2f8e-49b9-a0e3-b00e0bac6873",
+  "purchaseUrl": "/admin/purchases/e8efe111-6ccc-402b-bef6-fc7cd421a435",
+  "purchaseDatePicked": "2026-11-10",
+  "purchaseNo": "PO-10001-2026-0014",
+  "productDStockAfterGrn": "",
+  "purchaseReturnUrl": "/admin/purchase-returns/986d15ed-cc14-4041-88e1-c46d5d408647",
+  "returnDatePicked": "2026-11-10",
+  "r6cDiag": {
+    "picked": {
+      "inv": "2026-11-10",
+      "due": "2026-11-20"
+    },
+    "sent": {
+      "invoice_date": "2026-11-10",
+      "due_date": "2026-11-20"
+    },
+    "rawKeys": [
+      "supplier_id",
+      "supplier_invoice_number",
+      "invoice_date",
+      "items",
+      "purchase_id",
+      "due_date"
+    ]
+  },
+  "r8Detail": {
+    "url": "/admin/vehicle-stock/98a5b651-b851-4d84-bd45-be713775dd0c",
+    "items": [
+      {
+        "sku": "ANC-ROMA-6A-1W",
+        "uom": "Piece",
+        "variant_name": null
+      },
+      {
+        "sku": "EXT-BOARD-1788076779215",
+        "uom": "Piece",
+        "variant_name": null
+      },
+      {
+        "sku": "HAV-BAT-20W",
+        "uom": "Piece",
+        "variant_name": null
+      },
+      {
+        "sku": "LED-24W-1788076779215",
+        "uom": "Piece",
+        "variant_name": null
+      },
+      {
+        "sku": "PCB-FR-1.5-90M-RED",
+        "uom": "Bottle",
+        "variant_name": null
+      },
+      {
+        "sku": "TEST-SANDAL-001",
+        "uom": "Piece",
+        "variant_name": null
+      },
+      {
+        "sku": "ELE-DIV-20W",
+        "uom": "Piece",
+        "variant_name": null
+      }
+    ]
+  }
+}

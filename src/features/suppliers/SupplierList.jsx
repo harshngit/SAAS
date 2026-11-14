@@ -303,6 +303,7 @@ export default function SupplierList() {
         : [demoSupplier, ...current])
       setIsSaving(false)
       handleCloseForm()
+      showToast({ title: editingSupplier ? 'Supplier updated' : 'Supplier created', message: supplierData.name ? `${supplierData.name} was saved.` : undefined })
       return
     }
 
@@ -357,8 +358,14 @@ export default function SupplierList() {
           message: `${syncResult.failed.length} of ${syncResult.attempted} product link update${syncResult.attempted === 1 ? '' : 's'} failed. Edit this supplier again to retry.`,
           variant: 'error',
         })
+        return
       }
     }
+
+    showToast({
+      title: editingSupplier ? 'Supplier updated' : 'Supplier created',
+      message: supplierData.name || savedSupplier?.name ? `${supplierData.name || savedSupplier?.name} was saved.` : undefined,
+    })
   }
 
   const handleToggleStatus = async () => {

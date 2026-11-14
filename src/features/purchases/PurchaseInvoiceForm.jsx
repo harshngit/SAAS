@@ -382,6 +382,10 @@ export default function PurchaseInvoiceForm() {
 
     setIsSubmitting(false)
     navigate(`${basePath}/${result.purchase.id}`)
+    showToast({
+      title: isEditing ? 'Purchase updated' : 'Purchase created',
+      message: result.purchase.purchaseNumber ? `${result.purchase.purchaseNumber} was ${isEditing ? 'saved' : 'saved as a draft'}.` : undefined,
+    })
   }
 
   if (isLoadingPurchase) {

@@ -22,7 +22,35 @@ const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 const MONTHS = Array.from({ length: 12 }, (_, index) => new Date(2026, index, 1))
 const YEAR_RANGE_SIZE = 72
 
-export default function DatePicker({ label, value, onChange, error, placeholder = 'Select date', className = '' }) {
+// Extra props (all optional, defaults keep every existing caller unchanged) are what let Input.jsx
+// use this as the app-wide replacement for <input type="date">:
+//   displayFormat  - date-fns pattern for the trigger text (Input passes 'dd-MM-yyyy')
+//   min / max      - 'yyyy-MM-dd' bounds; days outside are disabled
+//   clearable      - shows a Clear button (optional date fields could be emptied natively)
+//   required/name  - mirrored onto an invisible input so native form validation + FormData still work
+//   triggerClassName / compact / ariaLabel / title / disabled - presentation + a11y
+// The value in and out is always the 'yyyy-MM-dd' string, same as before.
+export default function DatePicker({
+  label,
+  value,
+  onChange,
+  error,
+  invalid = false,
+  placeholder = 'Select date',
+  className = '',
+  displayFormat = 'dd MMM yyyy',
+  min,
+  max,
+  clearable = false,
+  required = false,
+  disabled = false,
+  name,
+  id,
+  compact = false,
+  triggerClassName,
+  ariaLabel,
+  title,
+}) {
   const [open, setOpen] = useState(false)
   const [viewMode, setViewMode] = useState('day')
   const selectedDate = value ? parseISO(value) : null
@@ -34,6 +62,9 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
   useEffect(() => {
     if (!open) return
     setViewMode('day')
+    // Edit forms often receive their date after first render - jump to the selected month on open.
+    const current = value ? parseISO(value) : null
+    if (current && isValid(current)) setViewMonth(current)
 
     const handleClickOutside = (event) => {
       if (
@@ -51,6 +82,7 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleEscape)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when opened/closed
   }, [open])
 
   // Positioned via a portal + measured coordinates (not plain CSS `absolute`) so the panel can
@@ -113,8 +145,19 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
   const gridEnd = addDays(gridStart, 41) > naturalGridEnd ? addDays(gridStart, 41) : naturalGridEnd
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd })
 
+  const isOutOfRange = (day) => {
+    const iso = format(day, 'yyyy-MM-dd')
+    return Boolean((min && iso < min) || (max && iso > max))
+  }
+
   const selectDay = (day) => {
+    if (isOutOfRange(day)) return
     onChange?.(format(day, 'yyyy-MM-dd'))
+    setOpen(false)
+  }
+
+  const clearDate = () => {
+    onChange?.('')
     setOpen(false)
   }
 
@@ -164,19 +207,40 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
       <div className="relative">
         <button
           type="button"
+          id={id}
           data-datepicker-trigger="true"
+          disabled={disabled}
+          title={title}
+          aria-label={ariaLabel}
+          aria-haspopup="dialog"
+          aria-expanded={open}
           onClick={() => setOpen((prev) => !prev)}
-          className={`flex w-full items-center justify-between rounded-xl border bg-neutral-50 px-3.5 py-2.5 text-left text-sm transition-all focus:bg-(--modal-bg) focus:outline-none focus:ring-4 ${
-            error
-              ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15'
-              : 'border-neutral-200 focus:border-primary-400 focus:ring-primary-500/12'
-          }`}
+          className={triggerClassName
+            ? `flex w-full items-center justify-between text-left ${triggerClassName} ${error || invalid ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15' : ''}`
+            : `flex w-full items-center justify-between rounded-xl border bg-neutral-50 px-3.5 py-2.5 text-left text-sm transition-all focus:bg-(--modal-bg) focus:outline-none focus:ring-4 ${
+              error || invalid
+                ? 'border-red-300 focus:border-red-400 focus:ring-red-500/15'
+                : 'border-neutral-200 focus:border-primary-400 focus:ring-primary-500/12'
+            }`}
         >
           <span className={selectedDate && isValid(selectedDate) ? 'text-neutral-900' : 'text-neutral-400'}>
-            {selectedDate && isValid(selectedDate) ? format(selectedDate, 'dd MMM yyyy') : placeholder}
+            {selectedDate && isValid(selectedDate) ? format(selectedDate, displayFormat) : placeholder}
           </span>
           <Calendar className="size-4 text-neutral-400" aria-hidden="true" />
         </button>
+        {(required || name) && (
+          // Invisible mirror of the value so a native `required` still blocks form submit and the
+          // value still reaches FormData; not focusable/readable for users or screen readers.
+          <input
+            tabIndex={-1}
+            aria-hidden="true"
+            name={name}
+            required={required}
+            value={value || ''}
+            onChange={() => {}}
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-px w-full opacity-0"
+          />
+        )}
 
         {open && menuStyle && createPortal(
           <div
@@ -284,12 +348,14 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
                   {days.map((day) => {
                     const inMonth = isSameMonth(day, viewMonth)
                     const selected = selectedDate && isValid(selectedDate) && isSameDay(day, selectedDate)
+                    const outOfRange = isOutOfRange(day)
                     return (
                       <button
                         key={day.toISOString()}
                         type="button"
+                        disabled={outOfRange}
                         onClick={() => selectDay(day)}
-                        className={`app-calendar-day mx-auto flex size-8 items-center justify-center rounded-full text-sm transition-all ${
+                        className={`app-calendar-day mx-auto flex size-8 items-center justify-center rounded-full text-sm transition-all disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent ${
                           selected
                             ? 'app-calendar-day-selected font-semibold'
                             : isToday(day)
@@ -305,13 +371,25 @@ export default function DatePicker({ label, value, onChange, error, placeholder 
                   })}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => selectDay(new Date())}
-                  className="mt-3 w-full rounded-full py-1.5 text-center text-sm font-semibold text-fg transition-colors hover:bg-surface-muted"
-                >
-                  Today
-                </button>
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isOutOfRange(new Date())}
+                    onClick={() => selectDay(new Date())}
+                    className="w-full rounded-full py-1.5 text-center text-sm font-semibold text-fg transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Today
+                  </button>
+                  {clearable && value && (
+                    <button
+                      type="button"
+                      onClick={clearDate}
+                      className="w-full rounded-full py-1.5 text-center text-sm font-semibold text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </div>,

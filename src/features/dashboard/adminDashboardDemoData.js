@@ -41,6 +41,7 @@ const EMPTY_DASHBOARD = {
   // anywhere, demo included, so AdminDashboard.jsx's Featured Sales card hides that breakdown the
   // same way in both demo and real mode rather than faking it here).
   today: { date: '', orders: 0, sales: 0 },
+  today_overall: { date: '', orders: 0, sales: 0 },
   cashflow: [],
   receivables_payables: { receivables: 0, payables: 0, overdue_receivables: 0, overdue_payables: 0 },
   top_customers: [],
@@ -137,6 +138,9 @@ export function buildDemoAdminDashboard() {
     },
     orders: {},
     today: { date: todayIso, orders: todaysOrders.length, sales: todaysSales },
+    // Real /dashboard/admin `today_overall` (filter-independent). Demo only knows date/orders/sales;
+    // the card shows "—" for the rest instead of faking them.
+    today_overall: { date: todayIso, orders: todaysOrders.length, sales: todaysSales },
     cashflow: byDate(flow),
     receivables_payables: {
       receivables: open.reduce((sum, invoice) => sum + (Number(invoice.outstandingAmount) || 0), 0),

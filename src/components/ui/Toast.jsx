@@ -5,7 +5,7 @@ import { setToastHandler, ToastContext } from './toastContext'
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
-  const showToast = ({ title, message, variant = 'success', duration = 3500 }) => {
+  const showToast = ({ title, message, variant = 'success', duration = 5000 }) => {
     const id = `${Date.now()}-${Math.random()}`
     const toast = { id, title, message, variant }
 

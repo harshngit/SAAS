@@ -10,6 +10,7 @@ import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import StatCard from '../../components/ui/StatCard'
 import { usePermission } from '../../auth/usePermission'
+import { useToast } from '../../components/ui/toastContext'
 import {
   PURCHASE_RETURNS_DEMO_ENABLED,
   cancelDemoPurchaseReturn,
@@ -48,6 +49,7 @@ export default function PurchaseReturnDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { can } = usePermission()
+  const { showToast } = useToast()
   const canManage = can('purchases', 'create')
 
   const [purchaseReturn, setPurchaseReturn] = useState(null)
@@ -117,16 +119,18 @@ export default function PurchaseReturnDetail() {
 
   // Real mode: call the backend, wait for success, then reload from GET /purchase-returns/{id} -
   // never update local state optimistically. Demo mode keeps its existing local simulation.
-  const runRealAction = async (apiCall) => {
+  const runRealAction = async (apiCall, successTitle) => {
     setIsActing(true)
     setActionError('')
     const result = await apiCall(purchaseReturn.id)
     setIsActing(false)
     if (!result.success) {
       setActionError(result.error)
-      return
+      return false
     }
+    showToast({ title: successTitle, message: purchaseReturn.returnNumber || undefined })
     await load()
+    return true
   }
 
   const runDemoAction = (fn, next) => {
@@ -171,7 +175,7 @@ export default function PurchaseReturnDetail() {
               variant="primary"
               size="sm"
               loading={isActing}
-              onClick={() => (PURCHASE_RETURNS_DEMO_ENABLED ? runDemoAction(confirmDemoPurchaseReturn) : runRealAction(confirmPurchaseReturn))}
+              onClick={() => (PURCHASE_RETURNS_DEMO_ENABLED ? runDemoAction(confirmDemoPurchaseReturn) : runRealAction(confirmPurchaseReturn, 'Purchase return confirmed'))}
             >
               <Check className="size-4" aria-hidden="true" />
               Confirm
@@ -182,7 +186,7 @@ export default function PurchaseReturnDetail() {
               variant="primary"
               size="sm"
               loading={isActing}
-              onClick={() => (PURCHASE_RETURNS_DEMO_ENABLED ? runDemoAction(dispatchDemoPurchaseReturn) : runRealAction(dispatchPurchaseReturn))}
+              onClick={() => (PURCHASE_RETURNS_DEMO_ENABLED ? runDemoAction(dispatchDemoPurchaseReturn) : runRealAction(dispatchPurchaseReturn, 'Purchase return dispatched'))}
             >
               <Send className="size-4" aria-hidden="true" />
               Dispatch Return
@@ -193,7 +197,7 @@ export default function PurchaseReturnDetail() {
               variant="primary"
               size="sm"
               loading={isActing}
-              onClick={() => (PURCHASE_RETURNS_DEMO_ENABLED ? runDemoAction(completeDemoPurchaseReturn) : runRealAction(completePurchaseReturn))}
+              onClick={() => (PURCHASE_RETURNS_DEMO_ENABLED ? runDemoAction(completeDemoPurchaseReturn) : runRealAction(completePurchaseReturn, 'Purchase return completed'))}
             >
               <Truck className="size-4" aria-hidden="true" />
               Complete Return
@@ -328,7 +332,7 @@ export default function PurchaseReturnDetail() {
                 if (PURCHASE_RETURNS_DEMO_ENABLED) {
                   runDemoAction((rid) => cancelDemoPurchaseReturn(rid, cancelReason.trim()), () => setCancelOpen(false))
                 } else {
-                  runRealAction((rid) => cancelPurchaseReturn(rid, cancelReason.trim())).then(() => setCancelOpen(false))
+                  runRealAction((rid) => cancelPurchaseReturn(rid, cancelReason.trim()), 'Purchase return cancelled').then(() => setCancelOpen(false))
                 }
               }}
             >

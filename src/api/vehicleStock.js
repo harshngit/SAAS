@@ -59,6 +59,8 @@ function normalizeSessionItem(item) {
     productId: item.product_id,
     variantId: item.variant_id,
     productName: item.product_name || item.name || '',
+    // Variant lines carry variant_name; sku/uom come straight from the API (null -> '').
+    variantName: item.variant_name || '',
     sku: item.sku || item.product_sku || '',
     uom: item.uom || item.unit || item.unit_of_measure || '',
     loadedQuantity,
@@ -127,7 +129,7 @@ function normalizeSession(session) {
   return {
     id: session.id,
     deliveryPartnerId: session.delivery_partner_id || session.delivery_partner?.id || '',
-    deliveryPartnerName: session.delivery_partner?.name || '',
+    deliveryPartnerName: session.delivery_partner?.name || session.driver_name || '',
     vehicleId: session.vehicle_id || session.vehicle?.id || '',
     vehicleNumber: session.vehicle?.vehicle_number || session.vehicle_number || '',
     vehicleType: session.vehicle?.vehicle_type || '',
@@ -300,6 +302,115 @@ export async function listVehicleStockSessions(params = {}) {
     )
 
     return { success: false, error: message }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Admin Vehicle Stock list endpoints (permission vehicle_stock.view)
+//   GET /vehicle-stock/today     -> plain array, active runs first then newest
+//   GET /vehicle-stock/history   -> { items, total, page, page_size, total_pages }
+//   GET /vehicle-stock/{id}      -> one session (same shape as /vehicle-stock/current/{partner}),
+//                                   active OR closed
+// Both lists return the same row shape (see normalizeStockRow). `date` is UTC.
+// ---------------------------------------------------------------------------------------------
+function normalizeStockRow(row) {
+  if (!row) return row
+
+  return {
+    id: row.id,
+    date: row.date,
+    vehicleId: row.vehicle_id || '',
+    vehicleNumber: row.vehicle_number || '',
+    deliveryPartnerId: row.delivery_partner_id || '',
+    driverName: row.driver_name || '',
+    warehouseId: row.warehouse_id || '',
+    orderUnits: Number(row.order_units) || 0,
+    loadedUnits: Number(row.loaded_units) || 0,
+    deliveredUnits: Number(row.delivered_units) || 0,
+    returnedUnits: Number(row.returned_units) || 0,
+    availableUnits: Number(row.available_units) || 0,
+    itemCount: Number(row.item_count) || 0,
+    status: String(row.status || 'active').toLowerCase(),
+    updatedAt: row.updated_at,
+  }
+}
+
+export async function getVehicleStockToday() {
+  try {
+    const { data } = await apiClient.get('/vehicle-stock/today', { headers: authHeader() })
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+    return { success: true, rows: rows.map(normalizeStockRow) }
+  } catch (error) {
+    const errorData = error.response?.data
+    return {
+      success: false,
+      error: formatApiError(
+        errorData?.detail || errorData?.message || errorData?.error || errorData,
+        "Unable to load today's vehicle load information. Please try again.",
+      ),
+    }
+  }
+}
+
+// params: page, pageSize (max 100), search, dateFrom/dateTo (YYYY-MM-DD), vehicleId,
+// deliveryPartnerId, status ('active'|'closed'), sortBy (date|vehicle_number|delivery_partner|
+// status|updated_at), sortOrder (asc|desc). Only non-empty values are sent.
+export async function getVehicleStockHistory(params = {}) {
+  try {
+    const queryParams = {
+      page: params.page || 1,
+      page_size: Math.min(Number(params.pageSize) || 25, 100),
+    }
+    if (params.search) queryParams.search = params.search
+    if (params.dateFrom) queryParams.date_from = params.dateFrom
+    if (params.dateTo) queryParams.date_to = params.dateTo
+    if (params.vehicleId) queryParams.vehicle_id = params.vehicleId
+    if (params.deliveryPartnerId) queryParams.delivery_partner_id = params.deliveryPartnerId
+    if (params.status) queryParams.status = params.status
+    if (params.sortBy) {
+      queryParams.sort_by = params.sortBy
+      queryParams.sort_order = params.sortOrder || 'asc'
+    }
+
+    const { data } = await apiClient.get('/vehicle-stock/history', { headers: authHeader(), params: queryParams })
+    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+
+    return {
+      success: true,
+      rows: rows.map(normalizeStockRow),
+      total: data?.total ?? rows.length,
+      page: data?.page ?? queryParams.page,
+      pageSize: data?.page_size ?? queryParams.page_size,
+      totalPages: data?.total_pages ?? 1,
+    }
+  } catch (error) {
+    const errorData = error.response?.data
+    return {
+      success: false,
+      error: formatApiError(
+        errorData?.detail || errorData?.message || errorData?.error || errorData,
+        'Unable to load vehicle load history. Please try again.',
+      ),
+    }
+  }
+}
+
+export async function getVehicleStockSession(sessionId) {
+  try {
+    const { data } = await apiClient.get(`/vehicle-stock/${encodeURIComponent(sessionId)}`, { headers: authHeader() })
+    return { success: true, session: normalizeSession(data) }
+  } catch (error) {
+    // 404 = no such session (or not in this organization) - an empty state, not a retry-able failure.
+    if (error.response?.status === 404) return { success: true, session: null }
+
+    const errorData = error.response?.data
+    return {
+      success: false,
+      error: formatApiError(
+        errorData?.detail || errorData?.message || errorData?.error || errorData,
+        'Unable to load this vehicle load. Please try again.',
+      ),
+    }
   }
 }
 

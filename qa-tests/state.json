@@ -1,0 +1,599 @@
+{
+  "menus": {
+    "ADMIN": [
+      {
+        "href": "/admin/dashboard",
+        "text": "Dashboard"
+      },
+      {
+        "href": "/admin/leads",
+        "text": "Leads"
+      },
+      {
+        "href": "/admin/quotations",
+        "text": "Quotations"
+      },
+      {
+        "href": "/admin/customers",
+        "text": "Customers"
+      },
+      {
+        "href": "/admin/brands",
+        "text": "Brands"
+      },
+      {
+        "href": "/admin/categories",
+        "text": "Categories"
+      },
+      {
+        "href": "/admin/products",
+        "text": "Products"
+      },
+      {
+        "href": "/admin/suppliers",
+        "text": "Suppliers"
+      },
+      {
+        "href": "/admin/inventory",
+        "text": "Inventory"
+      },
+      {
+        "href": "/admin/warehouses",
+        "text": "Warehouses"
+      },
+      {
+        "href": "/admin/purchases",
+        "text": "Purchases"
+      },
+      {
+        "href": "/admin/purchase-returns",
+        "text": "Purchase Returns"
+      },
+      {
+        "href": "/admin/orders",
+        "text": "Orders"
+      },
+      {
+        "href": "/admin/sales-returns",
+        "text": "Sales Returns"
+      },
+      {
+        "href": "/admin/deliveries",
+        "text": "Deliveries"
+      },
+      {
+        "href": "/admin/sales-overview",
+        "text": "Sales"
+      },
+      {
+        "href": "/admin/vehicle-stock",
+        "text": "Vehicle Stock"
+      },
+      {
+        "href": "/admin/vehicles",
+        "text": "Vehicles"
+      },
+      {
+        "href": "/admin/receivables",
+        "text": "Receivables"
+      },
+      {
+        "href": "/admin/payables",
+        "text": "Accounts Payable"
+      },
+      {
+        "href": "/admin/supplier-payments",
+        "text": "Supplier Payments"
+      },
+      {
+        "href": "/admin/collections",
+        "text": "Collection Reconciliation"
+      },
+      {
+        "href": "/admin/day-end-approvals",
+        "text": "Day-End Approvals"
+      },
+      {
+        "href": "/admin/expenses",
+        "text": "Expenses"
+      },
+      {
+        "href": "/admin/reports",
+        "text": "Reports"
+      },
+      {
+        "href": "/admin/reports?report=profit-loss",
+        "text": "Profit and Loss Sheet"
+      },
+      {
+        "href": "/admin/reports?report=cash-flow-sheet",
+        "text": "Cash Flow Sheet"
+      },
+      {
+        "href": "/admin/reports?report=gst-summary",
+        "text": "GST Filing Sheet"
+      },
+      {
+        "href": "/admin/invoices",
+        "text": "Sales Invoices"
+      },
+      {
+        "href": "/admin/supplier-invoices",
+        "text": "Supplier Invoices"
+      },
+      {
+        "href": "/admin/company-settings",
+        "text": "Company Settings"
+      },
+      {
+        "href": "/admin/plans",
+        "text": "Plans"
+      },
+      {
+        "href": "/admin/billing-history",
+        "text": "Billing History"
+      },
+      {
+        "href": "/admin/audit-logs",
+        "text": "Audit Log"
+      },
+      {
+        "href": "/profile",
+        "text": "My Profile"
+      },
+      {
+        "href": "/admin/users",
+        "text": "Staff"
+      },
+      {
+        "href": "/admin/attendance",
+        "text": "Attendance"
+      },
+      {
+        "href": "/admin/leaves",
+        "text": "Leaves"
+      },
+      {
+        "href": "/admin/roles",
+        "text": "Roles & Permissions"
+      },
+      {
+        "href": "/admin/object-fields",
+        "text": "Objects & Fields Settings"
+      },
+      {
+        "href": "/admin/invoices/settings",
+        "text": "Invoice Changes"
+      },
+      {
+        "href": "/admin/theme-settings",
+        "text": "Appearance & Branding"
+      },
+      {
+        "href": "/admin/settings/terms",
+        "text": "Terms & Conditions"
+      },
+      {
+        "href": "/admin/settings/privacy",
+        "text": "Privacy Policy"
+      },
+      {
+        "href": "/admin/settings/help",
+        "text": "Help & FAQ"
+      },
+      {
+        "href": "/admin/settings/policies",
+        "text": "View All Policies"
+      }
+    ],
+    "SALES": [
+      {
+        "href": "/sales/dashboard",
+        "text": "Dashboard"
+      },
+      {
+        "href": "/sales/customers",
+        "text": "Customers"
+      },
+      {
+        "href": "/sales/leads",
+        "text": "Leads"
+      },
+      {
+        "href": "/sales/quotations",
+        "text": "Quotations"
+      },
+      {
+        "href": "/sales/orders",
+        "text": "Orders"
+      },
+      {
+        "href": "/sales/orders/create",
+        "text": "Create Order"
+      },
+      {
+        "href": "/sales/sales-returns",
+        "text": "Sales Returns"
+      },
+      {
+        "href": "/sales/stock",
+        "text": "Stock"
+      },
+      {
+        "href": "/sales/visits",
+        "text": "Visits"
+      },
+      {
+        "href": "/sales/followups",
+        "text": "Follow-ups"
+      },
+      {
+        "href": "/sales/attendance",
+        "text": "Attendance"
+      },
+      {
+        "href": "/sales/leaves",
+        "text": "Leaves"
+      },
+      {
+        "href": "/sales/expenses",
+        "text": "Expenses"
+      }
+    ],
+    "ACCOUNTANT": [
+      {
+        "href": "/accounts/dashboard",
+        "text": "Dashboard"
+      },
+      {
+        "href": "/accounts/supplier-invoices",
+        "text": "Supplier Invoices"
+      },
+      {
+        "href": "/accounts/payables",
+        "text": "Accounts Payable"
+      },
+      {
+        "href": "/accounts/supplier-payments",
+        "text": "Supplier Payments"
+      },
+      {
+        "href": "/accounts/invoices/sales",
+        "text": "Sales Invoices"
+      },
+      {
+        "href": "/accounts/receivables",
+        "text": "Receivables"
+      },
+      {
+        "href": "/accounts/collections",
+        "text": "Collection Reconciliation"
+      },
+      {
+        "href": "/accounts/day-end-approvals",
+        "text": "Day-End Approvals"
+      },
+      {
+        "href": "/accounts/expenses/approval",
+        "text": "Expense Approval"
+      },
+      {
+        "href": "/accounts/expenses",
+        "text": "My Expenses"
+      },
+      {
+        "href": "/accounts/gst",
+        "text": "GST Summary"
+      },
+      {
+        "href": "/accounts/reports",
+        "text": "Financial Reports"
+      }
+    ],
+    "DELIVERY": [
+      {
+        "href": "/delivery/dashboard",
+        "text": "Dashboard"
+      },
+      {
+        "href": "/delivery/deliveries",
+        "text": "My Deliveries"
+      },
+      {
+        "href": "/delivery/vehicle-loading",
+        "text": "Vehicle Loading"
+      },
+      {
+        "href": "/delivery/vehicle-stock",
+        "text": "Vehicle Stock"
+      },
+      {
+        "href": "/delivery/end-of-day",
+        "text": "End of Day Return"
+      },
+      {
+        "href": "/delivery/attendance",
+        "text": "Attendance"
+      },
+      {
+        "href": "/delivery/leaves",
+        "text": "Leaves"
+      },
+      {
+        "href": "/delivery/expenses",
+        "text": "Expenses"
+      }
+    ],
+    "SUPERADMIN": [
+      {
+        "href": "/superadmin/dashboard",
+        "text": "Dashboard"
+      },
+      {
+        "href": "/superadmin/organizations",
+        "text": "Organizations"
+      },
+      {
+        "href": "/superadmin/upgrade-requests",
+        "text": "Upgrade Requests"
+      },
+      {
+        "href": "/superadmin/feature-requests",
+        "text": "Feature Requests"
+      },
+      {
+        "href": "/superadmin/support-tickets",
+        "text": "Support Tickets"
+      },
+      {
+        "href": "/superadmin/staff",
+        "text": "Platform Staff"
+      },
+      {
+        "href": "/superadmin/plans",
+        "text": "Plans"
+      },
+      {
+        "href": "/superadmin/analytics",
+        "text": "Platform Analytics"
+      },
+      {
+        "href": "/superadmin/admins",
+        "text": "Superadmins"
+      }
+    ]
+  },
+  "stamp": "QA-TEST-1411-1436",
+  "supplierType": "Manufacturer",
+  "created": [
+    {
+      "kind": "Supplier",
+      "name": "QA-TEST supplier QA-TEST-1411-1436",
+      "at": "2026-11-14T09:07:41.521Z"
+    },
+    {
+      "kind": "Product",
+      "name": "QA-TEST Product A QA-TEST-1411-1436",
+      "sku": "QA-TEST-1411-1436-A",
+      "at": "2026-11-14T09:25:51.552Z"
+    },
+    {
+      "kind": "Product (variants)",
+      "name": "QA-TEST Product B QA-TEST-1411-1436",
+      "sku": "QA-TEST-1411-1436-B",
+      "at": "2026-11-14T09:34:02.839Z"
+    },
+    {
+      "kind": "Purchase",
+      "name": "QA-TEST-INV-1",
+      "url": "/admin/purchases/605c071b-7a7d-413d-83b3-80a1cc6d1f42",
+      "at": "2026-11-14T09:37:32.615Z"
+    },
+    {
+      "kind": "GRN (draft)",
+      "name": "PO-10001-2026-0012",
+      "at": "2026-11-14T09:40:00.849Z"
+    },
+    {
+      "kind": "Purchase Return",
+      "name": "QA-TEST-1411-1436 qty 2",
+      "url": "/admin/purchase-returns/296ac53b-bb2a-423e-aeba-bba7750040e1",
+      "at": "2026-11-14T09:42:47.859Z"
+    },
+    {
+      "kind": "Expense",
+      "name": "QA-TEST expense QA-TEST-1411-1436",
+      "at": "2026-11-14T09:46:15.228Z"
+    }
+  ],
+  "supplierUrl": "/admin/suppliers/505351f0-97d0-4fc3-a5ee-8c3bf4496d13",
+  "supplierName": "QA-TEST supplier QA-TEST-1411-1436",
+  "productAEntered": {
+    "name": "QA-TEST Product A QA-TEST-1411-1436",
+    "sku": "QA-TEST-1411-1436-A",
+    "category": "Beverages",
+    "subCategory": "Water Bottles",
+    "status": "Active",
+    "uom": "Piece",
+    "spc": "SPC-QA-TEST-1411-1436",
+    "notes": "QA-TEST QA-TEST-1411-1436 notes"
+  },
+  "productAUrl": "/admin/products/e2f52362-8ff8-4637-b30e-c6d2d6f79364",
+  "productBEntered": {
+    "name": "QA-TEST Product B QA-TEST-1411-1436",
+    "sku": "QA-TEST-1411-1436-B",
+    "cat": "Beverages",
+    "sub": "Beverages › Water Bottles",
+    "variants": [
+      {
+        "name": "Red",
+        "sku": "QA-TEST-1411-1436-B-RED",
+        "stock": "5",
+        "purchase": "80",
+        "selling": "120",
+        "mrp": "150"
+      },
+      {
+        "name": "Blue",
+        "sku": "QA-TEST-1411-1436-B-BLUE",
+        "stock": "7",
+        "purchase": "85",
+        "selling": "125",
+        "mrp": "155"
+      }
+    ]
+  },
+  "productBUrl": "/admin/products/971d6bfa-1790-41ac-8227-e7dc6dc97d63",
+  "t5b": {
+    "banner": "Can't save yet — 1 field needs attention on the \"Variants & Attributes\" tab.",
+    "state": {
+      "redTexts": [
+        "Can't save yet — 1 field needs attention on the \"Variants & Attributes\" tab."
+      ],
+      "redBorders": 1,
+      "h": "Variants & Attributes"
+    },
+    "exactVariantMessageVisible": 0,
+    "productWritesSent": []
+  },
+  "productAStockBefore": "QA-TEST Product A QA-TEST-1411-1436 QA-TEST-1411-1436-A 0 0 Out of Stock",
+  "purchaseFormInfo": {
+    "ptype": "Purchase Order",
+    "wh": "Main Warehouse",
+    "dateVal": "2026-11-14",
+    "totalsText": "Subtotal ₹ 1,000 Item Discount - ₹ 0 Extra Discount - ₹ 0 Tax ₹ 0 Grand Total ₹ 1,000",
+    "rowText": " QA-TEST-1411-1436-A Piece ₹ 1,000 ",
+    "cnt": 5
+  },
+  "purchaseAfterCreate": {
+    "toast": "Loading... || Loading purchase...",
+    "bannerErr": "",
+    "url": "/admin/purchases/605c071b-7a7d-413d-83b3-80a1cc6d1f42"
+  },
+  "purchaseUrl": "/admin/purchases/605c071b-7a7d-413d-83b3-80a1cc6d1f42",
+  "purchaseNo": "PO-10001-2026-0012",
+  "productAStockAfterGrn": "QA-TEST Product A QA-TEST-1411-1436 QA-TEST-1411-1436-A 0 10 In Stock",
+  "purchaseReturnUrl": "/admin/purchase-returns/296ac53b-bb2a-423e-aeba-bba7750040e1",
+  "prStock_draft": "0 10 In Stock",
+  "prStock_confirm": "0 8 In Stock",
+  "prStock_dispatch": "0 8 In Stock",
+  "prStock_complete": "0 8 In Stock",
+  "expenseEntered": {
+    "category": "Petrol/Diesel",
+    "amount": "1",
+    "date": "2026-11-14",
+    "mode": "Cash",
+    "desc": "QA-TEST expense QA-TEST-1411-1436"
+  },
+  "t10": [
+    {
+      "p": "/admin/purchases/create",
+      "name": "Purchase - Create",
+      "native": [
+        "Purchase Date"
+      ]
+    },
+    {
+      "p": "/admin/purchase-returns/new",
+      "name": "Purchase Return - New",
+      "native": [
+        "Return Date"
+      ]
+    },
+    {
+      "p": "/admin/supplier-invoices/new",
+      "name": "Supplier Invoice - New",
+      "native": [
+        "Invoice Date",
+        "Due Date"
+      ]
+    },
+    {
+      "p": "/admin/quotations/new",
+      "name": "Quotation - New",
+      "native": [
+        "Quotation Date",
+        "Valid Until"
+      ]
+    },
+    {
+      "p": "/admin/sales-returns/new",
+      "name": "Sales Return - New",
+      "native": [
+        "Return Date"
+      ]
+    },
+    {
+      "p": "/admin/invoices/new",
+      "name": "Sales Invoice - New",
+      "native": []
+    },
+    {
+      "p": "/admin/orders/create",
+      "name": "Order - Create",
+      "native": []
+    },
+    {
+      "p": "/admin/leads/new",
+      "name": "Lead - New",
+      "native": []
+    },
+    {
+      "p": "/admin/expenses",
+      "name": "Expenses (list; Add modal below)",
+      "native": []
+    },
+    {
+      "p": "/admin/customers",
+      "name": "Customers (list)",
+      "native": []
+    },
+    {
+      "p": "/admin/supplier-payments",
+      "name": "Supplier Payments (list)",
+      "native": []
+    },
+    {
+      "p": "/admin/receivables",
+      "name": "Receivables (list)",
+      "native": []
+    },
+    {
+      "p": "/admin/dashboard",
+      "name": "Dashboard",
+      "native": []
+    },
+    {
+      "p": "/admin/collections",
+      "name": "Collection Reconciliation",
+      "native": []
+    },
+    {
+      "p": "/admin/reports",
+      "name": "Reports",
+      "native": []
+    },
+    {
+      "p": "/admin/deliveries",
+      "name": "Deliveries",
+      "native": []
+    },
+    {
+      "p": "/admin/users",
+      "name": "Users",
+      "native": []
+    },
+    {
+      "p": "/admin/leaves",
+      "name": "Leaves",
+      "native": []
+    },
+    {
+      "p": "/admin/expenses (Add Expense modal)",
+      "name": "Expenses - Add modal",
+      "native": [
+        "Expense Date"
+      ]
+    }
+  ]
+}

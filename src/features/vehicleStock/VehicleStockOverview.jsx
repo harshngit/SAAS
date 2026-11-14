@@ -41,8 +41,12 @@ function stockStatus(item) {
     : { label: 'Zero', variant: 'neutral' }
 }
 
+// "SKU / variant_name" for a variant line, plain SKU otherwise; "—" when the API sent neither.
 function skuVariantLabel(item) {
-  return friendly(item.sku) || friendly(item.variantId) || '—'
+  const sku = friendly(item.sku)
+  const variantName = friendly(item.variantName)
+  if (sku && variantName) return `${sku} / ${variantName}`
+  return sku || variantName || '—'
 }
 
 function SummaryTiles({ items }) {
@@ -86,7 +90,7 @@ function QtyCell({ value, className = '' }) {
   return <span className={`tabular-nums ${className}`}>{Number(value) || 0}</span>
 }
 
-function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn, heading }) {
+export function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn, heading }) {
   // /vehicle-stock's backend sort_by/sort_order sorts SESSION/header records, not these
   // in-session line items (confirmed against the live backend contract) - so this never sends
   // a sort_by request for this table. `items` is already the full, already-loaded array for
@@ -287,7 +291,7 @@ function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn, heading }
   )
 }
 
-function ItemDetailModal({ item, onClose }) {
+export function ItemDetailModal({ item, onClose }) {
   return (
     <Modal isOpen={Boolean(item)} onClose={onClose} title="Product stock details" size="lg">
       {item && (
@@ -303,7 +307,7 @@ function ItemDetailModal({ item, onClose }) {
             </div>
             <div>
               <p className="text-xs text-neutral-400">Variant</p>
-              <p className="font-medium text-neutral-900">{friendly(item.variantId) || '—'}</p>
+              <p className="font-medium text-neutral-900">{friendly(item.variantName) || '—'}</p>
             </div>
             <div>
               <p className="text-xs text-neutral-400">UOM</p>
