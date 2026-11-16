@@ -1,7 +1,7 @@
 import NumericInput from '../../components/ui/NumericInput'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Info, Plus, Save, Trash2 } from 'lucide-react'
 import Button from '../../components/ui/Button'
@@ -81,6 +81,8 @@ export default function PurchaseInvoiceForm() {
   const [loadError, setLoadError] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submitInFlight = useRef(false)
+  const stopSubmitting = () => { submitInFlight.current = false; setIsSubmitting(false) }
 
   // Load supplier / product / warehouse pick-lists once.
   useEffect(() => {
@@ -308,6 +310,9 @@ export default function PurchaseInvoiceForm() {
       return setSubmitError('Purchase price, discount and tax cannot be negative.')
     }
 
+    // One click = one request: the ref flips synchronously, before the disabled button re-renders.
+    if (submitInFlight.current) return
+    submitInFlight.current = true
     setIsSubmitting(true)
     setSubmitError('')
 
@@ -352,7 +357,7 @@ export default function PurchaseInvoiceForm() {
         items,
       }
       const saved = isEditing ? (patchDemoPurchase(id, patch), { ...existingPurchase, ...patch, id }) : createDemoPurchase(patch)
-      setIsSubmitting(false)
+      stopSubmitting()
       navigate(`${basePath}/${saved.id}`)
       return
     }
@@ -376,11 +381,11 @@ export default function PurchaseInvoiceForm() {
 
     if (!result.success) {
       setSubmitError(result.error)
-      setIsSubmitting(false)
+      stopSubmitting()
       return
     }
 
-    setIsSubmitting(false)
+    stopSubmitting()
     navigate(`${basePath}/${result.purchase.id}`)
     showToast({
       title: isEditing ? 'Purchase updated' : 'Purchase created',

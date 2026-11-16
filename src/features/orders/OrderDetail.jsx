@@ -1044,15 +1044,12 @@ export default function OrderDetail() {
             value={planForm.warehouseId}
             onChange={(event) => setPlanForm((current) => ({ ...current, warehouseId: event.target.value }))}
           />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-neutral-700">Scheduled Date</label>
-            <input
-              type="date"
-              value={planForm.scheduledDate}
-              onChange={(event) => setPlanForm((current) => ({ ...current, scheduledDate: event.target.value }))}
-              className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-            />
-          </div>
+          <Input
+            label="Scheduled Date"
+            type="date"
+            value={planForm.scheduledDate}
+            onChange={(event) => setPlanForm((current) => ({ ...current, scheduledDate: event.target.value }))}
+          />
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-neutral-700">Delivery Address</label>
             <textarea

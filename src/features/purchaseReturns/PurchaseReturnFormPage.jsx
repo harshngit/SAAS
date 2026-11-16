@@ -1,5 +1,5 @@
 import NumericInput from '../../components/ui/NumericInput'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, PackageSearch, PackageX, Search } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Button from '../../components/ui/Button'
@@ -142,6 +142,8 @@ export default function PurchaseReturnFormPage() {
   const [notes, setNotes] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submitInFlight = useRef(false)
+  const stopSubmitting = () => { submitInFlight.current = false; setIsSubmitting(false) }
   const [editRecord, setEditRecord] = useState(null)
 
   useEffect(() => {
@@ -294,6 +296,9 @@ export default function PurchaseReturnFormPage() {
       setSubmitError(error)
       return
     }
+    // One click = one request: the ref flips synchronously, before the disabled button re-renders.
+    if (submitInFlight.current) return
+    submitInFlight.current = true
     setIsSubmitting(true)
     setSubmitError('')
 
@@ -339,7 +344,7 @@ export default function PurchaseReturnFormPage() {
 
     if (isEdit && editRecord) {
       const result = await updatePurchaseReturn(editRecord.id, { reason: resolvedReason, returnDate, notes: notes.trim(), items })
-      setIsSubmitting(false)
+      stopSubmitting()
       if (!result.success) {
         setSubmitError(result.error)
         return
@@ -358,7 +363,7 @@ export default function PurchaseReturnFormPage() {
       notes: notes.trim(),
       items,
     })
-    setIsSubmitting(false)
+    stopSubmitting()
     if (!result.success) {
       setSubmitError(result.error)
       return

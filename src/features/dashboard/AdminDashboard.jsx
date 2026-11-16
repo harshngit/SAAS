@@ -298,7 +298,7 @@ function ProfitSummaryCard({ grossProfit, netProfit, onClick }) {
 // response doesn't carry it - each missing figure renders "—" rather than a fake 0 or a crash.
 //   big amount = sales | Received = received | Orders = orders
 //   Delivered = delivered_orders | Pending (count) = pending_orders
-//   Pending (amount) = pending_amount (today's UNDELIVERED orders, not unpaid)
+//   Pending (amount) = due_amount (today's UNPAID amount; "—" when the field is absent)
 function FeaturedSalesCard({ data }) {
   const navigate = useNavigate()
   const numberOrNull = (key) => {
@@ -338,10 +338,10 @@ function FeaturedSalesCard({ data }) {
             {money('received')}
           </p>
         </div>
-        <div className="min-w-0" title="Amount of today's orders that are not delivered yet">
+        <div className="min-w-0" title="Unpaid amount of today's orders">
           <p className="text-[0.92rem] font-semibold leading-none text-white/90">Pending</p>
           <p className="mt-1 truncate text-[1.50rem] font-semibold leading-none tracking-tight text-white">
-            {money('pending_amount')}
+            {money('due_amount')}
           </p>
         </div>
       </div>

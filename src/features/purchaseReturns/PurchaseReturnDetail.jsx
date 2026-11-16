@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Ban, Check, PackageX, RotateCcw, Send, Trash2, Truck } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
@@ -57,6 +57,7 @@ export default function PurchaseReturnDetail() {
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [isActing, setIsActing] = useState(false)
+  const actionInFlight = useRef(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -120,9 +121,17 @@ export default function PurchaseReturnDetail() {
   // Real mode: call the backend, wait for success, then reload from GET /purchase-returns/{id} -
   // never update local state optimistically. Demo mode keeps its existing local simulation.
   const runRealAction = async (apiCall, successTitle) => {
+    // One click = one request (ref flips synchronously, before the disabled buttons re-render).
+    if (actionInFlight.current) return false
+    actionInFlight.current = true
     setIsActing(true)
     setActionError('')
-    const result = await apiCall(purchaseReturn.id)
+    let result
+    try {
+      result = await apiCall(purchaseReturn.id)
+    } finally {
+      actionInFlight.current = false
+    }
     setIsActing(false)
     if (!result.success) {
       setActionError(result.error)

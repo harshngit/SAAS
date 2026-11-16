@@ -1,6 +1,6 @@
 import { SkeletonValue } from '../../components/ui/Skeleton'
 import { loadSummaryRows } from '../../utils/listSummary'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Download, Edit, Eye, Plus, Power, RotateCw, Search, SlidersHorizontal, Trash2, UploadCloud, Users, Wallet, X } from 'lucide-react'
@@ -49,6 +49,7 @@ const formatSupplierStatus = (status) => (status === 'active' ? 'Active' : 'Inac
 export default function SupplierList() {
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const saveInFlight = useRef(false)
   const useDemoSuppliers = DEMO_MODE && !DEMO_EMPTY
   const [suppliers, setSuppliers] = useState([])
   const [summarySuppliers, setSummarySuppliers] = useState([])
@@ -286,6 +287,9 @@ export default function SupplierList() {
   }
 
   const handleSaveSupplier = async (supplierData) => {
+    // One click = one request (ref flips synchronously, before the disabled button re-renders).
+    if (saveInFlight.current) return
+    saveInFlight.current = true
     setIsSaving(true)
     setFormError('')
 
@@ -301,15 +305,21 @@ export default function SupplierList() {
       updateSuppliers((current) => editingSupplier
         ? current.map((supplier) => supplier.id === editingSupplier.id ? demoSupplier : supplier)
         : [demoSupplier, ...current])
+      saveInFlight.current = false
       setIsSaving(false)
       handleCloseForm()
       showToast({ title: editingSupplier ? 'Supplier updated' : 'Supplier created', message: supplierData.name ? `${supplierData.name} was saved.` : undefined })
       return
     }
 
-    const result = editingSupplier
-      ? await updateSupplier(editingSupplier.id, supplierData)
-      : await createSupplier(supplierData)
+    let result
+    try {
+      result = editingSupplier
+        ? await updateSupplier(editingSupplier.id, supplierData)
+        : await createSupplier(supplierData)
+    } finally {
+      saveInFlight.current = false
+    }
 
     setIsSaving(false)
 

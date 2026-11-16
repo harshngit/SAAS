@@ -1,6 +1,6 @@
 import NumericInput from '../../components/ui/NumericInput'
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { Ban, Check, PackageCheck, PackageSearch, Pencil, Trash2 } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Ban, Check, Loader2, PackageCheck, PackageSearch, Pencil, Trash2 } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -94,6 +94,10 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
   const [isLoadingGrns, setIsLoadingGrns] = useState(!isDemo)
   const [listErr, setListErr] = useState('')
   const [busyId, setBusyId] = useState('')
+  const [busyKind, setBusyKind] = useState('')
+  // Synchronous guards: one click = one request, even before the disabled buttons re-render.
+  const actionInFlight = useRef(false)
+  const saveInFlight = useRef(false)
   const [actionErr, setActionErr] = useState('')
   const [refreshTick, setRefreshTick] = useState(0)
 
@@ -281,6 +285,8 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
       return
     }
 
+    if (saveInFlight.current) return
+    saveInFlight.current = true
     setIsSaving(true)
 
     if (isDemo) {
@@ -308,7 +314,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
         notes: receiveNotes.trim(),
         lines: grnLines,
       })
-      setIsSaving(false)
+      saveInFlight.current = false; setIsSaving(false)
       setReceiveOpen(false)
       setRefreshTick((tick) => tick + 1)
       showToast({ title: 'Goods receipt recorded', message: 'Simulated locally for this demo purchase.' })
@@ -342,7 +348,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
     if (editingGrnId) {
       // PATCH /grns/{id} - stays a Draft, never auto-confirms, moves no stock.
       const result = await updateGrn(editingGrnId, payload)
-      setIsSaving(false)
+      saveInFlight.current = false; setIsSaving(false)
       if (!result.success) {
         setReceiveError(result.error)
         return
@@ -360,7 +366,7 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
     }
 
     const result = await createGrn(payload)
-    setIsSaving(false)
+    saveInFlight.current = false; setIsSaving(false)
     if (!result.success) {
       setReceiveError(result.error)
       return
@@ -374,14 +380,21 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
   // ---- Real GRN lifecycle actions ---------------------------------------------------------
   const runGrnAction = async (grn, kind) => {
     const allowed = kind === 'delete' ? canDeleteGrn : canApproveGrn
-    if (busyId || isPreparingEdit || !allowed || !grnActions(grn).includes(kind)) return
+    if (actionInFlight.current || busyId || isPreparingEdit || !allowed || !grnActions(grn).includes(kind)) return
+    actionInFlight.current = true
     setBusyId(grn.id)
+    setBusyKind(kind)
     setActionErr('')
     let result
-    if (kind === 'confirm') result = await confirmGrn(grn.id)
-    else if (kind === 'cancel') result = await cancelGrn(grn.id)
-    else result = await deleteGrn(grn.id)
+    try {
+      if (kind === 'confirm') result = await confirmGrn(grn.id)
+      else if (kind === 'cancel') result = await cancelGrn(grn.id)
+      else result = await deleteGrn(grn.id)
+    } finally {
+      actionInFlight.current = false
+    }
     setBusyId('')
+    setBusyKind('')
     if (!result.success) {
       setActionErr(result.error)
       return
@@ -538,7 +551,14 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
                       <td className="px-5 py-3.5 text-neutral-500">{formatDate(grn.createdAt)}</td>
                       <td className="px-5 py-3.5 text-neutral-500">{grn.confirmedAt ? formatDate(grn.confirmedAt) : '—'}</td>
                       <td className="px-4 py-3.5 text-right" onClick={(event) => event.stopPropagation()}>
-                        <ActionMenu items={menuItems} />
+                        {busyId === grn.id ? (
+                          // A confirm / cancel / delete is in flight for this GRN: spinner instead of the menu.
+                          <span className="inline-flex size-8 items-center justify-center text-neutral-400" aria-busy="true" aria-label="Working...">
+                            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                          </span>
+                        ) : (
+                          <ActionMenu items={menuItems} />
+                        )}
                       </td>
                     </tr>
                   )
@@ -672,9 +692,10 @@ export default function PurchaseGrnPanel({ purchase, isDemo, currentUserName, pu
           {!isLoadingDetail && detailGrn && grnActionItems(detailGrn).map((item) => (
             <Button key={item.key} type="button" variant={item.key === 'confirm' ? 'primary' : 'outline'}
               className={item.danger ? 'text-red-600 hover:bg-red-50 hover:text-red-700' : ''}
+              loading={busyId === detailGrn.id && busyKind === item.key}
               disabled={Boolean(busyId) || isPreparingEdit} onClick={item.onClick}>
-              <item.icon className="size-4" aria-hidden="true" />
-              {isPreparingEdit && item.key === 'edit' ? 'Opening...' : busyId === detailGrn.id ? 'Please wait...' : item.label}
+              {!(busyId === detailGrn.id && busyKind === item.key) && <item.icon className="size-4" aria-hidden="true" />}
+              {isPreparingEdit && item.key === 'edit' ? 'Opening...' : busyId === detailGrn.id && busyKind === item.key ? 'Please wait...' : item.label}
             </Button>
           ))}
         </div>}

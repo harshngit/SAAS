@@ -73,12 +73,38 @@ export async function login({ email, password }) {
     return { success: true, ...profileResult }
   } catch (error) {
     const errorData = error.response?.data
+    const status = error.response?.status
+
+    // 503 = the server is busy (backend contract) - NOT a credentials problem. Show the server's
+    // own message with a Retry; the caller keeps the typed email/password.
+    if (status === 503) {
+      return {
+        success: false,
+        retryable: true,
+        status,
+        error: formatApiError(
+          errorData?.detail || errorData?.message,
+          'Login is temporarily unavailable because the server is busy. Please try again in a moment.',
+        ),
+      }
+    }
+
+    // No response at all (network down / timeout) is not a wrong password either.
+    if (!error.response && error.isAxiosError) {
+      return {
+        success: false,
+        retryable: true,
+        error: 'Unable to reach the server. Please check your connection and try again.',
+      }
+    }
+
+    // 401 wrong password / 403 deactivated account / anything else: unchanged.
     const message = formatApiError(
       errorData?.detail || errorData?.message || errorData?.error || errorData,
       'Unable to sign in. Please check your credentials and try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, status, error: message }
   }
 }
 

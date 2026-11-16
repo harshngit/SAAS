@@ -114,6 +114,8 @@ export default function AdminExpenses() {
   const [formData, setFormData] = useState(emptyForm)
   const [receiptFile, setReceiptFile] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submitInFlight = useRef(false)
+  const stopSubmitting = () => { submitInFlight.current = false; setIsSubmitting(false) }
   const [formError, setFormError] = useState('')
 
   const loadExpenses = useCallback(async () => {
@@ -193,13 +195,16 @@ export default function AdminExpenses() {
     if (fieldVisible('expenseDate') && formData.expenseDate > todayIso()) return setFormError('The expense date cannot be in the future.')
     if (fieldVisible('description') && !formData.description.trim()) return setFormError('Add a short description of the expense.')
 
+    // One click = one request: the ref flips synchronously, before the disabled button re-renders.
+    if (submitInFlight.current) return
+    submitInFlight.current = true
     setIsSubmitting(true)
     setFormError('')
 
     if (DEMO_EXPENSES_ENABLED) {
       simulateDemoCreateExpense({ ...formData, amount, hasReceipt: Boolean(receiptFile) })
       setExpenseList(demoExpensesResolved())
-      setIsSubmitting(false)
+      stopSubmitting()
       setShowAddForm(false)
       showToast({ title: 'Expense added', message: 'The expense has been recorded.' })
       return
@@ -207,7 +212,7 @@ export default function AdminExpenses() {
 
     if (categories.length === 0) {
       setFormError('Expense categories are not available yet — cannot submit.')
-      setIsSubmitting(false)
+      stopSubmitting()
       return
     }
 
@@ -221,13 +226,13 @@ export default function AdminExpenses() {
     if (!result.success) {
       if (result.code === 'IDEMPOTENCY_KEY_REUSED') createIdempotencyKeyRef.current = crypto.randomUUID()
       setFormError(result.error)
-      setIsSubmitting(false)
+      stopSubmitting()
       return
     }
 
     if (receiptFile) await uploadExpenseReceipt(result.expense.id, receiptFile)
 
-    setIsSubmitting(false)
+    stopSubmitting()
     setShowAddForm(false)
     showToast({
       title: 'Expense added',

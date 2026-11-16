@@ -98,6 +98,7 @@ export default function QuotationFormPage() {
   const [errors, setErrors] = useState({})
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submitInFlight = useRef(false)
 
   // One quotation-level discount (matches the Create Order design). It is distributed back
   // onto every line item as a percentage when the quotation is saved - the backend only has
@@ -431,6 +432,9 @@ export default function QuotationFormPage() {
       return
     }
 
+    // One click = one request (ref flips synchronously, before the disabled button re-renders).
+    if (submitInFlight.current) return
+    submitInFlight.current = true
     setIsSubmitting(true)
     setSubmitError('')
 
@@ -445,9 +449,14 @@ export default function QuotationFormPage() {
       ...(reopensAsDraft ? { status: 'draft' } : {}),
     }
 
-    const result = isEdit
-      ? await updateQuotation(editId, payload)
-      : await createQuotation(payload)
+    let result
+    try {
+      result = isEdit
+        ? await updateQuotation(editId, payload)
+        : await createQuotation(payload)
+    } finally {
+      submitInFlight.current = false
+    }
 
     if (!result.success) {
       setSubmitError(result.error)
@@ -462,6 +471,11 @@ export default function QuotationFormPage() {
     if (reopensAsDraft) patchQuotationMeta(editId, { updatedAfterSend: true })
 
     navigate(savedId ? `${basePath}/${encodeURIComponent(savedId)}` : basePath)
+    // Success toast only after the response has arrived (toasts outlive the navigation).
+    const savedNumber = result.quotation?.quotationNumber
+    showToast(isEdit
+      ? { title: 'Changes saved', message: reopensAsDraft ? 'Quotation is back to Draft — you can send it again.' : 'Draft updated.' }
+      : { title: 'Quotation created', message: savedNumber ? `${savedNumber} was saved as a draft.` : 'Saved as a draft.' })
   }
 
   if (isLoadingSource) {

@@ -1,5 +1,5 @@
 import NumericInput from '../../components/ui/NumericInput'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Ban, Check, FileText, IndianRupee, PackageCheck, PackageSearch, Pencil, RotateCcw, Trash2, Upload, Wallet } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
@@ -152,6 +152,15 @@ export default function PurchaseInvoiceDetail() {
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [isActing, setIsActing] = useState(false)
+  // Synchronous guard: one click = one request, even before the disabled button re-renders.
+  const actingRef = useRef(false)
+  const beginActing = () => {
+    if (actingRef.current) return false
+    actingRef.current = true
+    setIsActing(true)
+    return true
+  }
+  const endActing = () => { actingRef.current = false; setIsActing(false) }
   const [activeTab, setActiveTab] = useState('overview')
   const [createReceiptRequested, setCreateReceiptRequested] = useState(false)
   const clearCreateReceiptRequest = useCallback(() => setCreateReceiptRequested(false), [])
@@ -280,19 +289,19 @@ export default function PurchaseInvoiceDetail() {
   // real, honest equivalent: jump straight to the Goods Receipts tab on this same page to
   // actually receive the stock, which is the real action that moves inventory.
   const handleConfirm = async () => {
-    setIsActing(true)
+    if (!beginActing()) return
     setActionError('')
 
     if (isDemo) {
       applyDemo({ status: 'confirmed' })
-      setIsActing(false)
+      endActing()
       showToast({ title: 'Purchase confirmed', message: 'This purchase is now Confirmed.' })
       setIsReceiveGoodsPromptOpen(true)
       return
     }
 
     const result = await confirmPurchase(id)
-    setIsActing(false)
+    endActing()
     if (!result.success) {
       setActionError(result.error)
       return
@@ -304,18 +313,18 @@ export default function PurchaseInvoiceDetail() {
 
   // Close is only valid once fully received (backend also blocks an early close). No stock move.
   const handleClose = async () => {
-    setIsActing(true)
+    if (!beginActing()) return
     setActionError('')
 
     if (isDemo) {
       applyDemo({ status: 'closed' })
-      setIsActing(false)
+      endActing()
       showToast({ title: 'Purchase closed', message: 'This purchase is now Closed.' })
       return
     }
 
     const result = await closePurchase(id)
-    setIsActing(false)
+    endActing()
     if (!result.success) {
       setActionError(result.error)
       return
@@ -331,18 +340,18 @@ export default function PurchaseInvoiceDetail() {
   }
 
   const handleCancel = async () => {
-    setIsActing(true)
+    if (!beginActing()) return
     setCancelError('')
 
     if (isDemo) {
       applyDemo({ status: 'cancelled' })
-      setIsActing(false)
+      endActing()
       setCancelOpen(false)
       return
     }
 
     const result = await cancelPurchase(id, cancelReason.trim() || undefined)
-    setIsActing(false)
+    endActing()
     if (!result.success) {
       setCancelError(result.error)
       return
@@ -366,19 +375,19 @@ export default function PurchaseInvoiceDetail() {
       return
     }
 
-    setIsActing(true)
+    if (!beginActing()) return
     const amountPaid = Number(paymentAmount) || 0
     const paymentStatus = derivePaymentStatusFromAmount(amountPaid, grandTotal)
 
     if (isDemo) {
       applyDemo({ paymentStatus, amountPaid, outstandingAmount: derivePurchaseOutstanding({ total: grandTotal, amountPaid }) })
-      setIsActing(false)
+      endActing()
       setPaymentOpen(false)
       return
     }
 
     const result = await updatePurchasePaymentStatus(id, { paymentStatus, amountPaid })
-    setIsActing(false)
+    endActing()
     if (!result.success) {
       setPaymentError(result.error)
       return
@@ -418,18 +427,18 @@ export default function PurchaseInvoiceDetail() {
       return
     }
 
-    setIsActing(true)
+    if (!beginActing()) return
     setReturnError('')
 
     if (isDemo) {
       showToast({ title: 'Items returned', message: 'Recorded locally for this demo purchase.' })
-      setIsActing(false)
+      endActing()
       setReturnOpen(false)
       return
     }
 
     const result = await returnPurchaseItems(id, { items, reason: returnReason.trim() || undefined })
-    setIsActing(false)
+    endActing()
     if (!result.success) {
       setReturnError(result.error)
       return
@@ -439,17 +448,17 @@ export default function PurchaseInvoiceDetail() {
   }
 
   const handleDelete = async () => {
-    setIsActing(true)
+    if (!beginActing()) return
 
     if (isDemo) {
-      setIsActing(false)
+      endActing()
       setDeleteOpen(false)
       navigate(basePath)
       return
     }
 
     const result = await deletePurchase(id)
-    setIsActing(false)
+    endActing()
     if (!result.success) {
       setActionError(result.error)
       setDeleteOpen(false)

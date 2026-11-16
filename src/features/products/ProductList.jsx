@@ -1,7 +1,7 @@
 import { SkeletonValue } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toastContext'
 import { loadSummaryRows } from '../../utils/listSummary'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Download, Edit, Eye, Package, Plus, Power, RotateCw, ScanBarcode, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
@@ -55,6 +55,7 @@ function ProductThumbnail({ src, alt }) {
 export default function ProductList() {
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const saveInFlight = useRef(false)
   const [products, setProducts] = useState([])
   const [summaryProducts, setSummaryProducts] = useState([])
   const updateProducts = (updater) => {
@@ -275,13 +276,21 @@ export default function ProductList() {
   }
 
   const handleSaveProduct = async (productData) => {
+    // One click = one request: the ref flips synchronously, before React re-renders the disabled button.
+    if (saveInFlight.current) return
+    saveInFlight.current = true
     setIsSaving(true)
     setFormError('')
     setFormErrorFields([])
 
-    const result = editingProduct
-      ? await updateProduct(editingProduct.id, productData)
-      : await createProduct(productData)
+    let result
+    try {
+      result = editingProduct
+        ? await updateProduct(editingProduct.id, productData)
+        : await createProduct(productData)
+    } finally {
+      saveInFlight.current = false
+    }
 
     setIsSaving(false)
 

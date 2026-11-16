@@ -28,6 +28,7 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { getDeliveryStage, getNextDeliveryAction } from './deliveryStage'
@@ -1724,15 +1725,12 @@ export default function DeliveryDetail() {
             value={reassignVehicleId}
             onChange={(event) => setReassignVehicleId(event.target.value)}
           />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-neutral-700">Scheduled Date</label>
-            <input
-              type="date"
-              value={reassignScheduledDate}
-              onChange={(event) => setReassignScheduledDate(event.target.value)}
-              className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-            />
-          </div>
+          <Input
+            label="Scheduled Date"
+            type="date"
+            value={reassignScheduledDate}
+            onChange={(event) => setReassignScheduledDate(event.target.value)}
+          />
         </div>
       </Modal>
 
@@ -1768,15 +1766,12 @@ export default function DeliveryDetail() {
             value={editForm.vehicleId}
             onChange={(event) => setEditForm((current) => ({ ...current, vehicleId: event.target.value }))}
           />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-neutral-700">Scheduled Date</label>
-            <input
-              type="date"
-              value={editForm.scheduledDate}
-              onChange={(event) => setEditForm((current) => ({ ...current, scheduledDate: event.target.value }))}
-              className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-700 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-            />
-          </div>
+          <Input
+            label="Scheduled Date"
+            type="date"
+            value={editForm.scheduledDate}
+            onChange={(event) => setEditForm((current) => ({ ...current, scheduledDate: event.target.value }))}
+          />
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-neutral-700">Delivery Address</label>
             <textarea

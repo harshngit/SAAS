@@ -30,3 +30,6 @@ env
 *.sw?
 
 .env.qa.local
+
+qa-tests/
+qa-tests.zip

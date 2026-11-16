@@ -1,6 +1,6 @@
 import { platformHomeForUser } from '../../auth/platformRoles'
 import PhoneOtpLogin from "./PhoneOtpLogin";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -28,6 +28,7 @@ export default function Login() {
   });
   const [phoneBusy, setPhoneBusy] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [canRetry, setCanRetry] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   const [isResettingPassword, setIsResettingPassword] = useState(Boolean(location.state?.forgotPassword));
@@ -46,14 +47,27 @@ export default function Login() {
     resolver: zodResolver(schema),
   });
 
+  // Exactly one login request at a time, whatever triggers it (button, Enter, Retry).
+  const loginInFlight = useRef(false);
+
   const performLogin = async (credentials) => {
+    if (loginInFlight.current) return;
+    loginInFlight.current = true;
     setServerError("");
-    const result = await login(credentials);
-    if (!result.success) {
-      setServerError(result.error);
-      return;
+    setCanRetry(false);
+    try {
+      const result = await login(credentials);
+      if (!result.success) {
+        setServerError(result.error);
+        // 503 "server busy" / unreachable server: offer Retry. The typed email + password stay in
+        // the form (react-hook-form keeps them; nothing is reset here).
+        setCanRetry(Boolean(result.retryable));
+        return;
+      }
+      finishLogin(result);
+    } finally {
+      loginInFlight.current = false;
     }
-    finishLogin(result);
   };
 
   const finishLogin = (result) => {
@@ -204,7 +218,20 @@ export default function Login() {
                 </div>
 
                 {serverError && (
-                  <p className="text-sm text-red-600">{serverError}</p>
+                  <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <p className="text-sm text-red-600">{serverError}</p>
+                    {canRetry && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        loading={isSubmitting || isRedirecting}
+                        onClick={handleSubmit(performLogin)}
+                      >
+                        Retry
+                      </Button>
+                    )}
+                  </div>
                 )}
 
                 {resetMessage && (
