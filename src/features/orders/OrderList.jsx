@@ -97,7 +97,8 @@ export default function OrderList() {
   const [statusTab, setStatusTab] = useState('all')
   const [deliveryPartnerFilter, setDeliveryPartnerFilter] = useState('all')
   const [sourceFilter, setSourceFilter] = useState('all')
-  const [datePreset, setDatePreset] = useState('all')
+  // `?period=today` (Dashboard "Today's Sales" → View Sales) opens the list on Today; otherwise All.
+  const [datePreset, setDatePreset] = useState(() => (new URLSearchParams(window.location.search).get('period') === 'today' ? 'today' : 'all'))
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [customerFilter, setCustomerFilter] = useState('all')

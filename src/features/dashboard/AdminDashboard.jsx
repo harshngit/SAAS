@@ -313,8 +313,8 @@ function FeaturedSalesCard({ data }) {
   return (
     <button
       type="button"
-      onClick={() => navigate('/admin/orders')}
-      aria-label="View sales orders"
+      onClick={() => navigate('/admin/orders?period=today')}
+      aria-label="View today's sales orders"
       className="group relative flex h-[320px] w-full min-w-0 flex-col overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#175e17_0%,#0c4608_100%)] p-5 text-left text-white shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)]"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_33%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.06),transparent_28%)] opacity-85 transition-opacity duration-300 group-hover:opacity-100" />
