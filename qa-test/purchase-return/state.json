@@ -1,0 +1,1446 @@
+{
+  "ts": "2611181509",
+  "warehouse": {
+    "id": "5ba8a564-fe16-4ced-b779-1117e9704cd3",
+    "name": "Main Warehouse"
+  },
+  "otherWarehouse": {
+    "id": "82d34aca-b241-42f2-a9c4-1c5d3b703d93",
+    "name": "W2"
+  },
+  "tpl": {
+    "category_id": "8db6aa10-5a86-4547-930a-fdd99a8e8d7a",
+    "sub_category_id": "7b7b3fc6-191e-4736-bdf4-afaf0bfd2326",
+    "cover_image": "https://crm-saas-backend.bsmart.workers.dev/files/e8ea8c50-15a0-4ea3-b232-0250dd95951d",
+    "category": {
+      "id": "8db6aa10-5a86-4547-930a-fdd99a8e8d7a",
+      "name": "Beverages",
+      "parent_id": null,
+      "parent_name": null
+    },
+    "sub_category": null
+  },
+  "created": [
+    {
+      "kind": "supplier",
+      "id": "f36c1b6c-016b-4267-bee0-b0cb8d670e5b",
+      "name": "QA-PR-Supplier-2611181509",
+      "at": "2026-11-18T09:39:37.667Z"
+    },
+    {
+      "kind": "supplier",
+      "id": "8f296b90-71a8-4a8e-85c8-b36ee7c59b22",
+      "name": "QA-PR-Supplier2-2611181509",
+      "at": "2026-11-18T09:39:39.123Z"
+    },
+    {
+      "kind": "product",
+      "id": "db4397a0-0951-42a6-a103-62c61db0ed4a",
+      "name": "QA-PR-Product-2611181509",
+      "sku": "QA-PR-SKU-2611181509",
+      "at": "2026-11-18T09:40:03.482Z"
+    },
+    {
+      "kind": "product",
+      "id": "7b433dc6-6679-4086-8616-e78ea5767777",
+      "name": "QA-PR-ProductB-2611181509",
+      "sku": "QA-PR-SKU-B-2611181509",
+      "at": "2026-11-18T09:40:05.573Z"
+    },
+    {
+      "kind": "product",
+      "id": "342c84d2-bd9c-4926-8502-43bc08be4c40",
+      "name": "QA-PR-ProductC-2611181509",
+      "sku": "QA-PR-SKU-C-2611181509",
+      "at": "2026-11-18T09:40:07.707Z"
+    },
+    {
+      "kind": "product",
+      "id": "2c69c322-e698-4acc-995a-e40863704e6d",
+      "name": "QA-PR-ProductD-2611181509",
+      "sku": "QA-PR-SKU-D-2611181509",
+      "at": "2026-11-18T09:40:10.085Z"
+    },
+    {
+      "kind": "product",
+      "id": "f7844bc8-3f54-4c96-be22-ac8ccda9267c",
+      "name": "QA-PR-ProductE-2611181509",
+      "sku": "QA-PR-SKU-E-2611181509",
+      "at": "2026-11-18T09:40:12.174Z"
+    },
+    {
+      "kind": "purchase",
+      "id": "36687612-755d-4137-8ad4-18d4637335e0",
+      "name": "QA-PR-INV1-2611181509",
+      "number": "PO-10001-2026-0038",
+      "at": "2026-11-18T09:40:45.866Z"
+    },
+    {
+      "kind": "grn",
+      "id": "4aa0f582-bc22-4ed1-8dd2-7dd81b51c6a3",
+      "name": "GRN-10001-2026-1047",
+      "at": "2026-11-18T09:40:52.195Z"
+    },
+    {
+      "kind": "purchase",
+      "id": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "name": "QA-PR-INV2-2611181509",
+      "number": "PO-10001-2026-0040",
+      "at": "2026-11-18T09:41:07.628Z"
+    },
+    {
+      "kind": "grn",
+      "id": "9512d706-2516-4010-a88c-f753097803a8",
+      "name": "GRN-10001-2026-1049",
+      "at": "2026-11-18T09:41:12.109Z"
+    },
+    {
+      "kind": "purchase",
+      "id": "4f50f1e9-240e-494f-8552-97fc476da8c3",
+      "name": "QA-PR-INV3-2611181509",
+      "number": "PO-10001-2026-0042",
+      "at": "2026-11-18T09:41:32.583Z"
+    },
+    {
+      "kind": "grn",
+      "id": "be1a6a5f-961e-4d12-be03-f6550fa40aac",
+      "name": "GRN-10001-2026-1051",
+      "at": "2026-11-18T09:41:36.951Z"
+    },
+    {
+      "kind": "purchase",
+      "id": "5a969bc1-6cd4-437d-83b9-5c9113d55bff",
+      "name": "QA-PR-INV4-2611181509",
+      "number": "PO-10001-2026-0044",
+      "at": "2026-11-18T09:41:58.282Z"
+    },
+    {
+      "kind": "purchase",
+      "id": "fcf03add-9c22-471a-a253-b7348b57ee41",
+      "name": "QA-PR-INV5-2611181509",
+      "number": "PO-10001-2026-0046",
+      "at": "2026-11-18T09:42:11.538Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "2ea992c0-c0ca-45c3-9a1f-900011cc2c10",
+      "name": "PR-10001-2026-0010",
+      "purchaseId": "36687612-755d-4137-8ad4-18d4637335e0",
+      "at": "2026-11-18T09:49:58.985Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "8811b6bd-18c0-43fc-93c1-ccd9d0666d57",
+      "name": "PR-10001-2026-0011",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T09:52:45.384Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "ba93f8dc-43cc-42f5-b5b4-ec2c2f7072a5",
+      "name": "PR-10001-2026-0012",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T09:52:58.868Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "2a958232-fb60-4d0b-b3fe-a4371dd1b05f",
+      "name": "PR-10001-2026-0013",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T09:53:15.022Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "de7525ce-e796-42d0-8135-c3d364bec186",
+      "name": "PR-10001-2026-0014",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T09:53:40.652Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "fb108e22-6e94-465c-9957-822f1b1f2186",
+      "name": "PR-10001-2026-0015",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T09:54:03.086Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "4493cf6e-dc8f-4649-8256-3213c953f939",
+      "name": "PR-10001-2026-0016",
+      "purchaseId": "36687612-755d-4137-8ad4-18d4637335e0",
+      "at": "2026-11-18T09:54:23.647Z"
+    },
+    {
+      "kind": "product",
+      "id": "9d7c0ac4-4aa7-4670-9396-6744c18b9fff",
+      "name": "QA-PR-ProductF-2611181509",
+      "sku": "QA-PR-SKU-F-2611181509",
+      "at": "2026-11-18T09:57:03.480Z"
+    },
+    {
+      "kind": "purchase",
+      "id": "364fbc90-6b67-4200-80a8-c5bd2de253f1",
+      "name": "QA-PR-INV6-2611181509",
+      "number": "PO-10001-2026-0048",
+      "at": "2026-11-18T09:57:10.178Z"
+    },
+    {
+      "kind": "grn",
+      "id": "fb1fbaa7-409b-4242-ad3b-87ac20682643",
+      "name": "GRN-10001-2026-1055",
+      "at": "2026-11-18T09:57:14.439Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "943eb93d-28f1-4b6b-9649-ab7327cfb44f",
+      "name": "PR-10001-2026-0017",
+      "purchaseId": "364fbc90-6b67-4200-80a8-c5bd2de253f1",
+      "at": "2026-11-18T09:57:55.907Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "d7ba7dd5-3b0b-4445-a932-1421389a55b5",
+      "name": "PR-10001-2026-0018",
+      "purchaseId": "36687612-755d-4137-8ad4-18d4637335e0",
+      "at": "2026-11-18T09:58:59.392Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "cebf45b6-28ef-4644-8457-46f02ff83e5f",
+      "name": "PR-10001-2026-0021",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:04:01.789Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "b007bde7-b772-4156-ad35-dada7c19e5ca",
+      "name": "PR-10001-2026-0022",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:04:01.791Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "bc4ed52c-64e0-4e8c-9d5c-3fec72b67ca7",
+      "name": "PR-10001-2026-0023",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:04:20.318Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "6c349b06-50d3-44a5-8e84-279fae4a8796",
+      "name": "PR-10001-2026-0024",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:04:36.895Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "06da96fd-f535-4cfc-9cdd-cee1edacb9b9",
+      "name": "PR-10001-2026-0025",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:04:53.906Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "e0648196-7658-4c2f-871d-0801eb7fef96",
+      "name": "PR-10001-2026-0026",
+      "purchaseId": "4f50f1e9-240e-494f-8552-97fc476da8c3",
+      "at": "2026-11-18T10:06:05.674Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "c94e8fc7-81dc-41c5-a5a3-73fc3cc212ce",
+      "name": "PR-10001-2026-0027",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:07:02.315Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "67dbe7bd-bd99-4ae9-b72d-de696fbb2297",
+      "name": "PR-10001-2026-0028",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:07:33.046Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "7cbb4f1f-4c39-4ad0-a8d5-254a26774406",
+      "name": "PR-10001-2026-0029",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:08:03.690Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "b32b8a7f-37cd-4cef-909f-cbf3ccbd0a86",
+      "name": "PR-10001-2026-0030",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:08:29.443Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "46af9180-4cc3-4ce1-9cce-3ecf4337b2ef",
+      "name": "PR-10001-2026-0031",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:08:51.396Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "6a041326-7a6e-44c8-95b9-b8c019d4bffb",
+      "name": "PR-10001-2026-0032",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:10:52.278Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "f672e716-306c-4ba4-bc45-1405f18598fb",
+      "name": "PR-10001-2026-0033",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:11:47.676Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "93a75d28-de1d-4512-b8d6-95abcaf6e39c",
+      "name": "PR-10001-2026-0034",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:12:19.166Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "83bc1c4d-84ec-41c7-b4ab-9b974d7808d1",
+      "name": "PR-10001-2026-0035",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:12:31.902Z"
+    },
+    {
+      "kind": "purchase_return",
+      "id": "ba75c851-101f-4df3-b86e-d639af6724fd",
+      "name": "PR-10001-2026-0036",
+      "purchaseId": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+      "at": "2026-11-18T10:17:23.508Z"
+    }
+  ],
+  "supplier": {
+    "id": "f36c1b6c-016b-4267-bee0-b0cb8d670e5b",
+    "name": "QA-PR-Supplier-2611181509"
+  },
+  "supplier2": {
+    "id": "8f296b90-71a8-4a8e-85c8-b36ee7c59b22",
+    "name": "QA-PR-Supplier2-2611181509"
+  },
+  "prodA": {
+    "id": "db4397a0-0951-42a6-a103-62c61db0ed4a",
+    "name": "QA-PR-Product-2611181509",
+    "sku": "QA-PR-SKU-2611181509"
+  },
+  "prodB": {
+    "id": "7b433dc6-6679-4086-8616-e78ea5767777",
+    "name": "QA-PR-ProductB-2611181509",
+    "sku": "QA-PR-SKU-B-2611181509"
+  },
+  "prodC": {
+    "id": "342c84d2-bd9c-4926-8502-43bc08be4c40",
+    "name": "QA-PR-ProductC-2611181509",
+    "sku": "QA-PR-SKU-C-2611181509"
+  },
+  "prodD": {
+    "id": "2c69c322-e698-4acc-995a-e40863704e6d",
+    "name": "QA-PR-ProductD-2611181509",
+    "sku": "QA-PR-SKU-D-2611181509"
+  },
+  "prodE": {
+    "id": "f7844bc8-3f54-4c96-be22-ac8ccda9267c",
+    "name": "QA-PR-ProductE-2611181509",
+    "sku": "QA-PR-SKU-E-2611181509"
+  },
+  "pur1": {
+    "id": "36687612-755d-4137-8ad4-18d4637335e0",
+    "number": "PO-10001-2026-0038",
+    "invoice": "QA-PR-INV1-2611181509",
+    "supplierId": "f36c1b6c-016b-4267-bee0-b0cb8d670e5b",
+    "supplierName": "QA-PR-Supplier-2611181509",
+    "items": [
+      {
+        "id": "95a65aae-e04a-4fa8-960d-8ab7eaf5da7d",
+        "product_id": "db4397a0-0951-42a6-a103-62c61db0ed4a",
+        "name": "QA-PR-Product-2611181509",
+        "qty": 10,
+        "received_qty": 10
+      }
+    ],
+    "stockBefore": {
+      "db4397a0-0951-42a6-a103-62c61db0ed4a": 0
+    },
+    "confirmStatus": 200,
+    "grnId": "4aa0f582-bc22-4ed1-8dd2-7dd81b51c6a3",
+    "grnNumber": "GRN-10001-2026-1047",
+    "stockAfter": {
+      "db4397a0-0951-42a6-a103-62c61db0ed4a": 10
+    },
+    "purchaseStatus": "confirmed"
+  },
+  "pur2": {
+    "id": "c623f756-d619-45c6-b4f2-57f2b1bcee85",
+    "number": "PO-10001-2026-0040",
+    "invoice": "QA-PR-INV2-2611181509",
+    "supplierId": "f36c1b6c-016b-4267-bee0-b0cb8d670e5b",
+    "supplierName": "QA-PR-Supplier-2611181509",
+    "items": [
+      {
+        "id": "98bde5cf-2b87-4652-bba3-fcae6258dbdf",
+        "product_id": "7b433dc6-6679-4086-8616-e78ea5767777",
+        "name": "QA-PR-ProductB-2611181509",
+        "qty": 20,
+        "received_qty": 20
+      }
+    ],
+    "stockBefore": {
+      "7b433dc6-6679-4086-8616-e78ea5767777": 0
+    },
+    "confirmStatus": 200,
+    "grnId": "9512d706-2516-4010-a88c-f753097803a8",
+    "grnNumber": "GRN-10001-2026-1049",
+    "stockAfter": {
+      "7b433dc6-6679-4086-8616-e78ea5767777": 20
+    },
+    "purchaseStatus": "confirmed"
+  },
+  "pur3": {
+    "id": "4f50f1e9-240e-494f-8552-97fc476da8c3",
+    "number": "PO-10001-2026-0042",
+    "invoice": "QA-PR-INV3-2611181509",
+    "supplierId": "f36c1b6c-016b-4267-bee0-b0cb8d670e5b",
+    "supplierName": "QA-PR-Supplier-2611181509",
+    "items": [
+      {
+        "id": "2306ac73-978e-4f9a-8490-10e8d834e905",
+        "product_id": "2c69c322-e698-4acc-995a-e40863704e6d",
+        "name": "QA-PR-ProductD-2611181509",
+        "qty": 8,
+        "received_qty": 8
+      },
+      {
+        "id": "c736e2a8-60f0-4027-a6aa-dfaa1deafe8f",
+        "product_id": "342c84d2-bd9c-4926-8502-43bc08be4c40",
+        "name": "QA-PR-ProductC-2611181509",
+        "qty": 5,
+        "received_qty": 5
+      }
+    ],
+    "stockBefore": {
+      "342c84d2-bd9c-4926-8502-43bc08be4c40": 0,
+      "2c69c322-e698-4acc-995a-e40863704e6d": 0
+    },
+    "confirmStatus": 200,
+    "grnId": "be1a6a5f-961e-4d12-be03-f6550fa40aac",
+    "grnNumber": "GRN-10001-2026-1051",
+    "stockAfter": {
+      "342c84d2-bd9c-4926-8502-43bc08be4c40": 5,
+      "2c69c322-e698-4acc-995a-e40863704e6d": 8
+    },
+    "purchaseStatus": "confirmed"
+  },
+  "pur4": {
+    "id": "5a969bc1-6cd4-437d-83b9-5c9113d55bff",
+    "number": "PO-10001-2026-0044",
+    "invoice": "QA-PR-INV4-2611181509",
+    "supplierId": "f36c1b6c-016b-4267-bee0-b0cb8d670e5b",
+    "supplierName": "QA-PR-Supplier-2611181509",
+    "items": [
+      {
+        "id": "843b8021-021d-4ca0-bd95-a5bba4f53973",
+        "product_id": "f7844bc8-3f54-4c96-be22-ac8ccda9267c",
+        "name": "QA-PR-ProductE-2611181509",
+        "qty": 5,
+        "received_qty": 0
+      }
+    ],
+    "stockBefore": {
+      "f7844bc8-3f54-4c96-be22-ac8ccda9267c": 0
+    },
+    "confirmStatus": 200,
+    "stockAfter": {
+      "f7844bc8-3f54-4c96-be22-ac8ccda9267c": 0
+    },
+    "purchaseStatus": "confirmed"
+  },
+  "pur5": {
+    "id": "fcf03add-9c22-471a-a253-b7348b57ee41",
+    "number": "PO-10001-2026-0046",
+    "invoice": "QA-PR-INV5-2611181509",
+    "supplierId": "f36c1b6c-016b-4267-bee0-b0cb8d670e5b",
+    "supplierName": "QA-PR-Supplier-2611181509",
+    "items": [
+      {
+        "id": "544e9460-94fd-480f-8ab6-9f1c3616ed9b",
+        "product_id": "f7844bc8-3f54-4c96-be22-ac8ccda9267c",
+        "name": "QA-PR-ProductE-2611181509",
+        "qty": 5,
+        "received_qty": 0
+      }
+    ],
+    "stockBefore": {
+      "f7844bc8-3f54-4c96-be22-ac8ccda9267c": 0
+    },
+    "cancelStatus": 200,
+    "stockAfter": {
+      "f7844bc8-3f54-4c96-be22-ac8ccda9267c": 0
+    },
+    "purchaseStatus": "cancelled"
+  },
+  "baseline": {
+    "ui": {
+      "Total Returns": "9",
+      "Draft": "1",
+      "In Progress": "1",
+      "Completed": "7"
+    },
+    "api": {
+      "total": 9,
+      "draft": 1,
+      "confirmed": 1,
+      "dispatched": 0,
+      "completed": 7
+    }
+  },
+  "netlog": [
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 400,
+      "step": "login",
+      "test": "T3"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 400,
+      "step": "login",
+      "test": "T3"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns/8811b6bd-18c0-43fc-93c1-ccd9d0666d57/complete",
+      "status": 400,
+      "step": "login",
+      "test": "T7"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns/de7525ce-e796-42d0-8135-c3d364bec186/confirm",
+      "status": 400,
+      "step": "login",
+      "test": "T7"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns/fb108e22-6e94-465c-9957-822f1b1f2186/confirm",
+      "status": 400,
+      "step": "login",
+      "test": "T7"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns/2ea992c0-c0ca-45c3-9a1f-900011cc2c10/complete",
+      "status": 400,
+      "step": "login",
+      "test": "T8"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns/2ea992c0-c0ca-45c3-9a1f-900011cc2c10/dispatch",
+      "status": 400,
+      "step": "login",
+      "test": "T8"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns/2ea992c0-c0ca-45c3-9a1f-900011cc2c10/confirm",
+      "status": 400,
+      "step": "login",
+      "test": "T8"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns/4493cf6e-dc8f-4649-8256-3213c953f939/complete",
+      "status": 400,
+      "step": "login",
+      "test": "T8"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns/4493cf6e-dc8f-4649-8256-3213c953f939/dispatch",
+      "status": 400,
+      "step": "login",
+      "test": "T8"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns/4493cf6e-dc8f-4649-8256-3213c953f939/confirm",
+      "status": 400,
+      "step": "login",
+      "test": "T8"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 400,
+      "step": "login",
+      "test": "T11"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 400,
+      "step": "login",
+      "test": "T13"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 422,
+      "step": "login",
+      "test": "T14"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 422,
+      "step": "login",
+      "test": "T15"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 422,
+      "step": "login",
+      "test": "T16"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 400,
+      "step": "login",
+      "test": "T17"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 422,
+      "step": "login",
+      "test": "T19"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 400,
+      "step": "login",
+      "test": "T21"
+    },
+    {
+      "method": "DELETE",
+      "url": "/purchase-returns/7cbb4f1f-4c39-4ad0-a8d5-254a26774406",
+      "status": 405,
+      "step": "login",
+      "test": "T24"
+    },
+    {
+      "method": "PATCH",
+      "url": "/purchase-returns/2ea992c0-c0ca-45c3-9a1f-900011cc2c10",
+      "status": 400,
+      "step": "login",
+      "test": "T25"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns/2ea992c0-c0ca-45c3-9a1f-900011cc2c10/cancel",
+      "status": 400,
+      "step": "login",
+      "test": "T25"
+    },
+    {
+      "method": "PATCH",
+      "url": "/purchase-returns/2ea992c0-c0ca-45c3-9a1f-900011cc2c10",
+      "status": 400,
+      "step": "login",
+      "test": "T25"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 400,
+      "step": "login",
+      "test": "T31"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 400,
+      "step": "login",
+      "test": "T31"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 400,
+      "step": "login",
+      "test": "T33"
+    },
+    {
+      "method": "POST",
+      "url": "/purchase-returns",
+      "status": 400,
+      "step": "login",
+      "test": "T34"
+    }
+  ],
+  "consolelog": [
+    {
+      "test": "T1",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    },
+    {
+      "test": "T3",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T3",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T2",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    },
+    {
+      "test": "T4",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    },
+    {
+      "test": "T6",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    },
+    {
+      "test": "T7",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    },
+    {
+      "test": "T7",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T7",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T7",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T8",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T8",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T8",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T8",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T8",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T8",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T9",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    },
+    {
+      "test": "T11",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    },
+    {
+      "test": "T11",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T13",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T14",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    },
+    {
+      "test": "T14",
+      "text": "Failed to load resource: the server responded with a status of 422 ()"
+    },
+    {
+      "test": "T15",
+      "text": "Failed to load resource: the server responded with a status of 422 ()"
+    },
+    {
+      "test": "T16",
+      "text": "Failed to load resource: the server responded with a status of 422 ()"
+    },
+    {
+      "test": "T17",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T18",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    },
+    {
+      "test": "T19",
+      "text": "Failed to load resource: the server responded with a status of 422 ()"
+    },
+    {
+      "test": "T20",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    },
+    {
+      "test": "T21",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T24",
+      "text": "Failed to load resource: the server responded with a status of 405 ()"
+    },
+    {
+      "test": "T25",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T25",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T25",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T26",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    },
+    {
+      "test": "T31",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T31",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T33",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T34",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "test": "T27",
+      "text": "Failed to load resource: the server responded with a status of 403 ()"
+    }
+  ],
+  "t4": {
+    "stale": true,
+    "grnShown": "—",
+    "grnApi": "GRN-10001-2026-1047"
+  },
+  "ret1": {
+    "id": "2ea992c0-c0ca-45c3-9a1f-900011cc2c10",
+    "number": "PR-10001-2026-0010"
+  },
+  "staleResult": {
+    "stale": true,
+    "createdDespiteStaleBanner": true,
+    "status": 201
+  },
+  "recon": [
+    {
+      "stage": "Initial (product created)",
+      "received": 0,
+      "returned": 0,
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "stage": "Purchase received (GRN confirmed)",
+      "received": 10,
+      "returned": 0,
+      "expected": 10,
+      "actual": 10
+    },
+    {
+      "stage": "Return 1 complete (qty 4)",
+      "received": 10,
+      "returned": 4,
+      "expected": 6,
+      "actual": 6
+    },
+    {
+      "stage": "Return 2 complete (qty 3)",
+      "received": 10,
+      "returned": 7,
+      "expected": 3,
+      "actual": 3
+    },
+    {
+      "stage": "Fully returned (return 3 complete, qty 3)",
+      "received": 10,
+      "returned": 10,
+      "expected": 0,
+      "actual": 0
+    }
+  ],
+  "transitionProbes": [
+    {
+      "label": "draft -> complete",
+      "number": "PR-10001-2026-0011",
+      "id": "8811b6bd-18c0-43fc-93c1-ccd9d0666d57",
+      "st0": 20,
+      "log": [
+        {
+          "action": "complete",
+          "http": 400,
+          "detail": "{\"detail\":\"Cannot complete purchase return in status 'draft'. Only 'confirmed' or 'dispatched' returns can be ",
+          "now": "draft",
+          "stock_deducted": false,
+          "stock": 20
+        }
+      ]
+    },
+    {
+      "label": "draft -> dispatch",
+      "number": "PR-10001-2026-0012",
+      "id": "ba93f8dc-43cc-42f5-b5b4-ec2c2f7072a5",
+      "st0": 20,
+      "log": [
+        {
+          "action": "dispatch",
+          "http": 200,
+          "detail": "",
+          "now": "dispatched",
+          "stock_deducted": true,
+          "stock": 19
+        }
+      ]
+    },
+    {
+      "label": "confirmed -> complete",
+      "number": "PR-10001-2026-0013",
+      "id": "2a958232-fb60-4d0b-b3fe-a4371dd1b05f",
+      "st0": 19,
+      "log": [
+        {
+          "action": "confirm",
+          "http": 200,
+          "detail": "",
+          "now": "confirmed",
+          "stock_deducted": true,
+          "stock": 18
+        },
+        {
+          "action": "complete",
+          "http": 200,
+          "detail": "",
+          "now": "completed",
+          "stock_deducted": true,
+          "stock": 18
+        }
+      ]
+    },
+    {
+      "label": "confirm twice",
+      "number": "PR-10001-2026-0014",
+      "id": "de7525ce-e796-42d0-8135-c3d364bec186",
+      "st0": 18,
+      "log": [
+        {
+          "action": "confirm",
+          "http": 200,
+          "detail": "",
+          "now": "confirmed",
+          "stock_deducted": true,
+          "stock": 17
+        },
+        {
+          "action": "confirm",
+          "http": 400,
+          "detail": "{\"detail\":\"Cannot confirm purchase return in status 'confirmed'. Only 'draft' returns can be confirmed.\"}",
+          "now": "confirmed",
+          "stock_deducted": true,
+          "stock": 17
+        }
+      ]
+    },
+    {
+      "label": "cancel then confirm",
+      "number": "PR-10001-2026-0015",
+      "id": "fb108e22-6e94-465c-9957-822f1b1f2186",
+      "st0": 17,
+      "log": [
+        {
+          "action": "cancel",
+          "http": 200,
+          "detail": "",
+          "now": "cancelled",
+          "stock_deducted": false,
+          "stock": 17
+        },
+        {
+          "action": "confirm",
+          "http": 400,
+          "detail": "{\"detail\":\"Cannot confirm purchase return in status 'cancelled'. Only 'draft' returns can be confirmed.\"}",
+          "now": "cancelled",
+          "stock_deducted": false,
+          "stock": 17
+        }
+      ]
+    }
+  ],
+  "ret2": {
+    "id": "4493cf6e-dc8f-4649-8256-3213c953f939",
+    "number": "PR-10001-2026-0016"
+  },
+  "lifecycle": {
+    "before": 6,
+    "afterConfirm": 3,
+    "afterDispatch": 3,
+    "afterComplete": 3,
+    "afterReplay": 3,
+    "afterReturn1": 3
+  },
+  "ret2Confirm": {
+    "stock_deducted": true,
+    "confirmed_at": "2026-11-18T09:54:36.108991Z"
+  },
+  "prodF": {
+    "id": "9d7c0ac4-4aa7-4670-9396-6744c18b9fff",
+    "name": "QA-PR-ProductF-2611181509",
+    "sku": "QA-PR-SKU-F-2611181509"
+  },
+  "pur6": {
+    "id": "364fbc90-6b67-4200-80a8-c5bd2de253f1",
+    "number": "PO-10001-2026-0048",
+    "invoice": "QA-PR-INV6-2611181509",
+    "supplierId": "f36c1b6c-016b-4267-bee0-b0cb8d670e5b",
+    "supplierName": "QA-PR-Supplier-2611181509",
+    "items": [
+      {
+        "id": "903aa9af-0b5f-4571-aed0-f6a88e2bbca5",
+        "product_id": "9d7c0ac4-4aa7-4670-9396-6744c18b9fff",
+        "name": "QA-PR-ProductF-2611181509",
+        "qty": 10,
+        "received_qty": 10
+      }
+    ],
+    "stockBefore": {
+      "9d7c0ac4-4aa7-4670-9396-6744c18b9fff": 0
+    },
+    "confirmStatus": 200,
+    "grnId": "fb1fbaa7-409b-4242-ad3b-87ac20682643",
+    "grnNumber": "GRN-10001-2026-1055",
+    "stockAfter": {
+      "9d7c0ac4-4aa7-4670-9396-6744c18b9fff": 10
+    },
+    "purchaseStatus": "confirmed"
+  },
+  "ret9": {
+    "id": "943eb93d-28f1-4b6b-9649-ab7327cfb44f",
+    "number": "PR-10001-2026-0017"
+  },
+  "ret3": {
+    "id": "d7ba7dd5-3b0b-4445-a932-1421389a55b5",
+    "number": "PR-10001-2026-0018"
+  },
+  "dateRules": [
+    {
+      "id": "bc4ed52c-64e0-4e8c-9d5c-3fec72b67ca7",
+      "label": "today",
+      "entered": "2026-11-18",
+      "status": 201,
+      "stored": "2026-11-18T00:00:00Z",
+      "banner": ""
+    },
+    {
+      "id": "6c349b06-50d3-44a5-8e84-279fae4a8796",
+      "label": "future +30d",
+      "entered": "2026-12-18",
+      "status": 201,
+      "stored": "2026-12-18T00:00:00Z",
+      "banner": ""
+    },
+    {
+      "id": "06da96fd-f535-4cfc-9cdd-cee1edacb9b9",
+      "label": "before purchase 2020-01-01",
+      "entered": "2020-01-01",
+      "status": 201,
+      "stored": "2020-01-01T00:00:00Z",
+      "banner": ""
+    }
+  ],
+  "ret20": {
+    "id": "e0648196-7658-4c2f-871d-0801eb7fef96",
+    "number": "PR-10001-2026-0026"
+  },
+  "draft23": {
+    "id": "67dbe7bd-bd99-4ae9-b72d-de696fbb2297",
+    "number": "PR-10001-2026-0028"
+  },
+  "draft28": {
+    "id": "6a041326-7a6e-44c8-95b9-b8c019d4bffb",
+    "number": "PR-10001-2026-0032"
+  },
+  "ledgerA": [
+    {
+      "type": "purchase_return",
+      "qty": -3,
+      "ref": null
+    },
+    {
+      "type": "purchase_return",
+      "qty": -3,
+      "ref": null
+    },
+    {
+      "type": "purchase_return",
+      "qty": -4,
+      "ref": null
+    },
+    {
+      "type": "purchase_in",
+      "qty": 10,
+      "ref": null
+    }
+  ],
+  "final": {
+    "cancelled": [
+      "PR-10001-2026-0032:draft->200",
+      "PR-10001-2026-0028:draft->200",
+      "PR-10001-2026-0014:confirmed->200"
+    ],
+    "purchases": {
+      "pur1": {
+        "number": "PO-10001-2026-0038",
+        "received": [
+          10
+        ],
+        "qty": [
+          10
+        ],
+        "returnsByStatus": {
+          "completed": 3
+        },
+        "activeReturnedQty": 10
+      },
+      "pur2": {
+        "number": "PO-10001-2026-0040",
+        "received": [
+          20
+        ],
+        "qty": [
+          20
+        ],
+        "returnsByStatus": {
+          "cancelled": 19,
+          "completed": 1,
+          "dispatched": 1
+        },
+        "activeReturnedQty": 2
+      },
+      "pur3": {
+        "number": "PO-10001-2026-0042",
+        "received": [
+          8,
+          5
+        ],
+        "qty": [
+          8,
+          5
+        ],
+        "returnsByStatus": {
+          "completed": 1
+        },
+        "activeReturnedQty": 5
+      },
+      "pur4": {
+        "number": "PO-10001-2026-0044",
+        "received": [
+          0
+        ],
+        "qty": [
+          5
+        ],
+        "returnsByStatus": {},
+        "activeReturnedQty": 0
+      },
+      "pur5": {
+        "number": "PO-10001-2026-0046",
+        "received": [
+          0
+        ],
+        "qty": [
+          5
+        ],
+        "returnsByStatus": {},
+        "activeReturnedQty": 0
+      },
+      "pur6": {
+        "number": "PO-10001-2026-0048",
+        "received": [
+          10
+        ],
+        "qty": [
+          10
+        ],
+        "returnsByStatus": {
+          "completed": 1
+        },
+        "activeReturnedQty": 4
+      }
+    },
+    "products": {
+      "prodA": {
+        "name": "QA-PR-Product-2611181509",
+        "total_inventory": 0,
+        "wh": {
+          "5ba8a564-fe16-4ced-b779-1117e9704cd3": {
+            "on_hand": 0,
+            "reserved": 0,
+            "available": 0
+          }
+        }
+      },
+      "prodB": {
+        "name": "QA-PR-ProductB-2611181509",
+        "total_inventory": 18,
+        "wh": {
+          "5ba8a564-fe16-4ced-b779-1117e9704cd3": {
+            "on_hand": 18,
+            "reserved": 0,
+            "available": 18
+          }
+        }
+      },
+      "prodC": {
+        "name": "QA-PR-ProductC-2611181509",
+        "total_inventory": 3,
+        "wh": {
+          "5ba8a564-fe16-4ced-b779-1117e9704cd3": {
+            "on_hand": 3,
+            "reserved": 0,
+            "available": 3
+          }
+        }
+      },
+      "prodD": {
+        "name": "QA-PR-ProductD-2611181509",
+        "total_inventory": 5,
+        "wh": {
+          "5ba8a564-fe16-4ced-b779-1117e9704cd3": {
+            "on_hand": 5,
+            "reserved": 0,
+            "available": 5
+          }
+        }
+      },
+      "prodE": {
+        "name": "QA-PR-ProductE-2611181509",
+        "total_inventory": 0,
+        "wh": {
+          "5ba8a564-fe16-4ced-b779-1117e9704cd3": {
+            "on_hand": 0,
+            "reserved": 0,
+            "available": 0
+          }
+        }
+      },
+      "prodF": {
+        "name": "QA-PR-ProductF-2611181509",
+        "total_inventory": 6,
+        "wh": {
+          "5ba8a564-fe16-4ced-b779-1117e9704cd3": {
+            "on_hand": 6,
+            "reserved": 0,
+            "available": 6
+          }
+        }
+      }
+    },
+    "returns": [
+      {
+        "n": "PR-10001-2026-0018",
+        "p": "pur1",
+        "st": "completed",
+        "q": 3
+      },
+      {
+        "n": "PR-10001-2026-0016",
+        "p": "pur1",
+        "st": "completed",
+        "q": 3
+      },
+      {
+        "n": "PR-10001-2026-0010",
+        "p": "pur1",
+        "st": "completed",
+        "q": 4
+      },
+      {
+        "n": "PR-10001-2026-0035",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0034",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0033",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 10
+      },
+      {
+        "n": "PR-10001-2026-0032",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 2
+      },
+      {
+        "n": "PR-10001-2026-0031",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0030",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 2
+      },
+      {
+        "n": "PR-10001-2026-0029",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 2
+      },
+      {
+        "n": "PR-10001-2026-0028",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 3
+      },
+      {
+        "n": "PR-10001-2026-0027",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0025",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0024",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0023",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0022",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0021",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0020",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 14
+      },
+      {
+        "n": "PR-10001-2026-0019",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 2
+      },
+      {
+        "n": "PR-10001-2026-0015",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0014",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0013",
+        "p": "pur2",
+        "st": "completed",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0012",
+        "p": "pur2",
+        "st": "dispatched",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0011",
+        "p": "pur2",
+        "st": "cancelled",
+        "q": 1
+      },
+      {
+        "n": "PR-10001-2026-0026",
+        "p": "pur3",
+        "st": "completed",
+        "q": 5
+      },
+      {
+        "n": "PR-10001-2026-0017",
+        "p": "pur6",
+        "st": "completed",
+        "q": 4
+      }
+    ]
+  },
+  "dispatchedCancelProbe": {
+    "number": "PR-10001-2026-0036",
+    "stockBefore": 18,
+    "afterDispatch": 17,
+    "cancelHttp": 200,
+    "status": "cancelled",
+    "stock_deducted": false,
+    "afterCancel": 18
+  }
+}
