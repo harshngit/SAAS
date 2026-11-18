@@ -1,5 +1,6 @@
 import { useAuthStore } from '../store/authStore'
 import { apiClient } from './client'
+import { planErrorCode, planErrorMessage } from './entitlements'
 import {
   COLLECTION_DEMO_ENABLED,
   createDemoCollection,
@@ -67,11 +68,18 @@ function collectionError(error, fallback) {
       ),
     }
   }
+  // The ONE "feature is not enabled for this account" error: the backend's plan-restriction code.
+  // Only this gets the "isn't enabled for your account" hint in the Record Collection modal.
+  if (planErrorCode(error) === 'PLAN_FEATURE_NOT_AVAILABLE') {
+    return { code: 'FEATURE_NOT_ENABLED', error: planErrorMessage(error, fallback) }
+  }
   if (status === 404) {
     return { error: 'The delivery collections service did not respond (404). Nothing was changed — please retry.' }
   }
   if (status === 403) return { error: 'You do not have permission to perform this action.' }
-  if (status === 409) return { error: formatApiError(detail, 'This collection has already been reconciled or voided.') }
+  // 409 (e.g. money from this customer is already collected and awaiting admin approval): the
+  // backend's own `detail` text, as sent. `code` lets the caller refresh what the screen shows.
+  if (status === 409) return { code: 'CONFLICT', error: formatApiError(detail, 'This collection has already been reconciled or voided.') }
   return { error: formatApiError(detail, fallback) }
 }
 

@@ -748,6 +748,13 @@ export default function OrderDetail() {
               View Delivery
             </Button>
           )}
+          {/* Visible in the main button row (not under More Actions) whenever quantity is still unplanned. */}
+          {actions.includes('planDelivery') && (
+            <Button variant="outline" size="sm" onClick={openPlanModal}>
+              <Truck className="size-4" aria-hidden="true" />
+              Plan Delivery
+            </Button>
+          )}
           {/* Sales invoices are created automatically by the backend once the order reaches its
               invoice-trigger status - there is no manual "Generate Invoice" action here anymore.
               View Invoice once the backend reports one exists; a non-clickable "being generated"
@@ -796,12 +803,6 @@ export default function OrderDetail() {
             <Button variant="primary" size="sm" loading={isActing} onClick={handleConfirm}>
               <Check className="size-4" aria-hidden="true" />
               Confirm Order
-            </Button>
-          )}
-          {actions.includes('planDelivery') && (
-            <Button variant="outline" size="sm" onClick={openPlanModal}>
-              <Truck className="size-4" aria-hidden="true" />
-              Plan Delivery
             </Button>
           )}
           {actions.includes('pickupStart') && (

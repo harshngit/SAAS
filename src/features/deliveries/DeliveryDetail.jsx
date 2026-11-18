@@ -321,6 +321,19 @@ export default function DeliveryDetail() {
     })
   }
 
+  // After the collection API refuses a record (409 already collected / awaiting approval, or the
+  // day closed): re-read the delivery (amount due, previous pending balance) and its collections
+  // WITHOUT the full-page loading state, so the open modal and the figures update in place.
+  // Resolves with the fresh delivery (or null) so the modal can reset its Amount.
+  const refreshAfterCollectionBlocked = async () => {
+    loadCollections()
+    if (isDemoDelivery(id)) return delivery
+    const result = await getDelivery(id)
+    if (!result.success) return null
+    setDelivery(result.delivery)
+    return result.delivery
+  }
+
   useEffect(() => {
     loadDetail()
     loadCollections()
@@ -1840,7 +1853,7 @@ export default function DeliveryDetail() {
         delivery={delivery}
         isOpen={isCollectionModalOpen}
         onClose={() => setIsCollectionModalOpen(false)}
-        onBlocked={loadCollections}
+        onBlocked={refreshAfterCollectionBlocked}
         onRecorded={(collection) => {
           // A recorded collection is NOT a payment - it does not touch the delivery's amount
           // due. It waits in the reconciliation queue for the accounts team.

@@ -380,11 +380,23 @@ function PaymentQrBlock({ url, thermal = false }) {
   )
 }
 
+// Only the bank fields that actually have a value are printed (no empty "A/c" or "IFSC" placeholders).
+function bankLine(bank) {
+  const clean = (value) => String(value ?? '').trim()
+  const parts = [
+    clean(bank?.name) && `Bank: ${clean(bank.name)}`,
+    clean(bank?.account) && `A/c ${clean(bank.account)}`,
+    clean(bank?.ifsc) && `IFSC ${clean(bank.ifsc)}`,
+  ].filter(Boolean)
+  return parts.join(' | ')
+}
+
 function InvoiceFooter({ company, data, payment, footer, style }) {
+  const bankText = bankLine(data.bank)
   return (
     <div className="space-y-1.5 border-t border-neutral-200 pt-3" style={{ fontSize: style.body }}>
-      {payment.showBankDetails && data.bank?.name && (
-        <p className="text-neutral-500">Bank: {data.bank.name} | A/c {data.bank.account} | IFSC {data.bank.ifsc}</p>
+      {payment.showBankDetails && bankText && (
+        <p className="text-neutral-500">{bankText}</p>
       )}
       {payment.showUpiQr && (company.qrCodeUrl || company.upiId) && <div className="w-fit max-w-full">{company.qrCodeUrl && <PaymentQrBlock url={company.qrCodeUrl} />}{company.upiId && <p className="text-center text-neutral-500">UPI: {company.upiId}</p>}</div>}
       {footer.showTerms && footer.terms && (

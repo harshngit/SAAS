@@ -74,15 +74,25 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
     })
 
     if (!result.success) {
-      // Never pretend it saved. A 403 / "not available" means the collections endpoint isn't
-      // live for this account yet - the amount stays as due for the accounts team.
+      // Never pretend it saved. The backend's message is shown as sent; the "isn't enabled for your
+      // account" hint appears ONLY for the exact feature-not-enabled error (plan restriction).
       setError(result.error)
-      setPermissionGap(/permission|forbidden|not allowed|403|not available|access denied|unauthori/i.test(result.error || ''))
+      setPermissionGap(result.code === 'FEATURE_NOT_ENABLED')
       setIsSaving(false)
-      // Nothing was recorded, but the delivery partner's day closed in the background (e.g. the
-      // day-end was approved while this modal was open) - re-sync the page's own data so it
-      // reflects that, without touching anything this modal itself would change.
-      if (result.code === 'DAY_END_CLOSED') onBlocked?.()
+      // Nothing was recorded, but the data behind this screen changed in the background - the
+      // partner's day closed (DAY_END_CLOSED), or this customer's money is already collected and
+      // awaiting admin approval (409 CONFLICT). Re-fetch the delivery (and its collections) so the
+      // screen shows the up-to-date figures; after a 409 also reset the Amount to the new
+      // collectable amount (the error text stays visible).
+      if (result.code === 'DAY_END_CLOSED' || result.code === 'CONFLICT') {
+        const rejectedAmount = amount
+        const fresh = await onBlocked?.()
+        if (result.code === 'CONFLICT' && fresh) {
+          const due = Number(fresh.amountDue) || 0
+          // Only replace the amount that was just refused - never overwrite something typed since.
+          setAmount((current) => (current === rejectedAmount ? (due > 0 ? String(due) : '') : current))
+        }
+      }
       return
     }
 
