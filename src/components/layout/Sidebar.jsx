@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   BarChart3,
   CheckCircle2,
@@ -174,6 +174,59 @@ export default function Sidebar({
     )
   }, [currentRole])
 
+  // One highlight "pill" that slides to whichever nav item is active (instead of each item
+  // flipping its own background). Its position comes from the active item's real box, so it also
+  // follows the rail while the sidebar expands/collapses and when a section opens/closes.
+  const navRef = useRef(null)
+  const [pill, setPill] = useState({ top: 0, left: 0, width: 0, height: 0, visible: false })
+  const [pillReady, setPillReady] = useState(false)
+
+  useLayoutEffect(() => {
+    const nav = navRef.current
+    if (!nav) return undefined
+
+    const findActive = () => {
+      const candidates = Array.from(nav.querySelectorAll('[data-nav-active="true"]')).filter((el) => el.offsetParent !== null)
+      // Two items can match one URL (a base route and a deeper child) - the most specific one wins.
+      return candidates.sort((a, b) => (b.dataset.navPath || '').length - (a.dataset.navPath || '').length)[0] || null
+    }
+
+    const update = () => {
+      const el = findActive()
+      if (!el) {
+        setPill((prev) => (prev.visible ? { ...prev, visible: false } : prev))
+        return
+      }
+      const navRect = nav.getBoundingClientRect()
+      const rect = el.getBoundingClientRect()
+      const next = {
+        top: Math.round((rect.top - navRect.top + nav.scrollTop) * 10) / 10,
+        left: Math.round((rect.left - navRect.left + nav.scrollLeft) * 10) / 10,
+        width: Math.round(rect.width * 10) / 10,
+        height: Math.round(rect.height * 10) / 10,
+        visible: true,
+      }
+      setPill((prev) => (
+        prev.visible === next.visible && prev.top === next.top && prev.left === next.left && prev.width === next.width && prev.height === next.height
+          ? prev
+          : next
+      ))
+    }
+
+    update()
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
+    observer?.observe(nav)
+    const active = findActive()
+    if (active) observer?.observe(active)
+    // The first placement must not animate in from the top-left corner.
+    const frame = requestAnimationFrame(() => setPillReady(true))
+
+    return () => {
+      observer?.disconnect()
+      cancelAnimationFrame(frame)
+    }
+  }, [location.pathname, location.search, isExpanded, openSections, menuGroups.length, currentRole])
+
   if (!currentUser) return null
 
   const desktopLabelVisibilityClass = isExpanded
@@ -277,7 +330,24 @@ export default function Sidebar({
         <div className={`${isExpanded ? 'mx-5' : 'mx-3'} hidden h-px bg-neutral-100 transition-all duration-300 md:block`} />
         <div className="mx-5 h-px bg-neutral-100 md:hidden" />
 
-        <nav className={`sidebar-nav min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? 'py-5 md:px-3' : 'py-3 md:px-2.5 md:pt-0'} px-3`}>
+        <nav ref={navRef} className={`sidebar-nav relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? 'py-5 md:px-3' : 'py-3 md:px-2.5 md:pt-0'} px-3`}>
+          <span
+            aria-hidden="true"
+            className={`sidebar-active-pill pointer-events-none absolute left-0 top-0 z-0 rounded-2xl bg-primary-100/70 ${pillReady ? '' : 'sidebar-active-pill--instant'}`}
+            style={{
+              width: pill.width,
+              height: pill.height,
+              opacity: pill.visible ? 1 : 0,
+              transform: `translate3d(${pill.left}px, ${pill.top}px, 0)`,
+            }}
+          >
+            {/* "(" bracket hugging the left edge, plus a dot on the right - both only on the wide rail. */}
+            <span
+              key={`${pill.top}-${pill.left}`}
+              className={`sidebar-active-pill-bracket ${isExpanded ? '' : 'md:hidden'}`}
+            />
+            <span className={`sidebar-active-pill-dot absolute right-3.5 top-[calc(50%-0.25rem)] size-2 rounded-full ${isExpanded ? '' : 'md:hidden'}`} />
+          </span>
           {menuGroups.map((group, groupIndex) => {
             const SectionIcon = sectionIcons[group.section] || group.items[0]?.icon
             const sectionPath = group.items[0]?.path || '#'
@@ -371,10 +441,17 @@ export default function Sidebar({
                     {group.items.map((item) => {
                       const badgeCount = navBadgeCounts[NAV_BADGE_COUNTS[item.path]] || 0
 
+                      // Same rule NavLink uses (path or a child path), unless the item brings its own.
+                      const itemActive = item.activeWhen
+                        ? item.activeWhen(location)
+                        : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
+
                       return (
                       <NavLink
                         key={item.path}
                         to={item.path}
+                        data-nav-active={itemActive ? 'true' : undefined}
+                        data-nav-path={item.path}
                         onClick={(event) => {
                           if (navigateGuarded(event, item.path, onCloseMobile)) return
                           onCloseMobile()
@@ -387,10 +464,10 @@ export default function Sidebar({
                           // shortcuts, all "/admin/reports") would otherwise all highlight at once.
                           // activeWhen, when present, overrides with a query-param-aware check.
                           const computedActive = item.activeWhen ? item.activeWhen(location) : isActive
-                          return `group relative flex items-center rounded-l-lg rounded-r-2xl py-2 text-[0.750rem] font-medium transition-all duration-150 ${
+                          return `group relative z-10 flex items-center rounded-2xl py-1 text-[0.750rem] font-medium transition-[color,background-color] duration-200 ease-out ${
                             isExpanded
-                              ? 'gap-3 px-3.5 md:justify-start'
-                              : 'gap-3 px-3.5 md:gap-0 md:rounded-2xl md:px-0 md:justify-center'
+                              ? 'gap-2.5 px-2.5 md:justify-start'
+                              : 'gap-2.5 px-2.5 md:gap-0 md:px-0 md:justify-center'
                           } ${
                             computedActive
                               // text-primary-900, not text-neutral-900: --sidebar-active-bg is
@@ -401,7 +478,7 @@ export default function Sidebar({
                               // dark mode keeps using it untouched. app-sidebar-nav-label-active
                               // (index.css, light mode only) overrides this to the exact literal
                               // #00092A requested for light mode specifically.
-                              ? 'app-sidebar-nav-label-active bg-(--sidebar-active-bg) text-primary-900 shadow-[inset_0_0_0_1px_rgb(0_9_42/0.12)]'
+                              ? 'app-sidebar-nav-label-active text-primary-900'
                               : 'app-sidebar-nav-label text-fg-muted hover:bg-neutral-50 hover:text-fg'
                           }`
                         }}
@@ -411,13 +488,14 @@ export default function Sidebar({
                           return (
                           <>
                             <span
-                              className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary-800 transition-opacity ${
-                                computedActive ? 'opacity-100' : 'opacity-0'
-                              } ${isExpanded ? '' : 'md:hidden'}`}
-                              aria-hidden="true"
-                            />
-                            <span className="relative shrink-0">
-                              <item.icon className="size-4.5" aria-hidden="true" />
+                              className={`relative flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors duration-300 ${
+                                computedActive ? 'bg-primary-200/70 text-primary-700' : ''
+                              }`}
+                            >
+                              <item.icon
+                                className={`size-4.5 transition-transform duration-300 ease-out ${computedActive ? 'scale-105' : 'group-hover:scale-110'}`}
+                                aria-hidden="true"
+                              />
                               {!isExpanded && badgeCount > 0 && (
                                 <span
                                   className="absolute -right-1 -top-1 size-2 rounded-full bg-red-500 ring-2 ring-(--sidebar-bg)"
@@ -426,7 +504,7 @@ export default function Sidebar({
                               )}
                             </span>
                             <span className={`visible flex max-w-48 items-center gap-2 overflow-hidden opacity-100 transition-all duration-150 ${desktopLabelVisibilityClass}`}>
-                              <span className="truncate whitespace-nowrap">{item.label}</span>
+                              <span className={`truncate whitespace-nowrap transition-[font-weight] duration-200 ${computedActive ? 'font-semibold' : ''}`}>{item.label}</span>
                               {badgeCount > 0 && (
                                 <span className="inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1 text-[0.6rem] font-semibold leading-none text-white">
                                   {badgeCount}
