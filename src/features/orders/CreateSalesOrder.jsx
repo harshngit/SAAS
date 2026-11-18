@@ -3,6 +3,7 @@ import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
 import { loadSummaryRows } from '../../utils/listSummary'
+import { money, preTaxValue, productTaxInclusive, taxLines } from '../../utils/gstCalc'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -41,7 +42,7 @@ import { getFileUrl } from '../../api/files'
 import { duplicateDemoOrder, getDemoOrder, isDemoOrder, patchDemoOrder } from './orderDemoData'
 import { derivePaymentStatus, formatPaymentStatus } from './orderHelpers'
 import { useAuthStore } from '../../store/authStore'
-import { formatCurrency } from '../../utils/format'
+import { formatCurrency, formatCurrencyExact } from '../../utils/format'
 import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
 import { useToast } from '../../components/ui/toastContext'
 import ProductPickerList from './ProductPickerList'
@@ -448,6 +449,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     setErrors((current) => ({ ...current, items: '' }))
   }
 
+  // Same maths as the backend (utils/gstCalc.js <- app/services/gst_calc.py, crm_changes25): a tax-inclusive
+  // product's price already contains GST, the order-level discount reduces the value BEFORE tax, and
+  // each line's GST is charged on what is left. So the form total equals the saved total.
   const totals = useMemo(() => {
     const lines = orderItems.map((item) => {
       const product = availableProducts.find((p) => p.id === item.productId)
@@ -455,25 +459,31 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       const quantity = Number(item.quantity) || 0
       const taxRate = Number(item.taxRate) || 0
       const discountPercent = Math.min(Math.max(Number(item.discountPercent) || 0, 0), 100)
+      const inclusive = productTaxInclusive(product, item.variantId)
       const grossLineSubtotal = unitPrice * quantity
       const lineSubtotal = grossLineSubtotal - grossLineSubtotal * (discountPercent / 100)
-      return { product, unitPrice, quantity, taxRate, discountPercent, lineSubtotal }
+      const { value, contained } = preTaxValue(lineSubtotal, taxRate, inclusive)
+      return { product, unitPrice, quantity, taxRate, discountPercent, inclusive, lineSubtotal, value, containedTax: contained }
     })
 
-    const subtotal = lines.reduce((sum, line) => sum + line.lineSubtotal, 0)
+    const subtotal = money(lines.reduce((sum, line) => sum + line.value, 0))
     const rawDiscount =
       discountType === 'percentage' ? subtotal * ((Number(discountValue) || 0) / 100) : Number(discountValue) || 0
-    const discountAmount = Math.min(Math.max(rawDiscount, 0), subtotal)
-    const discountRatio = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 0
-
-    const gstAmount = lines.reduce((sum, line) => sum + line.lineSubtotal * discountRatio * (line.taxRate / 100), 0)
-
-    const taxableAmount = subtotal - discountAmount
-    const effectiveGstPercent = taxableAmount > 0 ? (gstAmount / taxableAmount) * 100 : 0
-    const total = taxableAmount + gstAmount
+    const requestedDiscount = money(Math.min(Math.max(rawDiscount, 0), subtotal))
+    const result = taxLines(
+      lines.map((line) => ({ value: line.value, rate: line.taxRate, containedTax: line.containedTax })),
+      requestedDiscount,
+    )
     const totalQuantity = lines.reduce((sum, line) => sum + line.quantity, 0)
 
-    return { subtotal, discountAmount, gstAmount, effectiveGstPercent, total, totalQuantity }
+    return {
+      subtotal: result.subtotal,
+      discountAmount: result.discountAmount,
+      gstAmount: result.gstAmount,
+      effectiveGstPercent: result.effectiveGstPercent,
+      total: result.total,
+      totalQuantity,
+    }
   }, [orderItems, availableProducts, discountType, discountValue])
 
   // A delivery partner is NOT required at creation - it is assigned later via Plan Delivery.
@@ -971,7 +981,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 <div className="flex flex-col gap-x-6 gap-y-3 rounded-xl border border-neutral-100 bg-neutral-50/70 px-4 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-center">
                   <div className="flex items-center justify-between gap-2 sm:justify-start">
                     <span className="text-xs text-neutral-500">Subtotal</span>
-                    <span className="font-semibold text-neutral-900">{formatCurrency(totals.subtotal)}</span>
+                    <span className="font-semibold text-neutral-900">{formatCurrencyExact(totals.subtotal)}</span>
                   </div>
 
                   <ConfiguredField module="sales_order" name="discountValue"><div className="flex items-center gap-2">
@@ -1001,18 +1011,18 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <div className="flex items-center justify-between gap-2 sm:justify-start">
                     <span className="text-xs text-neutral-500">Discount Amount</span>
                     <span className={`font-semibold ${totals.discountAmount > 0 ? 'text-red-600' : 'text-neutral-900'}`}>
-                      {totals.discountAmount > 0 ? `-${formatCurrency(totals.discountAmount)}` : formatCurrency(0)}
+                      {totals.discountAmount > 0 ? `-${formatCurrencyExact(totals.discountAmount)}` : formatCurrency(0)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-2 sm:justify-start">
                     <span className="text-xs text-neutral-500">GST ({formatGstPercent(totals.effectiveGstPercent)}%)</span>
-                    <span className="font-semibold text-neutral-900">{formatCurrency(totals.gstAmount)}</span>
+                    <span className="font-semibold text-neutral-900">{formatCurrencyExact(totals.gstAmount)}</span>
                   </div>
 
                   <div className="flex items-center justify-between gap-2 sm:ml-auto sm:justify-start">
                     <span className="text-xs text-neutral-500">Final Amount</span>
-                    <span className="font-bold text-primary-700">{formatCurrency(totals.total)}</span>
+                    <span className="font-bold text-primary-700">{formatCurrencyExact(totals.total)}</span>
                   </div>
                 </div>
               </div>
@@ -1211,17 +1221,17 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               <div className="space-y-2 border-t border-neutral-100 pt-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-600">Subtotal</span>
-                  <span className="text-sm font-medium text-neutral-900">{formatCurrency(totals.subtotal)}</span>
+                  <span className="text-sm font-medium text-neutral-900">{formatCurrencyExact(totals.subtotal)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-600">Discount</span>
                   <span className={`text-sm font-medium ${totals.discountAmount > 0 ? 'text-red-600' : 'text-neutral-900'}`}>
-                    {totals.discountAmount > 0 ? `-${formatCurrency(totals.discountAmount)}` : formatCurrency(0)}
+                    {totals.discountAmount > 0 ? `-${formatCurrencyExact(totals.discountAmount)}` : formatCurrency(0)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-600">GST ({formatGstPercent(totals.effectiveGstPercent)}%)</span>
-                  <span className="text-sm font-medium text-neutral-900">{formatCurrency(totals.gstAmount)}</span>
+                  <span className="text-sm font-medium text-neutral-900">{formatCurrencyExact(totals.gstAmount)}</span>
                 </div>
               </div>
 
@@ -1278,7 +1288,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   Final Amount
                   <span className="block text-xs font-normal text-neutral-400">(All Inclusive)</span>
                 </span>
-                <span className="text-2xl font-bold text-primary-700">{formatCurrency(totals.total)}</span>
+                <span className="text-2xl font-bold text-primary-700">{formatCurrencyExact(totals.total)}</span>
               </div>
             </div>
 
@@ -1402,7 +1412,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       const quantity = Number(item.quantity) || 0
                       const unitPrice = Number(item.unitPrice) || 0
                       const discountPercent = Math.min(Math.max(Number(item.discountPercent) || 0, 0), 100)
-                      const lineTotal = unitPrice * quantity * (1 - discountPercent / 100)
+                      const isInclusiveLine = productTaxInclusive(product, item.variantId)
+                      // line amount = value BEFORE tax (for a tax-inclusive product that is price / (1 + rate), not price x qty)
+                      const lineTotal = preTaxValue(unitPrice * quantity * (1 - discountPercent / 100), item.taxRate, isInclusiveLine).value
                       const unit = product.sales_unit || product.uom || 'unit'
                       const productImage = getFileUrl(
                         product.cover_image_url ||
@@ -1463,7 +1475,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               </button>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-right font-semibold text-neutral-900">{formatCurrency(lineTotal)}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold text-neutral-900">
+                            {isInclusiveLine ? formatCurrencyExact(lineTotal) : formatCurrency(lineTotal)}
+                            {isInclusiveLine && <span className="block text-[0.62rem] font-normal text-neutral-400">before tax · price incl. GST</span>}
+                          </td>
                           <td className="px-3 py-2.5 text-right">
                             <button
                               type="button"
@@ -1492,21 +1507,21 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               <div className="mt-2.5 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500">Subtotal</span>
-                  <span className="font-medium text-neutral-900">{formatCurrency(totals.subtotal)}</span>
+                  <span className="font-medium text-neutral-900">{formatCurrencyExact(totals.subtotal)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500">Discount</span>
                   <span className={`font-medium ${totals.discountAmount > 0 ? 'text-red-600' : 'text-neutral-900'}`}>
-                    {totals.discountAmount > 0 ? `-${formatCurrency(totals.discountAmount)}` : formatCurrency(0)}
+                    {totals.discountAmount > 0 ? `-${formatCurrencyExact(totals.discountAmount)}` : formatCurrency(0)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500">Tax / GST</span>
-                  <span className="font-medium text-neutral-900">{formatCurrency(totals.gstAmount)}</span>
+                  <span className="font-medium text-neutral-900">{formatCurrencyExact(totals.gstAmount)}</span>
                 </div>
                 <div className="flex items-center justify-between border-t border-neutral-100 pt-1.5">
                   <span className="font-semibold text-neutral-900">Current Order Total</span>
-                  <span className="font-semibold text-neutral-900">{formatCurrency(totals.total)}</span>
+                  <span className="font-semibold text-neutral-900">{formatCurrencyExact(totals.total)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500">Previous Balance</span>
@@ -1525,7 +1540,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
               <div className="mt-2.5 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500">Order Amount</span>
-                  <span className="font-medium text-neutral-900">{formatCurrency(totals.total)}</span>
+                  <span className="font-medium text-neutral-900">{formatCurrencyExact(totals.total)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-neutral-500">Paid Amount</span>

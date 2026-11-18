@@ -30,22 +30,29 @@ export const sampleInvoice = {
     cityLine: 'Bangalore, Karnataka - 560025',
     phone: '+91 90000 12345',
     gstin: '29XYZAB5678C1Z2',
+    placeOfSupply: 'Karnataka',
   },
   items: [
     {
-      name: '20L Water Jar (Refill)', hsn: '22011010', qty: 40, unit: 'Jar', rate: 90, taxRate: 5, amount: 3780,
-      description: 'Packaged drinking water, food grade jar', mrp: 100, discount: 5, taxAmount: 180,
+      name: '20L Water Jar (Refill)', hsn: '22011010', qty: 40, unit: 'Jar', rate: 90, taxRate: 5, amount: 3600, taxableValue: 3600,
+      description: 'Packaged drinking water, food grade jar', mrp: 100, discount: 0, taxAmount: 180,
       batchNumber: 'B-2026-07', expiryDate: '30 Dec 2026',
       productImage: 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=80&h=80&fit=crop',
     },
     {
-      name: 'Water Dispenser Rental', hsn: '99733100', qty: 2, unit: 'Unit', rate: 500, taxRate: 18, amount: 1180,
+      name: 'Water Dispenser Rental', hsn: '99733100', qty: 2, unit: 'Unit', rate: 500, taxRate: 18, amount: 1000, taxableValue: 1000,
       description: 'Monthly rental, hot & cold', mrp: 600, discount: 0, taxAmount: 180,
       batchNumber: '', expiryDate: '',
       productImage: 'https://images.unsplash.com/photo-1560269507-e8ddb8b74e74?w=80&h=80&fit=crop',
     },
   ],
   subtotal: 4600,
+  discount: 0,
+  taxableTotal: 4600,
+  supplyType: 'intra_state',
+  cgstTotal: 180,
+  sgstTotal: 180,
+  igstTotal: 0,
   taxTotal: 360,
   total: 4960,
   bank: { name: 'HDFC Bank', account: '50200012345678', ifsc: 'HDFC0001234' },
@@ -73,6 +80,10 @@ function formatDateLabel(dateString) {
 // raw Company Settings asset. See invoiceBranding.js for which of these fields are live on the
 // current backend snapshot vs. pending the backend's branding.stamp_file_id/payment_qr_file_id
 // addition.
+function titleCase(value) {
+  return String(value || '').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 export function buildInvoicePreviewData(invoice, org, invoiceSettings) {
   const company = org || {}
   const companyBranding = normalizeOrganizationBranding(org)
@@ -110,6 +121,8 @@ export function buildInvoicePreviewData(invoice, org, invoiceSettings) {
       cityLine: '',
       phone: invoice.customerPhone || invoice.walkInPhone || '',
       gstin: invoice.customerGstin || '',
+      // invoice.place_of_supply is lower-case in the JSON ("maharashtra"); the PDF prints it in title case.
+      placeOfSupply: titleCase(invoice.placeOfSupply),
     },
     shipTo: shippingAddress ? { name: invoice.customerName || invoice.walkInName || '', address: shippingAddress } : null,
     items: (invoice.items || []).map((item) => ({
@@ -119,7 +132,9 @@ export function buildInvoicePreviewData(invoice, org, invoiceSettings) {
       unit: item.unit || '',
       rate: item.unitPrice,
       taxRate: item.taxRate,
+      // line_total = the line's value BEFORE tax (also for tax-inclusive products); GST is charged on taxable_value.
       amount: item.lineTotal,
+      taxableValue: item.taxableValue,
       description: item.description || '',
       mrp: item.mrp,
       discount: item.discount,
@@ -131,6 +146,11 @@ export function buildInvoicePreviewData(invoice, org, invoiceSettings) {
     subtotal: invoice.subtotal,
     discount: invoice.discount,
     taxTotal: invoice.tax,
+    taxableTotal: invoice.taxableTotal,
+    supplyType: invoice.supplyType || null,
+    cgstTotal: invoice.cgstTotal,
+    sgstTotal: invoice.sgstTotal,
+    igstTotal: invoice.igstTotal,
     additionalCharges: invoice.additionalCharges,
     roundOff: invoice.roundOff,
     total: invoice.total,
@@ -201,8 +221,8 @@ const TABLE_ROW_BORDER = {
   minimal: '',
 }
 
-function ItemTable({ items, columns, showProductImage, style, tableStyle = 'lined', accentHeading = false, primaryColor }) {
-  const activeColumns = resolveActiveColumns(columns, { showProductImage })
+function ItemTable({ items, columns, showProductImage, simple = false, style, tableStyle = 'lined', accentHeading = false, primaryColor }) {
+  const activeColumns = resolveActiveColumns(columns, { showProductImage, simple })
   const alignClass = { left: 'text-left', center: 'text-center', right: 'text-right' }
   const justifyClass = { left: 'justify-start', center: 'justify-center', right: 'justify-end' }
   const wide = tableStyle === 'wide'
@@ -217,6 +237,7 @@ function ItemTable({ items, columns, showProductImage, style, tableStyle = 'line
       case 'rate': return money(item.rate)
       case 'mrp': return item.mrp != null && item.mrp !== '' ? money(item.mrp) : '—'
       case 'discount': return item.discount != null ? money(item.discount) : '—'
+      case 'taxable_value': return item.taxableValue != null ? money(item.taxableValue) : '—'
       case 'tax_rate': return item.taxRate ? `${item.taxRate}%` : '—'
       case 'tax_amount': return item.taxAmount != null ? money(item.taxAmount) : '—'
       case 'batch_number': return item.batchNumber || '—'
@@ -233,7 +254,7 @@ function ItemTable({ items, columns, showProductImage, style, tableStyle = 'line
         style={accentHeading ? { color: primaryColor } : undefined}
       >
         {activeColumns.map((col) => (
-          <div key={col.key} style={{ flexGrow: col.weight, flexBasis: 0 }} className={`min-w-0 truncate ${cellPad} py-1.5 ${alignClass[col.align]}`}>
+          <div key={col.key} style={{ flexGrow: col.weight, flexBasis: 0 }} className={`min-w-0 whitespace-normal break-words leading-tight ${cellPad} py-1.5 ${alignClass[col.align]}`}>
             {col.key === 'product' ? 'Item' : col.label}
           </div>
         ))}
@@ -274,26 +295,45 @@ function ItemTable({ items, columns, showProductImage, style, tableStyle = 'line
 // row on a solid primaryColor background (white text) instead of just tinting the text, which is
 // what makes the selected color visibly, unmistakably present instead of a single thin line of
 // colored text easy to read as "still basically black/grey".
-function SummaryTotals({ data, showDiscount, showTax, primaryColor, style, totalsStyle = 'plain' }) {
+// The rows, in the backend PDF's order (app/core/invoice_regular_pdf.py _totals):
+//   detailed: Subtotal, Discount (> 0), Taxable Value, then CGST + SGST (intra_state) / IGST (inter_state) /
+//             only Total GST (supply_type null) - printed even at 0.00 - then Additional Charges / Round Off, Grand Total.
+//   simple:   Subtotal, Discount (> 0), Total GST, Additional Charges / Round Off, Grand Total
+//             (no Taxable Value, no CGST/SGST/IGST split, so the short copy still explains its own total).
+// fields.show_discount / fields.show_tax_amount still hide the Discount row / the GST rows.
+export function buildTotalRows(data, { simple = false, showDiscount = true, showTax = true } = {}) {
+  const rows = [['Subtotal', money(data.subtotal)]]
+  if (showDiscount && Number(data.discount) > 0) rows.push(['Discount', `-${money(data.discount)}`])
+  if (showTax) {
+    if (!simple) rows.push(['Taxable Value', money(data.taxableTotal ?? (Number(data.subtotal) || 0) - (Number(data.discount) || 0))])
+    const supply = simple ? null : data.supplyType
+    if (supply === 'intra_state') {
+      rows.push(['CGST', money(data.cgstTotal)])
+      rows.push(['SGST', money(data.sgstTotal)])
+    } else if (supply === 'inter_state') {
+      rows.push(['IGST', money(data.igstTotal)])
+    } else {
+      rows.push(['Total GST', money(data.taxTotal)])
+    }
+  }
+  if (data.additionalCharges) rows.push(['Additional Charges', money(data.additionalCharges)])
+  if (data.roundOff) rows.push(['Round Off', money(data.roundOff)])
+  return rows
+}
+
+function SummaryTotals({ data, simple = false, showDiscount = true, showTax = true, primaryColor, style, totalsStyle = 'plain' }) {
+  const totalRows = buildTotalRows(data, { simple, showDiscount, showTax })
   const rows = (
     <>
-      <div className="flex justify-between"><span>Subtotal</span><span>{money(data.subtotal)}</span></div>
-      {showDiscount && data.discount ? <div className="flex justify-between"><span>Discount</span><span>-{money(data.discount)}</span></div> : null}
-      {showTax && data.taxTotal ? <div className="flex justify-between"><span>Tax</span><span>{money(data.taxTotal)}</span></div> : null}
-      {data.additionalCharges ? <div className="flex justify-between"><span>Additional Charges</span><span>{money(data.additionalCharges)}</span></div> : null}
-      {data.roundOff ? <div className="flex justify-between"><span>Round Off</span><span>{money(data.roundOff)}</span></div> : null}
+      {totalRows.map(([label, value]) => <div key={label} className="flex justify-between"><span>{label}</span><span>{value}</span></div>)}
     </>
   )
 
   if (totalsStyle === 'inline') {
     return (
       <div className="flex flex-wrap items-center justify-end gap-4" style={{ fontSize: style.body }}>
-        <span>Subtotal: {money(data.subtotal)}</span>
-        {showDiscount && data.discount ? <span>Discount: -{money(data.discount)}</span> : null}
-        {showTax && data.taxTotal ? <span>Tax: {money(data.taxTotal)}</span> : null}
-        {data.additionalCharges ? <span>Additional Charges: {money(data.additionalCharges)}</span> : null}
-        {data.roundOff ? <span>Round Off: {money(data.roundOff)}</span> : null}
-        <span className="rounded px-2 py-1 font-bold text-white" style={{ backgroundColor: primaryColor }}>Total: {money(data.total)}</span>
+        {totalRows.map(([label, value]) => <span key={label}>{label}: {value}</span>)}
+        <span className="rounded px-2 py-1 font-bold text-white" style={{ backgroundColor: primaryColor }}>Grand Total: {money(data.total)}</span>
       </div>
     )
   }
@@ -307,7 +347,7 @@ function SummaryTotals({ data, showDiscount, showTax, primaryColor, style, total
     <div className="space-y-1" style={{ fontSize: style.body }}>
       {rows}
       <div className={totalRowClass} style={totalRowStyle}>
-        <span>Total</span><span>{money(data.total)}</span>
+        <span>Grand Total</span><span>{money(data.total)}</span>
       </div>
     </div>
   )
@@ -504,6 +544,7 @@ function PartyBlock({ primaryColor, partyDetails, billTo, shipTo, accentHeading 
       {partyDetails.showBillingAddress && billTo.address && <p className="whitespace-pre-line text-neutral-500">{[billTo.address, billTo.cityLine].filter(Boolean).join(', ')}</p>}
       {partyDetails.showCustomerPhone && billTo.phone && <p className="text-neutral-500">Ph: {billTo.phone}</p>}
       {partyDetails.showCustomerGstin && billTo.gstin && <p className="text-neutral-500">GSTIN: {billTo.gstin}</p>}
+      {billTo.placeOfSupply && <p className="text-neutral-500">Place of supply: {billTo.placeOfSupply}</p>}
     </div>}
     {showShipTo && <div><p className="font-semibold" style={accentHeading ? { color: primaryColor } : undefined}>Ship To</p>{partyDetails.showCustomerName && shipTo.name && <p className="mt-0.5 font-medium text-neutral-800">{shipTo.name}</p>}<p className="whitespace-pre-line text-neutral-500">{shipTo.address}</p></div>}
     </div>
@@ -537,6 +578,7 @@ function RegularInvoiceDocument({ preset, ...props }) {
         items={items}
         columns={itemTable.columns}
         showProductImage={itemTable.showProductImage}
+        simple={isSimple}
         style={style}
         tableStyle={preset.table}
         accentHeading={accentHeading}
@@ -544,8 +586,9 @@ function RegularInvoiceDocument({ preset, ...props }) {
       />
       <SummaryTotals
         data={data}
-        showDiscount={!isSimple && fields.show_discount}
-        showTax={!isSimple && fields.show_tax_amount}
+        simple={isSimple}
+        showDiscount={fields.show_discount}
+        showTax={fields.show_tax_amount}
         primaryColor={primaryColor}
         style={style}
         totalsStyle={preset.totals}

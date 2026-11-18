@@ -357,6 +357,10 @@ function hydrateProduct(product) {
     brandId: product?.brandId || product?.brand_id || '',
     brand: product?.brand_ref?.name || product?.brand || '',
     hasVariants: product?.hasVariants ?? product?.has_variants ?? Boolean(product?.variants?.length),
+    // ONE backend flag: pricing.tax_inclusive. The Pricing tab ("Tax Inclusive Price") and the Tax tab
+    // ("Tax Inclusive") are two views of it, so both load from it (productUtils maps it to `taxInclusive`).
+    taxInclusive: Boolean(product?.taxInclusive ?? product?.taxInclusivePrice ?? false),
+    taxInclusivePrice: Boolean(product?.taxInclusive ?? product?.taxInclusivePrice ?? false),
     purchasePrice: product?.purchasePrice ?? '',
     sellingPrice: product?.sellingPrice ?? '',
     unitOfMeasure: product?.unitOfMeasure || firstVariant.unit || 'Piece',
@@ -658,7 +662,9 @@ export default function ProductForm({
   if (!isOpen) return null
 
   const updateField = (field, value) => {
-    setFormData((current) => ({ ...current, [field]: value }))
+    // The two tax-inclusive checkboxes write the same backend field (pricing.tax_inclusive) - keep them in step.
+    const linked = field === 'taxInclusive' || field === 'taxInclusivePrice' ? { taxInclusive: Boolean(value), taxInclusivePrice: Boolean(value) } : {}
+    setFormData((current) => ({ ...current, [field]: value, ...linked }))
     setErrors((current) => ({ ...current, [field]: '' }))
   }
 

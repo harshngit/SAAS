@@ -1,4 +1,5 @@
 import NumericInput from '../../components/ui/NumericInput'
+import { money, preTaxValue, productTaxInclusive, taxLines } from '../../utils/gstCalc'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
@@ -17,7 +18,7 @@ import { listOrders, getOrder } from '../../api/orders'
 import { ORDER_STATUS_VARIANT, formatOrderStatus, getDeliveryStatus } from '../orders/orderHelpers'
 import { listProducts } from '../../api/products'
 import { listWarehouses } from '../../api/warehouses'
-import { formatCurrency } from '../../utils/format'
+import { formatCurrency, formatCurrencyExact } from '../../utils/format'
 import { getPaymentMethodFlags, sanitizePaymentDetails } from '../payments/paymentMethodUtils'
 
 function formatOrderDate(value) {
@@ -66,6 +67,8 @@ const invoiceErrorHints = [
 
 function friendlyInvoiceError(message) {
   const lower = (message || '').toLowerCase()
+  // The backend's 409 ("already invoiced as a whole ... would bill the same goods twice") is shown exactly as sent.
+  if (lower.includes('already invoiced as a whole')) return message
   const hint = invoiceErrorHints.find((entry) => lower.includes(entry.match))
   return hint ? hint.hint : message
 }
@@ -148,12 +151,17 @@ function OrderInvoicePanel({ orderId }) {
   // delivery, or across the whole order when no delivery is selected (whole-order invoicing) -
   // never the ordered quantity. Rate/tax still come from the order line since delivery lines
   // don't carry pricing.
+  // The order lines are saved before tax (line_total = value before tax, also for tax-inclusive products),
+  // so the value of what is being invoiced is (line_total / ordered qty) x delivered qty. The backend
+  // bills each delivery its share of the order-level discount (before tax) and charges GST on what is
+  // left - mirrored here (utils/gstCalc.js) so the preview is the amount the invoice will carry.
   const previewItems = useMemo(() => {
     if (!order) return []
+    const unitValueOf = (orderItem) => (Number(orderItem.lineTotal) || 0) / (Number(orderItem.orderedQuantity) || Number(orderItem.quantity) || 1)
     if (!previewDelivery) {
       return order.items
         .filter((item) => (item.deliveredQuantity || 0) > 0)
-        .map((item) => ({ ...item, deliveredQuantity: item.deliveredQuantity || 0 }))
+        .map((item) => ({ ...item, deliveredQuantity: item.deliveredQuantity || 0, unitValue: unitValueOf(item) }))
     }
 
     return previewDelivery.items
@@ -167,19 +175,21 @@ function OrderInvoicePanel({ orderId }) {
           unitPrice: orderItem.unitPrice || 0,
           discount: orderItem.discount || 0,
           taxRate: orderItem.taxRate || 0,
+          unitValue: unitValueOf(orderItem),
         }
       })
   }, [order, previewDelivery])
 
-  const previewLineAmounts = previewItems.map((item) => {
-    const gross = (item.deliveredQuantity || 0) * (item.unitPrice || 0)
-    const taxable = gross - gross * ((item.discount || 0) / 100)
-    const tax = taxable * ((item.taxRate || 0) / 100)
-    return { subtotal: taxable, tax, total: taxable + tax }
-  })
-  const previewSubtotal = previewLineAmounts.reduce((sum, line) => sum + line.subtotal, 0)
-  const previewTax = previewLineAmounts.reduce((sum, line) => sum + line.tax, 0)
-  const previewTotal = previewSubtotal + previewTax
+  const previewValues = previewItems.map((item) => money((item.unitValue || 0) * (item.deliveredQuantity || 0)))
+  const orderValueBase = (order?.items || []).reduce((sum, item) => sum + (Number(item.lineTotal) || 0), 0)
+  const previewValueSum = previewValues.reduce((sum, value) => sum + value, 0)
+  const previewDiscount = orderValueBase > 0 ? money(((Number(order?.discount) || 0) * previewValueSum) / orderValueBase) : 0
+  const previewResult = taxLines(
+    previewItems.map((item, index) => ({ value: previewValues[index], rate: item.taxRate })),
+    previewDiscount,
+  )
+  const previewLineAmounts = previewResult.rows.map((row) => ({ subtotal: row.value, tax: row.tax, total: row.taxable + row.tax }))
+  const previewTotal = previewResult.total
 
   const invoicedByDeliveryId = useMemo(() => {
     const map = {}
@@ -295,7 +305,7 @@ function OrderInvoicePanel({ orderId }) {
                 <th className="px-3.5 py-2.5">Product</th>
                 <th className="px-3.5 py-2.5 text-right">{isPickupOrder ? 'Collected Qty' : 'Delivered Qty'}</th>
                 <th className="px-3.5 py-2.5 text-right">Rate</th>
-                <th className="px-3.5 py-2.5 text-right">Subtotal</th>
+                <th className="px-3.5 py-2.5 text-right" title="Value before tax (for tax-inclusive items: price excluding GST)">Value before tax</th>
                 <th className="px-3.5 py-2.5 text-right">GST</th>
               </tr>
             </thead>
@@ -305,16 +315,22 @@ function OrderInvoicePanel({ orderId }) {
                   <td className="px-3.5 py-2.5 text-neutral-800">{item.productName}</td>
                   <td className="px-3.5 py-2.5 text-right text-neutral-600">{item.deliveredQuantity}</td>
                   <td className="px-3.5 py-2.5 text-right text-neutral-600">{formatCurrency(item.unitPrice)}</td>
-                  <td className="px-3.5 py-2.5 text-right text-neutral-600">{formatCurrency(previewLineAmounts[index]?.subtotal)}</td>
-                  <td className="px-3.5 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(previewLineAmounts[index]?.tax)}</td>
+                  <td className="px-3.5 py-2.5 text-right text-neutral-600">{formatCurrencyExact(previewLineAmounts[index]?.subtotal)}</td>
+                  <td className="px-3.5 py-2.5 text-right font-medium text-neutral-900">{formatCurrencyExact(previewLineAmounts[index]?.tax)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {previewResult.discountAmount > 0 && (
+          <div className="mt-4 flex items-center justify-between text-sm">
+            <span className="text-neutral-500">Order discount (this invoice&apos;s share, before tax)</span>
+            <span className="font-medium text-red-500">- {formatCurrencyExact(previewResult.discountAmount)}</span>
+          </div>
+        )}
         <div className="mt-4 flex items-center justify-between border-t border-neutral-100 pt-4">
           <span className="text-sm font-semibold text-neutral-900">Total</span>
-          <span className="text-lg font-semibold text-primary-700">{formatCurrency(previewTotal)}</span>
+          <span className="text-lg font-semibold text-primary-700">{formatCurrencyExact(previewTotal)}</span>
         </div>
       </div>
 
@@ -705,7 +721,10 @@ function CreateSalesInvoiceForm() {
   const customerOptions = useMemo(() => customers.map((customer) => ({ value: customer.id, label: customer.name })), [customers])
   const productOptions = useMemo(() => products.map((product) => ({ value: product.id, label: product.name, product })), [products])
 
-  const lineItems = useMemo(
+  // Quick bill maths = the backend's (utils/gstCalc.js <- gst_calc.py): a tax-inclusive product's price
+  // already contains GST; the Extra Discount is a discount BEFORE tax (split across the lines) and each
+  // line's GST is charged on what is left. `discountAmount` stays in price terms - it is what the API gets.
+  const baseLineItems = useMemo(
     () =>
       items
         .filter((item) => item.productId)
@@ -713,21 +732,40 @@ function CreateSalesInvoiceForm() {
           const product = products.find((p) => p.id === item.productId)
           const quantity = Number(item.quantity) || 0
           const unitPrice = Number(item.unitPrice) || 0
+          const taxRate = Number(item.taxRate) || 0
+          const inclusive = productTaxInclusive(product, item.variantId)
           const lineSubtotal = unitPrice * quantity
           const discountAmount = (lineSubtotal * (Number(item.discount) || 0)) / 100
-          const taxable = lineSubtotal - discountAmount
-          const taxAmount = taxable * ((Number(item.taxRate) || 0) / 100)
-          return { ...item, product, quantity, unitPrice, discountAmount, taxAmount, amount: taxable + taxAmount }
+          const before = preTaxValue(lineSubtotal, taxRate, inclusive)
+          const after = preTaxValue(lineSubtotal - discountAmount, taxRate, inclusive)
+          return {
+            ...item,
+            product,
+            quantity,
+            unitPrice,
+            discountAmount,
+            inclusive,
+            grossValue: before.value,
+            discountValue: money(before.value - after.value),
+            value: after.value,
+            containedTax: after.contained,
+          }
         }),
     [items, products],
   )
 
-  const subtotal = lineItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
-  const discountTotal = lineItems.reduce((sum, item) => sum + item.discountAmount, 0)
-  const taxTotal = lineItems.reduce((sum, item) => sum + item.taxAmount, 0)
-  const chargesTotal = Number(additionalCharges) || 0
   const orderLevelDiscount = Number(discount) || 0
-  const grandTotal = subtotal - discountTotal - orderLevelDiscount + taxTotal + chargesTotal
+  const billResult = taxLines(
+    baseLineItems.map((item) => ({ value: item.value, rate: item.taxRate, containedTax: item.containedTax })),
+    orderLevelDiscount,
+  )
+  const lineItems = baseLineItems.map((item, index) => ({ ...item, taxAmount: billResult.rows[index].tax, amount: billResult.rows[index].taxable + billResult.rows[index].tax }))
+  const subtotal = lineItems.reduce((sum, item) => sum + item.grossValue, 0)
+  const discountTotal = lineItems.reduce((sum, item) => sum + item.discountValue, 0)
+  const extraDiscountApplied = billResult.discountAmount
+  const taxTotal = billResult.gstAmount
+  const chargesTotal = Number(additionalCharges) || 0
+  const grandTotal = billResult.total + chargesTotal
   const paidAmount = Number(amountPaid) || 0
   const dueAmount = Math.max(0, grandTotal - paidAmount)
   const paymentFlags = getPaymentMethodFlags(paymentType)
@@ -1257,19 +1295,19 @@ function CreateSalesInvoiceForm() {
               <div className="mt-5 space-y-2.5 border-t border-neutral-100 pt-4 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500">Subtotal</span>
-                  <span className="font-medium text-neutral-800">{formatCurrency(subtotal)}</span>
+                  <span className="font-medium text-neutral-800">{formatCurrencyExact(subtotal)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500">Item Discount</span>
-                  <span className="font-medium text-red-500">- {formatCurrency(discountTotal)}</span>
+                  <span className="font-medium text-red-500">- {formatCurrencyExact(discountTotal)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500">Extra Discount</span>
-                  <span className="font-medium text-red-500">- {formatCurrency(orderLevelDiscount)}</span>
+                  <span className="font-medium text-red-500">- {formatCurrencyExact(extraDiscountApplied)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500">Tax</span>
-                  <span className="font-medium text-neutral-800">{formatCurrency(taxTotal)}</span>
+                  <span className="font-medium text-neutral-800">{formatCurrencyExact(taxTotal)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500">Additional Charges</span>
@@ -1277,7 +1315,7 @@ function CreateSalesInvoiceForm() {
                 </div>
                 <div className="flex items-center justify-between border-t border-neutral-100 pt-2.5 text-base">
                   <span className="font-semibold text-neutral-900">Grand Total</span>
-                  <span className="font-semibold text-primary-700">{formatCurrency(grandTotal)}</span>
+                  <span className="font-semibold text-primary-700">{formatCurrencyExact(grandTotal)}</span>
                 </div>
               </div>
 

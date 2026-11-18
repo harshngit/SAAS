@@ -234,7 +234,30 @@ export function getOrderProgress(order) {
 // (no approve/reject - the finalized flow is Draft -> Confirm -> Confirmed;
 //  delivery reassignment lives on the delivery page, not here.)
 // -----------------------------------------------------------------------------
-export function getOrderActions(order, { invoices = [] } = {}) {
+// How much of each order line no delivery has planned yet - the backend's own rule
+// (app/services/delivery_service.py outstanding_for_order_item): a cancelled delivery counts for nothing; a delivery
+// still in flight (planned / accepted / ready / loaded / in transit) holds its PLANNED quantity; a delivery that has
+// finished (delivered, partially delivered, rejected, failed, returned) holds only what it actually DELIVERED, so the
+// rest of a partial delivery is free to plan again. Returns { [orderItemId]: unplannedQty }.
+const FINISHED_DELIVERY_STATUSES = ['delivered', 'partially_delivered', 'rejected', 'failed', 'returned']
+export function computeUnplannedByItem(order, deliveries = []) {
+  const consumed = {}
+  deliveries.forEach((delivery) => {
+    const status = String(delivery.internalStatus || delivery.status || '').toLowerCase()
+    if (status === 'cancelled' || String(delivery.status || '').toLowerCase() === 'cancelled') return
+    const finished = FINISHED_DELIVERY_STATUSES.includes(status) || FINISHED_DELIVERY_STATUSES.includes(String(delivery.status || '').toLowerCase())
+    ;(delivery.items || []).forEach((line) => {
+      if (!line.orderItemId) return
+      consumed[line.orderItemId] = (consumed[line.orderItemId] || 0) + (Number(finished ? line.deliveredQuantity : line.plannedQuantity) || 0)
+    })
+  })
+  return Object.fromEntries((order?.items || []).map((item) => [item.id, Math.max(Math.round(((Number(item.quantity) || 0) - (consumed[item.id] || 0)) * 1000) / 1000, 0)]))
+}
+
+// `unplannedQuantity` (total across the order's lines, from computeUnplannedByItem) is optional: when it is known,
+// "Plan Delivery" is offered whenever some quantity is still unplanned - also after a first (partial) delivery
+// exists. When it is not known (list rows, demo orders) the old rule applies (no partner assigned yet).
+export function getOrderActions(order, { invoices = [], unplannedQuantity = null } = {}) {
   if (!order) return []
   const status = order.status
   const hasInvoice = invoices.length > 0
@@ -273,16 +296,24 @@ export function getOrderActions(order, { invoices = [] } = {}) {
     return acts
   }
 
+  const planKnown = unplannedQuantity !== null && unplannedQuantity !== undefined
+  let acts
   if (!order.assignedDeliveryPartnerId && !loadedOrBeyond) {
-    return ['planDelivery', invoiceAction, 'cancel']
+    acts = ['planDelivery', invoiceAction, 'cancel']
+  } else if (loadedOrBeyond) {
+    acts = ['viewDelivery', invoiceAction]
+  } else {
+    // partner assigned, not yet loaded - reassignment happens on the delivery page itself
+    acts = ['viewDelivery', invoiceAction, 'cancel']
   }
 
-  if (loadedOrBeyond) {
-    return ['viewDelivery', invoiceAction]
+  if (planKnown) {
+    // The quantity left to plan decides, not whether a delivery already exists.
+    acts = acts.filter((action) => action !== 'planDelivery')
+    if (unplannedQuantity > 0) acts.unshift('planDelivery')
+    else if (order.deliveryId && !acts.includes('viewDelivery')) acts.unshift('viewDelivery')
   }
-
-  // partner assigned, not yet loaded - reassignment happens on the delivery page itself
-  return ['viewDelivery', invoiceAction, 'cancel']
+  return acts
 }
 
 // -----------------------------------------------------------------------------

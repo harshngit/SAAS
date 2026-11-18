@@ -15,6 +15,18 @@ export function formatCurrency(value) {
   return withCurrencyGap(currencyFormatter.format(value))
 }
 
+// Always 2 decimals - for GST / tax-inclusive screens where paise matter (formatCurrency rounds to whole rupees).
+const exactCurrencyFormatter = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+export function formatCurrencyExact(value) {
+  return withCurrencyGap(exactCurrencyFormatter.format(Number(value) || 0))
+}
+
 export function formatCompactCurrency(value) {
   const abs = Math.abs(value)
   if (abs >= 1_00_00_000) return `₹${CURRENCY_GAP}${(value / 1_00_00_000).toFixed(1)}Cr`

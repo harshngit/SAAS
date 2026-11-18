@@ -111,7 +111,7 @@ export default function OrderDetailView({ order, creator, delivery, progress, ti
         const image = meta.image || getFileUrl(item.productImage || '')
         const sku = meta.sku
         return <tr key={item.id || itemKey(item)}><td>{order.items.indexOf(item) + 1}</td><td><div className="od-product"><div className="od-product-image"><Package size={22} />{image && <img src={image} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} />}</div><div><strong>{item.productName}</strong>{meta.variantName && <small>{meta.variantName}{meta.variantCode ? ` / ${meta.variantCode}` : ''}</small>}{sku && <small>SKU: {sku}</small>}</div></div></td><td className="od-sku">{shown(sku)}</td><td><strong className="od-price">{formatCurrency(item.unitPrice)}</strong>{item.costPrice != null && <small>Cost: {formatCurrency(item.costPrice)}</small>}</td><td>{item.quantity}</td><td>{item.reservedQuantity}</td><td>{item.deliveredQuantity}</td><td>{invoicedByProduct[item.productId || item.id] || 0}</td><td>{item.remainingQuantity}</td><td>{item.discountPercent > 0 ? `${item.discountPercent}%` : '—'}</td><td>{item.taxRate != null ? `${item.taxRate}%` : '—'}</td><td><strong>{formatCurrency(item.lineTotal)}</strong></td></tr>
-      })}</tbody></table>{!filteredItems.length && <p className="od-empty">No products found.</p>}</div></Panel>
+      })}</tbody></table>{!filteredItems.length && <p className="od-empty">No products found.</p>}</div><p className="px-4 pb-3 text-xs text-neutral-400" data-testid="order-line-total-note">Line Total is the value before tax. For tax-inclusive items it is the price excluding GST, not unit price × quantity.</p></Panel>
       <Panel
         title="Delivery Summary"
         className="od-delivery-summary"

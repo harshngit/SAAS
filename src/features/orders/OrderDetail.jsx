@@ -64,6 +64,7 @@ import {
   getDeliveryStatus,
   getFulfilmentLabel,
   getOrderActions,
+  computeUnplannedByItem,
   getOrderProgress,
   hasOrderStateMismatch,
   isStockReserved,
@@ -123,6 +124,8 @@ export default function OrderDetail() {
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
   const [planForm, setPlanForm] = useState({ deliveryPartnerId: '', vehicleId: '', warehouseId: '', scheduledDate: '', deliveryAddress: '' })
   const [planItemQuantities, setPlanItemQuantities] = useState({})
+  // The order's deliveries (real orders only) - used to work out how much quantity is still unplanned.
+  const [orderDeliveries, setOrderDeliveries] = useState(null)
   const [planError, setPlanError] = useState('')
   const [isPlanning, setIsPlanning] = useState(false)
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
@@ -295,6 +298,22 @@ export default function OrderDetail() {
     }
   }, [order?.id, order?.invoiceId, isDemo]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Deliveries of this order -> quantity still unplanned -> whether "Plan Delivery" is offered. Re-read when the
+  // order moves (a delivery was cancelled, loaded, completed...).
+  useEffect(() => {
+    if (!order?.id || isDemo || order.status !== 'confirmed') {
+      setOrderDeliveries(null)
+      return undefined
+    }
+    let isMounted = true
+    listDeliveries({ order_id: order.id }).then((result) => {
+      if (isMounted) setOrderDeliveries(result.success ? result.deliveries : null)
+    })
+    return () => {
+      isMounted = false
+    }
+  }, [order?.id, order?.status, order?.fulfilmentStatus, order?.deliveryId, isDemo]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Customer-based payment collection history (§ collections are customer-scoped, not tied
   // to a specific order) - the same data source Customer Detail's Payments tab reads.
   // listCollections() demo-gates internally, so this works for both demo and real orders.
@@ -416,7 +435,10 @@ export default function OrderDetail() {
   const progress = getOrderProgress(order)
   const timeline = buildOrderTimeline(order, { invoices: orderInvoices })
   const source = orderSourceLabel(order)
-  const actions = getOrderActions(order, { invoices: orderInvoices })
+  const unplannedByItem = orderDeliveries ? computeUnplannedByItem(order, orderDeliveries) : null
+  const unplannedTotal = unplannedByItem ? Object.values(unplannedByItem).reduce((sum, qty) => sum + qty, 0) : null
+  const planLeft = (item) => (unplannedByItem ? unplannedByItem[item.id] ?? item.quantity : item.quantity)
+  const actions = getOrderActions(order, { invoices: orderInvoices, unplannedQuantity: unplannedTotal })
   const stockReserved = isStockReserved(order)
   const fulfilmentLabel = getFulfilmentLabel(order)
   const stateMismatch = hasOrderStateMismatch(order)
@@ -526,7 +548,7 @@ export default function OrderDetail() {
       scheduledDate: order.deliveryDate ? order.deliveryDate.slice(0, 10) : '',
       deliveryAddress: order.deliveryAddress || '',
     })
-    setPlanItemQuantities(Object.fromEntries(order.items.map((item) => [item.id, item.quantity])))
+    setPlanItemQuantities(Object.fromEntries(order.items.map((item) => [item.id, planLeft(item)])))
     setPlanError('')
     setIsPlanModalOpen(true)
   }
@@ -563,6 +585,11 @@ export default function OrderDetail() {
       return
     }
 
+    if (!order.items.some((item) => (planItemQuantities[item.id] ?? planLeft(item)) > 0)) {
+      setPlanError('Enter a quantity to plan for at least one product.')
+      return
+    }
+
     setIsPlanning(true)
     setPlanError('')
 
@@ -573,7 +600,10 @@ export default function OrderDetail() {
       warehouseId: planForm.warehouseId,
       scheduledDate: planForm.scheduledDate || undefined,
       deliveryAddress: planForm.deliveryAddress || undefined,
-      items: order.items.map((item) => ({ orderItemId: item.id, plannedQuantity: planItemQuantities[item.id] ?? item.quantity })),
+      // Only lines with something to plan (the API rejects a planned quantity of 0).
+      items: order.items
+        .map((item) => ({ orderItemId: item.id, plannedQuantity: planItemQuantities[item.id] ?? planLeft(item) }))
+        .filter((line) => line.plannedQuantity > 0),
     })
 
     setIsPlanning(false)
@@ -1063,24 +1093,26 @@ export default function OrderDetail() {
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-neutral-700">Items / Planned Qty</label>
             <div className="space-y-2">
-              {order.items.map((item) => (
+              {order.items.filter((item) => planLeft(item) > 0).map((item) => (
                 <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3 py-2.5">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-neutral-800">{item.productName}</p>
-                    <p className="text-xs text-neutral-400">Ordered: {item.quantity}</p>
+                    <p className="text-xs text-neutral-400">
+                      Ordered: {item.quantity}{unplannedByItem && planLeft(item) !== item.quantity ? ` · Left to plan: ${planLeft(item)}` : ''}
+                    </p>
                   </div>
                   <NumericInput
                     type="number"
                     min="0"
-                    max={item.quantity}
+                    max={planLeft(item)}
                     step="1"
-                    value={planItemQuantities[item.id] ?? item.quantity}
+                    value={planItemQuantities[item.id] ?? planLeft(item)}
                     onChange={(event) =>
                       setPlanItemQuantities((current) => ({ ...current, [item.id]: Number(event.target.value) }))
                     }
                     onBlur={(event) => {
                       const rounded = Math.round(Number(event.target.value))
-                      const clamped = Math.min(Math.max(Number.isFinite(rounded) ? rounded : 0, 0), item.quantity)
+                      const clamped = Math.min(Math.max(Number.isFinite(rounded) ? rounded : 0, 0), planLeft(item))
                       setPlanItemQuantities((current) => ({ ...current, [item.id]: clamped }))
                     }}
                     className="h-9 w-24 shrink-0 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm"

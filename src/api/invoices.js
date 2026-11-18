@@ -153,7 +153,7 @@ function normalizeInvoiceItem(item) {
   const subtotal = quantity * unitPrice
   // Invoice discounts are stored amounts; only tax_rate is a percentage.
   const discounted = subtotal - discount
-  const taxAmount = item.tax ?? item.tax_amount ?? discounted * (taxRate / 100)
+  const taxAmount = item.tax_amount ?? item.tax ?? discounted * (taxRate / 100)
   const fallbackLineTotal = discounted + Number(taxAmount)
 
   return {
@@ -167,6 +167,17 @@ function normalizeInvoiceItem(item) {
     discount,
     taxRate,
     taxAmount,
+    // GST details (backend crm_changes25): taxable_value = line_total minus the line's share of the
+    // invoice discount - GST is charged on this. null on invoices from before the change.
+    // For a tax-inclusive product line_total is the value BEFORE tax, not price x qty.
+    taxableValue: item.taxable_value ?? null,
+    // CGST/SGST (intra-state) or IGST (inter-state); all null when supply_type is null.
+    cgstRate: item.cgst_rate ?? null,
+    cgstAmount: item.cgst_amount ?? null,
+    sgstRate: item.sgst_rate ?? null,
+    sgstAmount: item.sgst_amount ?? null,
+    igstRate: item.igst_rate ?? null,
+    igstAmount: item.igst_amount ?? null,
     lineTotal: item.line_total ?? item.amount ?? fallbackLineTotal,
     unit: item.uom || item.unit || '',
     description: item.description || '',
@@ -206,8 +217,18 @@ function normalizeInvoice(invoice) {
     customerName: invoice.customer?.name || invoice.customer?.customer_name || invoice.walk_in_name || '',
     customerPhone: invoice.customer?.phone || invoice.customer?.mobile_number || invoice.walk_in_phone || '',
     customerEmail: invoice.customer?.email || '',
-    customerGstin: invoice.customer?.gst_number || invoice.customer?.gstin
-      ? resolveCustomerGst(invoice.customer.gst_number || invoice.customer.gstin) : '',
+    customerGstin: invoice.customer_gstin
+      || (invoice.customer?.gst_number || invoice.customer?.gstin
+        ? resolveCustomerGst(invoice.customer.gst_number || invoice.customer.gstin) : ''),
+    sellerGstin: invoice.seller_gstin || '',
+    // GST summary computed by the backend on read (crm_changes25). supply_type is
+    // 'intra_state' (CGST + SGST) | 'inter_state' (IGST) | null (a state is unknown -> show total GST only).
+    supplyType: invoice.supply_type ?? null,
+    placeOfSupply: invoice.place_of_supply || '',
+    taxableTotal: invoice.taxable_total ?? null,
+    cgstTotal: invoice.cgst_total ?? null,
+    sgstTotal: invoice.sgst_total ?? null,
+    igstTotal: invoice.igst_total ?? null,
     walkInName: invoice.walk_in_name || '',
     walkInPhone: invoice.walk_in_phone || '',
     invoiceDate: invoice.invoice_date,
@@ -320,15 +341,18 @@ export async function createInvoice(payload) {
 // canonical format (IN-<company>-<year>-<sequence>, e.g. IN-10001-2027-0001) or a historical one
 // (INV-<year>-<sequence>, e.g. INV-2026-1021) - old records are never migrated, so both must keep
 // matching. A UUID, when present, is still preferred over either.
+// The 409 for "this order is already invoiced as a whole" quotes BOTH the number and the id, e.g.
+// "This order is already invoiced as a whole (IN-10001-2026-0040); a delivery-wise invoice would bill
+// the same goods twice (Invoice ID: <uuid>)" - return both so the "View Invoice" button has a label.
 function extractDuplicateInvoiceRef(message) {
   if (typeof message !== 'string') return null
   const uuidMatch = message.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/)
-  if (uuidMatch) return { id: uuidMatch[0] }
-  const newFormatMatch = message.match(/IN-\d+-\d{4}-\d+/)
-  if (newFormatMatch) return { invoiceNumber: newFormatMatch[0] }
-  const legacyFormatMatch = message.match(/INV-\d{4}-\d+/)
-  if (legacyFormatMatch) return { invoiceNumber: legacyFormatMatch[0] }
-  return null
+  const numberMatch = message.match(/IN-\d+-\d{4}-\d+/) || message.match(/INV-\d{4}-\d+/)
+  if (!uuidMatch && !numberMatch) return null
+  return {
+    ...(uuidMatch ? { id: uuidMatch[0] } : {}),
+    ...(numberMatch ? { invoiceNumber: numberMatch[0] } : {}),
+  }
 }
 
 export async function invoiceOrder(orderId, deliveryId) {

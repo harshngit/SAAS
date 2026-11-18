@@ -41,7 +41,7 @@ import {
   findBaseThermalPresetForLayout,
   thermalWidthPx,
 } from './invoiceThemePresets'
-import { ITEM_COLUMN_DEFS, MAX_ITEM_COLUMNS, moveColumn, normalizeItemColumns, toggleItemColumn } from './invoiceColumns'
+import { ITEM_COLUMN_DEFS, SIMPLE_MAX_COLUMNS, moveColumn, normalizeItemColumns, toggleItemColumn } from './invoiceColumns'
 import { resolveInvoiceBranding } from './invoiceBranding'
 import { SettingsSection, ToggleRow, ColumnRow } from './InvoiceSettingsSection'
 
@@ -582,7 +582,6 @@ export default function InvoiceSettings() {
   }
 
   const selectedColumnCount = normalizeItemColumns(settings.itemTable.columns).length
-  const atMaxColumns = selectedColumnCount >= MAX_ITEM_COLUMNS
 
   const handleToggleColumn = (key) => {
     const next = toggleItemColumn(settings.itemTable.columns, key)
@@ -780,14 +779,17 @@ export default function InvoiceSettings() {
 
           <SettingsSection
             title="5. Item Table"
-            description="Choose up to 5 columns for the item table"
+            description="Choose the columns for the item table"
             isOpen={openSection === 'items'}
             onToggle={() => toggleSection('items')}
           >
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs text-neutral-500">The # (serial number) column is always shown and doesn't count toward the limit.</p>
-              <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${atMaxColumns ? 'bg-primary-50 text-primary-700' : 'bg-neutral-100 text-neutral-600'}`}>
-                {selectedColumnCount} / {MAX_ITEM_COLUMNS} columns selected
+              <p className="text-xs text-neutral-500">
+                The # (serial number) column is always shown. The detailed invoice prints every column you select; the simple copy and thermal receipts
+                print at most {SIMPLE_MAX_COLUMNS} (Taxable Value, GST % and GST Amount are left out of the simple copy - it shows GST once, in its totals).
+              </p>
+              <span className="shrink-0 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-600">
+                {selectedColumnCount} {selectedColumnCount === 1 ? 'column' : 'columns'} selected
               </span>
             </div>
             <div className="space-y-1">
@@ -799,7 +801,6 @@ export default function InvoiceSettings() {
                   total={selectedColumnCount}
                   onToggle={handleToggleColumn}
                   onMove={handleMoveColumn}
-                  atCap={atMaxColumns}
                 />
               ))}
             </div>

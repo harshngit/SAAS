@@ -31,7 +31,7 @@ import { INVOICE_DEMO_ENABLED } from './invoiceDemoData'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
 import InvoicePaymentLinks from './InvoicePaymentLinks'
 import { FINANCIAL_STATUS_VARIANT, financialStatus } from './invoiceHelpers'
-import { formatCurrency } from '../../utils/format'
+import { formatCurrency, formatCurrencyExact } from '../../utils/format'
 import { exportElementToPdf } from '../../utils/pdfExport'
 import { loadInvoicePreviewSources } from './invoicePreviewSources'
 
@@ -375,6 +375,17 @@ export default function InvoiceDetail() {
     loadInvoice() // reloads the invoice + its payment ledger
   }
 
+  // GST split (backend crm_changes25): supply_type is null when the seller's or customer's state is
+  // unknown - then only the total GST is shown, never a made-up CGST/SGST/IGST split.
+  const isIntraState = invoice.supplyType === 'intra_state'
+  const isInterState = invoice.supplyType === 'inter_state'
+  const hasGstSplit = isIntraState || isInterState
+  const supplyLabel = isIntraState ? 'Intra-state (CGST + SGST)' : isInterState ? 'Inter-state (IGST)' : 'Not determined (total GST only)'
+  // line_total is the value BEFORE tax for a tax-inclusive product (price x qty includes GST), so a
+  // line whose line_total is below qty x rate - discount is a tax-inclusive line.
+  const isInclusiveLine = (item) => Number(item.taxRate) > 0 && item.lineTotal < item.quantity * item.unitPrice - (Number(item.discount) || 0) - 0.005
+  const hasInclusiveLine = invoice.items.some(isInclusiveLine)
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 text-sm">
@@ -507,6 +518,32 @@ export default function InvoiceDetail() {
                   )}
                 </div>
               </div>
+
+              {(invoice.sellerGstin || invoice.customerGstin || invoice.supplyType || invoice.placeOfSupply) && (
+                <div className="rounded-xl border border-neutral-100 bg-neutral-50/50 p-4 sm:col-span-2" data-testid="invoice-gst-details">
+                  <p className="text-sm font-semibold text-neutral-700">GST Details</p>
+                  <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-neutral-400">Seller GSTIN</span>
+                      <span className="font-medium text-neutral-800">{invoice.sellerGstin || '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-neutral-400">Customer GSTIN</span>
+                      <span className="font-medium text-neutral-800">{invoice.customerGstin || '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-neutral-400">Supply</span>
+                      <span className="font-medium text-neutral-800">{supplyLabel}</span>
+                    </div>
+                    {invoice.placeOfSupply && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-neutral-400">Place of Supply</span>
+                        <span className="font-medium capitalize text-neutral-800">{invoice.placeOfSupply}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -601,46 +638,99 @@ export default function InvoiceDetail() {
               Invoice Items
             </p>
             <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-100">
-              <table className="w-full min-w-2xl text-left text-sm">
+              <table className="w-full min-w-[40rem] text-left text-sm" data-testid="invoice-items-table">
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
-                    <th className="px-3.5 py-2.5">#</th>
-                    <th className="px-3.5 py-2.5">Item</th>
-                    <th className="px-3.5 py-2.5">Qty</th>
-                    <th className="px-3.5 py-2.5">Rate</th>
-                    <th className="px-3.5 py-2.5">Discount</th>
-                    <th className="px-3.5 py-2.5">Tax</th>
-                    <th className="px-3.5 py-2.5 text-right">Amount</th>
+                    <th className="px-2.5 py-2.5">#</th>
+                    <th className="px-2.5 py-2.5">Item / HSN</th>
+                    <th className="px-2.5 py-2.5">Qty × Rate</th>
+                    <th className="px-2.5 py-2.5">Discount</th>
+                    <th className="px-2.5 py-2.5 text-right" title="Value before tax. For tax-inclusive items this is the price excluding GST.">Line Value</th>
+                    <th className="px-2.5 py-2.5 text-right" title="Amount on which GST is charged (line value minus the line's share of the invoice discount).">Taxable Value</th>
+                    <th className="px-2.5 py-2.5">GST %</th>
+                    <th className="px-2.5 py-2.5 text-right">GST Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {invoice.items.map((item, index) => (
                     <tr key={item.id || item.productId}>
-                      <td className="px-3.5 py-2.5 text-neutral-400">{index + 1}</td>
-                      <td className="px-3.5 py-2.5 text-neutral-800">{item.productName}</td>
-                      <td className="px-3.5 py-2.5 text-neutral-500">{item.quantity}</td>
-                      <td className="px-3.5 py-2.5 text-neutral-500">{formatCurrency(item.unitPrice)}</td>
-                      <td className="px-3.5 py-2.5 text-neutral-500">{item.discount != null ? formatCurrency(item.discount) : '—'}</td>
-                      <td className="px-3.5 py-2.5 text-neutral-500">{item.taxRate ? `${item.taxRate}% GST` : '—'}</td>
-                      <td className="px-3.5 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
+                      <td className="px-2.5 py-2.5 text-neutral-400">{index + 1}</td>
+                      <td className="px-2.5 py-2.5 text-neutral-800">
+                        {item.productName}
+                        <span className="block text-xs text-neutral-400">HSN/SAC: {item.hsnCode || '—'}</span>
+                      </td>
+                      <td className="px-2.5 py-2.5 text-neutral-500">
+                        {item.quantity} × {formatCurrencyExact(item.unitPrice)}
+                        {isInclusiveLine(item) && <span className="block text-[0.68rem] text-neutral-400">incl. GST</span>}
+                      </td>
+                      <td className="px-2.5 py-2.5 text-neutral-500">{item.discount != null ? formatCurrencyExact(item.discount) : '—'}</td>
+                      <td className="px-2.5 py-2.5 text-right text-neutral-700">{formatCurrencyExact(item.lineTotal)}</td>
+                      <td className="px-2.5 py-2.5 text-right font-medium text-neutral-900">
+                        {item.taxableValue != null ? formatCurrencyExact(item.taxableValue) : '—'}
+                      </td>
+                      <td className="px-2.5 py-2.5 text-neutral-500">
+                        {item.taxRate ? `${item.taxRate}%` : '0%'}
+                        {hasGstSplit && item.taxRate > 0 && (
+                          <span className="block text-[0.68rem] text-neutral-400">
+                            {isIntraState ? `CGST ${item.cgstRate ?? 0}% · SGST ${item.sgstRate ?? 0}%` : `IGST ${item.igstRate ?? item.taxRate}%`}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-2.5 py-2.5 text-right font-medium text-neutral-900">
+                        {formatCurrencyExact(item.taxAmount)}
+                        {hasGstSplit && item.taxRate > 0 && (
+                          <span className="block text-[0.68rem] font-normal text-neutral-400">
+                            {isIntraState
+                              ? `${formatCurrencyExact(item.cgstAmount)} + ${formatCurrencyExact(item.sgstAmount)}`
+                              : formatCurrencyExact(item.igstAmount ?? item.taxAmount)}
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <p className="mt-2 text-xs text-neutral-400" data-testid="invoice-line-value-note">
+              Line Value is the value before tax{hasInclusiveLine ? ' (for tax-inclusive items this is the price excluding GST, not rate × qty)' : ''}. GST is charged on the Taxable Value.
+            </p>
 
             <div className="mt-4 ml-auto max-w-xs space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-neutral-500">Subtotal</span>
-                <span className="font-medium text-neutral-800">{formatCurrency(invoice.subtotal)}</span>
+                <span className="font-medium text-neutral-800">{formatCurrencyExact(invoice.subtotal)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-neutral-500">Discount</span>
-                <span className="font-medium text-red-500">{formatCurrency(invoice.discount)}</span>
+                <span className="font-medium text-red-500">{formatCurrencyExact(invoice.discount)}</span>
               </div>
+              {invoice.taxableTotal != null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500">Taxable Value</span>
+                  <span className="font-medium text-neutral-800">{formatCurrencyExact(invoice.taxableTotal)}</span>
+                </div>
+              )}
+              {isIntraState && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500">CGST</span>
+                    <span className="font-medium text-neutral-800">{formatCurrencyExact(invoice.cgstTotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500">SGST</span>
+                    <span className="font-medium text-neutral-800">{formatCurrencyExact(invoice.sgstTotal)}</span>
+                  </div>
+                </>
+              )}
+              {isInterState && (
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500">IGST</span>
+                  <span className="font-medium text-neutral-800">{formatCurrencyExact(invoice.igstTotal)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Tax</span>
-                <span className="font-medium text-neutral-800">{formatCurrency(invoice.tax)}</span>
+                <span className="text-neutral-500">{hasGstSplit ? 'Total GST' : 'GST'}</span>
+                <span className="font-medium text-neutral-800">{formatCurrencyExact(invoice.tax)}</span>
               </div>
               {invoice.additionalCharges > 0 && (
                 <div className="flex items-center justify-between">
@@ -650,7 +740,7 @@ export default function InvoiceDetail() {
               )}
               <div className="flex items-center justify-between border-t border-neutral-100 pt-2 text-base">
                 <span className="font-semibold text-neutral-900">Grand Total</span>
-                <span className="font-semibold text-primary-700">{formatCurrency(invoice.total)}</span>
+                <span className="font-semibold text-primary-700">{formatCurrencyExact(invoice.total)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="font-medium text-green-600">Amount Paid</span>
