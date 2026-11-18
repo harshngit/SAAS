@@ -357,14 +357,14 @@ export function ConvertLeadForm({ lead, salespersonOptions, saving, formError, o
             label="Credit Limit"
             type="number"
             min="0"
-            step="1"
+            step="0.01"
             value={formData.creditLimit}
             onChange={(event) => updateField('creditLimit', event.target.value)}
           />
           <Input
             label="Opening Balance"
             type="number"
-            step="1"
+            step="0.01"
             value={formData.openingBalance}
             onChange={(event) => updateField('openingBalance', event.target.value)}
           />

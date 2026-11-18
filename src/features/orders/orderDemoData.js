@@ -22,6 +22,9 @@ import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 // renders these rows and never mixes them into real API results.
 export const DEMO_ORDERS_ENABLED = DEMO_MODE && !DEMO_EMPTY
 
+// Money is kept to the paisa (2 decimals) in the demo fixtures too, like the real order screens.
+const r2 = (value) => Math.round((Number(value) || 0) * 100) / 100
+
 export function isDemoOrder(id) {
   return typeof id === 'string' && id.startsWith('demo-so-')
 }
@@ -126,16 +129,16 @@ function order({
   // Demo-only payment figures for the Order Detail "Payment Summary" card (Previous Balance /
   // Total Due / Paid / Remaining). Never persisted, never sent to any API.
   const paid = Math.max(0, Number(paidAmount) || 0)
-  const totalDue = Math.round(total) + previousBalance
+  const totalDue = r2(total) + previousBalance
   const showPay = status !== 'cancelled' && (method === 'pickup' || previousBalance > 0 || paid > 0)
   // Order-level payment status mirrors the real backend `payment_status` (paid|partial|pending)
   // so demo rows exercise the same badges. Based on the amount applied to THIS order only.
-  const orderPaid = Math.min(paid, Math.round(total))
+  const orderPaid = Math.min(paid, r2(total))
   const paymentStatus = !showPay
     ? ''
     : orderPaid <= 0
       ? 'pending'
-      : orderPaid >= Math.round(total)
+      : orderPaid >= r2(total)
         ? 'paid'
         : 'partial'
   return {
@@ -173,7 +176,7 @@ function order({
     deliveryMethod: method === 'pickup' ? 'takeaway' : 'home_delivery',
     paymentStatus,
     paidAmount: paymentStatus ? orderPaid : null,
-    remainingAmount: paymentStatus ? Math.max(Math.round(total) - orderPaid, 0) : null,
+    remainingAmount: paymentStatus ? Math.max(r2(total) - orderPaid, 0) : null,
     pickupStatus,
     collectedBy: pickupStatus === 'collected' ? c.name : '',
     collectedAt: pickupStatus === 'collected' ? iso(-1) : null,
@@ -739,7 +742,7 @@ export function buildDemoDeliveryRecord(deliveryId) {
     // outstanding (order total + previous pending, minus anything collected via patchDemoDelivery).
     amountDue:
       ['in_transit', 'partially_delivered', 'delivered'].includes(fs) && !order.invoiceId
-        ? Math.round(order.total) + (order.previousPendingBalance || 0)
+        ? r2(order.total) + (order.previousPendingBalance || 0)
         : 0,
     collectedAmount: order.collectedFull
       ? Math.round((order.total + (order.previousPendingBalance || 0)) * 100) / 100

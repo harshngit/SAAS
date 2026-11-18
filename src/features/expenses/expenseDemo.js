@@ -231,7 +231,7 @@ export function simulateDemoCreateExpense({ category, description, amount, payme
     id: `demo-exp-${Date.now().toString(36)}`,
     category,
     description,
-    amount: Math.round(Number(amount)) || 0,
+    amount: Math.round((Number(amount) || 0) * 100) / 100,
     paymentMode,
     expenseDate,
     receipt: Boolean(hasReceipt),

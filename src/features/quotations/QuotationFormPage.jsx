@@ -20,6 +20,7 @@ import { listUsers } from '../../api/users'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
+import { money } from '../../utils/gstCalc'
 import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
 import { formatLeadStatus } from '../leads/leadActivity'
 import { DEMO_RECORDS_ENABLED, demoLeads, isDemoRecord } from '../leads/demoData'
@@ -185,7 +186,7 @@ export default function QuotationFormPage() {
       }, 0)
       if (seededDiscount > 0) {
         setDiscountType('amount')
-        setDiscountValue(String(Math.round(seededDiscount)))
+        setDiscountValue(String(money(seededDiscount)))
       }
 
       setFormData((current) => ({
@@ -370,8 +371,9 @@ export default function QuotationFormPage() {
 
   const roundItemOnBlur = (productId, field, { min = 0 } = {}) => (event) => {
     if (String(event.target.value ?? '').trim() === '') return
-    const rounded = Math.round(Number(event.target.value))
-    updateItemField(productId, field, String(Number.isFinite(rounded) ? Math.max(rounded, min) : min))
+    // Unit price keeps up to 2 decimals (paise) - it used to be rounded to a whole rupee.
+    const rounded = money(event.target.value)
+    updateItemField(productId, field, String(Math.max(rounded, min)))
   }
 
   const validate = () => {
@@ -644,12 +646,12 @@ export default function QuotationFormPage() {
                     <NumericInput
                       type="number"
                       min="0"
-                      step="1"
+                      step="0.01"
                       value={discountValue}
                       onChange={(event) => setDiscountValue(event.target.value)}
                       onBlur={(event) => {
-                        const rounded = Math.round(Number(event.target.value))
-                        setDiscountValue(String(Number.isFinite(rounded) ? Math.max(rounded, 0) : 0))
+                        const rounded = money(event.target.value)
+                        setDiscountValue(String(Math.max(rounded, 0)))
                       }}
                       aria-label="Discount value"
                       className="h-9 w-14 shrink-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"

@@ -773,8 +773,9 @@ function CreateSalesInvoiceForm() {
   // Rounds/clamps on blur, not on every keystroke - a controlled number input jumps its cursor
   // to the end after any programmatic value change mid-typing, so rounding while "10." is still
   // being typed turns the next digit into the wrong place (e.g. "100" instead of "10").
-  const roundItemFieldOnBlur = (index, field, { min = 0, max } = {}) => (event) => {
-    const rounded = Math.round(Number(event.target.value))
+  // `decimals: 2` keeps paise / fractional % (discount); the default is a whole number (quantity).
+  const roundItemFieldOnBlur = (index, field, { min = 0, max, decimals = 0 } = {}) => (event) => {
+    const rounded = decimals ? money(event.target.value) : Math.round(Number(event.target.value))
     const safe = Number.isFinite(rounded) ? rounded : min
     const clamped = max !== undefined ? Math.min(Math.max(safe, min), max) : Math.max(safe, min)
     updateItem(index, field, String(clamped))
@@ -1101,7 +1102,7 @@ function CreateSalesInvoiceForm() {
                           <NumericInput
                             type="number"
                             min="0"
-                            step="1"
+                            step="any"
                             value={item.unitPrice}
                             onChange={(event) => updateItem(index, 'unitPrice', event.target.value)}
                             className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
@@ -1112,10 +1113,10 @@ function CreateSalesInvoiceForm() {
                             type="number"
                             min="0"
                             max="100"
-                            step="1"
+                            step="0.01"
                             value={item.discount}
                             onChange={(event) => updateItem(index, 'discount', event.target.value)}
-                            onBlur={roundItemFieldOnBlur(index, 'discount', { min: 0, max: 100 })}
+                            onBlur={roundItemFieldOnBlur(index, 'discount', { min: 0, max: 100, decimals: 2 })}
                             className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                           />
                         </td>
@@ -1124,7 +1125,7 @@ function CreateSalesInvoiceForm() {
                             type="number"
                             min="0"
                             max="100"
-                            step="1"
+                            step="0.01"
                             value={item.taxRate}
                             onChange={(event) => updateItem(index, 'taxRate', event.target.value)}
                             className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
@@ -1199,8 +1200,8 @@ function CreateSalesInvoiceForm() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input label="Additional Charges (₹)" type="number" min="0" step="1" value={additionalCharges} onChange={(event) => setAdditionalCharges(event.target.value)} />
-              <Input label="Extra Discount (₹)" type="number" min="0" step="1" value={discount} onChange={(event) => setDiscount(event.target.value)} />
+              <Input label="Additional Charges (₹)" type="number" min="0" step="0.01" value={additionalCharges} onChange={(event) => setAdditionalCharges(event.target.value)} />
+              <Input label="Extra Discount (₹)" type="number" min="0" step="0.01" value={discount} onChange={(event) => setDiscount(event.target.value)} />
             </div>
 
             <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
@@ -1324,7 +1325,7 @@ function CreateSalesInvoiceForm() {
                   label={paymentType === 'cod' ? 'Amount Collected Now (Optional)' : 'Amount Paid Now (Optional)'}
                   type="number"
                   min="0"
-                  step="1"
+                  step="0.01"
                   value={amountPaid}
                   onChange={(event) => setAmountPaid(event.target.value)}
                 />

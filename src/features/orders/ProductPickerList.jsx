@@ -246,7 +246,7 @@ export default function ProductPickerList({
                       <NumericInput
                         type="number"
                         min="0"
-                        step="1"
+                        step="any"
                         value={item.unitPrice}
                         onChange={(event) => onUpdateItem(key, 'unitPrice', event.target.value)}
                         onBlur={onRoundBlur(key, 'unitPrice', { min: 0 })}

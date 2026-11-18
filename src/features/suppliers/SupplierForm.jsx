@@ -210,7 +210,7 @@ function CurrencyField({ label, value, onChange, error, helper }) {
         <NumericInput
           type="number"
           min="0"
-          step="1"
+          step="0.01"
           placeholder="0.00"
           value={value}
           onChange={onChange}

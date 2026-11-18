@@ -991,7 +991,7 @@ export default function UserEdit() {
                 <Input
                   label="Basic Salary"
                   type="number"
-                  step="1"
+                  step="0.01"
                   value={formData.basicSalary}
                   onChange={(event) => setFormData({ ...formData, basicSalary: event.target.value })}
                 />

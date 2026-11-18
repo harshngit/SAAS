@@ -36,6 +36,7 @@ import {
   simulateDemoRejectExpense,
 } from './expenseDemo'
 import { formatCurrency, formatDate } from '../../utils/format'
+import { money } from '../../utils/gstCalc'
 import { useToast } from '../../components/ui/toastContext'
 import { useAuthStore } from '../../store/authStore'
 import ReimburseExpenseModal from './ReimburseExpenseModal'
@@ -188,7 +189,7 @@ export default function AdminExpenses() {
   // that backend rule ever changes.
   const handleAddExpense = async (event) => {
     event.preventDefault()
-    const amount = Math.round(Number(formData.amount))
+    const amount = money(formData.amount)
     if (!formData.category) return setFormError('Choose an expense category.')
     if (!(amount > 0)) return setFormError('Enter an amount greater than zero.')
     if (fieldVisible('expenseDate') && !formData.expenseDate) return setFormError('Choose the expense date.')
@@ -563,7 +564,7 @@ export default function AdminExpenses() {
               label="Amount (₹)"
               type="number"
               min="1"
-              step="1"
+              step="0.01"
               value={formData.amount}
               onChange={(e) => setFormData((c) => ({ ...c, amount: e.target.value }))}
               required

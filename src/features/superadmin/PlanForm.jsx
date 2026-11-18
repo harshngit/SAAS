@@ -197,10 +197,10 @@ export default function PlanForm({ isOpen, onClose, plan, onSave, isSubmitting, 
             <Input label="Plan Name" value={formData.name} onChange={handleChange('name')} required />
 
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <Input label="Price / month" type="number" min="0" step="1" value={formData.price_monthly} onChange={handleChange('price_monthly')} required />
-              <Input label="Price / year" type="number" min="0" step="1" value={formData.price_yearly} onChange={handleChange('price_yearly')} required />
-              <Input label="Original price / month" type="number" min="0" step="1" value={formData.original_price_monthly} onChange={handleChange('original_price_monthly')} />
-              <Input label="Original price / year" type="number" min="0" step="1" value={formData.original_price_yearly} onChange={handleChange('original_price_yearly')} />
+              <Input label="Price / month" type="number" min="0" step="0.01" value={formData.price_monthly} onChange={handleChange('price_monthly')} required />
+              <Input label="Price / year" type="number" min="0" step="0.01" value={formData.price_yearly} onChange={handleChange('price_yearly')} required />
+              <Input label="Original price / month" type="number" min="0" step="0.01" value={formData.original_price_monthly} onChange={handleChange('original_price_monthly')} />
+              <Input label="Original price / year" type="number" min="0" step="0.01" value={formData.original_price_yearly} onChange={handleChange('original_price_yearly')} />
             </div>
 
             <label className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">

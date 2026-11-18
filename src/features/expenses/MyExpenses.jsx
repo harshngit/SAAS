@@ -30,6 +30,7 @@ import ExpenseHistory from './ExpenseHistory'
 import { usePermission } from '../../auth/usePermission'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/format'
+import { money } from '../../utils/gstCalc'
 import { useToast } from '../../components/ui/toastContext'
 import {
   DEMO_EXPENSES_ENABLED,
@@ -277,13 +278,13 @@ export default function MyExpenses() {
   }, [expenses, filter, search, dateFrom, dateTo])
 
   const duplicate = useMemo(() => {
-    const amount = Math.round(Number(formData.amount)) || 0
+    const amount = money(formData.amount)
     if (!formData.category || amount <= 0 || !formData.expenseDate) return false
     return expenses.some(
       (e) =>
         e.approvalStatus === 'Pending' &&
         e.category === formData.category &&
-        Math.round(Number(e.amount)) === amount &&
+        money(e.amount) === amount &&
         (e.expenseDate || '').slice(0, 10) === formData.expenseDate &&
         (e.description || '').trim() === formData.description.trim(),
     )
@@ -311,7 +312,7 @@ export default function MyExpenses() {
     setFormData({
       category: expense.category || '',
       description: expense.description || '',
-      amount: expense.amount ? String(Math.round(Number(expense.amount))) : '',
+      amount: expense.amount ? String(money(expense.amount)) : '',
       expenseDate: (expense.expenseDate || todayIso()).slice(0, 10),
       paymentMode: expense.paymentMode || '',
     })
@@ -322,7 +323,7 @@ export default function MyExpenses() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    const amount = Math.round(Number(formData.amount))
+    const amount = money(formData.amount)
     if (!formData.category) return setFormError('Choose an expense category.')
     if (!(amount > 0)) return setFormError('Enter an amount greater than zero.')
     if (fieldVisible('expenseDate') && !formData.expenseDate) return setFormError('Choose the expense date.')
@@ -636,7 +637,7 @@ export default function MyExpenses() {
               label="Amount (₹)"
               type="number"
               min="1"
-              step="1"
+              step="0.01"
               value={formData.amount}
               onChange={(e) => setFormData((c) => ({ ...c, amount: e.target.value }))}
               required

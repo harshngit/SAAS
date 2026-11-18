@@ -20,6 +20,7 @@ import { normalizeApiProduct } from '../products/productUtils'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import { demoProducts as demoSupplierProducts, demoSuppliers, getDemoSupplier } from '../suppliers/supplierDemoData'
 import { formatCurrency } from '../../utils/format'
+import { money } from '../../utils/gstCalc'
 import { computeFinancialYear, PURCHASE_TYPE_OPTIONS } from './purchaseHelpers'
 import { createDemoPurchase, getDemoPurchase, isDemoPurchase, patchDemoPurchase } from './purchaseDemoData'
 
@@ -250,8 +251,9 @@ export default function PurchaseInvoiceForm() {
 
   const updateField = (field, value) => setFormState((current) => ({ ...current, [field]: value }))
 
-  const roundItemFieldOnBlur = (index, field, { min = 0, max } = {}) => (event) => {
-    const rounded = Math.round(Number(event.target.value))
+  // `decimals: 2` keeps paise / fractional % (discount); the default is a whole number (quantity).
+  const roundItemFieldOnBlur = (index, field, { min = 0, max, decimals = 0 } = {}) => (event) => {
+    const rounded = decimals ? money(event.target.value) : Math.round(Number(event.target.value))
     const safe = Number.isFinite(rounded) ? rounded : min
     const clamped = max !== undefined ? Math.min(Math.max(safe, min), max) : Math.max(safe, min)
     updateItem(index, field, String(clamped))
@@ -555,7 +557,7 @@ export default function PurchaseInvoiceForm() {
                       <NumericInput
                         type="number"
                         min="0"
-                        step="1"
+                        step="any"
                         value={item.purchasePrice}
                         onChange={(event) => updateItem(index, 'purchasePrice', event.target.value)}
                         className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
@@ -566,10 +568,10 @@ export default function PurchaseInvoiceForm() {
                         type="number"
                         min="0"
                         max="100"
-                        step="1"
+                        step="0.01"
                         value={item.discount}
                         onChange={(event) => updateItem(index, 'discount', event.target.value)}
-                        onBlur={roundItemFieldOnBlur(index, 'discount', { min: 0, max: 100 })}
+                        onBlur={roundItemFieldOnBlur(index, 'discount', { min: 0, max: 100, decimals: 2 })}
                         className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                       />
                     </td>
@@ -578,7 +580,7 @@ export default function PurchaseInvoiceForm() {
                         type="number"
                         min="0"
                         max="100"
-                        step="1"
+                        step="0.01"
                         value={item.tax}
                         onChange={(event) => updateItem(index, 'tax', event.target.value)}
                         className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
@@ -612,7 +614,7 @@ export default function PurchaseInvoiceForm() {
                 label="Extra Discount (₹)"
                 type="number"
                 min="0"
-                step="1"
+                step="0.01"
                 value={formState.discount}
                 onChange={(event) => updateField('discount', event.target.value)}
               /></ConfiguredField>

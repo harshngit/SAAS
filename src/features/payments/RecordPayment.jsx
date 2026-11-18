@@ -191,7 +191,7 @@ export default function RecordPayment() {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               min="0"
-              step="1"
+              step="0.01"
               required={paymentMode !== 'cod'}
             />
             <Select

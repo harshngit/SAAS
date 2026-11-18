@@ -333,21 +333,15 @@ export default function Sidebar({
         <nav ref={navRef} className={`sidebar-nav relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? 'py-5 md:px-3' : 'py-3 md:px-2.5 md:pt-0'} px-3`}>
           <span
             aria-hidden="true"
-            className={`sidebar-active-pill pointer-events-none absolute left-0 top-0 z-0 rounded-2xl bg-primary-100/70 ${pillReady ? '' : 'sidebar-active-pill--instant'}`}
+            // Lavender pill whose thick left border (rounded by the pill's own corners) forms the purple crescent.
+            className={`sidebar-active-pill pointer-events-none absolute left-0 top-0 z-0 rounded-xl ${pillReady ? '' : 'sidebar-active-pill--instant'}`}
             style={{
               width: pill.width,
               height: pill.height,
               opacity: pill.visible ? 1 : 0,
               transform: `translate3d(${pill.left}px, ${pill.top}px, 0)`,
             }}
-          >
-            {/* "(" bracket hugging the left edge, plus a dot on the right - both only on the wide rail. */}
-            <span
-              key={`${pill.top}-${pill.left}`}
-              className={`sidebar-active-pill-bracket ${isExpanded ? '' : 'md:hidden'}`}
-            />
-            <span className={`sidebar-active-pill-dot absolute right-3.5 top-[calc(50%-0.25rem)] size-2 rounded-full ${isExpanded ? '' : 'md:hidden'}`} />
-          </span>
+          />
           {menuGroups.map((group, groupIndex) => {
             const SectionIcon = sectionIcons[group.section] || group.items[0]?.icon
             const sectionPath = group.items[0]?.path || '#'
@@ -366,18 +360,12 @@ export default function Sidebar({
                     }}
                     aria-label={group.section}
                     title={group.section}
-                    className={`group relative hidden items-center justify-center rounded-2xl py-2.5 text-sm font-medium transition-all duration-150 md:flex ${
+                    className={`group relative hidden items-center justify-center sidebar-chip rounded-xl py-2.5 text-sm font-medium transition-[color,background-color,border-color] duration-200 md:flex ${
                       isSectionActive
-                        ? 'bg-(--sidebar-active-bg) text-primary-700 shadow-[inset_0_0_0_1px_rgb(0_9_42/0.14)]'
+                        ? 'sidebar-chip-active'
                         : 'text-fg-muted hover:bg-neutral-50 hover:text-fg'
                     }`}
                   >
-                    <span
-                      className={`absolute left-1 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-linear-to-b from-primary-500 to-primary-700 transition-opacity ${
-                        isSectionActive ? 'opacity-100' : 'opacity-0'
-                      }`}
-                      aria-hidden="true"
-                    />
                     <SectionIcon className="size-4.5 shrink-0" aria-hidden="true" />
                     <CollapsedTooltip label={group.section} />
                   </NavLink>
@@ -464,21 +452,15 @@ export default function Sidebar({
                           // shortcuts, all "/admin/reports") would otherwise all highlight at once.
                           // activeWhen, when present, overrides with a query-param-aware check.
                           const computedActive = item.activeWhen ? item.activeWhen(location) : isActive
-                          return `group relative z-10 flex items-center rounded-2xl py-1 text-[0.750rem] font-medium transition-[color,background-color] duration-200 ease-out ${
+                          return `group relative z-10 flex items-center rounded-xl py-2 text-[0.750rem] font-medium transition-[color,background-color] duration-200 ease-out ${
                             isExpanded
-                              ? 'gap-2.5 px-2.5 md:justify-start'
-                              : 'gap-2.5 px-2.5 md:gap-0 md:px-0 md:justify-center'
+                              ? 'gap-3.5 px-4 md:justify-start'
+                              : 'gap-3.5 px-4 md:gap-0 md:px-0 md:justify-center'
                           } ${
                             computedActive
-                              // text-primary-900, not text-neutral-900: --sidebar-active-bg is
-                              // always a light accent tint (Part 2.6), even in dark mode, but
-                              // --color-neutral-900 INVERTS to a light value there (Part 2.3) -
-                              // that pairing went light-on-light. --color-primary-900 is a fixed
-                              // dark shade of the accent ramp and isn't part of that inversion, so
-                              // dark mode keeps using it untouched. app-sidebar-nav-label-active
-                              // (index.css, light mode only) overrides this to the exact literal
-                              // #00092A requested for light mode specifically.
-                              ? 'app-sidebar-nav-label-active text-primary-900'
+                              // The sliding pill (above) is the background; the item only carries the
+                              // indigo ink colour, light and dark (see .sidebar-item-active in index.css).
+                              ? 'sidebar-item-active'
                               : 'app-sidebar-nav-label text-fg-muted hover:bg-neutral-50 hover:text-fg'
                           }`
                         }}
@@ -487,13 +469,9 @@ export default function Sidebar({
                           const computedActive = item.activeWhen ? item.activeWhen(location) : isActive
                           return (
                           <>
-                            <span
-                              className={`relative flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors duration-300 ${
-                                computedActive ? 'bg-primary-200/70 text-primary-700' : ''
-                              }`}
-                            >
+                            <span className="relative shrink-0">
                               <item.icon
-                                className={`size-4.5 transition-transform duration-300 ease-out ${computedActive ? 'scale-105' : 'group-hover:scale-110'}`}
+                                className={`size-5 transition-transform duration-300 ease-out ${computedActive ? 'scale-105' : 'group-hover:scale-110'}`}
                                 aria-hidden="true"
                               />
                               {!isExpanded && badgeCount > 0 && (
@@ -504,7 +482,7 @@ export default function Sidebar({
                               )}
                             </span>
                             <span className={`visible flex max-w-48 items-center gap-2 overflow-hidden opacity-100 transition-all duration-150 ${desktopLabelVisibilityClass}`}>
-                              <span className={`truncate whitespace-nowrap transition-[font-weight] duration-200 ${computedActive ? 'font-semibold' : ''}`}>{item.label}</span>
+                              <span className={`truncate whitespace-nowrap transition-[font-weight] duration-200 ${computedActive ? 'font-bold' : ''}`}>{item.label}</span>
                               {badgeCount > 0 && (
                                 <span className="inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1 text-[0.6rem] font-semibold leading-none text-white">
                                   {badgeCount}

@@ -213,6 +213,7 @@ export default function DayEndClose() {
                         <NumericInput
                           type="number"
                           min="0"
+                          step="0.01"
                           value={handedOver[entry.method]}
                           onChange={(event) => setHandedOver((current) => ({ ...current, [entry.method]: event.target.value }))}
                           className="w-28 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"

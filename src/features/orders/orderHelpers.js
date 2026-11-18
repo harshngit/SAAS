@@ -54,8 +54,10 @@ export function formatPaymentStatus(status) {
 // status it is about to send from the amount typed vs the order total. Once the order exists,
 // the UI always reads `order.paymentStatus` from the backend instead of recomputing.
 export function derivePaymentStatus(orderTotal, paidAmount) {
-  const total = Math.round(Number(orderTotal) || 0)
-  const paid = Math.max(0, Math.round(Number(paidAmount) || 0))
+  // Compared to the paisa (2 decimals), not to the rupee - an order of 100.40 with 100.00 paid is partial.
+  const toPaise = (value) => Math.round((Number(value) || 0) * 100)
+  const total = toPaise(orderTotal)
+  const paid = Math.max(0, toPaise(paidAmount))
   if (paid <= 0) return 'pending'
   if (paid >= total) return 'paid'
   return 'partial'

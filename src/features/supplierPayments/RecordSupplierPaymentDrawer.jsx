@@ -243,7 +243,7 @@ export default function RecordSupplierPaymentDrawer({ isOpen, onClose, onRecorde
             <Select label="Payment Method" required options={PAYMENT_MODE_OPTIONS} value={paymentMode} onChange={(event) => setPaymentMode(event.target.value)} />
             <Input label="Reference Number" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="UTR / cheque / UPI ref" />
             <Input as="textarea" label="Notes" className="sm:col-span-2" value={notes} onChange={(event) => setNotes(event.target.value)} />
-            <Input label="Payment Amount" type="number" min="0" step="1" required value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
+            <Input label="Payment Amount" type="number" min="0" step="0.01" required value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
           </div>
 
           {supplierId && (
@@ -286,7 +286,7 @@ export default function RecordSupplierPaymentDrawer({ isOpen, onClose, onRecorde
                               type="number"
                               min="0"
                               max={invoice.outstanding}
-                              step="1"
+                              step="0.01"
                               value={allocations[invoice.id] ?? ''}
                               onChange={(event) => setAllocations((current) => ({ ...current, [invoice.id]: event.target.value }))}
                               className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm"

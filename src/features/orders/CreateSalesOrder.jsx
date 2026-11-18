@@ -223,7 +223,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
           item.discountPercent != null
             ? Number(item.discountPercent) || 0
             : gross > 0 && item.discount
-              ? Math.round((Number(item.discount) / gross) * 100)
+              ? money((Number(item.discount) / gross) * 100)
               : 0
         return {
           productId: item.productId,
@@ -276,7 +276,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       setOrderNotes(duplicateFromId ? '' : src.notes || '')
       if (src.discount) {
         setDiscountType('amount')
-        setDiscountValue(String(Math.round(Number(src.discount))))
+        setDiscountValue(String(money(src.discount)))
       }
     }
 
@@ -425,18 +425,18 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     setErrors((current) => ({ ...current, items: '' }))
   }
 
-  // Quantity, Unit Price, and the order-level Discount are all whole-number fields here (no
-  // paise, no fractional %). There is no per-item discount field - only one order-level
-  // discount in the summary; any item-level discount carried in from a quotation or a legacy
-  // order is kept in state for the maths but is not editable. Rounding is applied on blur, not on
+  // Quantity is a whole number; Unit Price and the order-level Discount / Paid amount keep up to 2
+  // decimals (paise). There is no per-item discount field - only one order-level discount in the
+  // summary; any item-level discount carried in from a quotation or a legacy order is kept in
+  // state for the maths but is not editable. Rounding (to 2 decimals) is applied on blur, not on
   // every keystroke - a controlled <input type="number"> jumps its cursor to the end after any
   // programmatic value change, so rounding while a "10." is still being typed turns the next
   // keystroke into "1007" instead of "10" (the decimal point silently vanishes and later digits
-  // land in the wrong place). Blur-time rounding still guarantees nothing but a whole number is
+  // land in the wrong place). Blur-time rounding still guarantees nothing finer than a paisa is
   // ever kept in state past the point the field is submitted.
-  const roundToWholeNumberOnBlur = (productId, field, { min = 0, max } = {}) => (event) => {
+  const roundMoneyOnBlur = (productId, field, { min = 0, max } = {}) => (event) => {
     if (String(event.target.value ?? '').trim() === '') return
-    const rounded = Math.round(Number(event.target.value))
+    const rounded = money(event.target.value)
     const safe = Number.isFinite(rounded) ? rounded : min
     const clamped = max !== undefined ? Math.min(Math.max(safe, min), max) : Math.max(safe, min)
     updateOrderItem(productId, field, String(clamped))
@@ -656,11 +656,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
     // Upfront payment (backend contract §11). Takeaway captures a paid amount in the preview
     // step; Home Delivery has no amount field, so only "Credit / Pay Later" reports a status.
-    const orderTotalRounded = Math.round(totals.total)
+    const orderTotalRounded = money(totals.total)
     let paymentStatusForApi
     let paidAmountForApi
     if (isTakeawayCheckout) {
-      paidAmountForApi = Math.min(Math.max(0, Math.round(paidAmountValue)), orderTotalRounded)
+      paidAmountForApi = Math.min(Math.max(0, money(paidAmountValue)), orderTotalRounded)
       paymentStatusForApi = derivePaymentStatus(orderTotalRounded, paidAmountForApi)
     } else if (paymentMethod === 'credit') {
       paymentStatusForApi = 'pending'
@@ -736,7 +736,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   // The payment_status that will be sent to the backend: derived from the order total vs the
   // amount applied to THIS order (payment beyond the order total goes to previous balance and
   // is not part of paid_amount, which the backend caps at the order total - contract §11).
-  const previewOrderPaid = Math.min(paidAmountValue, Math.round(totals.total))
+  const previewOrderPaid = Math.min(paidAmountValue, money(totals.total))
   const previewPaymentStatus = derivePaymentStatus(totals.total, previewOrderPaid)
   const warehouseName = warehouses.find((warehouse) => warehouse.id === warehouseId)?.name || '—'
   const paymentTypeLabel = paymentOptions.find((option) => option.value === paymentMethod)?.label || 'Not selected'
@@ -970,7 +970,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                 isLoading={isLoadingOptions}
                 onSetQuantity={setPickerQuantity}
                 onUpdateItem={updateOrderItem}
-                onRoundBlur={roundToWholeNumberOnBlur}
+                onRoundBlur={roundMoneyOnBlur}
               />
             </div>
 
@@ -995,12 +995,12 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <NumericInput
                       type="number"
                       min="0"
-                      step="1"
+                      step="0.01"
                       value={discountValue}
                       onChange={(event) => setDiscountValue(event.target.value)}
                       onBlur={(event) => {
-                        const rounded = Math.round(Number(event.target.value))
-                        setDiscountValue(String(Number.isFinite(rounded) ? Math.max(rounded, 0) : 0))
+                        const rounded = money(event.target.value)
+                        setDiscountValue(String(Math.max(rounded, 0)))
                       }}
                       aria-label="Discount value"
                       className="h-10 w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
@@ -1549,11 +1549,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <NumericInput
                       type="number"
                       min="0"
-                      step="1"
+                      step="0.01"
                       value={paidAmount}
                       onChange={(event) => setPaidAmount(event.target.value)}
                       onBlur={(event) => {
-                        const next = Math.max(0, Math.round(Number(event.target.value) || 0))
+                        const next = Math.max(0, money(event.target.value))
                         setPaidAmount(next ? String(next) : '')
                       }}
                       aria-label="Paid amount"
