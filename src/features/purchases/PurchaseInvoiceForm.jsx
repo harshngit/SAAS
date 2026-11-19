@@ -154,7 +154,7 @@ export default function PurchaseInvoiceForm() {
         invoiceNumber: purchase.invoiceNumber || '',
         warehouseId: purchase.warehouseId || '',
         notes: purchase.notes || '',
-        discount: String(purchase.discount ?? 0),
+        discount: String(purchase.extraDiscount ?? purchase.discount ?? 0),
         items: purchase.items?.length
           ? purchase.items.map((item) => ({ productId: item.productId, quantity: item.quantity, purchasePrice: item.purchasePrice, discount: item.discount, tax: item.tax }))
           : [emptyItem()],

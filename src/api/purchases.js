@@ -84,6 +84,8 @@ export const PURCHASE_RECEIVING_STATUS_OPTIONS = [
 
 // Item discount/tax are entered and displayed as percentages in the UI (matching the sales
 // invoice item picker convention) - the server is the source of truth for computed totals.
+// PurchaseItemIn has two pairs: discount_percent / tax_rate (percent) and discount / tax (rupees).
+// The percentages typed in the form go in discount_percent / tax_rate - never in the rupee fields.
 function buildPurchaseItemBody(item) {
   const body = {
     product_id: item.productId || item.product_id,
@@ -94,8 +96,8 @@ function buildPurchaseItemBody(item) {
   const variantId = item.variantId || item.variant_id
   if (variantId) body.variant_id = variantId
 
-  if (item.discount !== undefined && item.discount !== '') body.discount = Number(item.discount) || 0
-  if (item.tax !== undefined && item.tax !== '') body.tax = Number(item.tax) || 0
+  if (item.discount !== undefined && item.discount !== '') body.discount_percent = Number(item.discount) || 0
+  if (item.tax !== undefined && item.tax !== '') body.tax_rate = Number(item.tax) || 0
 
   return body
 }
@@ -162,11 +164,18 @@ function normalizePurchaseItem(item) {
 
   const orderedQty = Number(item.ordered_qty ?? item.quantity) || 0
   const purchasePrice = Number(item.purchase_price ?? item.purchasePrice) || 0
-  const discount = Number(item.discount) || 0
-  const tax = Number(item.tax) || 0
+  // The API returns the line's discount / tax twice: as a percent (discount_percent, tax_rate) and as rupees (discount, tax).
+  // `discount` / `tax` below stay percentages (what the form edits and the detail shows); the rupee values are
+  // discountAmount / taxAmount. When only rupees were saved, the percent is derived from them.
+  const discountPercent = Number(item.discount_percent) || 0
+  const discountAmount = Number(item.discount) || 0
+  const taxRate = Number(item.tax_rate) || 0
+  const taxAmount = Number(item.tax) || 0
   const subtotal = orderedQty * purchasePrice
-  const discounted = subtotal - subtotal * (discount / 100)
-  const fallbackLineTotal = discounted + discounted * (tax / 100)
+  const discount = discountPercent > 0 ? discountPercent : discountAmount > 0 && subtotal > 0 ? Math.round((discountAmount / subtotal) * 1e8) / 1e6 : 0
+  const discounted = subtotal - (discountAmount > 0 ? discountAmount : subtotal * (discount / 100))
+  const tax = taxRate > 0 ? taxRate : taxAmount > 0 && discounted > 0 ? Math.round((taxAmount / discounted) * 1e8) / 1e6 : 0
+  const fallbackLineTotal = discounted + (taxAmount > 0 ? taxAmount : discounted * (tax / 100))
 
   // Backend-controlled GRN rollups. `remaining_qty` is authoritative when present; otherwise
   // derive it (clamped) so a stale/partial response never renders NaN.
@@ -190,6 +199,8 @@ function normalizePurchaseItem(item) {
     purchasePrice,
     discount,
     tax,
+    discountAmount,
+    taxAmount,
     lineTotal: item.line_total ?? item.lineTotal ?? fallbackLineTotal,
   }
 }
@@ -222,6 +233,9 @@ function normalizePurchase(purchase) {
     paymentStatus: purchase.payment_status ?? null,
     subtotal: purchase.subtotal ?? fallbackSubtotal,
     discount: purchase.discount ?? 0,
+    // The API's header discount = the items' discounts unless an order-level discount was entered; the form's
+    // "Discount" box is only the order-level part, so it must not be pre-filled with the items' total.
+    extraDiscount: Math.abs((Number(purchase.discount) || 0) - items.reduce((sum, i) => sum + i.discountAmount, 0)) < 0.02 ? 0 : Number(purchase.discount) || 0,
     tax: purchase.tax ?? 0,
     total,
     amountPaid,

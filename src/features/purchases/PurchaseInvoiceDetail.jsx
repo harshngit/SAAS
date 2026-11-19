@@ -15,6 +15,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
 import { useWarehouseName } from '../../hooks/useWarehouseName'
 import { formatCurrency } from '../../utils/format'
+import { money } from '../../utils/gstCalc'
 import {
   cancelPurchase,
   closePurchase,
@@ -666,8 +667,8 @@ export default function PurchaseInvoiceDetail() {
                       <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{received}</td>
                       <td className="px-5 py-3.5 text-right text-neutral-600">{remaining}</td>
                       <td className="px-5 py-3.5 text-right text-neutral-600">{formatCurrency(purchaseItem.purchasePrice)}</td>
-                      <td className="px-5 py-3.5 text-right text-neutral-600">{purchaseItem.discount ? `${purchaseItem.discount}%` : '—'}</td>
-                      <td className="px-5 py-3.5 text-right text-neutral-600">{purchaseItem.tax ? `${purchaseItem.tax}%` : '—'}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-600">{purchaseItem.discount ? `${money(purchaseItem.discount)}%` : '—'}</td>
+                      <td className="px-5 py-3.5 text-right text-neutral-600">{purchaseItem.tax ? `${money(purchaseItem.tax)}%` : '—'}</td>
                       <td className="px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(purchaseItem.lineTotal)}</td>
                     </tr>
                     )
