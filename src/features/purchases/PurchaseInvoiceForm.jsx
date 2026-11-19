@@ -13,6 +13,8 @@ import Select from '../../components/ui/Select'
 import { useToast } from '../../components/ui/toastContext'
 import { createPurchase, getPurchase, updatePurchase } from '../../api/purchases'
 import { listProducts } from '../../api/products'
+import { isActiveProduct } from '../../utils/activeProducts'
+import { loadSummaryRows } from '../../utils/listSummary'
 import { listSuppliers, getSupplier } from '../../api/suppliers'
 import { listWarehouses } from '../../api/warehouses'
 import { normalizeApiSupplier } from '../suppliers/supplierUtils'
@@ -96,7 +98,7 @@ export default function PurchaseInvoiceForm() {
       setIsLoadingOptions(false)
       return
     }
-    Promise.all([listSuppliers(), listProducts(), listWarehouses()]).then(([suppliersResult, productsResult, warehousesResult]) => {
+    Promise.all([listSuppliers(), loadSummaryRows(listProducts, 'products', isEditing ? {} : { is_active: true }), listWarehouses()]).then(([suppliersResult, productsResult, warehousesResult]) => {
       if (suppliersResult.success) setSuppliers(suppliersResult.suppliers)
       if (productsResult.success) setProducts(productsResult.products.map((product) => normalizeApiProduct(product)))
       if (warehousesResult.success) setWarehouses(warehousesResult.warehouses)
@@ -221,12 +223,15 @@ export default function PurchaseInvoiceForm() {
   const productOptions = useMemo(() => {
     const linked = []
     const rest = []
+    const onThisPurchase = new Set(formState.items.map((item) => item.productId).filter(Boolean))
     products.forEach((product) => {
+      // New purchase: active products only. A product already on the purchase being edited stays in the list.
+      if (!isActiveProduct(product) && !onThisPurchase.has(product.id)) return
       const option = { value: product.id, label: linkedProductIds.has(product.id) ? `${product.name} (Linked)` : product.name }
       ;(linkedProductIds.has(product.id) ? linked : rest).push(option)
     })
     return [...linked, ...rest]
-  }, [products, linkedProductIds])
+  }, [products, linkedProductIds, formState.items])
 
   const lineItems = useMemo(
     () =>

@@ -34,6 +34,7 @@ import UnsavedChangesModal from '../../components/ui/UnsavedChangesModal'
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard'
 import { ROLES, roleHomePath } from '../../auth/roles'
 import { listProducts } from '../../api/products'
+import { pickableProducts } from '../../utils/activeProducts'
 import { listCustomers } from '../../api/customers'
 import { listWarehouses } from '../../api/warehouses'
 import { listDeliveryPartners } from '../../api/deliveries'
@@ -176,7 +177,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       // Delivery-partner list for the Home Delivery picker (create flow, both roles).
       const needsPartners = !restrictToVehicleStock && !isEditMode
       const [productsResult, customersResult, warehousesResult, partnersResult] = await Promise.all([
-        loadSummaryRows(listProducts, 'products'),
+        // A NEW order only offers active products (GET /products?is_active=true). Editing / duplicating an order or
+        // converting a quotation loads everything so lines with a since-deactivated product still resolve.
+        loadSummaryRows(listProducts, 'products', !editOrderId && !duplicateFromId && !sourceQuotationId ? { is_active: true } : {}),
         listCustomers(),
         listWarehouses(),
         needsPartners ? listDeliveryPartners() : Promise.resolve({ success: false }),
@@ -1001,7 +1004,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
             {/* Inline product picker - always visible, ~5 rows then scroll (deliberately not a full marketplace grid) */}
             <div className="border-b border-neutral-100 p-4">
               <ProductPickerList
-                products={availableProducts}
+                products={pickableProducts(availableProducts, orderItems.map((item) => item.productId))}
                 orderItems={orderItems}
                 isLoading={isLoadingOptions}
                 onSetQuantity={setPickerQuantity}
