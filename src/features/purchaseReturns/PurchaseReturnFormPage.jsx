@@ -1,5 +1,4 @@
-import WholeNumberInput from '../../components/ui/WholeNumberInput'
-import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
+import NumericInput from '../../components/ui/NumericInput'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, PackageSearch, PackageX, Search } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -17,9 +16,10 @@ import {
   updateDemoPurchaseReturn,
 } from './purchaseReturnDemoData'
 import { getPurchase, listPurchases } from '../../api/purchases'
+import { listGrns } from '../../api/grns'
 import { useToast } from '../../components/ui/toastContext'
 import { createPurchaseReturn, getPurchaseReturn, listPurchaseReturns, updatePurchaseReturn } from '../../api/purchaseReturns'
-import { RETURN_REASONS } from './purchaseReturnHelpers'
+import { RETURN_REASONS, prStatusMeta } from './purchaseReturnHelpers'
 
 const basePath = '/admin/purchase-returns'
 const today = new Date().toISOString().slice(0, 10)
@@ -67,9 +67,11 @@ async function fetchPreviouslyReturnedByItem(targetPurchaseId) {
 // per item) minus history from fetchPreviouslyReturnedByItem. Called only once a purchase has
 // been selected, never for every purchase in a list.
 async function buildReturnableSource(targetPurchaseId) {
-  const [purchaseResult, returnedResult] = await Promise.all([
+  const [purchaseResult, returnedResult, grnResult] = await Promise.all([
     getPurchase(targetPurchaseId),
     fetchPreviouslyReturnedByItem(targetPurchaseId),
+    // The goods receipt(s) behind this purchase - shown read-only in the Source card. A failure here never blocks the form.
+    listGrns({ purchaseId: targetPurchaseId }),
   ])
 
   if (!purchaseResult.success) return { success: false, error: purchaseResult.error }
@@ -92,21 +94,62 @@ async function buildReturnableSource(targetPurchaseId) {
       }
     })
 
+  // GRN: the confirmed goods receipts of this purchase; the purchase's own grn_number when the GRN list has none.
+  const confirmedGrns = grnResult.success ? (grnResult.grns || []).filter((grn) => String(grn.status || '').toLowerCase() === 'confirmed') : []
+  const grnNumbers = [...new Set(confirmedGrns.map((grn) => grn.grnNumber).filter(Boolean))]
+  const grnNumber = grnNumbers.length ? grnNumbers.join(', ') : purchase.grnNumber || ''
+
+  // A purchase the backend would refuse to return against: cancelled, or nothing received yet.
+  const purchaseStatus = String(purchase.status || '').toLowerCase()
+  const ineligibleReason = purchaseStatus === 'cancelled'
+    ? 'This purchase is cancelled, so goods cannot be returned against it.'
+    : items.length === 0
+      ? 'No goods have been received for this purchase yet, so there is nothing to return.'
+      : ''
+
   return {
     success: true,
     source: {
       id: purchase.id,
       purchaseNumber: purchase.purchaseNumber || purchase.invoiceNumber,
+      purchaseDate: String(purchase.purchaseDate || purchase.invoiceDate || '').slice(0, 10),
       supplierId: purchase.supplierId,
       supplierName: purchase.supplierName,
       warehouseId: purchase.warehouseId,
       warehouseName: purchase.warehouseName || '',
-      grnId: '',
-      grnNumber: '',
+      grnId: confirmedGrns[0]?.id || '',
+      grnNumber,
       items,
-      hasReturnable: items.some((line) => line.returnableQty > 0),
+      ineligibleReason,
+      hasReturnable: !ineligibleReason && items.some((line) => line.returnableQty > 0),
     },
   }
+}
+
+// Whole-number / limit check for ONE return quantity, exactly as typed. Nothing is rounded or clamped: the text stays in the
+// box and the message sits under it. '' = this item is not being returned.
+function quantityError(raw, returnable) {
+  const text = String(raw ?? '').trim()
+  if (text === '') return ''
+  if (!/^-?\d+$/.test(text)) return 'Please enter a whole number.'
+  const qty = Number(text)
+  if (qty <= 0) return 'Return quantity must be greater than 0.'
+  if (qty > returnable) return 'Return quantity cannot exceed the returnable quantity.'
+  return ''
+}
+
+// Backend text -> the field it belongs to (the messages the live API sends for POST /purchase-returns).
+function mapBackendError(message, lines) {
+  const text = String(message || '')
+  if (/return reason|reason is required/i.test(text)) return { reason: 'Return reason is required.' }
+  if (/return date/i.test(text)) return { returnDate: text }
+  if (/supplier|purchase/i.test(text) && !/quantity/i.test(text)) return { purchase: text }
+  if (/quantity/i.test(text)) {
+    const named = lines.find((line) => line.productName && text.includes(line.productName))
+    const friendly = /exceed/i.test(text) ? 'Return quantity cannot exceed the returnable quantity.' : /whole|integer/i.test(text) ? 'Please enter a whole number.' : /greater than 0|greater_than/i.test(text) ? 'Return quantity must be greater than 0.' : text
+    return named ? { lines: { [named.purchaseItemId]: friendly } } : { items: friendly }
+  }
+  return {}
 }
 
 export default function PurchaseReturnFormPage() {
@@ -136,8 +179,13 @@ export default function PurchaseReturnFormPage() {
   const [selectedError, setSelectedError] = useState('')
 
   const [purchaseId, setPurchaseId] = useState(searchParams.get('purchase') || '')
-  const [returnQty, setReturnQty] = useState({}) // purchaseItemId -> number
-  const [reason, setReason] = useState(RETURN_REASONS[0])
+  const [returnQty, setReturnQty] = useState({}) // purchaseItemId -> the text typed in the Return Qty box
+  // A return reason is mandatory: nothing is pre-selected, so "required" can actually be checked.
+  const [reason, setReason] = useState('')
+  // Field-level errors: purchase, reason, returnDate, items (general), lines { purchaseItemId: message }
+  const [errors, setErrors] = useState({ lines: {} })
+  const clearError = (field) => setErrors((current) => (current[field] ? { ...current, [field]: '' } : current))
+  const loadToken = useRef(0)
   const [otherReason, setOtherReason] = useState('')
   const [returnDate, setReturnDate] = useState(today)
   const [notes, setNotes] = useState('')
@@ -177,7 +225,8 @@ export default function PurchaseReturnFormPage() {
       }
       setPurchaseOptions(
         result.purchases
-          .filter((purchase) => purchase.items.some((item) => item.receivedQty > 0))
+          // Only purchases the backend would accept a return for: goods received, not cancelled.
+          .filter((purchase) => purchase.items.some((item) => item.receivedQty > 0) && String(purchase.status || '').toLowerCase() !== 'cancelled')
           .map((purchase) => ({
             id: purchase.id,
             purchaseNumber: purchase.purchaseNumber || purchase.invoiceNumber,
@@ -194,16 +243,18 @@ export default function PurchaseReturnFormPage() {
   // Load the one selected purchase's returnable items + return history - fires on manual
   // selection and on edit-mode preload alike, since both just set purchaseId.
   const loadSelectedPurchase = useCallback(async () => {
-    if (PURCHASE_RETURNS_DEMO_ENABLED || !purchaseId) {
-      setSelectedPurchase(null)
-      return
-    }
-    setIsLoadingSelected(true)
+    const token = ++loadToken.current
+    // Whatever belonged to the previous purchase (supplier, warehouse, GRN, item rows, errors) goes first, then the new one loads.
+    setSelectedPurchase(null)
     setSelectedError('')
+    setSubmitError('')
+    setErrors({ lines: {} })
+    if (PURCHASE_RETURNS_DEMO_ENABLED || !purchaseId) return
+    setIsLoadingSelected(true)
     const result = await buildReturnableSource(purchaseId)
+    if (token !== loadToken.current) return // a newer selection took over
     setIsLoadingSelected(false)
     if (!result.success) {
-      setSelectedPurchase(null)
       setSelectedError(result.error)
       return
     }
@@ -233,11 +284,11 @@ export default function PurchaseReturnFormPage() {
     function applyEditRecord(record) {
       setEditRecord(record)
       setPurchaseId(record.purchaseId)
-      setReason(RETURN_REASONS.includes(record.returnReason) ? record.returnReason : 'Other')
+      setReason(RETURN_REASONS.includes(record.returnReason) ? record.returnReason : record.returnReason ? 'Other' : '')
       if (!RETURN_REASONS.includes(record.returnReason)) setOtherReason(record.returnReason || '')
       setReturnDate((record.returnDate || today).slice(0, 10))
       setNotes(record.notes || '')
-      setReturnQty(Object.fromEntries(record.items.map((item) => [item.purchaseItemId, item.returnQty])))
+      setReturnQty(Object.fromEntries(record.items.map((item) => [item.purchaseItemId, String(item.returnQty)])))
     }
 
     loadEditRecord()
@@ -253,7 +304,7 @@ export default function PurchaseReturnFormPage() {
   const lines = useMemo(() => {
     if (!source) return []
     return source.items.map((line) => {
-      const ownQty = editRecord ? Number(returnQty[line.purchaseItemId]) || 0 : 0
+      const ownQty = editRecord ? Number(returnQty[line.purchaseItemId]) || 0 : 0 // (kept for the edit maths below)
       const alreadyOther = Math.max(line.previouslyReturned - (editRecord ? editRecord.items.find((i) => i.purchaseItemId === line.purchaseItemId)?.returnQty || 0 : 0), 0)
       return {
         ...line,
@@ -269,37 +320,63 @@ export default function PurchaseReturnFormPage() {
 
   const resolvedReason = reason === 'Other' ? otherReason.trim() || 'Other' : reason
 
+  // What was typed stays exactly as typed (never rounded or clamped); the message under each box is worked out from it.
   const setQty = (line, value) => {
-    const numeric = Math.round(Number(value))
-    const clamped = Number.isNaN(numeric) ? 0 : Math.max(0, Math.min(numeric, line.returnableQty))
-    setReturnQty((current) => ({ ...current, [line.purchaseItemId]: clamped }))
+    setReturnQty((current) => ({ ...current, [line.purchaseItemId]: value }))
+    setErrors((current) => ({ ...current, items: '', lines: { ...current.lines, [line.purchaseItemId]: '' } }))
+    setSubmitError('')
   }
+  const lineErrors = useMemo(
+    () => Object.fromEntries(returnableLines.map((line) => [line.purchaseItemId, quantityError(returnQty[line.purchaseItemId], line.returnableQty)])),
+    [returnableLines, returnQty],
+  )
 
-  const validate = () => {
-    if (!source) return 'Select a purchase with received goods first.'
-    if (noReturnable) return 'All received quantities on this purchase have already been returned.'
-    if (!resolvedReason) return 'A return reason is required.'
-    if (reason === 'Other' && !otherReason.trim()) return 'Add the details for an "Other" reason.'
-    const rows = returnableLines.filter((line) => (Number(returnQty[line.purchaseItemId]) || 0) > 0)
-    if (rows.length === 0) return 'Enter a return quantity for at least one item.'
-    const bad = rows.some((line) => {
-      const qty = Number(returnQty[line.purchaseItemId])
-      return !Number.isInteger(qty) || qty <= 0 || qty > line.returnableQty
-    })
-    if (bad) return 'Each return quantity must be a whole number within what is still returnable.'
-    return ''
+  // Every problem at once, each on its own field. Returns the errors object ('' / {} entries = fine).
+  const collectErrors = () => {
+    const found = { lines: {} }
+    if (!source) {
+      found.purchase = 'Select a purchase with received goods first.'
+      return found
+    }
+    if (source.ineligibleReason) found.purchase = source.ineligibleReason
+    else if (noReturnable) found.purchase = 'All received quantities for this purchase have already been returned.'
+    if (!resolvedReason) found.reason = 'Return reason is required.'
+    if (reason === 'Other' && !otherReason.trim()) found.reason = 'Return reason is required.'
+    if (!returnDate) found.returnDate = 'Return date is required.'
+    else if (source.purchaseDate && returnDate < source.purchaseDate) found.returnDate = `Return date cannot be earlier than the purchase date (${source.purchaseDate}).`
+    else if (returnDate > today) found.returnDate = 'Return date cannot be in the future.'
+    if (!found.purchase) {
+      // Any line with text in it must be valid; a blank line is simply not returned.
+      returnableLines.forEach((line) => {
+        const message = quantityError(returnQty[line.purchaseItemId], line.returnableQty)
+        if (message) found.lines[line.purchaseItemId] = message
+      })
+      const hasQuantity = returnableLines.some((line) => String(returnQty[line.purchaseItemId] ?? '').trim() !== '')
+      if (!hasQuantity) found.items = 'Enter a return quantity for at least one item.'
+    }
+    return found
+  }
+  const hasAnyError = (found) => Boolean(found.purchase || found.reason || found.returnDate || found.items || Object.values(found.lines || {}).some(Boolean))
+
+  // A backend refusal goes to the field it is about (reason, date, purchase / supplier, the item row) and keeps a short banner.
+  const showBackendError = (message) => {
+    const mapped = mapBackendError(message, returnableLines)
+    if (Object.keys(mapped).length === 0) {
+      setSubmitError(message)
+      return
+    }
+    setErrors({ lines: {}, ...mapped, ...(mapped.lines ? { lines: mapped.lines } : {}) })
+    setSubmitError(mapped.purchase || mapped.items || (mapped.lines ? 'Fix the highlighted return quantity before saving.' : 'Fix the highlighted field before saving.'))
   }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    const quantityError = invalidWholeNumberMessage()
-    if (quantityError) {
-      setSubmitError(quantityError)
-      return
-    }
-    const error = validate()
-    if (error) {
-      setSubmitError(error)
+    if (submitInFlight.current) return
+    const found = collectErrors()
+    setErrors(found)
+    if (hasAnyError(found)) {
+      // One invalid line (or field) blocks the whole submit - valid lines are never sent on their own.
+      setSubmitError(found.purchase || (Object.values(found.lines).some(Boolean) ? 'Fix the highlighted return quantities before saving.' : 'Fix the highlighted fields before saving.'))
       return
     }
     // One click = one request: the ref flips synchronously, before the disabled button re-renders.
@@ -309,7 +386,7 @@ export default function PurchaseReturnFormPage() {
     setSubmitError('')
 
     const items = returnableLines
-      .filter((line) => (Number(returnQty[line.purchaseItemId]) || 0) > 0)
+      .filter((line) => String(returnQty[line.purchaseItemId] ?? '').trim() !== '')
       .map((line) => ({
         purchaseItemId: line.purchaseItemId,
         productId: line.productId,
@@ -352,7 +429,7 @@ export default function PurchaseReturnFormPage() {
       const result = await updatePurchaseReturn(editRecord.id, { reason: resolvedReason, returnDate, notes: notes.trim(), items })
       stopSubmitting()
       if (!result.success) {
-        setSubmitError(result.error)
+        showBackendError(result.error)
         return
       }
       navigate(`${basePath}/${encodeURIComponent(editRecord.id)}`)
@@ -371,7 +448,7 @@ export default function PurchaseReturnFormPage() {
     })
     stopSubmitting()
     if (!result.success) {
-      setSubmitError(result.error)
+      showBackendError(result.error)
       return
     }
     navigate(`${basePath}/${encodeURIComponent(result.purchaseReturn.id)}`)
@@ -379,6 +456,21 @@ export default function PurchaseReturnFormPage() {
       title: 'Draft return created',
       message: result.purchaseReturn.returnNumber ? `${result.purchaseReturn.returnNumber} was saved as a draft.` : undefined,
     })
+  }
+
+  // Only a Draft can be changed: a confirmed / dispatched / completed / cancelled return is read-only (its quantities, source and
+  // reason drive stock and the supplier's account), so the edit address of such a return opens a notice, not the form.
+  if (isEdit && editRecord && prStatusMeta(editRecord.status).key !== 'draft') {
+    return (
+      <Card>
+        <EmptyState
+          icon={PackageX}
+          title="This return can no longer be edited"
+          description={`${editRecord.returnNumber || 'This return'} is ${prStatusMeta(editRecord.status).label.toLowerCase()}. Only a draft return can be changed.`}
+          action={{ label: 'Open the return', onClick: () => navigate(`${basePath}/${encodeURIComponent(editRecord.id)}`) }}
+        />
+      </Card>
+    )
   }
 
   if (PURCHASE_RETURNS_DEMO_ENABLED && isLoadingDemoSource) {
@@ -491,6 +583,7 @@ export default function PurchaseReturnFormPage() {
                 )}
               </div>
             )}
+            {errors.purchase && <p role="alert" className="text-sm text-red-600 sm:col-span-2">{errors.purchase}</p>}
             <Input label="Supplier" value={source?.supplierName || ''} readOnly placeholder="Derived from the purchase" />
             <Input label="Goods Receipt (GRN)" value={source?.grnNumber || '—'} readOnly />
             <Input label="Receiving Warehouse" value={source?.warehouseName || '—'} readOnly />
@@ -523,7 +616,7 @@ export default function PurchaseReturnFormPage() {
           >
             {noReturnable ? (
               <div className="px-5 py-8 text-center text-sm text-neutral-500">
-                No returnable goods on this receipt — every received quantity has already been returned.
+                {source.ineligibleReason || 'All received quantities for this purchase have already been returned.'}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -547,17 +640,26 @@ export default function PurchaseReturnFormPage() {
                         <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{line.receivedQty}</td>
                         <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{line.alreadyReturned}</td>
                         <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">{line.returnableQty}</td>
-                        <td className="whitespace-nowrap px-5 py-3.5 text-right">
-                          <WholeNumberInput
+                        <td className="px-5 py-3.5 text-right align-top">
+                          {/* Typed text is kept as typed; the message for THIS row sits under its box. */}
+                          <NumericInput
+                            type="text"
+                            inputMode="numeric"
                             value={returnQty[line.purchaseItemId] ?? ''}
                             onChange={(event) => setQty(line, event.target.value)}
-                            className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm text-neutral-900"
+                            aria-label={`Return quantity for ${line.productName}`}
+                            aria-invalid={lineErrors[line.purchaseItemId] || errors.lines?.[line.purchaseItemId] ? 'true' : undefined}
+                            className={`w-24 rounded-lg border bg-surface px-2.5 py-1.5 text-right text-sm text-neutral-900 ${lineErrors[line.purchaseItemId] || errors.lines?.[line.purchaseItemId] ? 'border-red-400 text-red-600 ring-2 ring-red-100' : 'border-neutral-200'}`}
                           />
+                          {(lineErrors[line.purchaseItemId] || errors.lines?.[line.purchaseItemId]) && (
+                            <p role="alert" className="mt-1 ml-auto max-w-56 text-xs text-red-600">{lineErrors[line.purchaseItemId] || errors.lines[line.purchaseItemId]}</p>
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                {errors.items && <p role="alert" className="px-5 pb-4 pt-2 text-sm text-red-600">{errors.items}</p>}
               </div>
             )}
           </Card>
@@ -565,13 +667,23 @@ export default function PurchaseReturnFormPage() {
 
         <Card title="Return Details">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Select label="Return Reason" required options={reasonOptions} value={reason} onChange={(event) => setReason(event.target.value)} />
-            <Input label="Return Date" type="date" value={returnDate} onChange={(event) => setReturnDate(event.target.value)} />
+            <Select label="Return Reason" required options={reasonOptions} value={reason} placeholder="Select a reason" error={errors.reason} onChange={(event) => { setReason(event.target.value); clearError('reason'); setSubmitError('') }} />
+            <Input
+              label="Return Date"
+              type="date"
+              required
+              value={returnDate}
+              min={source?.purchaseDate || undefined}
+              max={today}
+              error={errors.returnDate}
+              onChange={(event) => { setReturnDate(event.target.value); clearError('returnDate'); setSubmitError('') }}
+            />
             {reason === 'Other' && (
               <Input
                 label="Reason Details"
                 value={otherReason}
-                onChange={(event) => setOtherReason(event.target.value)}
+                error={reason === 'Other' ? errors.reason : undefined}
+                onChange={(event) => { setOtherReason(event.target.value); clearError('reason'); setSubmitError('') }}
                 placeholder="Describe the reason"
                 maxLength={100}
                 className="sm:col-span-2"
@@ -596,7 +708,7 @@ export default function PurchaseReturnFormPage() {
           <Button type="button" variant="secondary" onClick={() => navigate(basePath)} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" loading={isSubmitting} disabled={noReturnable}>
+          <Button type="submit" loading={isSubmitting} disabled={noReturnable || Boolean(source?.ineligibleReason)}>
             <PackageSearch className="size-4" aria-hidden="true" />
             {isEdit ? 'Save Changes' : 'Create Draft Return'}
           </Button>

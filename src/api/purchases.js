@@ -222,6 +222,8 @@ function normalizePurchase(purchase) {
     // business ID (e.g. PO-10001-2027-0001). Neither falls back to the other or to the UUID.
     invoiceNumber: purchase.invoice_number || '',
     purchaseId: purchase.purchase_id || '',
+    // The goods receipt number the purchase carries (shown on the Purchase Return source card when the GRN list has none).
+    grnNumber: purchase.grn_number || '',
     purchaseNumber: purchase.purchase_number || '',
     supplierId: purchase.supplier_id || purchase.supplier?.id || '',
     supplierName: purchase.supplier?.name || purchase.supplier_name || '',

@@ -316,8 +316,10 @@ export default function PurchaseReturnDetail() {
       <Modal isOpen={cancelOpen} onClose={() => !isActing && setCancelOpen(false)} title="Cancel Purchase Return">
         <div className="space-y-4">
           <p className="text-sm text-neutral-600">
-            A return can only be cancelled before it is dispatched. This does not change any stock.
+            Are you sure you want to cancel this purchase return? This action may update the related inventory state.
+            A return can only be cancelled before it is dispatched.
           </p>
+          {actionError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>}
           <Input
             as="textarea"
             label="Cancellation Reason"
@@ -341,7 +343,8 @@ export default function PurchaseReturnDetail() {
                 if (PURCHASE_RETURNS_DEMO_ENABLED) {
                   runDemoAction((rid) => cancelDemoPurchaseReturn(rid, cancelReason.trim()), () => setCancelOpen(false))
                 } else {
-                  runRealAction((rid) => cancelPurchaseReturn(rid, cancelReason.trim()), 'Purchase return cancelled').then(() => setCancelOpen(false))
+                  // The modal closes only when the backend accepted the cancel; a refusal stays visible inside it.
+                  runRealAction((rid) => cancelPurchaseReturn(rid, cancelReason.trim()), 'Purchase return cancelled').then((done) => { if (done) setCancelOpen(false) })
                 }
               }}
             >
