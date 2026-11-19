@@ -538,7 +538,7 @@ export default function SupplierInvoiceForm() {
                       <td className="px-3 py-2.5 text-right">
                         <NumericInput type="number" min="0" max="100" step="any" value={item.taxRate} onChange={(event) => updateItem(index, 'taxRate', event.target.value)} className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                       </td>
-                      <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(line.lineTotal)}</td>
+                      <td data-line-amount className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(line.lineTotal)}</td>
                       <td className="px-3 py-2.5 text-right">
                         <button type="button" onClick={() => update({ items: form.items.filter((_, i) => i !== index) })} aria-label="Remove item" className="rounded-lg p-1.5 text-red-500 hover:bg-red-50">
                           <Trash2 className="size-4" />

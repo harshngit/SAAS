@@ -1141,7 +1141,7 @@ function CreateSalesInvoiceForm() {
                             className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                           />
                         </td>
-                        <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.amount)}</td>
+                        <td data-line-amount className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.amount)}</td>
                         <td className="px-3 py-2.5">
                           <button type="button" onClick={() => removeItem(index)} aria-label="Remove item" className="rounded-lg p-1.5 text-red-500 hover:bg-red-50">
                             <Trash2 className="size-4" />
