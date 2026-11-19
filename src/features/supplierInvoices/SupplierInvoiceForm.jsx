@@ -533,10 +533,10 @@ export default function SupplierInvoiceForm() {
                         />
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <NumericInput type="number" min="0" max="100" step="any" value={item.discount} onChange={(event) => updateItem(index, 'discount', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
+                        <NumericInput type="number" min="0" max="100" step="any" value={item.discount} onChange={(event) => updateItem(index, 'discount', event.target.value)} className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <NumericInput type="number" min="0" max="100" step="any" value={item.taxRate} onChange={(event) => updateItem(index, 'taxRate', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
+                        <NumericInput type="number" min="0" max="100" step="any" value={item.taxRate} onChange={(event) => updateItem(index, 'taxRate', event.target.value)} className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                       </td>
                       <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(line.lineTotal)}</td>
                       <td className="px-3 py-2.5 text-right">

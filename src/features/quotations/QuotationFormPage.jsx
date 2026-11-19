@@ -661,7 +661,7 @@ export default function QuotationFormPage() {
                         setDiscountValue(String(Math.max(rounded, 0)))
                       }}
                       aria-label="Discount value"
-                      className="h-9 w-14 shrink-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                      className="h-9 w-24 shrink-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                     />
                     <span className="shrink-0 text-xs font-medium text-neutral-500">{discountType === 'percentage' ? '%' : '₹'}</span>
                   </div>

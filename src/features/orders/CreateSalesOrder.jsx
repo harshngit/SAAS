@@ -1050,7 +1050,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                         setDiscountValue(String(Math.max(rounded, 0)))
                       }}
                       aria-label="Discount value"
-                      className="h-10 w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                      className="h-10 w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                     />
                     <span className="text-xs font-medium text-neutral-500">{discountType === 'percentage' ? '%' : '₹'}</span>
                   </div></ConfiguredField>
@@ -1658,7 +1658,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                         setPaidAmount(next ? String(next) : '')
                       }}
                       aria-label="Paid amount"
-                      className="h-7 w-20 bg-transparent text-right text-xs font-semibold text-neutral-900 focus:outline-none"
+                      className="h-7 w-28 bg-transparent text-right text-xs font-semibold text-neutral-900 focus:outline-none"
                     />
                   </div>
                 </div>

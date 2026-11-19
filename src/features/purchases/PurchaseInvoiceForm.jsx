@@ -579,7 +579,7 @@ export default function PurchaseInvoiceForm() {
                         value={item.discount}
                         onChange={(event) => updateItem(index, 'discount', event.target.value)}
                         onBlur={roundItemFieldOnBlur(index, 'discount', { min: 0, max: 100, decimals: 2 })}
-                        className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
+                        className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                       />
                     </td>
                     <td className="px-3 py-2.5">
@@ -590,7 +590,7 @@ export default function PurchaseInvoiceForm() {
                         step="any"
                         value={item.tax}
                         onChange={(event) => updateItem(index, 'tax', event.target.value)}
-                        className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
+                        className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                       />
                     </td>
                     <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.amount)}</td>
