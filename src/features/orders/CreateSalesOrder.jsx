@@ -1,5 +1,6 @@
 import NumericInput from '../../components/ui/NumericInput'
 import WholeNumberInput from '../../components/ui/WholeNumberInput'
+import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
@@ -558,6 +559,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
     if (!validateForm()) return
 
     // Takeaway: open the frontend review modal instead of placing the order right away.
@@ -572,6 +578,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   }
 
   const submitOrder = async () => {
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
     if (submitInFlight.current) return
     submitInFlight.current = true
     try {

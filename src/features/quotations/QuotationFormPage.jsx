@@ -25,6 +25,7 @@ import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
 import { formatLeadStatus } from '../leads/leadActivity'
 import { DEMO_RECORDS_ENABLED, demoLeads, isDemoRecord } from '../leads/demoData'
 import ProductPickerList from '../orders/ProductPickerList'
+import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
 import {
   canEditQuotation,
   lineDiscount,
@@ -433,6 +434,11 @@ export default function QuotationFormPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
     if (!validate()) return
 
     const itemsPayload = buildDiscountedItems(formData.items)

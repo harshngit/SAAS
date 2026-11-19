@@ -1,5 +1,6 @@
 import NumericInput from '../../components/ui/NumericInput'
 import WholeNumberInput from '../../components/ui/WholeNumberInput'
+import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
 import { money, preTaxValue, productTaxInclusive, taxLines } from '../../utils/gstCalc'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -839,6 +840,11 @@ function CreateSalesInvoiceForm() {
 
   const handleIssueInvoice = async (event) => {
     event.preventDefault()
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
 
     if (lineItems.length === 0) {
       setSubmitError('Add at least one invoice item before issuing.')

@@ -1,5 +1,6 @@
 import NumericInput from '../../components/ui/NumericInput'
 import WholeNumberInput from '../../components/ui/WholeNumberInput'
+import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
@@ -323,6 +324,11 @@ export default function SupplierInvoiceForm() {
   const handleSubmit = async (event) => {
     event.preventDefault()
     setSubmitError('')
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
 
     if (DEMO_MODE) {
       const existingNumbers = form.supplierId

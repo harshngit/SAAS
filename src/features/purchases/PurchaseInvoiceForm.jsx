@@ -1,5 +1,6 @@
 import NumericInput from '../../components/ui/NumericInput'
 import WholeNumberInput from '../../components/ui/WholeNumberInput'
+import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -304,6 +305,11 @@ export default function PurchaseInvoiceForm() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
 
     if (!formState.supplierId) return setSubmitError('Select a supplier.')
     if (visible('purchaseType') && !formState.purchaseType) return setSubmitError('Select a purchase type.')
