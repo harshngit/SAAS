@@ -116,7 +116,7 @@ export function validatePurchasePaymentAmount(amountPaidRaw, grandTotal) {
   if (!Number.isFinite(amountPaid)) return 'Enter a valid amount.'
   if (amountPaid < 0) return 'Amount paid cannot be negative.'
   const total = safeNumber(grandTotal)
-  if (amountPaid > total) return `Amount paid cannot exceed the grand total (₹${total.toLocaleString('en-IN')}).`
+  if (amountPaid > total) return `Amount paid cannot exceed the grand total (₹${total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`
   return ''
 }
 

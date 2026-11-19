@@ -218,18 +218,19 @@ function KpiCard({ title, value, delta, footer, icon: Icon, tone = 'green', onCl
     <button
       type="button"
       onClick={onClick}
-      className={`group relative flex h-full min-h-[220px] min-w-0 flex-col overflow-hidden rounded-2xl p-4 text-left shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:ring-offset-2 ${toneClasses[tone]}`}
+      className={`@container group relative flex h-full min-h-[220px] min-w-0 flex-col overflow-hidden rounded-2xl p-4 text-left shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-24px_rgb(15_23_42/0.28)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:ring-offset-2 ${toneClasses[tone]}`}
     >
       <div className="min-w-0">
         <p className="flex h-10 items-start justify-center text-center text-[0.68rem] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-current/72 sm:text-[0.72rem]">
           {title}
         </p>
-        <div className="mt-3 flex min-h-8 items-center justify-between gap-2">
-          <p className="min-w-0 whitespace-nowrap font-(--font-display) text-[1rem] font-semibold leading-none tracking-tight sm:text-[1.05rem]">
+        {/* Amounts carry 2 decimals (₹ 5,46,168.63): smaller figure + icon, and the icon is dropped when the card is too narrow for both. */}
+        <div className="mt-3 flex min-h-8 items-center justify-between gap-1">
+          <p className="min-w-0 whitespace-nowrap font-(--font-display) text-[0.88rem] font-semibold leading-none tracking-tight sm:text-[0.92rem]">
             {value}
           </p>
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20 transition-transform duration-300 group-hover:scale-105">
-            <Icon className="size-4" aria-hidden="true" />
+          <div className="hidden size-6 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20 transition-transform duration-300 group-hover:scale-105 @[7.5rem]:flex">
+            <Icon className="size-3.5" aria-hidden="true" />
           </div>
         </div>
         <p className="mt-2 min-h-8 text-[0.65rem] leading-4 text-current/78">{delta || '\u00a0'}</p>
@@ -331,16 +332,16 @@ function FeaturedSalesCard({ data }) {
         </p>
       </div>
 
-      <div className="relative mt-10 grid grid-cols-2 gap-x-8 gap-y-2">
+      <div className="relative mt-10 grid grid-cols-2 gap-x-4 gap-y-2">
         <div className="min-w-0">
           <p className="text-[0.92rem] font-semibold leading-none text-white/90">Received</p>
-          <p className="mt-1 truncate text-[1.50rem] font-semibold leading-none tracking-tight text-white">
+          <p className="mt-1 truncate text-[1.25rem] font-semibold leading-none tracking-tight text-white">
             {money('received')}
           </p>
         </div>
         <div className="min-w-0" title="Unpaid amount of today's orders">
           <p className="text-[0.92rem] font-semibold leading-none text-white/90">Pending</p>
-          <p className="mt-1 truncate text-[1.50rem] font-semibold leading-none tracking-tight text-white">
+          <p className="mt-1 truncate text-[1.25rem] font-semibold leading-none tracking-tight text-white">
             {money('due_amount')}
           </p>
         </div>

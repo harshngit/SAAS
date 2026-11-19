@@ -1,7 +1,9 @@
+// Money is always shown with 2 decimals (473.03 must not read as 473).
 const currencyFormatter = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
-  maximumFractionDigits: 0,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 })
 
 // A small non-breaking gap between the ₹ symbol and the amount, used everywhere.
@@ -15,7 +17,7 @@ export function formatCurrency(value) {
   return withCurrencyGap(currencyFormatter.format(value))
 }
 
-// Always 2 decimals - for GST / tax-inclusive screens where paise matter (formatCurrency rounds to whole rupees).
+// Same as formatCurrency (kept as its own name for the GST / tax-inclusive screens that already import it).
 const exactCurrencyFormatter = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',

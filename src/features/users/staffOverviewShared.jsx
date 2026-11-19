@@ -19,7 +19,7 @@ export function formatCurrency(value) {
   if (value === undefined || value === null || value === '') return ''
   const amount = Number(value)
   if (Number.isNaN(amount)) return ''
-  return `₹ ${amount.toLocaleString('en-IN')}`
+  return `₹ ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function formatMinutes(minutes) {

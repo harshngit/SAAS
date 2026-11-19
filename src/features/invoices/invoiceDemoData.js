@@ -299,7 +299,7 @@ export function recordDemoPayment(payload) {
     return { success: false, error: 'Enter an amount greater than zero.' }
   }
   if (amount > invoice.outstandingAmount + 0.5) {
-    return { success: false, error: `Amount cannot exceed the outstanding balance of ₹${invoice.outstandingAmount}.` }
+    return { success: false, error: `Amount cannot exceed the outstanding balance of ₹${Number(invoice.outstandingAmount).toFixed(2)}.` }
   }
 
   const map = storedReceipts()

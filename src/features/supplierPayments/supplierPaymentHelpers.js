@@ -97,7 +97,7 @@ export function validateSupplierPayment({ supplierId, paymentDate, paymentMode, 
     const value = Number(allocations?.[invoice.id] ?? 0)
     if (!Number.isFinite(value) || value < 0) return `${invoice.supplierInvoiceNumber}: allocation cannot be negative.`
     if (value > safeNumber(invoice.outstanding) + 0.001) {
-      return `${invoice.supplierInvoiceNumber}: allocation cannot exceed its outstanding (₹${safeNumber(invoice.outstanding).toLocaleString('en-IN')}).`
+      return `${invoice.supplierInvoiceNumber}: allocation cannot exceed its outstanding (₹${safeNumber(invoice.outstanding).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`
     }
     allocated += value
   }
@@ -122,7 +122,7 @@ export function validateRealSupplierPayment({ supplierId, paymentMethod, payment
     const value = Number(allocations?.[invoice.id] ?? 0)
     if (!Number.isFinite(value) || value < 0) return `${invoice.supplierInvoiceNumber}: allocation cannot be negative.`
     if (value > safeNumber(invoice.outstanding) + 0.001) {
-      return `${invoice.supplierInvoiceNumber}: allocation cannot exceed its outstanding (₹${safeNumber(invoice.outstanding).toLocaleString('en-IN')}).`
+      return `${invoice.supplierInvoiceNumber}: allocation cannot exceed its outstanding (₹${safeNumber(invoice.outstanding).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`
     }
     allocated += value
   }

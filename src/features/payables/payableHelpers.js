@@ -85,7 +85,7 @@ export function validatePayablePayment(amountRaw, outstanding, { paymentDate, pa
   const amount = Number(amountRaw)
   if (!Number.isFinite(amount) || amount <= 0) return 'Enter an amount greater than 0.'
   if (amount > safeNumber(outstanding)) {
-    return `Amount cannot exceed the outstanding balance (₹${safeNumber(outstanding).toLocaleString('en-IN')}).`
+    return `Amount cannot exceed the outstanding balance (₹${safeNumber(outstanding).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`
   }
   if (paymentDate !== undefined && !paymentDate) return 'Payment date is required.'
   if (paymentMode !== undefined && !paymentMode) return 'Payment mode is required.'
