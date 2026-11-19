@@ -30,6 +30,7 @@ import {
   canEditQuotation,
   lineDiscount,
   patchQuotationMeta,
+  priceQuotationLines,
   quantityStepForUom,
   quotationToDraftForm,
 } from './quotationHelpers'
@@ -224,21 +225,8 @@ export default function QuotationFormPage() {
   const selectedLead = useMemo(() => leads.find((lead) => lead.id === formData.leadId) || null, [leads, formData.leadId])
   const entityIsLead = formData.quotationFor === 'lead'
 
-  const totals = useMemo(() => {
-    const lines = formData.items.map((item) => {
-      const qty = Number(item.quantity) || 0
-      const price = Number(item.unitPrice) || 0
-      const rate = Number(item.taxRate) || 0
-      return { qty, rate, gross: qty * price }
-    })
-    const subtotal = lines.reduce((sum, line) => sum + line.gross, 0)
-    const raw = discountType === 'percentage' ? subtotal * ((Number(discountValue) || 0) / 100) : Number(discountValue) || 0
-    const discountAmount = Math.min(Math.max(raw, 0), subtotal)
-    const ratio = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 0
-    const tax = lines.reduce((sum, line) => sum + line.gross * ratio * (line.rate / 100), 0)
-    const totalQuantity = lines.reduce((sum, line) => sum + line.qty, 0)
-    return { subtotal, discountAmount, tax, grandTotal: subtotal - discountAmount + tax, totalQuantity }
-  }, [formData.items, discountType, discountValue])
+  // Same per-line rounding as the backend, so the total shown here is the total that gets saved.
+  const totals = useMemo(() => priceQuotationLines(formData.items, discountType, discountValue), [formData.items, discountType, discountValue])
 
   // What goes to the API (QuotationItemCreate has two fields): a percentage discount is sent per line in
   // `discount_percent` (the value typed, e.g. 10.25), a rupee discount is split over the lines in `discount`
@@ -249,16 +237,8 @@ export default function QuotationFormPage() {
       const percent = Math.min(Math.max(money(Number(discountValue) || 0), 0), 100)
       return items.map((item) => ({ ...item, discountPercent: percent, discountAmount: 0 }))
     }
-    const grossOf = (item) => (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-    const total = money(totals.discountAmount)
-    let lastIndex = -1
-    items.forEach((item, index) => { if (grossOf(item) > 0) lastIndex = index })
-    let allocated = 0
-    return items.map((item, index) => {
-      const share = index === lastIndex ? money(total - allocated) : money(total * (grossOf(item) / totals.subtotal))
-      if (index !== lastIndex) allocated += share
-      return { ...item, discountPercent: 0, discountAmount: grossOf(item) > 0 ? share : 0 }
-    })
+    // rupee discount: the per-line amounts the totals above were built from
+    return items.map((item, index) => ({ ...item, discountPercent: 0, discountAmount: totals.lines[index]?.discount || 0 }))
   }
 
   const updateField = (field, value) => {
