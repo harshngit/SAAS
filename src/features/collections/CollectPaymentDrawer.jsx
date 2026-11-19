@@ -320,7 +320,7 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, onBl
                   label="Amount Received"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="any"
                   required
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}

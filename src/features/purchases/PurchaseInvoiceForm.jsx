@@ -569,7 +569,7 @@ export default function PurchaseInvoiceForm() {
                         type="number"
                         min="0"
                         max="100"
-                        step="0.01"
+                        step="any"
                         value={item.discount}
                         onChange={(event) => updateItem(index, 'discount', event.target.value)}
                         onBlur={roundItemFieldOnBlur(index, 'discount', { min: 0, max: 100, decimals: 2 })}
@@ -581,7 +581,7 @@ export default function PurchaseInvoiceForm() {
                         type="number"
                         min="0"
                         max="100"
-                        step="0.01"
+                        step="any"
                         value={item.tax}
                         onChange={(event) => updateItem(index, 'tax', event.target.value)}
                         className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
@@ -615,7 +615,7 @@ export default function PurchaseInvoiceForm() {
                 label="Extra Discount (₹)"
                 type="number"
                 min="0"
-                step="0.01"
+                step="any"
                 value={formState.discount}
                 onChange={(event) => updateField('discount', event.target.value)}
               /></ConfiguredField>

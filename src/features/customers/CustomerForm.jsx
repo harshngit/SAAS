@@ -1185,7 +1185,7 @@ export default function CustomerForm({
         {...commonProps}
         type={field.input === 'date' ? 'date' : field.input === 'number' ? 'number' : field.input === 'email' ? 'email' : field.input === 'url' ? 'url' : field.input === 'tel' ? 'tel' : 'text'}
         min={field.input === 'number' ? '0' : undefined}
-        step={field.input === 'number' ? '0.01' : undefined}
+        step={field.input === 'number' ? 'any' : undefined}
         inputMode={field.input === 'number' ? 'decimal' : field.input === 'tel' ? 'tel' : undefined}
         // Money/decimal fields: block the keystrokes that would otherwise let scientific
         // notation ("1e5") or a leading minus sign through a native number input.

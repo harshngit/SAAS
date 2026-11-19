@@ -667,7 +667,7 @@ export default function QuotationFormPage() {
                     <NumericInput
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="any"
                       value={discountValue}
                       onChange={(event) => setDiscountValue(event.target.value)}
                       onBlur={(event) => {

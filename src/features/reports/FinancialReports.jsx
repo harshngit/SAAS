@@ -665,7 +665,7 @@ function ReportFilterControl({ filter, value, selectedLabel, onChange, entityOpt
       <NumericInput
         type="number"
         min="0"
-        step="0.01"
+        step="any"
         value={value ?? ''}
         onChange={(event) => onChange(event.target.value)}
         placeholder={filter.label}

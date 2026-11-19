@@ -1117,7 +1117,7 @@ function CreateSalesInvoiceForm() {
                             type="number"
                             min="0"
                             max="100"
-                            step="0.01"
+                            step="any"
                             value={item.discount}
                             onChange={(event) => updateItem(index, 'discount', event.target.value)}
                             onBlur={roundItemFieldOnBlur(index, 'discount', { min: 0, max: 100, decimals: 2 })}
@@ -1129,7 +1129,7 @@ function CreateSalesInvoiceForm() {
                             type="number"
                             min="0"
                             max="100"
-                            step="0.01"
+                            step="any"
                             value={item.taxRate}
                             onChange={(event) => updateItem(index, 'taxRate', event.target.value)}
                             className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
@@ -1205,8 +1205,8 @@ function CreateSalesInvoiceForm() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input label="Additional Charges (₹)" type="number" min="0" step="0.01" value={additionalCharges} onChange={(event) => setAdditionalCharges(event.target.value)} />
-              <Input label="Extra Discount (₹)" type="number" min="0" step="0.01" value={discount} onChange={(event) => setDiscount(event.target.value)} />
+              <Input label="Additional Charges (₹)" type="number" min="0" step="any" value={additionalCharges} onChange={(event) => setAdditionalCharges(event.target.value)} />
+              <Input label="Extra Discount (₹)" type="number" min="0" step="any" value={discount} onChange={(event) => setDiscount(event.target.value)} />
             </div>
 
             <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
@@ -1330,7 +1330,7 @@ function CreateSalesInvoiceForm() {
                   label={paymentType === 'cod' ? 'Amount Collected Now (Optional)' : 'Amount Paid Now (Optional)'}
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="any"
                   value={amountPaid}
                   onChange={(event) => setAmountPaid(event.target.value)}
                 />

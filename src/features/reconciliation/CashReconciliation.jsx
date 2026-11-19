@@ -78,7 +78,7 @@ function MoneyInput({ value, onChange, disabled, className = '' }) {
     <NumericInput
       type="number"
       min="0"
-      step="0.01"
+      step="any"
       inputMode="decimal"
       disabled={disabled}
       value={value}

@@ -1031,7 +1031,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <NumericInput
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="any"
                       value={discountValue}
                       onChange={(event) => setDiscountValue(event.target.value)}
                       onBlur={(event) => {
@@ -1639,7 +1639,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <NumericInput
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="any"
                       value={paidAmount}
                       onChange={(event) => setPaidAmount(event.target.value)}
                       onBlur={(event) => {

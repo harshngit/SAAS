@@ -269,7 +269,7 @@ export default function InvoicePaymentLinks({ invoice, canCollectOnline, onLinkC
             label="Amount"
             type="number"
             min="0"
-            step="0.01"
+            step="any"
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
           />

@@ -134,7 +134,7 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
 
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-neutral-700">Amount</label>
-          <NumericInput type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} className={field} />
+          <NumericInput type="number" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} className={field} />
         </div>
 
         <div className="flex flex-col gap-1.5">
