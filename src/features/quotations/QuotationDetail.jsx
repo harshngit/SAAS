@@ -26,6 +26,7 @@ import Select from '../../components/ui/Select'
 import Input from '../../components/ui/Input'
 import { useToast } from '../../components/ui/toastContext'
 import { formatCurrency } from '../../utils/format'
+import { money } from '../../utils/gstCalc'
 import {
   convertQuotationToOrder,
   deleteQuotation,
@@ -482,7 +483,7 @@ export default function QuotationDetail() {
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.quantity}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-neutral-600">{item.uom || '—'}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{formatCurrency(item.unitPrice)}</td>
-                  <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.discount ? `${item.discount}%` : '—'}</td>
+                  <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.discountPercent > 0 ? `${money(item.discountPercent)}%` : item.discountAmount > 0 ? formatCurrency(item.discountAmount) : item.discount ? `${money(item.discount)}%` : '—'}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{item.taxRate ? `${item.taxRate}%` : '—'}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">{formatCurrency(item.lineTotal)}</td>
                 </tr>

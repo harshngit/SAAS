@@ -27,6 +27,7 @@ import { DEMO_RECORDS_ENABLED, demoLeads, isDemoRecord } from '../leads/demoData
 import ProductPickerList from '../orders/ProductPickerList'
 import {
   canEditQuotation,
+  lineDiscount,
   patchQuotationMeta,
   quantityStepForUom,
   quotationToDraftForm,
@@ -179,12 +180,16 @@ export default function QuotationFormPage() {
         if (String(draft.customerId).startsWith('demo-')) draft.customerId = ''
       }
 
-      // Seed the single discount control from whatever per-line discount the source carried.
-      const seededDiscount = draft.items.reduce((sum, item) => {
-        const gross = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-        return sum + gross * ((Number(item.discount) || 0) / 100)
-      }, 0)
-      if (seededDiscount > 0) {
+      // Seed the single discount control from whatever per-line discount the source carried: one shared % on
+      // every discounted line -> "percentage" with that value, anything else -> the total rupees off.
+      const lineDiscounts = draft.items.map((item) => lineDiscount(item))
+      const seededDiscount = lineDiscounts.reduce((sum, line) => sum + line.amount, 0)
+      const sharedPercent = lineDiscounts[0]?.percent
+      const allSamePercent = sharedPercent > 0 && draft.items.every((item) => !(Number(item.discountAmount) > 0)) && lineDiscounts.every((line) => Math.abs(line.percent - sharedPercent) < 1e-6)
+      if (allSamePercent) {
+        setDiscountType('percentage')
+        setDiscountValue(String(money(sharedPercent)))
+      } else if (seededDiscount > 0) {
         setDiscountType('amount')
         setDiscountValue(String(money(seededDiscount)))
       }
@@ -234,7 +239,26 @@ export default function QuotationFormPage() {
     return { subtotal, discountAmount, tax, grandTotal: subtotal - discountAmount + tax, totalQuantity }
   }, [formData.items, discountType, discountValue])
 
-  const discountPercentForItems = totals.subtotal > 0 ? (totals.discountAmount / totals.subtotal) * 100 : 0
+  // What goes to the API (QuotationItemCreate has two fields): a percentage discount is sent per line in
+  // `discount_percent` (the value typed, e.g. 10.25), a rupee discount is split over the lines in `discount`
+  // (paise-exact, the last line takes the rounding remainder). Never a percentage in `discount`.
+  const buildDiscountedItems = (items) => {
+    if (!(totals.discountAmount > 0)) return items.map((item) => ({ ...item, discountPercent: 0, discountAmount: 0 }))
+    if (discountType === 'percentage') {
+      const percent = Math.min(Math.max(money(Number(discountValue) || 0), 0), 100)
+      return items.map((item) => ({ ...item, discountPercent: percent, discountAmount: 0 }))
+    }
+    const grossOf = (item) => (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+    const total = money(totals.discountAmount)
+    let lastIndex = -1
+    items.forEach((item, index) => { if (grossOf(item) > 0) lastIndex = index })
+    let allocated = 0
+    return items.map((item, index) => {
+      const share = index === lastIndex ? money(total - allocated) : money(total * (grossOf(item) / totals.subtotal))
+      if (index !== lastIndex) allocated += share
+      return { ...item, discountPercent: 0, discountAmount: grossOf(item) > 0 ? share : 0 }
+    })
+  }
 
   const updateField = (field, value) => {
     setFormData((current) => {
@@ -411,10 +435,7 @@ export default function QuotationFormPage() {
     event.preventDefault()
     if (!validate()) return
 
-    const itemsPayload = formData.items.map((item) => ({
-      ...item,
-      discount: discountPercentForItems > 0 ? discountPercentForItems : Number(item.discount) || 0,
-    }))
+    const itemsPayload = buildDiscountedItems(formData.items)
 
     // Editing a demo quotation stays local - no backend PATCH with a demo id.
     if (isEdit && isDemoQuotation(editId)) {

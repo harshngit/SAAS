@@ -208,6 +208,18 @@ export function priceWarnings(item, product) {
 // -----------------------------------------------------------------------------
 // Totals breakdown from line items (Subtotal / Discount / Tax / Grand Total)
 // -----------------------------------------------------------------------------
+// One line's discount as { percent, amount }. Real quotations carry discountPercent (% off) or discountAmount (rupees off);
+// demo rows only have `discount` in %. Percent wins when both are present.
+export function lineDiscount(item) {
+  const gross = (Number(item?.quantity) || 0) * (Number(item?.unitPrice ?? item?.unit_price) || 0)
+  const percent = Number(item?.discountPercent) || 0
+  const amount = Number(item?.discountAmount) || 0
+  if (percent > 0) return { percent, amount: gross * (percent / 100) }
+  if (amount > 0) return { percent: gross > 0 ? (amount / gross) * 100 : 0, amount }
+  const legacy = Number(item?.discount) || 0
+  return { percent: legacy, amount: gross * (legacy / 100) }
+}
+
 export function quotationTotals(items = []) {
   let subtotal = 0
   let discount = 0
@@ -215,10 +227,9 @@ export function quotationTotals(items = []) {
   items.forEach((item) => {
     const qty = Number(item.quantity) || 0
     const price = Number(item.unitPrice ?? item.unit_price) || 0
-    const disc = Number(item.discount) || 0
     const rate = Number(item.taxRate ?? item.tax_rate) || 0
     const gross = qty * price
-    const discAmt = gross * (disc / 100)
+    const discAmt = lineDiscount(item).amount
     const net = gross - discAmt
     subtotal += gross
     discount += discAmt
@@ -311,6 +322,8 @@ export function quotationToDraftForm(source) {
       quantity: String(item.quantity ?? ''),
       unitPrice: String(item.unitPrice ?? ''),
       discount: String(item.discount ?? ''),
+      discountPercent: String(item.discountPercent ?? ''),
+      discountAmount: String(item.discountAmount ?? ''),
       taxRate: String(item.taxRate ?? ''),
     })),
   }

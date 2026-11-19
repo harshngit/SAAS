@@ -77,7 +77,10 @@ function buildItemBody(item) {
     product_id: item.productId || item.product_id,
     quantity: Number(item.quantity) || 0,
     unit_price: Number(item.unitPrice ?? item.unit_price) || 0,
-    discount: Number(item.discount) || 0,
+    // Two separate backend fields (QuotationItemCreate): `discount` = rupees off the line, `discount_percent` =
+    // percent off the line. A percentage must never go in `discount` - the backend would store it as rupees.
+    discount: Number(item.discountAmount) || 0,
+    discount_percent: Number(item.discountPercent) || 0,
   }
 
   const variantId = item.variantId || item.variant_id
@@ -123,6 +126,14 @@ function buildQuotationBody(payload) {
   return body
 }
 
+function lineDiscountPercent(item) {
+  const percent = Number(item.discount_percent) || 0
+  if (percent > 0) return percent
+  const amount = Number(item.discount) || 0
+  const gross = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0)
+  return amount > 0 && gross > 0 ? Math.round((amount / gross) * 1e8) / 1e6 : 0
+}
+
 function normalizeQuotationItem(item) {
   if (!item) return item
 
@@ -134,7 +145,11 @@ function normalizeQuotationItem(item) {
     quantity: item.quantity ?? 0,
     uom: item.uom || '',
     unitPrice: item.unit_price ?? 0,
-    discount: item.discount ?? 0,
+    // discountPercent = line discount in %, discountAmount = line discount in rupees (as the API returns them).
+    // `discount` is kept as the line's discount in % for older screens (derived when only rupees were saved).
+    discountPercent: Number(item.discount_percent) || 0,
+    discountAmount: Number(item.discount) || 0,
+    discount: lineDiscountPercent(item),
     taxRate: item.tax_rate ?? 0,
     taxAmount: item.tax_amount ?? 0,
     lineTotal: item.line_total ?? 0,

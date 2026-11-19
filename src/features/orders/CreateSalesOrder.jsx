@@ -224,12 +224,17 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     const applyItems = (items) =>
       items.map((item) => {
         const gross = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+        // A quotation line carries discountPercent (% off) and/or discountAmount (rupees off); an order line only discountPercent.
+        const savedPercent = Number(item.discountPercent) || 0
+        const savedAmount = Number(item.discountAmount) || 0
         const discountPercent =
-          item.discountPercent != null
-            ? Number(item.discountPercent) || 0
-            : gross > 0 && item.discount
-              ? money((Number(item.discount) / gross) * 100)
-              : 0
+          savedPercent > 0
+            ? savedPercent
+            : savedAmount > 0 && gross > 0
+              ? Math.round((savedAmount / gross) * 1e8) / 1e6
+              : item.discountPercent == null && gross > 0 && item.discount
+                ? money((Number(item.discount) / gross) * 100)
+                : 0
         return {
           productId: item.productId,
           variantId: item.variantId || '',
