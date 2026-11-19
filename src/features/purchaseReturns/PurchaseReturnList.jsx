@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, RotateCcw, Search, Truck, CheckCircle2, PackageX } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, RotateCcw, Truck, CheckCircle2, PackageX } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -8,9 +8,8 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
-import StatCard from '../../components/ui/StatCard'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import { ListOverview, ListSummary, ListTableToolbar, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { usePermission } from '../../auth/usePermission'
 import { PURCHASE_RETURNS_DEMO_ENABLED, getDemoPurchaseReturns } from './purchaseReturnDemoData'
 import { listPurchaseReturns } from '../../api/purchaseReturns'
@@ -61,12 +60,14 @@ export default function PurchaseReturnList() {
   }
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
-  const hasExtraFilters = supplierFilter !== 'all' || datePreset !== 'all'
-  const clearExtraFilters = () => {
-    setSupplierFilter('all')
-    setDatePreset('all')
-    setCustomFrom('')
-    setCustomTo('')
+  const appliedFilters = { statusFilter, supplierFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { statusFilter: 'all', supplierFilter: 'all', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setStatusFilter(next.statusFilter)
+    setSupplierFilter(next.supplierFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
     setPage(1)
   }
 
@@ -190,58 +191,52 @@ export default function PurchaseReturnList() {
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Purchase Returns</h1>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard loading={isLoading} icon={RotateCcw} iconVariant="primary" label="Total Returns" value={String(stats.total)} />
-        <StatCard loading={isLoading} icon={PackageX} iconVariant="neutral" label="Draft" value={String(stats.draft)} />
-        <StatCard loading={isLoading} icon={Truck} iconVariant="warning" label="In Progress" value={String(stats.inProgress)} />
-        <StatCard loading={isLoading} icon={CheckCircle2} iconVariant="success" label="Completed" value={String(stats.completed)} />
-      </div>
+      <ListOverview>
+        <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-4">
+          <StatCard icon={RotateCcw} label="Total Returns" value={String(stats.total)} />
+          <StatCard icon={PackageX} label="Draft" value={String(stats.draft)} />
+          <StatCard icon={Truck} label="In Progress" value={String(stats.inProgress)} />
+          <StatCard icon={CheckCircle2} label="Completed" value={String(stats.completed)} />
+        </ListSummary>
+      </ListOverview>
 
-      <Card className="p-0">
-        <div className="border-b border-neutral-100 px-4 py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Purchase Returns</h2>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative sm:w-72">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search return #, supplier, purchase # or GRN #"
-                  className="h-9 w-full rounded-xl border border-neutral-100 bg-neutral-50 py-1.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                />
-              </div>
-              <Select
-                options={PR_STATUS_FILTERS}
-                value={statusFilter}
-                onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}
-                className="sm:w-40"
-                triggerClassName="h-9 bg-neutral-50 py-1.5"
-              />
-              {!PURCHASE_RETURNS_DEMO_ENABLED && (
-                <ListFilterPanel title="Filter Purchase Returns">
-                  <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Supplier
-                    <Select options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); setPage(1) }} />
-                  </label>
-                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Return Date
-                    <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} />
-                  </div>
-                  {hasExtraFilters && (
-                    <button type="button" onClick={clearExtraFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100">
+          <ListTableToolbar
+            title="Purchase Returns"
+            subtitle="Goods sent back to suppliers"
+            search={searchTerm}
+            onSearchChange={(event) => setSearchTerm(event.target.value)}
+            searchPlaceholder="Search return #, supplier, purchase # or GRN #"
+            resultCount={effectiveTotal}
+            actions={(
+              <>
+                <ListFilterPanel title="Filter Purchase Returns" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters}>
+                  {({ draft, set, errors }) => (
+                    <>
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                        <Select options={PR_STATUS_FILTERS} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+                      </label>
+                      {!PURCHASE_RETURNS_DEMO_ENABLED && (
+                        <>
+                          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Supplier
+                            <Select options={supplierOptions} value={draft.supplierFilter} onChange={(event) => set('supplierFilter', event.target.value)} />
+                          </label>
+                          <FilterDateRange label="Return Date" draft={draft} set={set} errors={errors} />
+                        </>
+                      )}
+                    </>
                   )}
                 </ListFilterPanel>
-              )}
-            </div>
-            {canCreate && (
-              <Button type="button" size="sm" className="h-9 rounded-2xl px-3.5" onClick={() => navigate(`${basePath}/new`)}>
-                <Plus className="size-4" aria-hidden="true" />
-                New Return
-              </Button>
+                {canCreate && (
+                  <Button type="button" size="sm" className="h-9 rounded-2xl px-3.5" onClick={() => navigate(`${basePath}/new`)}>
+                    <Plus className="size-4" aria-hidden="true" />
+                    New Return
+                  </Button>
+                )}
+              </>
             )}
-            </div>
-          </div>
+          />
         </div>
 
         <div className="overflow-x-auto bg-neutral-50/35 py-4">

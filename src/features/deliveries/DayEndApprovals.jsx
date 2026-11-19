@@ -1,5 +1,5 @@
 import { ListDataTable as DataTable } from '../../components/ui/ListPresentation'
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, BadgeCheck, CalendarCheck2, Eye, Search, Wallet, XCircle } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
@@ -9,7 +9,6 @@ import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { resolveDateRange } from '../../utils/dateRange'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
@@ -52,6 +51,16 @@ export default function DayEndApprovals() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  // The approval queue opens on "Submitted"; that is the default, so Clear Filters returns to it.
+  const appliedFilters = { statusFilter, partnerFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { statusFilter: 'submitted', partnerFilter: 'all', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setStatusFilter(next.statusFilter)
+    setPartnerFilter(next.partnerFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
+  }
   const hasExtraFilters = partnerFilter !== 'all' || datePreset !== 'all'
 
   const [detail, setDetail] = useState(null)
@@ -215,7 +224,7 @@ export default function DayEndApprovals() {
         ) : (
           <div className="hidden md:block">
             <DataTable
-              key={`${statusFilter}-${partnerFilter}-${datePreset}-${customFrom}-${customTo}`}
+              resetKey={`${statusFilter}-${partnerFilter}-${datePreset}-${customFrom}-${customTo}`}
               renderToolbar={({ search, onSearchChange, resultCount }) => (
                 <div className="flex flex-col gap-3 border-b border-neutral-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
@@ -228,14 +237,17 @@ export default function DayEndApprovals() {
                       <input type="search" value={search} onChange={onSearchChange} placeholder="Search by delivery partner..." aria-label="Search day-ends"
                         className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
                     </div>
-                    <ListFilterPanel title="Filter Day-Ends">
-                      <Select label="Status" options={DAY_END_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                      <Select label="Delivery Partner" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" searchable />
-                      <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Business Date
-                        <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-                      </div>
-                      {hasExtraFilters && (
-                        <button type="button" onClick={() => { setPartnerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                    <ListFilterPanel title="Filter Day-Ends" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters}>
+                      {({ draft, set, errors }) => (
+                        <>
+                          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                            <Select options={DAY_END_STATUS_FILTERS} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+                          </label>
+                          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Delivery Partner
+                            <Select searchable options={partnerOptions} value={draft.partnerFilter} onChange={(event) => set('partnerFilter', event.target.value)} />
+                          </label>
+                          <FilterDateRange label="Business Date" draft={draft} set={set} errors={errors} />
+                        </>
                       )}
                     </ListFilterPanel>
                   </div>

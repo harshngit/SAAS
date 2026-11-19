@@ -1,4 +1,4 @@
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarClock, IndianRupee, Plus, Search, Users, Wallet } from 'lucide-react'
@@ -24,7 +24,6 @@ import {
   PAYMENT_STATUS_FILTER_OPTIONS,
   paymentStatusMeta,
 } from './supplierPaymentHelpers'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import {
   getSupplierPayments,
@@ -43,6 +42,13 @@ function formatDate(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
+}
+
+// yyyy-MM-dd + 1 calendar day (local calendar math, no UTC shift).
+function addOneDay(day) {
+  const [y, m, d] = day.split('-').map(Number)
+  const next = new Date(y, m - 1, d + 1)
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
 }
 
 const PAGE_SIZE = 25
@@ -121,6 +127,19 @@ export default function SupplierPaymentsList() {
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
+  const appliedFilters = { supplierFilter, modeFilter, statusFilter, datePreset, customFrom, customTo, sortFilter }
+  const defaultFilters = { supplierFilter: 'all', modeFilter: 'all', statusFilter: 'all', datePreset: 'all', customFrom: '', customTo: '', sortFilter: 'recent' }
+  const applyFilters = (next) => {
+    setSupplierFilter(next.supplierFilter)
+    setModeFilter(next.modeFilter)
+    setStatusFilter(next.statusFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
+    setSortFilter(next.sortFilter)
+    setPage(1)
+  }
+
   const loadReal = useCallback(async () => {
     if (DEMO_MODE) return
     setIsLoading(true)
@@ -132,7 +151,10 @@ export default function SupplierPaymentsList() {
       status: statusFilter,
       payment_method: modeFilter,
       date_from: dateFrom || undefined,
-      date_to: dateTo || undefined,
+      // The backend compares date_to as midnight, so a payment recorded later on the last day (a
+      // timestamp such as 2026-11-19T08:07) is left out. Ask for one more day and drop the extra
+      // day's rows below, so the last selected day is always included.
+      date_to: dateTo ? addOneDay(dateTo) : undefined,
       search: search.trim() || undefined,
       ...sortParams,
     })
@@ -143,8 +165,9 @@ export default function SupplierPaymentsList() {
       setLoadError(result.error)
       return
     }
-    setRealPayments(result.payments)
-    setRealTotal(result.total)
+    const kept = dateTo ? result.payments.filter((payment) => String(payment.paymentDate || '').slice(0, 10) <= dateTo) : result.payments
+    setRealPayments(kept)
+    setRealTotal(Math.max(0, result.total - (result.payments.length - kept.length)))
   }, [page, statusFilter, modeFilter, dateFrom, dateTo, search, supplierFilter, sortParams])
 
   useEffect(() => {
@@ -278,15 +301,24 @@ export default function SupplierPaymentsList() {
                   className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
               </div>
-              <ListFilterPanel title="Filter Supplier Payments">
-                <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Payment mode" options={[{ value: 'all', label: 'All Modes' }, ...PAYMENT_MODE_OPTIONS]} value={modeFilter} onChange={(event) => { setModeFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Status" options={PAYMENT_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Date
-                <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
-              </div>
-              <Select label="Sort by" options={PAYMENT_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setModeFilter('all'); setStatusFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSortFilter('recent'); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
+              <ListFilterPanel title="Filter Supplier Payments" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters} ignoreKeys={['sortFilter']}>
+                {({ draft, set, errors }) => (
+                  <>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Supplier
+                      <Select options={supplierOptions} value={draft.supplierFilter} onChange={(event) => set('supplierFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Mode
+                      <Select options={[{ value: 'all', label: 'All Modes' }, ...PAYMENT_MODE_OPTIONS]} value={draft.modeFilter} onChange={(event) => set('modeFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                      <Select options={PAYMENT_STATUS_FILTER_OPTIONS} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+                    </label>
+                    <FilterDateRange label="Payment Date" draft={draft} set={set} errors={errors} />
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort By
+                      <Select options={PAYMENT_SORT_OPTIONS} value={draft.sortFilter} onChange={(event) => set('sortFilter', event.target.value)} />
+                    </label>
+                  </>
+                )}
               </ListFilterPanel>
               {canCreate && (
               <Button type="button" onClick={() => setRecordOpen(true)}>

@@ -35,10 +35,18 @@ export default function DataTable({
   totalPages: serverTotalPages = 1,
   onPageChange,
   totalCount,
+  // Changes whenever the caller's filters change: the table goes back to page 1 but keeps its
+  // search text and sort (unlike a React `key`, which remounts and wipes both).
+  resetKey,
 }) {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState({ key: null, direction: 'asc' })
   const [page, setPage] = useState(1)
+  const [seenResetKey, setSeenResetKey] = useState(resetKey)
+  if (resetKey !== seenResetKey) {
+    setSeenResetKey(resetKey)
+    setPage(1)
+  }
 
   const effectiveSearchKeys = searchKeys || columns.map((column) => column.key)
 

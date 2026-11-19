@@ -20,7 +20,8 @@ import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import { ListOverview, ListSummary, ListTableToolbar, ListStatCard } from '../../components/ui/ListPresentation'
 import { resolveDateRange } from '../../utils/dateRange'
 import { getAttendance } from '../../api/attendance'
 import { listUsers } from '../../api/users'
@@ -240,127 +241,76 @@ export default function AdminAttendance() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="listing-page space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Attendance</h1>
-        <p className="mt-1 text-sm text-neutral-500">Monitor check-ins across every role in your organization.</p>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Attendance</h1>
+        <p className="mt-1 text-xs text-neutral-400">Monitor check-ins across every role in your organization.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Card bodyClassName="flex items-center gap-3" className="p-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
-            <UsersRound className="size-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-neutral-500">Total Staff</p>
-            <p className="text-xl font-semibold text-neutral-900">{totalStaff}</p>
-            <p className="text-xs text-neutral-400">All roles</p>
-          </div>
-        </Card>
-        <Card bodyClassName="flex items-center gap-3" className="p-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100">
-            <CalendarCheck className="size-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-neutral-500">Present Today</p>
-            <p className="text-xl font-semibold text-neutral-900">{presentToday}</p>
-            <p className="text-xs text-neutral-400">{percentOfTotal(presentToday)}</p>
-          </div>
-        </Card>
-        <Card bodyClassName="flex items-center gap-3" className="p-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 ring-1 ring-amber-100">
-            <Clock className="size-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-neutral-500">On Leave</p>
-            <p className="text-xl font-semibold text-neutral-900">{onLeaveToday}</p>
-            <p className="text-xs text-neutral-400">{percentOfTotal(onLeaveToday)}</p>
-          </div>
-        </Card>
-        <Card bodyClassName="flex items-center gap-3" className="p-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
-            <Briefcase className="size-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-neutral-500">Week Off</p>
-            <p className="text-xl font-semibold text-neutral-900">{weekOffToday}</p>
-            <p className="text-xs text-neutral-400">{percentOfTotal(weekOffToday)}</p>
-          </div>
-        </Card>
-        <Card bodyClassName="flex items-center gap-3" className="p-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200">
-            <Gauge className="size-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-neutral-500">Avg. Working Hours</p>
-            <p className="text-xl font-semibold text-neutral-900">{avgWorkingHoursLabel}</p>
-            <p className="text-xs text-neutral-400">Today</p>
-          </div>
-        </Card>
-      </div>
+      <ListOverview>
+        <ListSummary loading={isLoading} className="grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+          <ListStatCard icon={UsersRound} label="Total Staff" value={totalStaff} />
+          <ListStatCard icon={CalendarCheck} label="Present Today" value={`${presentToday} (${percentOfTotal(presentToday)})`} />
+          <ListStatCard icon={Clock} label="On Leave" value={`${onLeaveToday} (${percentOfTotal(onLeaveToday)})`} />
+          <ListStatCard icon={Briefcase} label="Week Off" value={`${weekOffToday} (${percentOfTotal(weekOffToday)})`} />
+          <ListStatCard icon={Gauge} label="Avg. Working Hours" value={avgWorkingHoursLabel} />
+        </ListSummary>
+      </ListOverview>
 
-      <Card className="p-0">
-        <div className="border-b border-neutral-100 px-4 py-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <Select options={roleOptions} value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="w-44" triggerClassName="h-9 bg-neutral-50 py-1.5" />
-            <Select options={staffOptions} value={userFilter} onChange={(event) => setUserFilter(event.target.value)} className="w-44" triggerClassName="h-9 bg-neutral-50 py-1.5" />
-            <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-            <Select options={statusOptions} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-36" triggerClassName="h-9 bg-neutral-50 py-1.5" />
-
-            <div className="relative w-full sm:w-56">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search by name or ID..."
-                className="h-9 w-full rounded-xl border border-neutral-100 bg-neutral-50 py-1.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={loadAttendance}
-              aria-label="Refresh"
-              className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-surface text-neutral-500 transition-colors hover:border-primary-300 hover:text-primary-700"
-            >
-              <RotateCw className="size-4" aria-hidden="true" />
-            </button>
-
-            <Button type="button" variant={showMoreFilters ? 'primary' : 'outline'} size="sm" className="h-9 rounded-xl" onClick={() => setShowMoreFilters((current) => !current)}>
-              <Filter className="size-4" aria-hidden="true" />
-              More Filters
-            </Button>
-
-            {(roleFilter !== 'all' || userFilter !== 'all' || statusFilter !== 'all' || datePreset !== 'today' || searchTerm) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setRoleFilter('all')
-                  setUserFilter('all')
-                  setStatusFilter('all')
-                  setSearchTerm('')
-                  setDatePreset('today')
-                  setCustomFrom('')
-                  setCustomTo('')
-                }}
-                className="text-xs font-medium text-primary-600 hover:underline"
-              >
-                Clear Filters
-              </button>
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100">
+          <ListTableToolbar
+            title="Attendance Records"
+            subtitle="Select rows with the checkboxes to download only those, or leave none selected to download everything currently filtered."
+            search={searchTerm}
+            onSearchChange={(event) => { setSearchTerm(event.target.value); setPage(1) }}
+            searchPlaceholder="Search by name or ID..."
+            actions={(
+              <>
+                <ListFilterPanel
+                  title="Filter Attendance"
+                  applied={{ roleFilter, userFilter, statusFilter, datePreset, customFrom, customTo }}
+                  defaults={{ roleFilter: 'all', userFilter: 'all', statusFilter: 'all', datePreset: 'today', customFrom: '', customTo: '' }}
+                  onApply={(next) => {
+                    setRoleFilter(next.roleFilter)
+                    setUserFilter(next.userFilter)
+                    setStatusFilter(next.statusFilter)
+                    setDatePreset(next.datePreset)
+                    setCustomFrom(next.customFrom)
+                    setCustomTo(next.customTo)
+                    setPage(1)
+                  }}
+                >
+                  {({ draft, set, errors }) => (
+                    <>
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Role
+                        <Select options={roleOptions} value={draft.roleFilter} onChange={(event) => set('roleFilter', event.target.value)} />
+                      </label>
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Employee
+                        <Select options={staffOptions} value={draft.userFilter} onChange={(event) => set('userFilter', event.target.value)} />
+                      </label>
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                        <Select options={statusOptions} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+                      </label>
+                      <FilterDateRange label="Date" draft={draft} set={set} errors={errors} />
+                    </>
+                  )}
+                </ListFilterPanel>
+                <button
+                  type="button"
+                  onClick={loadAttendance}
+                  aria-label="Refresh"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-surface text-neutral-500 transition-colors hover:border-primary-300 hover:text-primary-700"
+                >
+                  <RotateCw className="size-4" aria-hidden="true" />
+                </button>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={handleDownload}>
+                  <Download className="size-4" aria-hidden="true" />
+                  Download{selectedKeys.length > 0 ? ` (${selectedKeys.length})` : ''}
+                </Button>
+              </>
             )}
-
-            <Button type="button" variant="outline" size="sm" className="ml-auto h-9 rounded-xl" onClick={handleDownload}>
-              <Download className="size-4" aria-hidden="true" />
-              Download{selectedKeys.length > 0 ? ` (${selectedKeys.length})` : ''}
-            </Button>
-          </div>
-
-          {showMoreFilters && (
-            <p className="mt-3 text-xs text-neutral-400">
-              Tip: select rows with the checkboxes to download only those records, or leave nothing selected to download everything currently filtered.
-            </p>
-          )}
+          />
         </div>
 
         <div className="overflow-x-auto bg-neutral-50/35 py-4">

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import LegalPageLayout from './LegalPageLayout'
 import FaqSection from './FaqSection'
@@ -216,9 +217,20 @@ const SECTIONS = [
 // `embedded` version of this page (the /admin/settings/help alias) - the public /help route
 // (reachable while logged out) stays exactly the plain FAQ it always was.
 function TicketsPanel() {
-  const [tab, setTab] = useState('faq')
-  const [isRaiseOpen, setIsRaiseOpen] = useState(false)
+  // ?tab=tickets opens straight on the Tickets list (what a ticket's Back button links to), and
+  // ?raise=1 also opens the Raise a Ticket form (what a closed ticket's "Raise New Ticket" links to).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [tab, setTab] = useState(() => (searchParams.get('tab') === 'tickets' || searchParams.get('raise') === '1' ? 'tickets' : 'faq'))
+  const [isRaiseOpen, setIsRaiseOpen] = useState(() => searchParams.get('raise') === '1')
   const [reloadToken, setReloadToken] = useState(0)
+
+  useEffect(() => {
+    if (searchParams.get('raise') !== '1') return
+    // One-shot: drop the flag so a refresh or Back does not reopen the form.
+    const next = new URLSearchParams(searchParams)
+    next.delete('raise')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   return (
     <>

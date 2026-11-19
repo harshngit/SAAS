@@ -22,7 +22,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
-import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
+import { isWithinDateRange, resolveDateRange, validateCustomRange } from '../../utils/dateRange'
 import { exportRowsToExcel } from '../../utils/exportToExcel'
 import {
   clearReadNotifications,
@@ -185,7 +185,15 @@ export default function NotificationsList() {
     setShowFilters(true)
   }
 
+  const [rangeError, setRangeError] = useState('')
+
   const applyFilters = () => {
+    const message = validateCustomRange(draftDatePreset, draftCustomFrom, draftCustomTo)
+    if (message) {
+      setRangeError(message)
+      return
+    }
+    setRangeError('')
     setTypeFilter(draftType)
     setReadFilter(draftRead)
     setDatePreset(draftDatePreset)
@@ -195,6 +203,7 @@ export default function NotificationsList() {
   }
 
   const resetFilters = () => {
+    setRangeError('')
     setDraftType('')
     setDraftRead('')
     setDraftDatePreset('all')
@@ -351,6 +360,7 @@ export default function NotificationsList() {
               </div>
             </div>
 
+            {rangeError && <p role="alert" className="px-6 pb-3 text-xs text-red-600">{rangeError}</p>}
             <div className="flex shrink-0 justify-between gap-3 border-t border-surface-border p-6">
               <Button type="button" variant="secondary" onClick={resetFilters}>Reset</Button>
               <Button type="button" onClick={applyFilters}>Apply Filters</Button>

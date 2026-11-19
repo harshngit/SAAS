@@ -1,9 +1,10 @@
 import NumericInput from '../../components/ui/NumericInput'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { AlertTriangle, Download, FileSpreadsheet, RefreshCw, SlidersHorizontal, X } from 'lucide-react'
+import { AlertTriangle, Download, FileSpreadsheet, RefreshCw, Search } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import DatePicker from '../../components/ui/DatePicker'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -28,7 +29,7 @@ import { PERIOD_OPTIONS, getDateRangeForPeriod } from './reportConstants'
 import { getReportConfig, resolveValidGroupBy } from './reportConfig'
 import { resolveColumns } from './reportDataUtils'
 import ReportSelector from './components/ReportSelector'
-import ReportSummaryCards from './components/ReportSummaryCards'
+import ReportKpiRow from './components/ReportKpiRow'
 import GstSplitSummary from './components/GstSplitSummary'
 import ReportChart from './components/ReportChart'
 import ReportTable from './components/ReportTable'
@@ -83,26 +84,20 @@ export default function FinancialReports({
   const config = getReportConfig(reportType)
 
   const [period, setPeriod] = useState(searchParams.get('period') || 'monthly')
-  // dateFrom/dateTo are the APPLIED range (what the request actually uses); draftDateFrom/
-  // draftDateTo are what the always-visible filter panel's Date From/Date To fields show while
-  // being edited - the two only converge when Apply Filters is clicked, matching the mockup's
-  // explicit Apply step instead of applying every keystroke immediately.
+  // dateFrom/dateTo/filters are the APPLIED values (what the request actually uses). The Filter
+  // drawer edits a private draft and only commits here when Apply Filters is pressed.
   const initialRange = getDateRangeForPeriod(searchParams.get('period') || 'monthly', '', '')
   const [dateFrom, setDateFrom] = useState(initialRange.dateFrom)
   const [dateTo, setDateTo] = useState(initialRange.dateTo)
-  const [draftDateFrom, setDraftDateFrom] = useState(initialRange.dateFrom)
-  const [draftDateTo, setDraftDateTo] = useState(initialRange.dateTo)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({})
-  const [draftFilters, setDraftFilters] = useState({})
-  const [draftFilterLabels, setDraftFilterLabels] = useState({})
+  const [filterLabels, setFilterLabels] = useState({})
+  // Lets the toolbar's Period dropdown open the Filter drawer (on Custom Range) without owning it.
+  const [openRequest, setOpenRequest] = useState(null)
   const [groupBy, setGroupBy] = useState(() => resolveValidGroupBy(getReportConfig(initialType), searchParams.get('group_by')))
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState('25')
-  // Open by default - the filter panel is always-visible chrome now, not something a user has to
-  // discover behind a toggle; the button still lets them collapse it out of the way.
-  const [moreFiltersOpen, setMoreFiltersOpen] = useState(true)
 
   const [report, setReport] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -171,8 +166,7 @@ export default function FinancialReports({
     const nextGroupBy = resolveValidGroupBy(nextConfig, urlGroupBy)
     setReportType(nextType)
     setFilters({})
-    setDraftFilters({})
-    setDraftFilterLabels({})
+    setFilterLabels({})
     setSearchInput('')
     setSearch('')
     setGroupBy(nextGroupBy)
@@ -191,30 +185,26 @@ export default function FinancialReports({
     setSearchParams(nextParams, { replace: true })
   }
 
-  // The toolbar's quick-select period preset still applies immediately (it's a convenience
-  // shortcut, not part of the staged filter panel) - it updates the APPLIED range directly and
-  // keeps the panel's draft Date From/To fields in sync with it.
-  const handlePeriodChange = (value) => {
-    setPeriod(value)
-    if (value !== 'custom') {
-      const range = getDateRangeForPeriod(value, '', '')
-      setDateFrom(range.dateFrom)
-      setDateTo(range.dateTo)
-      setDraftDateFrom(range.dateFrom)
-      setDraftDateTo(range.dateTo)
-    }
-    setPage(1)
+  const writePeriodParam = (value) => {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set('period', value)
     setSearchParams(nextParams, { replace: true })
   }
 
-  // Report-specific filters + the panel's own Date From/To only ever touch DRAFT state here -
-  // nothing is applied/refetched until Apply Filters commits it (matching the mockup's explicit
-  // Apply step, reusing this codebase's existing staged-filter pattern).
-  const handleDraftFilterChange = (key, value, label) => {
-    setDraftFilters((current) => ({ ...current, [key]: value }))
-    if (label !== undefined) setDraftFilterLabels((current) => ({ ...current, [key]: label }))
+  // The toolbar's quick-select period applies immediately for the fixed presets (Today, Last 7 Days,
+  // This Month...). Custom Range needs two dates, so it opens the Filter drawer with Custom selected
+  // instead - nothing changes until From/To are chosen and Apply Filters is pressed.
+  const handlePeriodChange = (value) => {
+    if (value === 'custom') {
+      setOpenRequest({ id: Date.now(), patch: { period: 'custom' } })
+      return
+    }
+    setPeriod(value)
+    const range = getDateRangeForPeriod(value, '', '')
+    setDateFrom(range.dateFrom)
+    setDateTo(range.dateTo)
+    setPage(1)
+    writePeriodParam(value)
   }
 
   const handleGroupByChange = (value) => {
@@ -225,41 +215,43 @@ export default function FinancialReports({
     setSearchParams(nextParams, { replace: true })
   }
 
-  const handleApplyFilters = () => {
-    setFilters(draftFilters)
-    setDateFrom(draftDateFrom)
-    setDateTo(draftDateTo)
-    setPage(1)
-
-    // Only relabels the toolbar's period dropdown as "Custom Range" when the applied dates
-    // actually diverge from that preset's own range - changing just a report filter (status,
-    // customer, ...) without touching the dates must not silently rename "This Month" to custom.
-    const presetRange = getDateRangeForPeriod(period, '', '')
-    if (draftDateFrom !== presetRange.dateFrom || draftDateTo !== presetRange.dateTo) {
-      setPeriod('custom')
-      const nextParams = new URLSearchParams(searchParams)
-      nextParams.set('period', 'custom')
-      setSearchParams(nextParams, { replace: true })
-    }
+  const filterDefinitions = config?.filters || []
+  const showPeriod = !config?.noAsOfDate
+  const periodKeys = { preset: 'period', from: 'customFrom', to: 'customTo' }
+  const defaultFilters = {
+    ...(showPeriod ? { period: 'monthly', customFrom: '', customTo: '' } : {}),
+    labels: {},
+    ...Object.fromEntries(filterDefinitions.map((filter) => [filter.key, filter.type === 'toggle' ? false : ''])),
+  }
+  const appliedFilters = {
+    ...(showPeriod ? { period, customFrom: period === 'custom' ? dateFrom : '', customTo: period === 'custom' ? dateTo : '' } : {}),
+    labels: filterLabels,
+    ...Object.fromEntries(filterDefinitions.map((filter) => [filter.key, filters[filter.key] ?? (filter.type === 'toggle' ? false : '')])),
   }
 
-  const handleClearFilters = () => {
-    setFilters({})
-    setDraftFilters({})
-    setDraftFilterLabels({})
-    setSearchInput('')
-    setSearch('')
+  // Apply Filters (and Clear Filters, which passes the defaults): commit the draft in one go and go
+  // back to page 1. The request only ever sees a complete, validated date range.
+  const applyFilters = (next) => {
+    if (showPeriod) {
+      setPeriod(next.period)
+      if (next.period === 'custom') {
+        setDateFrom(next.customFrom)
+        setDateTo(next.customTo)
+      } else {
+        const range = getDateRangeForPeriod(next.period, '', '')
+        setDateFrom(range.dateFrom)
+        setDateTo(range.dateTo)
+      }
+      writePeriodParam(next.period)
+    }
+    const nextFilters = {}
+    filterDefinitions.forEach((filter) => {
+      const value = next[filter.key]
+      if (value !== undefined && value !== '' && value !== false) nextFilters[filter.key] = value
+    })
+    setFilters(nextFilters)
+    setFilterLabels(next.labels || {})
     setPage(1)
-
-    const defaultRange = getDateRangeForPeriod('monthly', '', '')
-    setPeriod('monthly')
-    setDateFrom(defaultRange.dateFrom)
-    setDateTo(defaultRange.dateTo)
-    setDraftDateFrom(defaultRange.dateFrom)
-    setDraftDateTo(defaultRange.dateTo)
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.set('period', 'monthly')
-    setSearchParams(nextParams, { replace: true })
   }
 
   // Keeps local state in sync with the URL for navigation this component didn't itself trigger
@@ -290,14 +282,10 @@ export default function FinancialReports({
         const range = getDateRangeForPeriod(urlPeriod, '', '')
         setDateFrom(range.dateFrom)
         setDateTo(range.dateTo)
-        setDraftDateFrom(range.dateFrom)
-        setDraftDateTo(range.dateTo)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
-
-  const activeFilterCount = Object.values(filters).filter((value) => value !== undefined && value !== '' && value !== false).length
 
   // Every param here is scoped to what THIS report actually supports - never one giant object
   // blindly spread onto every report type. `filters` itself can only ever hold keys from the
@@ -444,39 +432,95 @@ export default function FinancialReports({
   const completenessStatus = report?.summary?.completeness_status ?? report?.meta?.completeness?.status
   const completenessMessage = report?.summary?.completeness_message ?? report?.meta?.completeness?.message
 
+  const exportButtons = canExport && !DEMO_MODE && isReportEntitled(reportType) && (
+    <>
+      <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" loading={isExporting === 'pdf'} disabled={Boolean(isExporting) || isLoading} onClick={() => handleExport('pdf')}>
+        <Download className="size-4" aria-hidden="true" />
+        Export PDF
+      </Button>
+      <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" loading={isExporting === 'excel'} disabled={Boolean(isExporting) || isLoading} onClick={() => handleExport('excel')}>
+        <Download className="size-4" aria-hidden="true" />
+        Export Excel
+      </Button>
+    </>
+  )
+
+  const filterPanel = (showPeriod || filterDefinitions.length > 0) && (
+    <ListFilterPanel
+      title="Filter Report"
+      applied={appliedFilters}
+      defaults={defaultFilters}
+      onApply={applyFilters}
+      dateKeys={showPeriod ? periodKeys : []}
+      ignoreKeys={['labels']}
+      openRequest={openRequest}
+    >
+      {({ draft, set, errors }) => (
+        <>
+          {showPeriod && <FilterDateRange label="Period" draft={draft} set={set} errors={errors} keys={periodKeys} options={PERIOD_OPTIONS} />}
+          {filterDefinitions.map((filter) => (
+            <div key={filter.key} className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+              {filter.type !== 'toggle' && <span>{filter.label}</span>}
+              <ReportFilterControl
+                filter={filter}
+                value={draft[filter.key]}
+                selectedLabel={draft.labels?.[filter.key]}
+                onChange={(value, label) => set({ [filter.key]: value, ...(label !== undefined ? { labels: { ...(draft.labels || {}), [filter.key]: label } } : {}) })}
+                entityOptions={entityOptions}
+                searchEntity={searchEntity}
+              />
+            </div>
+          ))}
+        </>
+      )}
+    </ListFilterPanel>
+  )
+
   return (
-    <div className="space-y-5">
+    <div className="listing-page space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">{title}</h1>
-        <p className="mt-1 text-sm text-neutral-500">{description}</p>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">{title}</h1>
+        <p className="mt-1 text-xs text-neutral-400">{description}</p>
       </div>
 
-      <Card className="p-0">
-        <div className="space-y-3 border-b border-neutral-100 px-4 py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            {lockReportType ? (
-              <h2 className="text-lg font-semibold text-neutral-900">{config?.label || title}</h2>
-            ) : (
-              <ReportSelector value={reportType} onChange={handleReportTypeChange} className="lg:w-72" isVisible={isReportEntitled} />
-            )}
+      {isReportEntitled(reportType) && config?.isSpecialView !== 'pnl' && (config?.summaryCards?.length || 0) > 0 && (
+        <ReportKpiRow summary={report?.summary} cards={config?.summaryCards || []} loading={isLoading && !report} />
+      )}
 
-            <div className="flex flex-wrap items-center gap-2">
-              {!config?.noAsOfDate && (
+      <Card className="overflow-hidden p-0">
+        <div className="space-y-3 border-b border-neutral-100 px-5 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              {lockReportType ? (
+                <h2 className="font-(--font-display) text-base font-semibold tracking-tight text-neutral-900">{config?.label || title}</h2>
+              ) : (
+                <ReportSelector value={reportType} onChange={handleReportTypeChange} className="lg:w-64" isVisible={isReportEntitled} />
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              {showPeriod && (
                 <Select
                   options={PERIOD_OPTIONS}
                   value={period}
                   onChange={(event) => handlePeriodChange(event.target.value)}
-                  className="w-44"
+                  className="w-36"
+                  triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
                 />
               )}
 
               {config?.supportsSearch !== false && (
-                <input
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="Search…"
-                  className="h-10 w-40 rounded-xl border border-neutral-200 bg-surface px-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                />
+                <div className="relative w-full sm:w-48">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="Search report..."
+                    aria-label="Search report"
+                    className="h-9 w-full rounded-xl border border-neutral-200 bg-surface py-1.5 pl-9 pr-3 text-xs text-neutral-700 shadow-(--shadow-xs) transition-colors placeholder:text-neutral-400 hover:border-neutral-300 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+                  />
+                </div>
               )}
 
               {config?.groupBy && (
@@ -485,33 +529,18 @@ export default function FinancialReports({
                   value={groupBy}
                   onChange={(event) => handleGroupByChange(event.target.value)}
                   className="w-40"
+                  triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
                 />
               )}
 
-              <Button type="button" variant="outline" size="sm" onClick={loadReport} disabled={isLoading}>
+              {filterPanel}
+
+              <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={loadReport} disabled={isLoading}>
                 <RefreshCw className={`size-4 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
                 Refresh
               </Button>
 
-              {(!config?.noAsOfDate || config?.filters?.length > 0) && (
-                <Button type="button" variant={moreFiltersOpen ? 'secondary' : 'outline'} size="sm" onClick={() => setMoreFiltersOpen((prev) => !prev)}>
-                  <SlidersHorizontal className="size-4" aria-hidden="true" />
-                  Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-                </Button>
-              )}
-
-              {canExport && !DEMO_MODE && isReportEntitled(reportType) && (
-                <>
-                  <Button type="button" variant="secondary" size="sm" loading={isExporting === 'pdf'} disabled={Boolean(isExporting) || isLoading} onClick={() => handleExport('pdf')}>
-                    <Download className="size-4" aria-hidden="true" />
-                    Export PDF
-                  </Button>
-                  <Button type="button" variant="secondary" size="sm" loading={isExporting === 'excel'} disabled={Boolean(isExporting) || isLoading} onClick={() => handleExport('excel')}>
-                    <Download className="size-4" aria-hidden="true" />
-                    Export Excel
-                  </Button>
-                </>
-              )}
+              {exportButtons}
             </div>
           </div>
 
@@ -520,37 +549,6 @@ export default function FinancialReports({
           )}
           {config?.valuationNote && (
             <p className="text-xs font-medium text-neutral-400">{config.valuationNote}</p>
-          )}
-
-          {moreFiltersOpen && (!config?.noAsOfDate || config?.filters?.length > 0) && (
-            <div className="flex flex-wrap items-end gap-2 rounded-xl border border-neutral-100 bg-neutral-50/60 p-3">
-              {!config?.noAsOfDate && (
-                <>
-                  <DatePicker label="Date From" value={draftDateFrom} onChange={setDraftDateFrom} placeholder="From date" className="w-40" />
-                  <DatePicker label="Date To" value={draftDateTo} onChange={setDraftDateTo} placeholder="To date" className="w-40" />
-                </>
-              )}
-
-              {config?.filters?.map((filter) => (
-                <ReportFilterControl
-                  key={filter.key}
-                  filter={filter}
-                  value={draftFilters[filter.key]}
-                  selectedLabel={draftFilterLabels[filter.key]}
-                  onChange={(value, label) => handleDraftFilterChange(filter.key, value, label)}
-                  entityOptions={entityOptions}
-                  searchEntity={searchEntity}
-                />
-              ))}
-
-              <Button type="button" size="sm" onClick={handleApplyFilters}>
-                Apply Filters
-              </Button>
-              <button type="button" onClick={handleClearFilters} className="flex h-10 items-center gap-1 px-2 text-sm font-medium text-neutral-500 hover:text-neutral-900">
-                <X className="size-3.5" aria-hidden="true" />
-                Clear Filters
-              </button>
-            </div>
           )}
         </div>
 
@@ -588,7 +586,6 @@ export default function FinancialReports({
                 </div>
               )}
 
-              <ReportSummaryCards summary={report?.summary} cards={config?.summaryCards || []} />
               {reportType === 'gst-summary' && <GstSplitSummary summary={report?.summary} />}
 
               {config?.isSpecialView === 'pnl' ? (
@@ -651,13 +648,13 @@ function ReportFilterControl({ filter, value, selectedLabel, onChange, entityOpt
         value={value || ''}
         onChange={(event) => onChange(event.target.value)}
         placeholder={filter.label}
-        className="h-10 w-48 rounded-xl border border-neutral-200 bg-surface px-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+        className="h-10 w-full rounded-xl border border-neutral-200 bg-surface px-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
       />
     )
   }
 
   if (filter.type === 'date') {
-    return <DatePicker label={filter.label} value={value || ''} onChange={onChange} placeholder={filter.label} className="w-40" />
+    return <DatePicker label={filter.label} value={value || ''} onChange={onChange} placeholder={filter.label} className="w-full" />
   }
 
   if (filter.type === 'number') {
@@ -670,7 +667,7 @@ function ReportFilterControl({ filter, value, selectedLabel, onChange, entityOpt
         onChange={(event) => onChange(event.target.value)}
         placeholder={filter.label}
         aria-label={filter.label}
-        className="h-10 w-40 rounded-xl border border-neutral-200 bg-surface px-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
+        className="h-10 w-full rounded-xl border border-neutral-200 bg-surface px-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
       />
     )
   }
@@ -684,7 +681,7 @@ function ReportFilterControl({ filter, value, selectedLabel, onChange, entityOpt
           onChange={onChange}
           fetchOptions={(query) => searchEntity(filter.entity, query)}
           placeholder={filter.label}
-          className="w-48"
+          className="w-full"
         />
       )
     }
@@ -696,7 +693,7 @@ function ReportFilterControl({ filter, value, selectedLabel, onChange, entityOpt
         value={value || ''}
         onChange={(event) => onChange(event.target.value)}
         placeholder={filter.label}
-        className="w-48"
+        className="w-full"
       />
     )
   }
@@ -708,7 +705,7 @@ function ReportFilterControl({ filter, value, selectedLabel, onChange, entityOpt
       options={options}
       value={value || ''}
       onChange={(event) => onChange(event.target.value)}
-      className="w-48"
+      className="w-full"
     />
   )
 }

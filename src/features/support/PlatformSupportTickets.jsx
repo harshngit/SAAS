@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, Clock, HelpCircle, Search, UserX } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Select from '../../components/ui/Select'
-import DatePicker from '../../components/ui/DatePicker'
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import { resolveDateRange } from '../../utils/dateRange'
 import { ListHeader, ListSummary, ListStatCard as StatCard, ListDataTable } from '../../components/ui/ListPresentation'
 import { listPlatformSupportTickets, getPlatformSupportSummary } from '../../api/platformSupport'
 import { listPlatformOrganizations } from '../../api/platform'
@@ -42,8 +42,10 @@ export default function PlatformSupportTickets() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [assignedToMe, setAssignedToMe] = useState(false)
   const [unassignedOnly, setUnassignedOnly] = useState(false)
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
@@ -103,15 +105,18 @@ export default function PlatformSupportTickets() {
     [organizations],
   )
 
-  const hasExtraFilters = organizationId !== 'all' || priorityFilter !== 'all' || categoryFilter !== 'all' || assignedToMe || unassignedOnly || Boolean(dateFrom) || Boolean(dateTo)
-  const clearFilters = () => {
-    setOrganizationId('all')
-    setPriorityFilter('all')
-    setCategoryFilter('all')
-    setAssignedToMe(false)
-    setUnassignedOnly(false)
-    setDateFrom('')
-    setDateTo('')
+  const appliedFilters = { organizationId, statusFilter, priorityFilter, categoryFilter, assignedToMe, unassignedOnly, datePreset, customFrom, customTo }
+  const defaultFilters = { organizationId: 'all', statusFilter: 'all', priorityFilter: 'all', categoryFilter: 'all', assignedToMe: false, unassignedOnly: false, datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setOrganizationId(next.organizationId)
+    setStatusFilter(next.statusFilter)
+    setPriorityFilter(next.priorityFilter)
+    setCategoryFilter(next.categoryFilter)
+    setAssignedToMe(next.assignedToMe)
+    setUnassignedOnly(next.unassignedOnly)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
     setPage(1)
   }
 
@@ -168,27 +173,31 @@ export default function PlatformSupportTickets() {
                   <input type="search" value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setPage(1) }} placeholder="Search tickets..." aria-label="Search tickets"
                     className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
                 </div>
-                <Select options={[{ value: 'all', label: 'All status' }, ...TICKET_STATUS_OPTIONS]} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                <ListFilterPanel title="Filter Tickets">
-                  <Select label="Organization" options={organizationOptions} value={organizationId} onChange={(event) => { setOrganizationId(event.target.value); setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                  <Select label="Priority" options={[{ value: 'all', label: 'All priorities' }, ...TICKET_PRIORITY_OPTIONS]} value={priorityFilter} onChange={(event) => { setPriorityFilter(event.target.value); setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                  <Select label="Category" options={[{ value: 'all', label: 'All categories' }, ...TICKET_CATEGORY_OPTIONS]} value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                  <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
-                    <input type="checkbox" checked={assignedToMe} onChange={(event) => { setAssignedToMe(event.target.checked); setPage(1) }} />
-                    Assigned to me
-                  </label>
-                  <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
-                    <input type="checkbox" checked={unassignedOnly} onChange={(event) => { setUnassignedOnly(event.target.checked); setPage(1) }} />
-                    Unassigned only
-                  </label>
-                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Date Range
-                    <div className="flex gap-2">
-                      <DatePicker value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} placeholder="From date" />
-                      <DatePicker value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} placeholder="To date" />
-                    </div>
-                  </div>
-                  {hasExtraFilters && (
-                    <button type="button" onClick={clearFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                <ListFilterPanel title="Filter Tickets" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters}>
+                  {({ draft, set, errors }) => (
+                    <>
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                        <Select options={[{ value: 'all', label: 'All status' }, ...TICKET_STATUS_OPTIONS]} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+                      </label>
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Organization
+                        <Select options={organizationOptions} value={draft.organizationId} onChange={(event) => set('organizationId', event.target.value)} />
+                      </label>
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Priority
+                        <Select options={[{ value: 'all', label: 'All priorities' }, ...TICKET_PRIORITY_OPTIONS]} value={draft.priorityFilter} onChange={(event) => set('priorityFilter', event.target.value)} />
+                      </label>
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category
+                        <Select options={[{ value: 'all', label: 'All categories' }, ...TICKET_CATEGORY_OPTIONS]} value={draft.categoryFilter} onChange={(event) => set('categoryFilter', event.target.value)} />
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
+                        <input type="checkbox" checked={draft.assignedToMe} onChange={(event) => set('assignedToMe', event.target.checked)} />
+                        Assigned to me
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
+                        <input type="checkbox" checked={draft.unassignedOnly} onChange={(event) => set('unassignedOnly', event.target.checked)} />
+                        Unassigned only
+                      </label>
+                      <FilterDateRange label="Created" draft={draft} set={set} errors={errors} />
+                    </>
                   )}
                 </ListFilterPanel>
               </div>

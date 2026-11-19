@@ -12,7 +12,7 @@ const TONE_CLASSES = {
 // Every card's tone/icon is derived from its own label text - never a per-report hand-picked
 // list (this file has no knowledge of which specific report a card belongs to), so every report's
 // summary cards get the same colored-icon treatment consistently, not just GST's.
-function resolveCardVisual(label) {
+export function resolveCardVisual(label) {
   const normalized = String(label || '').toLowerCase()
   if (/\boutput\b/.test(normalized)) return { tone: 'primary', icon: ArrowUpCircle }
   if (/\binput\b/.test(normalized)) return { tone: 'danger', icon: ArrowDownCircle }

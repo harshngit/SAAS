@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, PieChart, RefreshCw } from 'lucide-react'
+import { Download, PieChart } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
-import DatePicker from '../../components/ui/DatePicker'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import { ListTableToolbar } from '../../components/ui/ListPresentation'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
@@ -16,7 +17,7 @@ import { usePermission } from '../../auth/usePermission'
 import { DEMO_MODE } from '../../config/demoMode'
 import { PERIOD_OPTIONS, getDateRangeForPeriod } from '../reports/reportConstants'
 import { col, ref } from '../reports/reportConfig'
-import ReportSummaryCards from '../reports/components/ReportSummaryCards'
+import ReportKpiRow from '../reports/components/ReportKpiRow'
 import ReportTable from '../reports/components/ReportTable'
 import EntitySearchSelect from '../reports/components/EntitySearchSelect'
 import { resolveColumns } from '../reports/reportDataUtils'
@@ -275,15 +276,20 @@ export default function SalesOverview() {
     if (!result.success) setExportError(result.error)
   }
 
-  const handleClearFilters = () => {
-    setCustomerId('')
-    setCustomerLabel('')
-    setSalespersonId('')
-    setOrderStatus('')
-    setFulfilmentStatus('')
-    setDeliveryStatus('')
-    setSearchInput('')
-    setSearch('')
+  const appliedFilters = { period, customFrom, customTo, customerId, customerLabel, salespersonId, orderStatus, fulfilmentStatus, deliveryStatus }
+  const defaultFilters = { period: 'monthly', customFrom: '', customTo: '', customerId: '', customerLabel: '', salespersonId: '', orderStatus: '', fulfilmentStatus: '', deliveryStatus: '' }
+  // Nothing here reaches the report request until the user presses Apply Filters in the drawer;
+  // Clear Filters hands back the defaults through the same path.
+  const applyFilters = (next) => {
+    setPeriod(next.period)
+    setCustomFrom(next.period === 'custom' ? next.customFrom : '')
+    setCustomTo(next.period === 'custom' ? next.customTo : '')
+    setCustomerId(next.customerId)
+    setCustomerLabel(next.customerLabel)
+    setSalespersonId(next.salespersonId)
+    setOrderStatus(next.orderStatus)
+    setFulfilmentStatus(next.fulfilmentStatus)
+    setDeliveryStatus(next.deliveryStatus)
     setPage(1)
   }
 
@@ -302,75 +308,75 @@ export default function SalesOverview() {
   const isDemoUnavailable = loadError === 'demo-unavailable'
   const hasData = rows.length > 0
 
+  const exportActions = canExport && !DEMO_MODE && (
+    <>
+      <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" loading={isExporting === 'pdf'} disabled={Boolean(isExporting) || isLoading} onClick={() => handleExport('pdf')}>
+        <Download className="size-4" aria-hidden="true" />
+        Export PDF
+      </Button>
+      <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" loading={isExporting === 'excel'} disabled={Boolean(isExporting) || isLoading} onClick={() => handleExport('excel')}>
+        <Download className="size-4" aria-hidden="true" />
+        Export Excel
+      </Button>
+    </>
+  )
+
+  const dateKeys = { preset: 'period', from: 'customFrom', to: 'customTo' }
+  const filterPanel = (
+    <ListFilterPanel title="Filter Sales" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters} dateKeys={dateKeys} ignoreKeys={['customerLabel']}>
+      {({ draft, set, errors }) => (
+        <>
+          <FilterDateRange label="Period" draft={draft} set={set} errors={errors} keys={dateKeys} options={PERIOD_OPTIONS} />
+          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+            Customer
+            <EntitySearchSelect
+              value={draft.customerId}
+              selectedLabel={draft.customerLabel}
+              onChange={(value, label) => set({ customerId: value, customerLabel: label })}
+              fetchOptions={searchCustomers}
+              placeholder="All customers"
+            />
+          </div>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+            Salesperson
+            <Select searchable options={[{ value: '', label: 'All Salespeople' }, ...salespeople]} value={draft.salespersonId} onChange={(event) => set('salespersonId', event.target.value)} placeholder="Salesperson" />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+            Order Status
+            <Select options={SALES_OVERVIEW_ORDER_STATUS_OPTIONS} value={draft.orderStatus} onChange={(event) => set('orderStatus', event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+            Fulfilment Status
+            <Select options={SALES_OVERVIEW_FULFILMENT_STATUS_OPTIONS} value={draft.fulfilmentStatus} onChange={(event) => set('fulfilmentStatus', event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+            Delivery Status
+            <Select options={SALES_OVERVIEW_DELIVERY_STATUS_OPTIONS} value={draft.deliveryStatus} onChange={(event) => set('deliveryStatus', event.target.value)} />
+          </label>
+        </>
+      )}
+    </ListFilterPanel>
+  )
+
   return (
-    <div className="space-y-5">
+    <div className="listing-page space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Sales</h1>
-        <p className="mt-1 text-sm text-neutral-500">Combined view of sales orders and delivery fulfilment.</p>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Sales</h1>
       </div>
 
-      <Card className="p-0">
-        <div className="space-y-3 border-b border-neutral-100 px-4 py-4">
-          <div className="flex flex-wrap items-end gap-2">
-            <Select options={PERIOD_OPTIONS} value={period} onChange={(event) => { setPeriod(event.target.value); setPage(1) }} className="w-44" />
-            {period === 'custom' && (
-              <>
-                <DatePicker value={customFrom} onChange={(value) => { setCustomFrom(value); setPage(1) }} placeholder="From date" className="w-36" />
-                <DatePicker value={customTo} onChange={(value) => { setCustomTo(value); setPage(1) }} placeholder="To date" className="w-36" />
-              </>
-            )}
+      <ReportKpiRow summary={report?.summary} cards={SUMMARY_CARDS} loading={isLoading && !report} />
 
-            <EntitySearchSelect
-              value={customerId}
-              selectedLabel={customerLabel}
-              onChange={(value, label) => { setCustomerId(value); setCustomerLabel(label); setPage(1) }}
-              fetchOptions={searchCustomers}
-              placeholder="Customer"
-              className="w-48"
-            />
-
-            <Select
-              searchable
-              options={[{ value: '', label: 'All Salespeople' }, ...salespeople]}
-              value={salespersonId}
-              onChange={(event) => { setSalespersonId(event.target.value); setPage(1) }}
-              placeholder="Salesperson"
-              className="w-44"
-            />
-
-            <Select options={SALES_OVERVIEW_ORDER_STATUS_OPTIONS} value={orderStatus} onChange={(event) => { setOrderStatus(event.target.value); setPage(1) }} className="w-44" />
-            <Select options={SALES_OVERVIEW_FULFILMENT_STATUS_OPTIONS} value={fulfilmentStatus} onChange={(event) => { setFulfilmentStatus(event.target.value); setPage(1) }} className="w-48" />
-            <Select options={SALES_OVERVIEW_DELIVERY_STATUS_OPTIONS} value={deliveryStatus} onChange={(event) => { setDeliveryStatus(event.target.value); setPage(1) }} className="w-44" />
-
-            <input
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search…"
-              className="h-10 w-40 rounded-xl border border-neutral-200 bg-surface px-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-            />
-
-            <Button type="button" variant="outline" size="sm" onClick={loadReport} disabled={isLoading}>
-              <RefreshCw className={`size-4 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
-              Refresh
-            </Button>
-
-            <button type="button" onClick={handleClearFilters} className="flex h-10 items-center px-2 text-sm font-medium text-neutral-500 hover:text-neutral-900">
-              Clear filters
-            </button>
-
-            {canExport && !DEMO_MODE && (
-              <div className="ml-auto flex items-center gap-2">
-                <Button type="button" variant="secondary" size="sm" loading={isExporting === 'pdf'} disabled={Boolean(isExporting) || isLoading} onClick={() => handleExport('pdf')}>
-                  <Download className="size-4" aria-hidden="true" />
-                  Export PDF
-                </Button>
-                <Button type="button" variant="secondary" size="sm" loading={isExporting === 'excel'} disabled={Boolean(isExporting) || isLoading} onClick={() => handleExport('excel')}>
-                  <Download className="size-4" aria-hidden="true" />
-                  Export Excel
-                </Button>
-              </div>
-            )}
-          </div>
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-neutral-100">
+          <ListTableToolbar
+            title="Sales Orders"
+            subtitle="Combined view of sales orders and delivery fulfilment."
+            search={searchInput}
+            onSearchChange={(event) => setSearchInput(event.target.value)}
+            searchPlaceholder="Search sales..."
+            resultCount={report ? total : undefined}
+            actions={<>{filterPanel}{exportActions}</>}
+          />
         </div>
 
         <div className="px-5 py-4">
@@ -382,7 +388,7 @@ export default function SalesOverview() {
           )}
 
           {isLoading ? (
-            <LoadingSpinner variant="report" columns={columns} stats={SUMMARY_CARDS.length} label="Loading sales overview…" />
+            <LoadingSpinner variant="report" columns={columns} stats={0} label="Loading sales overview…" />
           ) : loadError && !isDemoUnavailable ? (
             <EmptyState icon={PieChart} title="Couldn't load the sales overview" description={loadError} action={{ label: 'Try again', onClick: loadReport }} />
           ) : isDemoUnavailable ? (
@@ -391,7 +397,6 @@ export default function SalesOverview() {
             <EmptyState icon={PieChart} title="No orders found" description="No sales orders match the selected filters." />
           ) : (
             <div className="space-y-5">
-              <ReportSummaryCards summary={report?.summary} cards={SUMMARY_CARDS} />
               <ReportTable columns={columns} rows={rows} />
 
               <div className="flex flex-col items-center justify-between gap-3 pt-1 text-sm text-neutral-500 sm:flex-row">

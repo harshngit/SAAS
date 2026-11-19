@@ -9,8 +9,7 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { usePermission } from '../../auth/usePermission'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { uniqueOptions } from '../../utils/filterOptions'
@@ -90,13 +89,15 @@ export default function AdminExpenses() {
   const [customTo, setCustomTo] = useState('')
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const hasActiveFilters = statusFilter !== 'all' || categoryFilter !== 'all' || submittedByFilter !== 'all' || datePreset !== 'all'
-  const clearFilters = () => {
-    setStatusFilter('all')
-    setCategoryFilter('all')
-    setSubmittedByFilter('all')
-    setDatePreset('all')
-    setCustomFrom('')
-    setCustomTo('')
+  const appliedFilters = { statusFilter, categoryFilter, submittedByFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { statusFilter: 'all', categoryFilter: 'all', submittedByFilter: 'all', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setStatusFilter(next.statusFilter)
+    setCategoryFilter(next.categoryFilter)
+    setSubmittedByFilter(next.submittedByFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
   }
 
   const [reviewTarget, setReviewTarget] = useState(null) // { row, mode: 'reject' | 'clarify' }
@@ -384,26 +385,25 @@ export default function AdminExpenses() {
           <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
         <DataTable
-          key={`${statusFilter}-${categoryFilter}-${submittedByFilter}-${datePreset}-${customFrom}-${customTo}`}
+          resetKey={`${statusFilter}-${categoryFilter}-${submittedByFilter}-${datePreset}-${customFrom}-${customTo}`}
           title="All Expenses"
           subtitle="Organization-wide expenses submitted by admin, sales, delivery, and staff teams"
           toolbarActions={
             <>
-              <ListFilterPanel title="Filter Expenses">
-                <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
-                  <Select options={FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category
-                  <Select options={categoryOptions} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Submitted By
-                  <Select options={submittedByOptions} value={submittedByFilter} onChange={(event) => setSubmittedByFilter(event.target.value)} />
-                </label>
-                <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Expense Date
-                  <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-                </div>
-                {hasActiveFilters && (
-                  <button type="button" onClick={clearFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+              <ListFilterPanel title="Filter Expenses" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters}>
+                {({ draft, set, errors }) => (
+                  <>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                      <Select options={FILTERS} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category
+                      <Select options={categoryOptions} value={draft.categoryFilter} onChange={(event) => set('categoryFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Submitted By
+                      <Select options={submittedByOptions} value={draft.submittedByFilter} onChange={(event) => set('submittedByFilter', event.target.value)} />
+                    </label>
+                    <FilterDateRange label="Expense Date" draft={draft} set={set} errors={errors} />
+                  </>
                 )}
               </ListFilterPanel>
               {canCreate && (

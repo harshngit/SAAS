@@ -287,6 +287,8 @@ export async function listPurchases(params = {}) {
     if (params.tag) queryParams.tag = params.tag
     if (params.skip !== undefined) queryParams.skip = params.skip
     if (params.limit !== undefined) queryParams.limit = params.limit
+    if (params.page !== undefined) queryParams.page = params.page
+    if (params.page_size !== undefined) queryParams.page_size = params.page_size
     if (params.sort_by) queryParams.sort_by = params.sort_by
     if (params.sort_order) queryParams.sort_order = params.sort_order
 
@@ -296,7 +298,7 @@ export async function listPurchases(params = {}) {
     })
 
     const purchases = Array.isArray(data) ? data : data?.purchases || data?.items || []
-    return { success: true, purchases: purchases.map(normalizePurchase) }
+    return { success: true, purchases: purchases.map(normalizePurchase), total: data?.total ?? purchases.length }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

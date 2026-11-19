@@ -7,7 +7,7 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { listDeliveries, listDeliveryPartners, getDeliverySummary } from '../../api/deliveries'
 import { DELIVERY_STAGE_FILTER_OPTIONS, getDeliveryStage } from './deliveryStage'
 import { formatCurrency } from '../../utils/format'
@@ -15,6 +15,7 @@ import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { uniqueOptions } from '../../utils/filterOptions'
 
 const PAGE_SIZE = 20
+const MAX_FULL_LOAD_PAGES = 50
 
 // Maps this page's fine-grained UI stage keys to the backend's own `GET /deliveries?status=`
 // filter value. 'picking' has no backend `status` value of its own - it's filtered via the
@@ -79,18 +80,17 @@ export default function AdminDeliveries() {
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
   const hasActiveFilters = statusFilter !== 'all' || partnerFilter !== 'all' || vehicleFilter !== 'all' || datePreset !== 'all' || Boolean(debouncedSearch)
-  const clearFilters = () => {
-    setStatusFilter('all')
-    setPartnerFilter('all')
-    setVehicleFilter('all')
-    setDatePreset('all')
-    setCustomFrom('')
-    setCustomTo('')
-    setSearchInput('')
-    setDebouncedSearch('')
+  const appliedFilters = { status: statusFilter, partner: partnerFilter, vehicle: vehicleFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { status: 'all', partner: 'all', vehicle: 'all', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setStatusFilter(next.status)
+    setPartnerFilter(next.partner)
+    setVehicleFilter(next.vehicle)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
     setPage(1)
   }
-
   // Delivery partner is a documented GET /deliveries filter (unlike status/vehicle/date below),
   // so it's applied server-side and needs the full partner roster, not just names seen on the
   // currently loaded page.
@@ -105,37 +105,63 @@ export default function AdminDeliveries() {
     return () => clearTimeout(timeout)
   }, [searchInput])
 
+  // GET /deliveries has no date or vehicle parameter. Filtering only the 20 rows of the current
+  // page made a valid date range look empty, so while either filter is active the page loads every
+  // delivery (100 per request - the backend maximum) and filters + paginates here instead. With
+  // neither active the table pages on the server exactly as before.
+  const clientFiltered = vehicleFilter !== 'all' || datePreset !== 'all'
+  const fetchPage = clientFiltered ? 0 : page
+
   const loadDeliveries = useCallback(async () => {
     setIsLoading(true)
     setError('')
 
-    const result = await listDeliveries({
-      page,
-      page_size: PAGE_SIZE,
+    const base = {
       delivery_partner_id: partnerFilter !== 'all' ? partnerFilter : undefined,
       status: statusFilter === 'picking' ? undefined : STATUS_FILTER_TO_BACKEND[statusFilter],
       picking_status: statusFilter === 'picking' ? 'picking' : undefined,
       search: debouncedSearch || undefined,
-    })
+    }
 
-    if (!result.success) {
-      setDeliveries([])
-      setTotal(0)
-      setError(result.error)
+    if (!clientFiltered) {
+      const result = await listDeliveries({ ...base, page: fetchPage, page_size: PAGE_SIZE })
+      if (!result.success) {
+        setDeliveries([])
+        setTotal(0)
+        setError(result.error)
+        setIsLoading(false)
+        return
+      }
+      setDeliveries(result.deliveries)
+      setTotal(result.total)
       setIsLoading(false)
       return
     }
 
-    setDeliveries(result.deliveries)
-    setTotal(result.total)
+    let rows = []
+    let expected = Infinity
+    for (let next = 1; rows.length < expected && next <= MAX_FULL_LOAD_PAGES; next += 1) {
+      const result = await listDeliveries({ ...base, page: next, page_size: 100 })
+      if (!result.success) {
+        setDeliveries([])
+        setTotal(0)
+        setError(result.error)
+        setIsLoading(false)
+        return
+      }
+      rows = rows.concat(result.deliveries)
+      expected = result.total
+      if (result.deliveries.length === 0) break
+    }
+    setDeliveries(rows)
+    setTotal(rows.length)
     setIsLoading(false)
-  }, [page, partnerFilter, statusFilter, debouncedSearch])
+  }, [fetchPage, clientFiltered, partnerFilter, statusFilter, debouncedSearch])
 
   useEffect(() => {
     loadDeliveries()
   }, [loadDeliveries])
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   // Summary cards, no overlap between any two cards: Unassigned = by_status.unassigned;
   // Awaiting Response = pending + rejected; In Progress = accepted + in_transit; Delivered =
@@ -189,6 +215,10 @@ export default function AdminDeliveries() {
     })
   }, [deliveries, statusFilter, vehicleFilter, dateFrom, dateTo])
 
+  const shownTotal = clientFiltered ? filteredDeliveries.length : total
+  const totalPages = Math.max(1, Math.ceil(shownTotal / PAGE_SIZE))
+  const visibleDeliveries = clientFiltered ? filteredDeliveries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : filteredDeliveries
+
   return (
     <div className="listing-page space-y-4">
       <div>
@@ -240,7 +270,7 @@ export default function AdminDeliveries() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-(--font-display) text-base font-semibold tracking-tight text-neutral-900">All Deliveries</h3>
-                      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium tabular-nums text-neutral-500" aria-live="polite">{total} {total === 1 ? 'result' : 'results'}</span>
+                      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium tabular-nums text-neutral-500" aria-live="polite">{shownTotal} {shownTotal === 1 ? 'result' : 'results'}</span>
                     </div>
                     <p className="mt-1 text-xs leading-5 text-neutral-400">Every delivery across the organization</p>
                   </div>
@@ -256,24 +286,22 @@ export default function AdminDeliveries() {
                         className="h-9 w-full rounded-xl border border-neutral-200 bg-surface py-1.5 pl-9 pr-3 text-xs text-neutral-700 shadow-(--shadow-xs) transition-colors placeholder:text-neutral-400 hover:border-neutral-300 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                       />
                     </div>
-                    <ListFilterPanel title="Filter Deliveries">
-                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
-                        Status
-                        <Select options={[{ value: 'all', label: 'All status' }, ...DELIVERY_STAGE_FILTER_OPTIONS]} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} />
-                      </label>
-                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Delivery Partner
-                        <Select options={partnerOptions} value={partnerFilter} onChange={(event) => { setPartnerFilter(event.target.value); setPage(1) }} />
-                      </label>
-                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
-                        Vehicle<span className="font-normal text-neutral-400"> (this page only)</span>
-                        <Select options={vehicleOptions} value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)} />
-                      </label>
-                      <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
-                        Scheduled Date<span className="font-normal text-neutral-400"> (this page only)</span>
-                        <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-                      </div>
-                      {hasActiveFilters && (
-                        <button type="button" onClick={clearFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                    <ListFilterPanel title="Filter Deliveries" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters}>
+                      {({ draft, set, errors }) => (
+                        <>
+                          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+                            Status
+                            <Select options={[{ value: 'all', label: 'All status' }, ...DELIVERY_STAGE_FILTER_OPTIONS]} value={draft.status} onChange={(event) => set('status', event.target.value)} />
+                          </label>
+                          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Delivery Partner
+                            <Select options={partnerOptions} value={draft.partner} onChange={(event) => set('partner', event.target.value)} />
+                          </label>
+                          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+                            Vehicle
+                            <Select options={vehicleOptions} value={draft.vehicle} onChange={(event) => set('vehicle', event.target.value)} />
+                          </label>
+                          <FilterDateRange label="Scheduled Date" draft={draft} set={set} errors={errors} />
+                        </>
                       )}
                     </ListFilterPanel>
                   </div>
@@ -307,7 +335,7 @@ export default function AdminDeliveries() {
                 { key: 'scheduledDate', header: 'Scheduled Date', sortable: true, render: (row) => formatScheduledDate(row.scheduledDate) },
                 { key: 'amountDue', header: 'Amount Due', sortable: true, align: 'right', render: (row) => formatCurrency(row.amountDue) },
               ]}
-              data={filteredDeliveries}
+              data={visibleDeliveries}
               onRowClick={(row) => navigate(`/admin/deliveries/${row.id}`)}
               actions={(row) => [
                 {
@@ -319,7 +347,7 @@ export default function AdminDeliveries() {
               serverPagination
               page={page}
               totalPages={totalPages}
-              totalCount={total}
+              totalCount={shownTotal}
               onPageChange={setPage}
             />
           </>

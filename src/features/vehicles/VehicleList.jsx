@@ -1,4 +1,4 @@
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -15,7 +15,6 @@ import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import {
   AVAILABILITY_FILTER_OPTIONS,
@@ -125,6 +124,17 @@ export default function VehicleList() {
   }, [vehicles])
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  const appliedFilters = { statusFilter, availabilityFilter, typeFilter, sortFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { statusFilter: 'all', availabilityFilter: 'all', typeFilter: 'all', sortFilter: 'recent', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setStatusFilter(next.statusFilter)
+    setAvailabilityFilter(next.availabilityFilter)
+    setTypeFilter(next.typeFilter)
+    setSortFilter(next.sortFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
+  }
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -256,14 +266,24 @@ export default function VehicleList() {
                   className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
               </div>
-              <ListFilterPanel title="Filter Vehicles">
-                <Select label="Status" options={VEHICLE_STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Availability" options={AVAILABILITY_FILTER_OPTIONS} value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Vehicle type" options={VEHICLE_TYPE_FILTER_OPTIONS} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Sort by" options={VEHICLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Created
-                <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-              </div>
+              <ListFilterPanel title="Filter Vehicles" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters} ignoreKeys={['sortFilter']}>
+                {({ draft, set, errors }) => (
+                  <>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                      <Select options={VEHICLE_STATUS_FILTER_OPTIONS} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Availability
+                      <Select options={AVAILABILITY_FILTER_OPTIONS} value={draft.availabilityFilter} onChange={(event) => set('availabilityFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Vehicle Type
+                      <Select options={VEHICLE_TYPE_FILTER_OPTIONS} value={draft.typeFilter} onChange={(event) => set('typeFilter', event.target.value)} />
+                    </label>
+                    <FilterDateRange label="Created" draft={draft} set={set} errors={errors} />
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort By
+                      <Select options={VEHICLE_SORT_OPTIONS} value={draft.sortFilter} onChange={(event) => set('sortFilter', event.target.value)} />
+                    </label>
+                  </>
+                )}
               </ListFilterPanel>
               <Button type="button" onClick={() => openForm()}>
               <Plus className="size-4" aria-hidden="true" />

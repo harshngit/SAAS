@@ -1,5 +1,5 @@
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
-import { ListOverview, ListHeader, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import { ListOverview, ListSummary, ListTableToolbar, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import ActionMenu from '../../components/ui/ActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -28,7 +28,6 @@ import { usePermission } from '../../auth/usePermission'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
 import { INVOICE_DEMO_ENABLED } from './invoiceDemoData'
 import { formatCurrency } from '../../utils/format'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { uniqueOptions } from '../../utils/filterOptions'
 import {
@@ -48,7 +47,7 @@ function formatDateLabel(dateString) {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-function SalesInvoicesPanel({ header }) {
+function SalesInvoicesPanel({ toolbarExtras }) {
   const navigate = useNavigate()
   const { can } = usePermission()
   // Recording a customer payment is a financial transaction - gate it on payments:create only.
@@ -151,55 +150,60 @@ function SalesInvoicesPanel({ header }) {
     return Array.from(pages).filter((value) => value >= 1 && value <= totalPages).sort((a, b) => a - b)
   }, [totalPages, currentPage])
 
-  const updateFilter = (setter) => (event) => {
-    setter(event.target.value)
+  const appliedFilters = { paymentStatus, customerFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { paymentStatus: 'all', customerFilter: 'all', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setPaymentStatus(next.paymentStatus)
+    setCustomerFilter(next.customerFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
     setPage(1)
   }
 
-  const filterControls = (
-    <>
-          <div className="relative w-full sm:w-60">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={updateFilter(setSearch)}
-              placeholder="Search invoices..."
-              className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-            />
-          </div>
-          <ListFilterPanel title="Filter Sales Invoices">
-          <Select label="Payment status" options={INVOICE_STATUS_FILTERS} value={paymentStatus} onChange={updateFilter(setPaymentStatus)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <Select label="Customer" options={customerOptions} value={customerFilter} onChange={updateFilter(setCustomerFilter)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
-            <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} />
-          </div>
-          <button
-            type="button"
-            onClick={() => { setSearch(''); setPaymentStatus('all'); setCustomerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setPage(1) }}
-            aria-label="Reset filters"
-            className="flex size-9 shrink-0 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 hover:bg-neutral-50"
-          >
-            <RefreshCw className="size-4" />
-          </button>
-          </ListFilterPanel>
-    </>
+  const filterPanel = (
+    <ListFilterPanel title="Filter Sales Invoices" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters}>
+      {({ draft, set, errors }) => (
+        <>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Status
+            <Select options={INVOICE_STATUS_FILTERS} value={draft.paymentStatus} onChange={(event) => set('paymentStatus', event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Customer
+            <Select options={customerOptions} value={draft.customerFilter} onChange={(event) => set('customerFilter', event.target.value)} />
+          </label>
+          <FilterDateRange label="Invoice Date" draft={draft} set={set} errors={errors} />
+        </>
+      )}
+    </ListFilterPanel>
   )
 
   return (
     <div className="listing-page space-y-4">
-      <ListOverview>
-        {header(filterControls)}
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Sales Invoices</h1>
+      </div>
 
+      <ListOverview>
         <ListSummary className="grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={IndianRupee} iconVariant="success" label="Total Receivables" value={formatCurrency(stats.totalReceivable)} />
-        <StatCard icon={RefreshCw} iconVariant="danger" label="Overdue" value={formatCurrency(stats.overdueAmount)} />
-        <StatCard icon={FileText} iconVariant="warning" label="Due Soon" value={formatCurrency(stats.dueSoonAmount)} />
-        <StatCard icon={Receipt} iconVariant="info" label="Paid This Month" value={formatCurrency(stats.paidThisMonth)} />
-      </ListSummary>
+          <StatCard icon={IndianRupee} iconVariant="success" label="Total Receivables" value={formatCurrency(stats.totalReceivable)} />
+          <StatCard icon={RefreshCw} iconVariant="danger" label="Overdue" value={formatCurrency(stats.overdueAmount)} />
+          <StatCard icon={FileText} iconVariant="warning" label="Due Soon" value={formatCurrency(stats.dueSoonAmount)} />
+          <StatCard icon={Receipt} iconVariant="info" label="Paid This Month" value={formatCurrency(stats.paidThisMonth)} />
+        </ListSummary>
       </ListOverview>
 
       <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)">
+        <div className="border-b border-neutral-100">
+          <ListTableToolbar
+            title="Sales Invoices"
+            subtitle="Customer invoices and receivables. Supplier bills live under Supplier Invoices."
+            search={search}
+            onSearchChange={(event) => { setSearch(event.target.value); setPage(1) }}
+            searchPlaceholder="Search invoices..."
+            resultCount={filtered.length}
+            actions={<>{filterPanel}{toolbarExtras}</>}
+          />
+        </div>
         {listError ? (
           <div className="p-10 text-center">
             <p className="text-sm text-red-600">{listError}</p>
@@ -360,28 +364,21 @@ export default function AdminInvoices() {
 
   return (
     <div className="listing-page space-y-4">
-      <SalesInvoicesPanel header={(controls) => (
-        <ListHeader>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Sales Invoices</h1>
-          <p className="mt-1 text-xs text-neutral-400">Customer invoices and receivables. Supplier bills live under Supplier Invoices.</p>
-        </div>
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-          {controls}
-          <Button type="button" onClick={() => setShowNewInvoiceChoice(true)}>
-            <Plus className="size-4" />
-            New Invoice
-          </Button>
+      <SalesInvoicesPanel toolbarExtras={(
+        <>
           <button
             type="button"
             onClick={() => navigate('/admin/invoices/settings')}
-            className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-neutral-200 bg-surface px-3.5 text-sm font-medium text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
+            className="flex h-9 shrink-0 items-center gap-2 rounded-xl border border-neutral-200 bg-surface px-3.5 text-xs font-medium text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
           >
             <Settings className="size-4" />
             Invoice Settings
           </button>
-        </div>
-      </ListHeader>
+          <Button type="button" onClick={() => setShowNewInvoiceChoice(true)}>
+            <Plus className="size-4" />
+            New Invoice
+          </Button>
+        </>
       )} />
 
       <Modal

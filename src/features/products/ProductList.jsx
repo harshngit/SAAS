@@ -1,4 +1,5 @@
 import { SkeletonValue } from '../../components/ui/Skeleton'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { useToast } from '../../components/ui/toastContext'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -385,6 +386,33 @@ export default function ProductList() {
     )
   }
 
+  const filterPanel = (
+    <ListFilterPanel
+      title="Filter Products"
+      applied={{ statusFilter, categoryFilter, sortFilter, datePreset, customFrom, customTo }}
+      defaults={{ statusFilter: 'all', categoryFilter: 'all', sortFilter: 'recent', datePreset: 'all', customFrom: '', customTo: '' }}
+      ignoreKeys={['sortFilter']}
+      onApply={(next) => {
+        setStatusFilter(next.statusFilter)
+        setCategoryFilter(next.categoryFilter)
+        setSortFilter(next.sortFilter)
+        setDatePreset(next.datePreset)
+        setCustomFrom(next.customFrom)
+        setCustomTo(next.customTo)
+        setPage(1)
+      }}
+    >
+      {({ draft, set, errors }) => (
+        <>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={productStatusTabs} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} /></label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category<Select options={categoryFilterOptions} value={draft.categoryFilter} onChange={(event) => set('categoryFilter', event.target.value)} /></label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort<Select options={[{ value: 'recent', label: 'Recent' }, { value: 'oldest', label: 'Oldest' }]} value={draft.sortFilter} onChange={(event) => set('sortFilter', event.target.value)} /></label>
+          <FilterDateRange label="Created" draft={draft} set={set} errors={errors} />
+        </>
+      )}
+    </ListFilterPanel>
+  )
+
   return (
     <div className="listing-page space-y-4">
       <div>
@@ -410,7 +438,7 @@ export default function ProductList() {
         <div className="border-b border-neutral-100 px-5 py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div><h2 className="text-xl font-semibold tracking-tight text-neutral-900">Products</h2><p className="mt-1 text-xs text-neutral-400">{filteredProducts.length} products in view</p></div>
-            <div className="flex flex-wrap items-center justify-end gap-2"><div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search products..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" />Filter</Button><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportProducts()}><Download className="size-4" />Export</Button><Button onClick={handleAddProduct} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Product</Button></div>
+            <div className="flex flex-wrap items-center justify-end gap-2"><div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1) }} placeholder="Search products..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>{filterPanel}<Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportProducts()}><Download className="size-4" />Export</Button><Button onClick={handleAddProduct} size="sm" className="h-9 rounded-2xl px-3.5"><Plus className="size-4" />Add Product</Button></div>
           </div>
         </div>
         <div className="overflow-x-auto bg-surface px-0 py-0">
@@ -520,7 +548,6 @@ export default function ProductList() {
         </div>
       </Card>
 
-      {isFilterOpen && createPortal(<div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Product filters"><button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" /><aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl"><div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4"><div><h2 className="text-lg font-semibold text-neutral-900">Filter Products</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the products shown in the table.</p></div><button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button></div><div className="flex-1 space-y-5 overflow-y-auto px-5 py-6"><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status<Select options={productStatusTabs} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} /></label><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Category<Select options={categoryFilterOptions} value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1) }} /></label><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort<Select options={[{ value: 'recent', label: 'Recent' }, { value: 'oldest', label: 'Oldest' }]} value={sortFilter} onChange={(event) => { setSortFilter(event.target.value); setPage(1) }} /></label><label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Created<DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} /></label></div><div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSortFilter('recent'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div></aside></div>, document.body)}
 
       <Modal
         isOpen={Boolean(statusProduct)}

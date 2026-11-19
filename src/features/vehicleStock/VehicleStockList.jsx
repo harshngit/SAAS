@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, RotateCw, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, RotateCw } from 'lucide-react'
 import { format, isSameDay, isValid, parseISO } from 'date-fns'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import { ListTableToolbar } from '../../components/ui/ListPresentation'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
@@ -45,11 +45,15 @@ function demoRows() {
   }]
 }
 
+// Vehicle Load History is the record of PAST loads, so it opens on Closed. A vehicle that is loaded
+// right now is listed under "Today's Vehicle Load Information" and must not appear a second time
+// here. Active / All stay available as an explicit choice in the Filter drawer.
 const STATUS_FILTERS = [
-  { value: 'all', label: 'All status' },
+  { value: 'closed', label: 'Closed (past loads)' },
   { value: 'active', label: 'Active' },
-  { value: 'closed', label: 'Closed' },
+  { value: 'all', label: 'All status' },
 ]
+const DEFAULT_HISTORY_STATUS = 'closed'
 
 const PAGE_SIZE_OPTIONS = [
   { value: '10', label: '10' },
@@ -224,7 +228,7 @@ export default function VehicleStockList() {
   // ---- Vehicle Load History
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState(DEFAULT_HISTORY_STATUS)
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -242,6 +246,15 @@ export default function VehicleStockList() {
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const hasExtraFilters = datePreset !== 'all'
+  const appliedFilters = { statusFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { statusFilter: DEFAULT_HISTORY_STATUS, datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setStatusFilter(next.statusFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
+    setPage(1)
+  }
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -331,16 +344,9 @@ export default function VehicleStockList() {
     setIsExporting(false)
   }
 
-  const clearExtraFilters = () => {
-    setDatePreset('all')
-    setCustomFrom('')
-    setCustomTo('')
-    setPage(1)
-  }
-
   const rangeStart = historyRows.length === 0 ? 0 : (page - 1) * Number(pageSize) + 1
   const rangeEnd = Math.min(total, (page - 1) * Number(pageSize) + historyRows.length)
-  const hasHistoryFilters = Boolean(debouncedSearch) || statusFilter !== 'all' || hasExtraFilters
+  const hasHistoryFilters = Boolean(debouncedSearch) || statusFilter !== DEFAULT_HISTORY_STATUS || hasExtraFilters
 
   return (
     <div className="listing-page space-y-5">
@@ -372,56 +378,42 @@ export default function VehicleStockList() {
       </Card>
 
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-4 py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Vehicle Load History</h2>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="relative sm:w-72">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search vehicle no or driver"
-                  className="h-9 w-full rounded-xl border border-neutral-100 bg-neutral-50 py-1.5 pl-10 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                />
-              </div>
-              <Select
-                options={STATUS_FILTERS}
-                value={statusFilter}
-                onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}
-                className="sm:w-40"
-                triggerClassName="h-9 bg-neutral-50 py-1.5"
-              />
-              <ListFilterPanel title="Filter Vehicle Load History">
-                <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Date
-                  <DateRangeFilter
-                    preset={datePreset}
-                    onPresetChange={(value) => { setDatePreset(value); setPage(1) }}
-                    customFrom={customFrom}
-                    customTo={customTo}
-                    onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }}
-                  />
-                </div>
-                {hasExtraFilters && (
-                  <button type="button" onClick={clearExtraFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
-                )}
-              </ListFilterPanel>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9 rounded-2xl px-3.5"
-                onClick={handleExport}
-                loading={isExporting}
-                disabled={isExporting || historyLoading || total === 0}
-              >
-                <Download className="size-4" aria-hidden="true" />
-                Export to Excel
-              </Button>
-            </div>
-          </div>
-          {exportError && <p className="mt-3 text-sm text-red-600">{exportError}</p>}
+        <div className="border-b border-neutral-100">
+          <ListTableToolbar
+            title="Vehicle Load History"
+            subtitle="Past loads. A vehicle that is loaded right now is listed under Today's Vehicle Load Information."
+            search={searchTerm}
+            onSearchChange={(event) => setSearchTerm(event.target.value)}
+            searchPlaceholder="Search vehicle no or driver"
+            resultCount={historyLoading ? undefined : total}
+            actions={(
+              <>
+                <ListFilterPanel title="Filter Vehicle Load History" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters}>
+                  {({ draft, set, errors }) => (
+                    <>
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                        <Select options={STATUS_FILTERS} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+                      </label>
+                      <FilterDateRange label="Date" draft={draft} set={set} errors={errors} />
+                    </>
+                  )}
+                </ListFilterPanel>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-xl px-3.5"
+                  onClick={handleExport}
+                  loading={isExporting}
+                  disabled={isExporting || historyLoading || total === 0}
+                >
+                  <Download className="size-4" aria-hidden="true" />
+                  Export to Excel
+                </Button>
+              </>
+            )}
+          />
+          {exportError && <p className="px-5 pb-3 text-sm text-red-600">{exportError}</p>}
         </div>
 
         <div className="overflow-x-auto bg-neutral-50/35 py-4">

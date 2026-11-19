@@ -85,12 +85,14 @@ export function ListTableToolbar({ title, subtitle, search, onSearchChange, sear
 }
 
 export function ListDataTable({ title, subtitle, toolbarActions, ...props }) {
-  if (title) {
+  // A page that supplies its own toolbar (title on the left, controls on the right) must not get
+  // the "search first" row-reverse below - that is only for the plain, title-less table.
+  if (title || props.renderToolbar) {
     return (
       <div className="[&>div>div.overflow-x-auto]:rounded-none [&>div>div.overflow-x-auto]:border-x-0 [&>div>div:last-child:not(.overflow-x-auto)]:px-5 [&>div>div:last-child:not(.overflow-x-auto)]:pb-4">
-        <DataTable {...props} renderToolbar={({ search, onSearchChange, resultCount, searchable }) => (
+        <DataTable {...props} renderToolbar={title ? ({ search, onSearchChange, resultCount, searchable }) => (
           <ListTableToolbar title={title} subtitle={subtitle} search={search} onSearchChange={searchable ? onSearchChange : undefined} searchPlaceholder={props.searchPlaceholder} resultCount={resultCount} actions={toolbarActions} />
-        )} />
+        ) : props.renderToolbar} />
       </div>
     )
   }

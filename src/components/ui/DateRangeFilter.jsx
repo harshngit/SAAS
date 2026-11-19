@@ -15,11 +15,11 @@ import { DATE_RANGE_PRESETS } from '../../utils/dateRange'
 // (not a narrow drawer) - the preset dropdown and, once "Custom Range" is picked, the two date
 // fields sit side by side instead of stacking a 3-row-tall column next to whatever else shares
 // that header row.
-export default function DateRangeFilter({ preset, onPresetChange, customFrom, customTo, onCustomChange, className = '', inline = false }) {
+export default function DateRangeFilter({ preset, onPresetChange, customFrom, customTo, onCustomChange, className = '', inline = false, options = DATE_RANGE_PRESETS }) {
   return (
     <div className={`flex gap-2 ${inline ? 'flex-row flex-wrap items-center' : 'flex-col'} ${className}`}>
       <Select
-        options={DATE_RANGE_PRESETS}
+        options={options}
         value={preset}
         onChange={(event) => onPresetChange(event.target.value)}
         triggerClassName="h-9 bg-neutral-50 py-1.5 text-xs"
