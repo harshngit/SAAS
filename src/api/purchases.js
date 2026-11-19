@@ -233,9 +233,10 @@ function normalizePurchase(purchase) {
     paymentStatus: purchase.payment_status ?? null,
     subtotal: purchase.subtotal ?? fallbackSubtotal,
     discount: purchase.discount ?? 0,
-    // The API's header discount = the items' discounts unless an order-level discount was entered; the form's
-    // "Discount" box is only the order-level part, so it must not be pre-filled with the items' total.
-    extraDiscount: Math.abs((Number(purchase.discount) || 0) - items.reduce((sum, i) => sum + i.discountAmount, 0)) < 0.02 ? 0 : Number(purchase.discount) || 0,
+    // Backend (build babbad9): `discount` is the WHOLE discount = the items' discounts + the order-level discount.
+    // The form's Discount box is only the order-level part, so it shows discount - sum(items' discount).
+    // Saving sends just that order-level part in `discount`.
+    extraDiscount: Math.max(0, Math.round(((Number(purchase.discount) || 0) - items.reduce((sum, i) => sum + i.discountAmount, 0)) * 100) / 100),
     tax: purchase.tax ?? 0,
     total,
     amountPaid,

@@ -235,9 +235,11 @@ export default function PurchaseInvoiceForm() {
         const quantity = Number(item.quantity) || 0
         const purchasePrice = Number(item.purchasePrice) || 0
         const lineSubtotal = purchasePrice * quantity
-        const discountAmount = (lineSubtotal * (Number(item.discount) || 0)) / 100
+        // Same rounding as the backend: each line's discount and its GST are rounded to the paisa; GST is on the line
+        // after its own item discount (the order-level discount does not change GST).
+        const discountAmount = money((lineSubtotal * (Number(item.discount) || 0)) / 100)
         const taxable = lineSubtotal - discountAmount
-        const taxAmount = taxable * ((Number(item.tax) || 0) / 100)
+        const taxAmount = money(taxable * ((Number(item.tax) || 0) / 100))
         return { ...item, product, quantity, purchasePrice, discountAmount, taxAmount, amount: taxable + taxAmount }
       }),
     [formState.items, products],
@@ -247,7 +249,8 @@ export default function PurchaseInvoiceForm() {
   const itemDiscountTotal = lineItems.reduce((sum, item) => sum + item.discountAmount, 0)
   const taxTotal = lineItems.reduce((sum, item) => sum + item.taxAmount, 0)
   const extraDiscount = Number(formState.discount) || 0
-  const grandTotal = Math.max(0, subtotal - itemDiscountTotal - extraDiscount + taxTotal)
+  // Total = subtotal - item discounts - order-level discount + GST (item 220.75, 10.25 %, GST 5.5 %, order discount 5 = 204.02).
+  const grandTotal = Math.max(0, money(subtotal - itemDiscountTotal - extraDiscount + taxTotal))
   const financialYear = computeFinancialYear(formState.purchaseDate)
 
   const updateField = (field, value) => setFormState((current) => ({ ...current, [field]: value }))
