@@ -728,8 +728,9 @@ function CreateSalesInvoiceForm() {
   const baseLineItems = useMemo(
     () =>
       items
-        .filter((item) => item.productId)
-        .map((item) => {
+        .map((item, rowIndex) => ({ item, rowIndex }))
+        .filter(({ item }) => item.productId)
+        .map(({ item, rowIndex }) => {
           const product = products.find((p) => p.id === item.productId)
           const quantity = Number(item.quantity) || 0
           const unitPrice = Number(item.unitPrice) || 0
@@ -741,6 +742,7 @@ function CreateSalesInvoiceForm() {
           const after = preTaxValue(lineSubtotal - discountAmount, taxRate, inclusive)
           return {
             ...item,
+            rowIndex,
             product,
             quantity,
             unitPrice,
@@ -905,8 +907,8 @@ function CreateSalesInvoiceForm() {
         productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        // The UI accepts a percent; InvoiceItemIn.discount is a rupee amount.
-        discount: item.discountAmount,
+        // The UI accepts a percent; InvoiceItemIn.discount is a rupee amount (to the paisa).
+        discount: money(item.discountAmount),
         taxRate: Number(item.taxRate) || 0,
         batchNumber: item.product?.batch_tracking && item.batchNumber ? item.batchNumber : undefined,
         serialNumbers: item.product?.serial_number_tracking
@@ -1075,7 +1077,11 @@ function CreateSalesInvoiceForm() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-50">
-                    {lineItems.map((item, index) => (
+                    {/* Every row of the form is drawn, also a blank one - the product picker is inside the row, so a row with no
+                        product yet must be visible or no item could ever be added. Priced rows carry their computed amount. */}
+                    {items.map((rawItem, index) => {
+                      const item = lineItems.find((line) => line.rowIndex === index) || { ...rawItem, amount: 0 }
+                      return (
                       <Fragment key={index}>
                       <tr>
                         <td className="px-3 py-2.5">
@@ -1188,7 +1194,8 @@ function CreateSalesInvoiceForm() {
                         </tr>
                       )}
                       </Fragment>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
