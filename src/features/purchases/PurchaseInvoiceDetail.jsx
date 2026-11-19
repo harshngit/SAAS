@@ -865,7 +865,7 @@ export default function PurchaseInvoiceDetail() {
         <div className="space-y-4">
           {paymentError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{paymentError}</div>}
           <p className="text-sm text-neutral-500">Grand Total: <span className="font-medium text-neutral-800">{formatCurrency(purchase.total)}</span></p>
-          <Input label="Amount Paid" type="number" min="0" max={purchase.total} step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
+          <Input label="Amount Paid" type="number" min="0" max={purchase.total} step="any" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
           <p className="text-sm text-neutral-500">Updated payment totals and status appear after saving.</p>
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" disabled={isActing} onClick={() => setPaymentOpen(false)}>Cancel</Button>

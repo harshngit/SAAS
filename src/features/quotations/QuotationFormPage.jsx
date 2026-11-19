@@ -25,10 +25,12 @@ import QuickAddCustomerModal from '../customers/QuickAddCustomerModal'
 import { formatLeadStatus } from '../leads/leadActivity'
 import { DEMO_RECORDS_ENABLED, demoLeads, isDemoRecord } from '../leads/demoData'
 import ProductPickerList from '../orders/ProductPickerList'
+import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
 import {
   canEditQuotation,
   lineDiscount,
   patchQuotationMeta,
+  priceQuotationLines,
   quantityStepForUom,
   quotationToDraftForm,
 } from './quotationHelpers'
@@ -223,21 +225,8 @@ export default function QuotationFormPage() {
   const selectedLead = useMemo(() => leads.find((lead) => lead.id === formData.leadId) || null, [leads, formData.leadId])
   const entityIsLead = formData.quotationFor === 'lead'
 
-  const totals = useMemo(() => {
-    const lines = formData.items.map((item) => {
-      const qty = Number(item.quantity) || 0
-      const price = Number(item.unitPrice) || 0
-      const rate = Number(item.taxRate) || 0
-      return { qty, rate, gross: qty * price }
-    })
-    const subtotal = lines.reduce((sum, line) => sum + line.gross, 0)
-    const raw = discountType === 'percentage' ? subtotal * ((Number(discountValue) || 0) / 100) : Number(discountValue) || 0
-    const discountAmount = Math.min(Math.max(raw, 0), subtotal)
-    const ratio = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 0
-    const tax = lines.reduce((sum, line) => sum + line.gross * ratio * (line.rate / 100), 0)
-    const totalQuantity = lines.reduce((sum, line) => sum + line.qty, 0)
-    return { subtotal, discountAmount, tax, grandTotal: subtotal - discountAmount + tax, totalQuantity }
-  }, [formData.items, discountType, discountValue])
+  // Same per-line rounding as the backend, so the total shown here is the total that gets saved.
+  const totals = useMemo(() => priceQuotationLines(formData.items, discountType, discountValue), [formData.items, discountType, discountValue])
 
   // What goes to the API (QuotationItemCreate has two fields): a percentage discount is sent per line in
   // `discount_percent` (the value typed, e.g. 10.25), a rupee discount is split over the lines in `discount`
@@ -248,16 +237,8 @@ export default function QuotationFormPage() {
       const percent = Math.min(Math.max(money(Number(discountValue) || 0), 0), 100)
       return items.map((item) => ({ ...item, discountPercent: percent, discountAmount: 0 }))
     }
-    const grossOf = (item) => (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-    const total = money(totals.discountAmount)
-    let lastIndex = -1
-    items.forEach((item, index) => { if (grossOf(item) > 0) lastIndex = index })
-    let allocated = 0
-    return items.map((item, index) => {
-      const share = index === lastIndex ? money(total - allocated) : money(total * (grossOf(item) / totals.subtotal))
-      if (index !== lastIndex) allocated += share
-      return { ...item, discountPercent: 0, discountAmount: grossOf(item) > 0 ? share : 0 }
-    })
+    // rupee discount: the per-line amounts the totals above were built from
+    return items.map((item, index) => ({ ...item, discountPercent: 0, discountAmount: totals.lines[index]?.discount || 0 }))
   }
 
   const updateField = (field, value) => {
@@ -433,6 +414,11 @@ export default function QuotationFormPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
     if (!validate()) return
 
     const itemsPayload = buildDiscountedItems(formData.items)
@@ -667,7 +653,7 @@ export default function QuotationFormPage() {
                     <NumericInput
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="any"
                       value={discountValue}
                       onChange={(event) => setDiscountValue(event.target.value)}
                       onBlur={(event) => {
@@ -675,7 +661,7 @@ export default function QuotationFormPage() {
                         setDiscountValue(String(Math.max(rounded, 0)))
                       }}
                       aria-label="Discount value"
-                      className="h-9 w-14 shrink-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                      className="h-9 w-24 shrink-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                     />
                     <span className="shrink-0 text-xs font-medium text-neutral-500">{discountType === 'percentage' ? '%' : '₹'}</span>
                   </div>

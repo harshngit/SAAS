@@ -1,5 +1,6 @@
 import NumericInput from '../../components/ui/NumericInput'
 import WholeNumberInput from '../../components/ui/WholeNumberInput'
+import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
@@ -558,6 +559,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
     if (!validateForm()) return
 
     // Takeaway: open the frontend review modal instead of placing the order right away.
@@ -572,6 +578,11 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   }
 
   const submitOrder = async () => {
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
     if (submitInFlight.current) return
     submitInFlight.current = true
     try {
@@ -1031,7 +1042,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <NumericInput
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="any"
                       value={discountValue}
                       onChange={(event) => setDiscountValue(event.target.value)}
                       onBlur={(event) => {
@@ -1039,7 +1050,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                         setDiscountValue(String(Math.max(rounded, 0)))
                       }}
                       aria-label="Discount value"
-                      className="h-10 w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                      className="h-10 w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
                     />
                     <span className="text-xs font-medium text-neutral-500">{discountType === 'percentage' ? '%' : '₹'}</span>
                   </div></ConfiguredField>
@@ -1639,7 +1650,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <NumericInput
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="any"
                       value={paidAmount}
                       onChange={(event) => setPaidAmount(event.target.value)}
                       onBlur={(event) => {
@@ -1647,7 +1658,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                         setPaidAmount(next ? String(next) : '')
                       }}
                       aria-label="Paid amount"
-                      className="h-7 w-20 bg-transparent text-right text-xs font-semibold text-neutral-900 focus:outline-none"
+                      className="h-7 w-28 bg-transparent text-right text-xs font-semibold text-neutral-900 focus:outline-none"
                     />
                   </div>
                 </div>

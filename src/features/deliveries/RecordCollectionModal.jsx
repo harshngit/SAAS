@@ -4,6 +4,7 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { createDeliveryCollection } from '../../api/deliveryCollections'
+import { getCustomerCollectable } from '../../api/customers'
 import { formatCurrency } from '../../utils/format'
 
 const METHOD_OPTIONS = [
@@ -86,11 +87,20 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
       // collectable amount (the error text stays visible).
       if (result.code === 'DAY_END_CLOSED' || result.code === 'CONFLICT') {
         const rejectedAmount = amount
-        const fresh = await onBlocked?.()
-        if (result.code === 'CONFLICT' && fresh) {
-          const due = Number(fresh.amountDue) || 0
+        // Re-read the delivery and, after a 409, the customer: the Amount becomes the smaller of what was typed and what
+        // can still be collected from the customer (collectable_amount = outstanding less collections awaiting approval).
+        const [fresh, collectable] = await Promise.all([
+          onBlocked?.(),
+          result.code === 'CONFLICT' && delivery.customerId ? getCustomerCollectable(delivery.customerId) : Promise.resolve(null),
+        ])
+        if (result.code === 'CONFLICT') {
+          const cap = collectable?.success ? collectable.collectable : null
           // Only replace the amount that was just refused - never overwrite something typed since.
-          setAmount((current) => (current === rejectedAmount ? (due > 0 ? String(due) : '') : current))
+          if (cap !== null) setAmount((current) => (current === rejectedAmount ? (cap > 0 ? String(Math.min(Number(rejectedAmount) || cap, cap)) : '') : current))
+          else if (fresh) {
+            const due = Number(fresh.amountDue) || 0
+            setAmount((current) => (current === rejectedAmount ? (due > 0 ? String(due) : '') : current))
+          }
         }
       }
       return
@@ -134,7 +144,7 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
 
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-neutral-700">Amount</label>
-          <NumericInput type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} className={field} />
+          <NumericInput type="number" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} className={field} />
         </div>
 
         <div className="flex flex-col gap-1.5">

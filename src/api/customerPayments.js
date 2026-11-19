@@ -76,7 +76,9 @@ function collectionError(error, fallback) {
   if (status === 404 || status === 405) {
     return { error: 'Collecting an outstanding payment isn’t available on the server yet. Nothing was recorded — the amount stays due for the accounts team to collect.' }
   }
-  if (status === 409) return { error: formatApiError(detail, 'This collection could not be recorded — it may already exist.') }
+  // 409: the backend's own text, as sent (e.g. "... awaiting admin approval; at most 2000.00 can still be collected"); `code` lets
+  // the drawer refresh the customer's collectable amount.
+  if (status === 409) return { code: 'CONFLICT', error: formatApiError(detail, 'This collection could not be recorded — it may already exist.') }
   return { error: formatApiError(detail, fallback) }
 }
 

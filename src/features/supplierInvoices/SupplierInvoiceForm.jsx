@@ -1,5 +1,6 @@
 import NumericInput from '../../components/ui/NumericInput'
 import WholeNumberInput from '../../components/ui/WholeNumberInput'
+import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
@@ -323,6 +324,11 @@ export default function SupplierInvoiceForm() {
   const handleSubmit = async (event) => {
     event.preventDefault()
     setSubmitError('')
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
 
     if (DEMO_MODE) {
       const existingNumbers = form.supplierId
@@ -527,10 +533,10 @@ export default function SupplierInvoiceForm() {
                         />
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <NumericInput type="number" min="0" max="100" step="0.01" value={item.discount} onChange={(event) => updateItem(index, 'discount', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
+                        <NumericInput type="number" min="0" max="100" step="any" value={item.discount} onChange={(event) => updateItem(index, 'discount', event.target.value)} className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <NumericInput type="number" min="0" max="100" step="0.01" value={item.taxRate} onChange={(event) => updateItem(index, 'taxRate', event.target.value)} className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
+                        <NumericInput type="number" min="0" max="100" step="any" value={item.taxRate} onChange={(event) => updateItem(index, 'taxRate', event.target.value)} className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm" />
                       </td>
                       <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(line.lineTotal)}</td>
                       <td className="px-3 py-2.5 text-right">
@@ -607,7 +613,7 @@ export default function SupplierInvoiceForm() {
                   ['otherCharges', 'Other Charges'],
                   ['roundOff', 'Round Off'],
                 ].map(([key, label]) => (
-                  <Input key={key} label={label} type="number" step="0.01" value={form.charges[key]} onChange={(event) => updateCharge(key, event.target.value)} />
+                  <Input key={key} label={label} type="number" step="any" value={form.charges[key]} onChange={(event) => updateCharge(key, event.target.value)} />
                 ))}
               </div>
             </Card>

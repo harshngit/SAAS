@@ -1,5 +1,6 @@
 import NumericInput from '../../components/ui/NumericInput'
 import WholeNumberInput from '../../components/ui/WholeNumberInput'
+import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
 import { money, preTaxValue, productTaxInclusive, taxLines } from '../../utils/gstCalc'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -839,6 +840,11 @@ function CreateSalesInvoiceForm() {
 
   const handleIssueInvoice = async (event) => {
     event.preventDefault()
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
 
     if (lineItems.length === 0) {
       setSubmitError('Add at least one invoice item before issuing.')
@@ -1117,11 +1123,11 @@ function CreateSalesInvoiceForm() {
                             type="number"
                             min="0"
                             max="100"
-                            step="0.01"
+                            step="any"
                             value={item.discount}
                             onChange={(event) => updateItem(index, 'discount', event.target.value)}
                             onBlur={roundItemFieldOnBlur(index, 'discount', { min: 0, max: 100, decimals: 2 })}
-                            className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
+                            className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                           />
                         </td>
                         <td className="px-3 py-2.5">
@@ -1129,10 +1135,10 @@ function CreateSalesInvoiceForm() {
                             type="number"
                             min="0"
                             max="100"
-                            step="0.01"
+                            step="any"
                             value={item.taxRate}
                             onChange={(event) => updateItem(index, 'taxRate', event.target.value)}
-                            className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
+                            className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                           />
                         </td>
                         <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.amount)}</td>
@@ -1205,8 +1211,8 @@ function CreateSalesInvoiceForm() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input label="Additional Charges (₹)" type="number" min="0" step="0.01" value={additionalCharges} onChange={(event) => setAdditionalCharges(event.target.value)} />
-              <Input label="Extra Discount (₹)" type="number" min="0" step="0.01" value={discount} onChange={(event) => setDiscount(event.target.value)} />
+              <Input label="Additional Charges (₹)" type="number" min="0" step="any" value={additionalCharges} onChange={(event) => setAdditionalCharges(event.target.value)} />
+              <Input label="Extra Discount (₹)" type="number" min="0" step="any" value={discount} onChange={(event) => setDiscount(event.target.value)} />
             </div>
 
             <div className="rounded-2xl border border-neutral-100 bg-surface p-5 shadow-(--shadow-card)">
@@ -1330,7 +1336,7 @@ function CreateSalesInvoiceForm() {
                   label={paymentType === 'cod' ? 'Amount Collected Now (Optional)' : 'Amount Paid Now (Optional)'}
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="any"
                   value={amountPaid}
                   onChange={(event) => setAmountPaid(event.target.value)}
                 />

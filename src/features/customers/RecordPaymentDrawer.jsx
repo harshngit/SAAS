@@ -198,7 +198,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, customer, onSaved
             label="Amount"
             type="number"
             min="0"
-            step="0.01"
+            step="any"
             placeholder="0.00"
             value={paymentForm.amount}
             onChange={(event) => setPaymentForm((current) => ({ ...current, amount: event.target.value }))}

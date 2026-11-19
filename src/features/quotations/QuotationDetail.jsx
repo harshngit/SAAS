@@ -155,7 +155,13 @@ export default function QuotationDetail() {
   }, [id])
 
   const timeline = useMemo(() => buildQuotationTimeline(quotation, meta), [quotation, meta])
-  const totals = useMemo(() => quotationTotals(quotation?.items || []), [quotation])
+  // A saved quotation shows the totals the API saved (subtotal there is AFTER the line discounts, so the Subtotal tile is the
+  // sum of qty x price and Discount is what was taken off); demo rows are worked out with the same per-line rounding.
+  const totals = useMemo(() => {
+    const calculated = quotationTotals(quotation?.items || [])
+    if (!quotation || isDemo || quotation.total == null) return calculated
+    return { subtotal: calculated.subtotal, discount: money(calculated.subtotal - (Number(quotation.subtotal) || 0)), tax: Number(quotation.taxTotal) || 0, grandTotal: Number(quotation.total) || 0 }
+  }, [quotation, isDemo])
 
   if (isLoading) {
     return (

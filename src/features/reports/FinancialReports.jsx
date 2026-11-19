@@ -29,6 +29,7 @@ import { getReportConfig, resolveValidGroupBy } from './reportConfig'
 import { resolveColumns } from './reportDataUtils'
 import ReportSelector from './components/ReportSelector'
 import ReportSummaryCards from './components/ReportSummaryCards'
+import GstSplitSummary from './components/GstSplitSummary'
 import ReportChart from './components/ReportChart'
 import ReportTable from './components/ReportTable'
 import ProfitLossStatement from './components/ProfitLossStatement'
@@ -390,8 +391,10 @@ export default function FinancialReports({
     }
   }
 
-  const rows = Array.isArray(report?.rows) ? report.rows : []
-  const columns = useMemo(() => resolveColumns(report, config?.columns || []), [report, config])
+  const rawRows = Array.isArray(report?.rows) ? report.rows : []
+  // A report can add row fields the API does not send (GST: unsplit_tax_amount) through its config.normalizeRow.
+  const rows = useMemo(() => (config?.normalizeRow ? rawRows.map(config.normalizeRow) : rawRows), [rawRows, config])
+  const columns = useMemo(() => resolveColumns(report, config?.columns || [], config?.extraColumns || []), [report, config])
 
   const pagination = report?.pagination
   const total = pagination?.total ?? rows.length
@@ -586,6 +589,7 @@ export default function FinancialReports({
               )}
 
               <ReportSummaryCards summary={report?.summary} cards={config?.summaryCards || []} />
+              {reportType === 'gst-summary' && <GstSplitSummary summary={report?.summary} />}
 
               {config?.isSpecialView === 'pnl' ? (
                 <>
@@ -661,7 +665,7 @@ function ReportFilterControl({ filter, value, selectedLabel, onChange, entityOpt
       <NumericInput
         type="number"
         min="0"
-        step="0.01"
+        step="any"
         value={value ?? ''}
         onChange={(event) => onChange(event.target.value)}
         placeholder={filter.label}

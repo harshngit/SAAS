@@ -1,4 +1,5 @@
 import WholeNumberInput from '../../components/ui/WholeNumberInput'
+import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, PackageSearch, PackageX, Search } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -291,6 +292,11 @@ export default function PurchaseReturnFormPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
     const error = validate()
     if (error) {
       setSubmitError(error)

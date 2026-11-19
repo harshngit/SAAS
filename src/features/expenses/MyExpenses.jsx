@@ -637,7 +637,7 @@ export default function MyExpenses() {
               label="Amount (₹)"
               type="number"
               min="1"
-              step="0.01"
+              step="any"
               value={formData.amount}
               onChange={(e) => setFormData((c) => ({ ...c, amount: e.target.value }))}
               required

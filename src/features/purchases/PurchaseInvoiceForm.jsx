@@ -1,5 +1,6 @@
 import NumericInput from '../../components/ui/NumericInput'
 import WholeNumberInput from '../../components/ui/WholeNumberInput'
+import { invalidWholeNumberMessage } from '../../components/ui/wholeNumberRegistry'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -235,9 +236,11 @@ export default function PurchaseInvoiceForm() {
         const quantity = Number(item.quantity) || 0
         const purchasePrice = Number(item.purchasePrice) || 0
         const lineSubtotal = purchasePrice * quantity
-        const discountAmount = (lineSubtotal * (Number(item.discount) || 0)) / 100
+        // Same rounding as the backend: each line's discount and its GST are rounded to the paisa; GST is on the line
+        // after its own item discount (the order-level discount does not change GST).
+        const discountAmount = money((lineSubtotal * (Number(item.discount) || 0)) / 100)
         const taxable = lineSubtotal - discountAmount
-        const taxAmount = taxable * ((Number(item.tax) || 0) / 100)
+        const taxAmount = money(taxable * ((Number(item.tax) || 0) / 100))
         return { ...item, product, quantity, purchasePrice, discountAmount, taxAmount, amount: taxable + taxAmount }
       }),
     [formState.items, products],
@@ -247,7 +250,8 @@ export default function PurchaseInvoiceForm() {
   const itemDiscountTotal = lineItems.reduce((sum, item) => sum + item.discountAmount, 0)
   const taxTotal = lineItems.reduce((sum, item) => sum + item.taxAmount, 0)
   const extraDiscount = Number(formState.discount) || 0
-  const grandTotal = Math.max(0, subtotal - itemDiscountTotal - extraDiscount + taxTotal)
+  // Total = subtotal - item discounts - order-level discount + GST (item 220.75, 10.25 %, GST 5.5 %, order discount 5 = 204.02).
+  const grandTotal = Math.max(0, money(subtotal - itemDiscountTotal - extraDiscount + taxTotal))
   const financialYear = computeFinancialYear(formState.purchaseDate)
 
   const updateField = (field, value) => setFormState((current) => ({ ...current, [field]: value }))
@@ -301,6 +305,11 @@ export default function PurchaseInvoiceForm() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    const quantityError = invalidWholeNumberMessage()
+    if (quantityError) {
+      setSubmitError(quantityError)
+      return
+    }
 
     if (!formState.supplierId) return setSubmitError('Select a supplier.')
     if (visible('purchaseType') && !formState.purchaseType) return setSubmitError('Select a purchase type.')
@@ -566,11 +575,11 @@ export default function PurchaseInvoiceForm() {
                         type="number"
                         min="0"
                         max="100"
-                        step="0.01"
+                        step="any"
                         value={item.discount}
                         onChange={(event) => updateItem(index, 'discount', event.target.value)}
                         onBlur={roundItemFieldOnBlur(index, 'discount', { min: 0, max: 100, decimals: 2 })}
-                        className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
+                        className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                       />
                     </td>
                     <td className="px-3 py-2.5">
@@ -578,10 +587,10 @@ export default function PurchaseInvoiceForm() {
                         type="number"
                         min="0"
                         max="100"
-                        step="0.01"
+                        step="any"
                         value={item.tax}
                         onChange={(event) => updateItem(index, 'tax', event.target.value)}
-                        className="w-16 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
+                        className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                       />
                     </td>
                     <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.amount)}</td>
@@ -612,7 +621,7 @@ export default function PurchaseInvoiceForm() {
                 label="Extra Discount (₹)"
                 type="number"
                 min="0"
-                step="0.01"
+                step="any"
                 value={formState.discount}
                 onChange={(event) => updateField('discount', event.target.value)}
               /></ConfiguredField>

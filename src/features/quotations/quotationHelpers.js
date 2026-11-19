@@ -220,6 +220,13 @@ export function lineDiscount(item) {
   return { percent: legacy, amount: gross * (legacy / 100) }
 }
 
+// The quotation backend rounds each amount to the paisa with a plain round(x, 2) on the stored number: 4.515 is stored as
+// 4.51499... so it becomes 4.51, 0.505 (stored as 0.50500...) becomes 0.51, 1.845 becomes 1.84. toFixed(2) rounds the stored
+// number the same way; the half-up helper in gstCalc would say 4.52 / 0.51 / 1.85.
+const round2 = (value) => Number((Number(value) || 0).toFixed(2))
+
+// Same per-line rounding as the backend (and the purchase form): the line, then its discount, then the tax on what is
+// left are each rounded to the paisa, then added up. 450.55 x 2, 10.25 %, 5 % tax -> 901.10 - 92.36 = 808.74, tax 40.44, 849.18.
 export function quotationTotals(items = []) {
   let subtotal = 0
   let discount = 0
@@ -228,14 +235,54 @@ export function quotationTotals(items = []) {
     const qty = Number(item.quantity) || 0
     const price = Number(item.unitPrice ?? item.unit_price) || 0
     const rate = Number(item.taxRate ?? item.tax_rate) || 0
-    const gross = qty * price
-    const discAmt = lineDiscount(item).amount
-    const net = gross - discAmt
+    const gross = round2(qty * price)
+    const discAmt = round2(lineDiscount(item).amount)
+    const net = round2(gross - discAmt)
     subtotal += gross
     discount += discAmt
-    tax += net * (rate / 100)
+    tax += round2((net * rate) / 100)
   })
-  return { subtotal, discount, tax, grandTotal: subtotal - discount + tax }
+  subtotal = round2(subtotal)
+  discount = round2(discount)
+  tax = round2(tax)
+  return { subtotal, discount, tax, grandTotal: round2(subtotal - discount + tax) }
+}
+
+// The form's pricing with the same per-line rounding: one quotation-level discount (a % or a rupee amount) is applied
+// line by line - a % per line, a rupee amount split over the lines in proportion (the last line takes the remainder) -
+// then each line is rounded to the paisa and its tax is charged on what is left.
+export function priceQuotationLines(items = [], discountType = 'percentage', discountValue = 0) {
+  const lines = items.map((item) => {
+    const qty = Number(item.quantity) || 0
+    const price = Number(item.unitPrice) || 0
+    return { qty, rate: Number(item.taxRate) || 0, gross: round2(qty * price) }
+  })
+  const subtotal = round2(lines.reduce((sum, line) => sum + line.gross, 0))
+  let discounts
+  if (discountType === 'percentage') {
+    const percent = Math.min(Math.max(round2(Number(discountValue) || 0), 0), 100)
+    discounts = lines.map((line) => round2((line.gross * percent) / 100))
+  } else {
+    const total = round2(Math.min(Math.max(Number(discountValue) || 0, 0), subtotal))
+    let lastIndex = -1
+    lines.forEach((line, index) => { if (line.gross > 0) lastIndex = index })
+    let allocated = 0
+    discounts = lines.map((line, index) => {
+      if (line.gross <= 0) return 0
+      const share = index === lastIndex ? round2(total - allocated) : round2(subtotal > 0 ? (total * line.gross) / subtotal : 0)
+      if (index !== lastIndex) allocated += share
+      return share
+    })
+  }
+  const priced = lines.map((line, index) => {
+    const discount = Math.min(discounts[index], line.gross)
+    const net = round2(line.gross - discount)
+    return { ...line, discount, net, tax: round2((net * line.rate) / 100) }
+  })
+  const discountAmount = round2(priced.reduce((sum, line) => sum + line.discount, 0))
+  const tax = round2(priced.reduce((sum, line) => sum + line.tax, 0))
+  const net = round2(priced.reduce((sum, line) => sum + line.net, 0))
+  return { lines: priced, subtotal, discountAmount, tax, grandTotal: round2(net + tax), totalQuantity: lines.reduce((sum, line) => sum + line.qty, 0) }
 }
 
 // -----------------------------------------------------------------------------
