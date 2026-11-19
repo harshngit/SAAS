@@ -440,6 +440,28 @@ export async function listCustomers(params = {}) {
   }
 }
 
+// The most that can still be collected from a customer: outstanding balance less the collections that are still awaiting
+// admin approval. The API names it `collectable_amount` (on the customer list rows); the single-customer response
+// carries the two figures it is made of (financial_summary), so the same number is read from there when the field is absent.
+export async function getCustomerCollectable(customerId) {
+  try {
+    const { data } = await apiClient.get(`/customers/${customerId}`, {
+      headers: authHeader(),
+    })
+    const financial = data?.financial_summary || {}
+    const outstanding = Number(financial.outstanding_balance ?? data?.outstanding_balance) || 0
+    const awaitingApproval = Number(financial.unreconciled_collection_amount ?? data?.unreconciled_collection_amount) || 0
+    const explicit = data?.collectable_amount ?? financial.collectable_amount
+    const collectable = explicit !== undefined && explicit !== null
+      ? Number(explicit) || 0
+      : Math.max(0, Math.round((outstanding - awaitingApproval) * 100) / 100)
+
+    return { success: true, collectable, outstanding, awaitingApproval }
+  } catch {
+    return { success: false }
+  }
+}
+
 export async function getCustomer(customerId) {
   try {
     const { data } = await apiClient.get(`/customers/${customerId}`, {

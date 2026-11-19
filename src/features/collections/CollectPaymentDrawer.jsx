@@ -8,6 +8,7 @@ import EntitySearchSelect from '../reports/components/EntitySearchSelect'
 import { useToast } from '../../components/ui/toastContext'
 import { formatCurrency, toLocalDateString } from '../../utils/format'
 import { getCustomerOutstanding, recordCustomerCollection, searchCustomerOrders, searchOutstandingCustomers } from '../../api/customerPayments'
+import { getCustomerCollectable } from '../../api/customers'
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -188,6 +189,16 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, onBl
       // Nothing was recorded, but the collector's day-end state moved in the background -
       // re-sync whatever page opened this drawer so it reflects that.
       if (result.code === 'DAY_END_CLOSED') onBlocked?.()
+      // 409 (money from this customer already collected and awaiting approval): read the customer again and put the smaller of
+      // the typed amount and the customer's collectable amount in the box (the error text stays visible).
+      if (result.code === 'CONFLICT') {
+        const rejectedAmount = amount
+        const fresh = await getCustomerCollectable(customer.id)
+        if (fresh.success) {
+          setAmount((current) => (current === rejectedAmount ? (fresh.collectable > 0 ? String(Math.min(Number(rejectedAmount) || fresh.collectable, fresh.collectable)) : '') : current))
+          setCustomer((current) => (current ? { ...current, outstandingBalance: fresh.outstanding } : current))
+        }
+      }
       return
     }
 
