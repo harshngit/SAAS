@@ -19,7 +19,7 @@ import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { listCategories } from '../../api/categories'
 import { exportRowsToExcel } from '../../utils/exportToExcel'
 import { listSuppliers } from '../../api/suppliers'
-import { createProduct, deleteProduct, listProducts, updateProduct } from '../../api/products'
+import { addProductAttachments, createProduct, deleteProduct, listProducts, updateProduct } from '../../api/products'
 import { getFileUrl } from '../../api/files'
 import { formatCurrency } from '../../utils/format'
 import { normalizeApiProduct } from './productUtils'
@@ -85,6 +85,7 @@ export default function ProductList() {
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [formErrorFields, setFormErrorFields] = useState([])
+  const [formFieldErrors, setFormFieldErrors] = useState({})
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [statusError, setStatusError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -246,6 +247,7 @@ export default function ProductList() {
     setEditingProduct(null)
     setFormError('')
     setFormErrorFields([])
+    setFormFieldErrors({})
     setIsFormOpen(true)
   }
 
@@ -253,6 +255,7 @@ export default function ProductList() {
     setEditingProduct(product)
     setFormError('')
     setFormErrorFields([])
+    setFormFieldErrors({})
     setIsFormOpen(true)
   }
 
@@ -282,12 +285,22 @@ export default function ProductList() {
     setIsSaving(true)
     setFormError('')
     setFormErrorFields([])
+    setFormFieldErrors({})
 
+    // One save = one product. Phases: create (the primary image is already uploaded - its /files/{id} is in the
+    // body) -> attach the Other Attachments (they need the new product's id). The guard and the disabled button
+    // stay on until the last phase ends, and POST /products is never repeated if only the attachments fail.
     let result
+    let attachmentError = ''
+    const attachmentFiles = !editingProduct ? productData.attachmentFiles || [] : []
     try {
       result = editingProduct
         ? await updateProduct(editingProduct.id, productData)
         : await createProduct(productData)
+      if (result.success && attachmentFiles.length > 0) {
+        const attached = await addProductAttachments(result.product.id, attachmentFiles)
+        if (!attached.success) attachmentError = attached.error || 'Upload failed.'
+      }
     } finally {
       saveInFlight.current = false
     }
@@ -297,6 +310,20 @@ export default function ProductList() {
     if (!result.success) {
       setFormError(result.error)
       setFormErrorFields(result.errorFields || [])
+      setFormFieldErrors(result.fieldErrors || {})
+      return
+    }
+
+    if (attachmentError) {
+      // The product exists, only its attachments are missing: say so and open the product, where Attachments can be retried.
+      showToast({
+        title: 'Product created - attachments not uploaded',
+        message: `${productData.name || 'The product'} was created, but ${attachmentFiles.length === 1 ? 'the attachment' : 'the attachments'} could not be uploaded (${attachmentError}). Open the product and use Attachments to upload again.`,
+        variant: 'error',
+        duration: 12000,
+      })
+      setIsFormOpen(false)
+      navigate(`/admin/products/${result.product.id}`)
       return
     }
 
@@ -373,6 +400,7 @@ export default function ProductList() {
           if (isSaving) return
           setFormError('')
           setFormErrorFields([])
+          setFormFieldErrors({})
           setIsFormOpen(false)
         }}
         product={editingProduct}
@@ -380,6 +408,7 @@ export default function ProductList() {
         saving={isSaving}
         formError={formError}
         formErrorFields={formErrorFields}
+        formFieldErrors={formFieldErrors}
         catalogProducts={products}
       />
     )
