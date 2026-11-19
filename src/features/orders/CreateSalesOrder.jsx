@@ -4,7 +4,7 @@ import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { money, preTaxValue, productTaxInclusive, supplyTypeFromGstins, taxLines } from '../../utils/gstCalc'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -159,6 +159,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   const [submitError, setSubmitError] = useState('')
   const [stockShortages, setStockShortages] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // One click = one request: flips synchronously, before the disabled button re-renders (a double click or Enter
+  // can otherwise fire twice), and stays set until the request AND its recovery check have finished.
+  const submitInFlight = useRef(false)
 
   // Takeaway / Self Pickup checkout: a frontend-only review step before the order is placed.
   // "preview" is never an order status - it is local UI state only.
@@ -563,6 +566,16 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   }
 
   const submitOrder = async () => {
+    if (submitInFlight.current) return
+    submitInFlight.current = true
+    try {
+      await runSubmitOrder()
+    } finally {
+      submitInFlight.current = false
+    }
+  }
+
+  const runSubmitOrder = async () => {
     if (!validateForm()) return
     setIsSubmitting(true)
     setSubmitError('')

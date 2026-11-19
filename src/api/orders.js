@@ -404,14 +404,69 @@ export async function getOrder(orderId) {
   }
 }
 
+// Creating an order (order + stock reservation + invoice + delivery) can take longer than the default 20 s
+// client timeout, so this one request gets 60 s.
+const CREATE_ORDER_TIMEOUT_MS = 60000
+
+// "Did the request reach the server and save anyway?" A request that timed out (or got a gateway 502/503/504)
+// tells us nothing about whether the order exists, and repeating the POST would create a duplicate. So we
+// look for it: the newest orders of the same customer, created since we started, whose lines (product,
+// variant, quantity) equal what we sent. Polls for up to ~40 s because the server may still be finishing.
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function findOrderCreatedByRequest(requestBody, startedAt) {
+  const lineKey = (item) => `${item.product_id || ''}:${item.variant_id || ''}:${Number(item.quantity) || 0}`
+  const wanted = (requestBody.items || []).map(lineKey).sort().join('|')
+
+  for (let attempt = 0; attempt < 9; attempt += 1) {
+    if (attempt > 0) await delay(5000)
+    try {
+      const { data } = await apiClient.get('/orders', {
+        headers: authHeader(),
+        params: { customer_id: requestBody.customer_id, page_size: 5, sort_by: 'created_at', sort_order: 'desc' },
+      })
+      const rows = Array.isArray(data) ? data : data?.items || []
+      for (const row of rows) {
+        // 30 s of clock tolerance between this browser and the server.
+        if (!row?.id || Date.parse(row.created_at) < startedAt - 30000) continue
+        const { data: full } = await apiClient.get(`/orders/${row.id}`, { headers: authHeader() })
+        const have = (full.items || []).map(lineKey).sort().join('|')
+        if (have === wanted) return full
+      }
+    } catch {
+      // keep polling - the check itself can fail while the server is busy
+    }
+  }
+  return null
+}
+
 export async function createOrder(payload) {
+  const requestBody = buildOrderBody(payload)
+  const startedAt = Date.now()
+
   try {
-    const { data } = await apiClient.post('/orders', buildOrderBody(payload), {
+    const { data } = await apiClient.post('/orders', requestBody, {
       headers: authHeader(),
+      timeout: CREATE_ORDER_TIMEOUT_MS,
     })
 
     return { success: true, order: normalizeOrder(data) }
   } catch (error) {
+    const unknownOutcome =
+      error.code !== 'ERR_CANCELED' &&
+      (!error.response || [502, 503, 504].includes(error.response.status))
+
+    if (unknownOutcome) {
+      const existing = await findOrderCreatedByRequest(requestBody, startedAt)
+      if (existing) return { success: true, order: normalizeOrder(existing), recovered: true }
+
+      return {
+        success: false,
+        timedOut: true,
+        error: 'The server took too long to answer and we could not confirm whether the order was saved. Please check the Orders list before creating it again.',
+      }
+    }
+
     const errorData = error.response?.data
     const shortages = extractShortages(errorData)
     const message = formatApiError(
