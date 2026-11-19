@@ -1,4 +1,5 @@
 import NumericInput from '../../components/ui/NumericInput'
+import WholeNumberInput from '../../components/ui/WholeNumberInput'
 import { itemKey, productVariants, readableClassification, selectedProductValues } from '../../utils/productVariants'
 import { useMemo, useState } from 'react'
 import { AlertTriangle, ChevronDown, Minus, Package, Pencil, Plus, Search } from 'lucide-react'
@@ -273,11 +274,10 @@ export default function ProductPickerList({
                     >
                       <Minus className="size-3.5" aria-hidden="true" />
                     </button>
-                    <NumericInput
+                    <WholeNumberInput
                       value={quantity}
                       disabled={!canAdd}
                       onChange={(event) => onSetQuantity(product, event.target.value, variant?.id)}
-                      inputMode="numeric"
                       className="w-8 min-w-0 bg-transparent text-center text-xs font-semibold focus:outline-none"
                       aria-label={`${displayName} quantity`}
                     />

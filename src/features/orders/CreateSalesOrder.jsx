@@ -1,4 +1,5 @@
 import NumericInput from '../../components/ui/NumericInput'
+import WholeNumberInput from '../../components/ui/WholeNumberInput'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
@@ -1525,10 +1526,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               >
                                 <Minus className="size-3.5" aria-hidden="true" />
                               </button>
-                              <NumericInput
+                              <WholeNumberInput
                                 value={quantity}
                                 onChange={(event) => setPickerQuantity(product, event.target.value, item.variantId)}
-                                inputMode="numeric"
                                 className="w-9 min-w-0 bg-transparent text-center text-xs font-semibold text-neutral-900 focus:outline-none"
                                 aria-label={`${product.name} quantity`}
                               />

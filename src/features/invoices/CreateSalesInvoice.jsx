@@ -1,4 +1,5 @@
 import NumericInput from '../../components/ui/NumericInput'
+import WholeNumberInput from '../../components/ui/WholeNumberInput'
 import { money, preTaxValue, productTaxInclusive, taxLines } from '../../utils/gstCalc'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -1088,10 +1089,7 @@ function CreateSalesInvoiceForm() {
                           />
                         </td>
                         <td className="px-3 py-2.5">
-                          <NumericInput
-                            type="number"
-                            min="1"
-                            step="1"
+                          <WholeNumberInput
                             value={item.quantity}
                             onChange={(event) => updateItem(index, 'quantity', event.target.value)}
                             onBlur={roundItemFieldOnBlur(index, 'quantity', { min: 1 })}

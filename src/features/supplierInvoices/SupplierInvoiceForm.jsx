@@ -1,4 +1,5 @@
 import NumericInput from '../../components/ui/NumericInput'
+import WholeNumberInput from '../../components/ui/WholeNumberInput'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
@@ -508,10 +509,8 @@ export default function SupplierInvoiceForm() {
                       <td className="px-3 py-2.5 text-right text-neutral-500">{item.purchasePrice != null ? formatCurrency(item.purchasePrice) : '—'}</td>
                       <td className="px-3 py-2.5 text-right text-neutral-500">{item.remainingInvoiceableQty != null ? item.remainingInvoiceableQty : '—'}</td>
                       <td className="px-3 py-2.5 text-right">
-                        <NumericInput
-                          type="number"
-                          min="0"
-                          step="1"
+                        <WholeNumberInput
+                          label="Invoice quantity"
                           value={item.invoiceQty}
                           onChange={(event) => updateItem(index, 'invoiceQty', event.target.value)}
                           className={`w-20 rounded-lg border bg-surface px-2.5 py-1.5 text-right text-sm ${over ? 'border-amber-400' : 'border-neutral-200'}`}

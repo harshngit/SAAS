@@ -1,4 +1,5 @@
 import NumericInput from '../../components/ui/NumericInput'
+import WholeNumberInput from '../../components/ui/WholeNumberInput'
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -543,10 +544,7 @@ export default function PurchaseInvoiceForm() {
                     <td className="whitespace-nowrap px-3 py-2.5 text-neutral-500">{item.product?.sku || '—'}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-neutral-500">{item.product?.unitOfMeasure || '—'}</td>
                     <td className="px-3 py-2.5">
-                      <NumericInput
-                        type="number"
-                        min="1"
-                        step="1"
+                      <WholeNumberInput
                         value={item.quantity}
                         onChange={(event) => updateItem(index, 'quantity', event.target.value)}
                         onBlur={roundItemFieldOnBlur(index, 'quantity', { min: 1 })}

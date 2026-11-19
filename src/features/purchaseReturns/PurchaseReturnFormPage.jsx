@@ -1,4 +1,4 @@
-import NumericInput from '../../components/ui/NumericInput'
+import WholeNumberInput from '../../components/ui/WholeNumberInput'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, PackageSearch, PackageX, Search } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -542,11 +542,7 @@ export default function PurchaseReturnFormPage() {
                         <td className="whitespace-nowrap px-5 py-3.5 text-right text-neutral-600">{line.alreadyReturned}</td>
                         <td className="whitespace-nowrap px-5 py-3.5 text-right font-medium text-neutral-900">{line.returnableQty}</td>
                         <td className="whitespace-nowrap px-5 py-3.5 text-right">
-                          <NumericInput
-                            type="number"
-                            min="0"
-                            max={line.returnableQty}
-                            step="1"
+                          <WholeNumberInput
                             value={returnQty[line.purchaseItemId] ?? ''}
                             onChange={(event) => setQty(line, event.target.value)}
                             className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-right text-sm text-neutral-900"
