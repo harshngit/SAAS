@@ -34,7 +34,7 @@ export const ITEM_COLUMN_DEFS = [
   { key: 'batch_number', label: 'Batch Number', core: false, weight: 16, align: 'center' },
   { key: 'expiry_date', label: 'Expiry Date', core: false, weight: 18, align: 'center' },
   // line_total: the line's value BEFORE tax (also for tax-inclusive products, whose unit_price is the price as entered).
-  { key: 'amount', label: 'Amount (before tax)', core: true, weight: 24, align: 'right' },
+  { key: 'amount', label: 'Pre-Tax Amt', core: true, weight: 24, align: 'right' },
 ]
 
 const COLUMN_BY_KEY = Object.fromEntries(ITEM_COLUMN_DEFS.map((col) => [col.key, col]))

@@ -3,7 +3,7 @@ import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import ConfiguredField from '../../fieldSettings/ConfiguredField'
 import { itemKey, productVariants, selectedProductValues, validateVariantItems } from '../../utils/productVariants'
 import { loadSummaryRows } from '../../utils/listSummary'
-import { money, preTaxValue, productTaxInclusive, taxLines } from '../../utils/gstCalc'
+import { money, preTaxValue, productTaxInclusive, supplyTypeFromGstins, taxLines } from '../../utils/gstCalc'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -38,6 +38,7 @@ import { listWarehouses } from '../../api/warehouses'
 import { listDeliveryPartners } from '../../api/deliveries'
 import { createOrder, assignDeliveryPartner, getOrder, updateOrder } from '../../api/orders'
 import { getQuotation } from '../../api/quotations'
+import { getCurrentOrganizationState } from '../../api/organizations'
 import { getFileUrl } from '../../api/files'
 import { duplicateDemoOrder, getDemoOrder, isDemoOrder, patchDemoOrder } from './orderDemoData'
 import { derivePaymentStatus, formatPaymentStatus } from './orderHelpers'
@@ -357,6 +358,20 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   )
   const savedCustomerAddress = resolveCustomerAddress(selectedCustomer)
 
+  // Intra-state (CGST + SGST) / inter-state (IGST) / unknown, from the seller's and the customer's GSTIN state
+  // codes. Only decides whether the summary shows the split; the GST total never depends on it.
+  const [sellerGstin, setSellerGstin] = useState('')
+  useEffect(() => {
+    let isMounted = true
+    getCurrentOrganizationState().then((result) => {
+      if (isMounted && result.success) setSellerGstin(result.organization?.gst_number || result.organization?.gstin_pan || '')
+    })
+    return () => {
+      isMounted = false
+    }
+  }, [])
+  const supplyType = supplyTypeFromGstins(sellerGstin, selectedCustomer?.gst_number || selectedCustomer?.gstNumber)
+
   // Customer profile photo — same file-id resolution chain the Customers list uses.
   const customerPhotoUrl = useMemo(
     () =>
@@ -480,6 +495,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       subtotal: result.subtotal,
       discountAmount: result.discountAmount,
       gstAmount: result.gstAmount,
+      cgstAmount: result.cgstAmount,
+      sgstAmount: result.sgstAmount,
       effectiveGstPercent: result.effectiveGstPercent,
       total: result.total,
       totalQuantity,
@@ -1020,6 +1037,25 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                     <span className="font-semibold text-neutral-900">{formatCurrencyExact(totals.gstAmount)}</span>
                   </div>
 
+                  {supplyType === 'intra_state' && (
+                    <>
+                      <div className="flex items-center justify-between gap-2 sm:justify-start">
+                        <span className="text-xs text-neutral-500">CGST</span>
+                        <span className="font-semibold text-neutral-900">{formatCurrencyExact(totals.cgstAmount)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 sm:justify-start">
+                        <span className="text-xs text-neutral-500">SGST</span>
+                        <span className="font-semibold text-neutral-900">{formatCurrencyExact(totals.sgstAmount)}</span>
+                      </div>
+                    </>
+                  )}
+                  {supplyType === 'inter_state' && (
+                    <div className="flex items-center justify-between gap-2 sm:justify-start">
+                      <span className="text-xs text-neutral-500">IGST</span>
+                      <span className="font-semibold text-neutral-900">{formatCurrencyExact(totals.gstAmount)}</span>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between gap-2 sm:ml-auto sm:justify-start">
                     <span className="text-xs text-neutral-500">Final Amount</span>
                     <span className="font-bold text-primary-700">{formatCurrencyExact(totals.total)}</span>
@@ -1233,6 +1269,24 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <span className="text-sm text-neutral-600">GST ({formatGstPercent(totals.effectiveGstPercent)}%)</span>
                   <span className="text-sm font-medium text-neutral-900">{formatCurrencyExact(totals.gstAmount)}</span>
                 </div>
+                {supplyType === 'intra_state' && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-neutral-600">CGST</span>
+                      <span className="text-sm font-medium text-neutral-900">{formatCurrencyExact(totals.cgstAmount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-neutral-600">SGST</span>
+                      <span className="text-sm font-medium text-neutral-900">{formatCurrencyExact(totals.sgstAmount)}</span>
+                    </div>
+                  </>
+                )}
+                {supplyType === 'inter_state' && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-600">IGST</span>
+                    <span className="text-sm font-medium text-neutral-900">{formatCurrencyExact(totals.gstAmount)}</span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2 border-t border-neutral-100 pt-4">
@@ -1519,6 +1573,24 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                   <span className="text-neutral-500">Tax / GST</span>
                   <span className="font-medium text-neutral-900">{formatCurrencyExact(totals.gstAmount)}</span>
                 </div>
+                {supplyType === 'intra_state' && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-500">CGST</span>
+                      <span className="font-medium text-neutral-900">{formatCurrencyExact(totals.cgstAmount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-500">SGST</span>
+                      <span className="font-medium text-neutral-900">{formatCurrencyExact(totals.sgstAmount)}</span>
+                    </div>
+                  </>
+                )}
+                {supplyType === 'inter_state' && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500">IGST</span>
+                    <span className="font-medium text-neutral-900">{formatCurrencyExact(totals.gstAmount)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between border-t border-neutral-100 pt-1.5">
                   <span className="font-semibold text-neutral-900">Current Order Total</span>
                   <span className="font-semibold text-neutral-900">{formatCurrencyExact(totals.total)}</span>

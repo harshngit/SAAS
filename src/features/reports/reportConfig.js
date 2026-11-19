@@ -532,8 +532,11 @@ export const REPORT_CONFIG = {
       col('invoice_type', 'Invoice Type', 'status'),
       col('gst_classification', 'GST Classification', 'status'),
       col('taxable_value', 'Taxable Value', 'currency', { align: 'right' }),
-      // The backend's current data model does not store CGST/SGST/IGST as separate components -
-      // only the combined tax amount. Never derive/guess a split here; show total_gst only.
+      // Never derive/guess a CGST/SGST split here. The columns below appear only if the report API sends
+      // cgst_amount / sgst_amount on its rows (shown exactly as returned); the live payload currently has
+      // only tax_amount, so today the table shows the total.
+      col('cgst_amount', 'CGST', 'currency', { align: 'right', optional: true }),
+      col('sgst_amount', 'SGST', 'currency', { align: 'right', optional: true }),
       col('total_gst', 'Total GST', 'currency', { align: 'right' }),
       col('amount', 'Invoice Amount', 'currency', { align: 'right' }),
       col('status', 'Status', 'status'),

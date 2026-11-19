@@ -58,6 +58,20 @@ export function splitDiscount(values, discount) {
   return shares
 }
 
+// 'intra_state' (CGST + SGST) | 'inter_state' (IGST) | null (unknown), from the seller's and the buyer's GSTIN:
+// the first two digits of a GSTIN are the state code. Anything else (a GSTIN missing or malformed) is
+// "unknown" - then only the total GST is shown, never a made-up split.
+export function supplyTypeFromGstins(sellerGstin, buyerGstin) {
+  const code = (value) => {
+    const match = /^(\d{2})[0-9A-Z]{13}$/i.exec(String(value || '').trim())
+    return match ? match[1] : ''
+  }
+  const seller = code(sellerGstin)
+  const buyer = code(buyerGstin)
+  if (!seller || !buyer) return null
+  return seller === buyer ? 'intra_state' : 'inter_state'
+}
+
 // lines: [{ value, rate, containedTax? }] where `value` is already before tax and after the line's own
 // discount. Returns the per-line result plus totals.
 export function taxLines(lines, billDiscount = 0) {
@@ -74,6 +88,27 @@ export function taxLines(lines, billDiscount = 0) {
     const tax = share === 0 && line.containedTax != null ? money(line.containedTax) : money((taxable * rate) / 100)
     return { value, share, taxable, tax }
   })
+  // Intra-state split of each line's GST. Both halves are whole paise: a line with an even number of paise
+  // is split equally; a line with an ODD number of paise gives the spare paisa to CGST and SGST in turn -
+  // the 1st odd line to CGST, the 2nd to SGST, the 3rd to CGST, and so on (the backend's rule, so the
+  // CGST / SGST totals here equal the saved invoice's cgst_total / sgst_total). Only meaningful when the
+  // supply is intra-state; the caller decides whether to show it (see supplyTypeFromGstins).
+  let oddLines = 0
+  rows.forEach((row) => {
+    const paise = Math.round(row.tax * 100)
+    const half = Math.floor(paise / 2)
+    let cgstPaise = half
+    let sgstPaise = half
+    if (paise % 2 !== 0) {
+      if (oddLines % 2 === 0) cgstPaise += 1
+      else sgstPaise += 1
+      oddLines += 1
+    }
+    row.cgst = cgstPaise / 100
+    row.sgst = sgstPaise / 100
+  })
+  const cgstAmount = money(rows.reduce((sum, row) => sum + row.cgst, 0))
+  const sgstAmount = money(rows.reduce((sum, row) => sum + row.sgst, 0))
   const gstAmount = money(rows.reduce((sum, row) => sum + row.tax, 0))
   const taxableAmount = money(rows.reduce((sum, row) => sum + row.taxable, 0))
   return {
@@ -82,6 +117,8 @@ export function taxLines(lines, billDiscount = 0) {
     discountAmount,
     taxableAmount,
     gstAmount,
+    cgstAmount,
+    sgstAmount,
     total: money(taxableAmount + gstAmount),
     effectiveGstPercent: taxableAmount > 0 ? (gstAmount / taxableAmount) * 100 : 0,
   }

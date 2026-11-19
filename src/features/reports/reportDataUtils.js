@@ -89,5 +89,8 @@ export function resolveColumns(report, fallbackColumns = []) {
     const fallbackByKey = new Map(fallbackColumns.map((column) => [column.key, column]))
     return metaColumns.map((entry) => normalizeBackendColumn(entry, fallbackByKey))
   }
-  return fallbackColumns
+  // A fallback column marked `optional` (e.g. GST report cgst_amount / sgst_amount) is shown only when the
+  // API actually returns that field on at least one row - the value is shown exactly as sent, never derived.
+  const rows = Array.isArray(report?.rows) ? report.rows : []
+  return fallbackColumns.filter((column) => !column.optional || rows.some((row) => row?.[column.key] !== undefined && row?.[column.key] !== null))
 }

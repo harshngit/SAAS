@@ -262,7 +262,7 @@ function ItemTable({ items, columns, showProductImage, simple = false, style, ta
       {items.map((item, index) => (
         <div
           key={item.name + index}
-          className={`flex items-center ${TABLE_ROW_BORDER[tableStyle] || TABLE_ROW_BORDER.lined} ${tableStyle === 'banded' && index % 2 === 1 ? 'bg-neutral-50/70' : ''}`}
+          className={`flex items-start ${TABLE_ROW_BORDER[tableStyle] || TABLE_ROW_BORDER.lined} ${tableStyle === 'banded' && index % 2 === 1 ? 'bg-neutral-50/70' : ''}`}
         >
           {activeColumns.map((col) => (
             <div key={col.key} style={{ flexGrow: col.weight, flexBasis: 0 }} className={`min-w-0 ${cellPad} ${style.rowPad} ${alignClass[col.align]}`}>
@@ -278,10 +278,10 @@ function ItemTable({ items, columns, showProductImage, simple = false, style, ta
                       onError={(event) => { event.currentTarget.style.display = 'none' }}
                     />
                   )}
-                  <span className="truncate">{item.name}</span>
+                  <span className="min-w-0 whitespace-normal break-words">{item.name}</span>
                 </span>
               ) : (
-                <span className="block truncate">{cellText(col, item)}</span>
+                <span className={`block ${col.key === 'description' ? 'whitespace-normal break-words' : 'truncate'}`}>{cellText(col, item)}</span>
               )}
             </div>
           ))}
@@ -685,7 +685,7 @@ export function ThermalPreview(props) {
       <div className={`${dividerClass} ${spacing} ${itemsWrapClass}`} style={{ fontSize: style.table }}>
         {items.map((item, index) => (
           <div key={item.name + index}>
-            <p className={`truncate ${boldItems ? 'font-bold' : ''}`}>{item.name}</p>
+            <p className={`break-words ${boldItems ? 'font-bold' : ''}`}>{item.name}</p>
             {showExtras && (item.hsn || item.taxRate) && (
               <p className="text-neutral-400" style={{ fontSize: '0.85em' }}>
                 {[item.hsn ? `HSN ${item.hsn}` : '', item.taxRate ? `${item.taxRate}% GST` : ''].filter(Boolean).join(' · ')}
