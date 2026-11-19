@@ -520,10 +520,23 @@ export const REPORT_CONFIG = {
       { key: 'max_tax_amount', type: 'number', label: 'Max Tax Amount' },
     ],
     summaryCards: [
-      { keys: ['output_gst'], label: 'Output GST', format: 'currency' },
-      { keys: ['input_gst'], label: 'Input GST', format: 'currency' },
-      { keys: ['net_gst'], label: 'Net GST', format: 'currency' },
+      // The transaction view (group_by=transaction) names them output_tax_amount / input_tax_amount / net_tax_amount;
+      // the aggregate view output_gst / input_gst / net_gst. The CGST / SGST / IGST / Unsplit split of each group is in
+      // the "GST split" table under the cards (components/GstSplitSummary.jsx).
+      { keys: ['output_gst', 'output_tax_amount'], label: 'Output GST', format: 'currency' },
+      { keys: ['input_gst', 'input_tax_amount'], label: 'Input GST', format: 'currency' },
+      { keys: ['net_gst', 'net_tax_amount'], label: 'Net GST', format: 'currency' },
     ],
+    // Unsplit tax is tax on a document whose party state is unknown (its cgst / sgst / igst are null). The backend's
+    // meta.columns does not list it, so it is appended after the table's own columns (see normalizeRow).
+    extraColumns: [col('unsplit_tax_amount', 'Unsplit tax', 'currency', { align: 'right' })],
+    // Per row: use the API's unsplit_tax_amount when it sends one; otherwise a row whose cgst / sgst / igst are all null
+    // (state unknown) has its whole tax_amount unsplit, any other row has none.
+    normalizeRow: (row) => {
+      if (row.unsplit_tax_amount !== undefined && row.unsplit_tax_amount !== null) return row
+      const stateUnknown = [row.cgst_total, row.sgst_total, row.igst_total].every((value) => value === null || value === undefined)
+      return { ...row, unsplit_tax_amount: stateUnknown ? Number(row.tax_amount) || 0 : 0 }
+    },
     columns: [
       col('date', 'Date', 'date'),
       col('invoice_number', 'Invoice #', 'text'),
@@ -532,11 +545,11 @@ export const REPORT_CONFIG = {
       col('invoice_type', 'Invoice Type', 'status'),
       col('gst_classification', 'GST Classification', 'status'),
       col('taxable_value', 'Taxable Value', 'currency', { align: 'right' }),
-      // Never derive/guess a CGST/SGST split here. The columns below appear only if the report API sends
-      // cgst_amount / sgst_amount on its rows (shown exactly as returned); the live payload currently has
-      // only tax_amount, so today the table shows the total.
-      col('cgst_amount', 'CGST', 'currency', { align: 'right', optional: true }),
-      col('sgst_amount', 'SGST', 'currency', { align: 'right', optional: true }),
+      // CGST / SGST / IGST exactly as the API returns them (cgst_total, sgst_total, igst_total); null = the party's
+      // state is unknown, shown as "-" (its tax is in "Unsplit tax"). Never split in the frontend.
+      col('cgst_total', 'CGST', 'currency', { align: 'right', nullText: '-' }),
+      col('sgst_total', 'SGST', 'currency', { align: 'right', nullText: '-' }),
+      col('igst_total', 'IGST', 'currency', { align: 'right', nullText: '-' }),
       col('total_gst', 'Total GST', 'currency', { align: 'right' }),
       col('amount', 'Invoice Amount', 'currency', { align: 'right' }),
       col('status', 'Status', 'status'),

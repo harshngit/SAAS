@@ -32,7 +32,8 @@ export function formatSummaryValue(value, format) {
 }
 
 export function formatCellValue(value, column) {
-  if (value === undefined || value === null || value === '') return '—'
+  // A column can choose its own empty text (GST split columns show "-" when the party's state is unknown).
+  if (value === undefined || value === null || value === '') return column.nullText ?? '—'
   switch (column.type) {
     case 'currency':
       return formatCurrency(Number(value) || 0)
@@ -73,6 +74,7 @@ function normalizeBackendColumn(entry, fallbackByKey) {
     refType: fallback?.refType,
     idKey: fallback?.idKey,
     signed: fallback?.signed,
+    nullText: fallback?.nullText,
   }
 }
 
@@ -83,11 +85,15 @@ function humanizeKeyLocal(key = '') {
 // Source of truth for a report's table schema: backend `meta.columns` when the response sends a
 // non-empty array, the report's own fallback column config otherwise. NEVER Object.keys(rows[0]) -
 // an empty page, or a row missing a field another row has, would silently mis-render the table.
-export function resolveColumns(report, fallbackColumns = []) {
+// extraColumns: columns the report always wants shown even when the backend's meta.columns does not list them
+// (GST "Unsplit tax"); they are appended only when meta.columns does not already contain that key.
+export function resolveColumns(report, fallbackColumns = [], extraColumns = []) {
   const metaColumns = report?.meta?.columns
   if (Array.isArray(metaColumns) && metaColumns.length > 0) {
-    const fallbackByKey = new Map(fallbackColumns.map((column) => [column.key, column]))
-    return metaColumns.map((entry) => normalizeBackendColumn(entry, fallbackByKey))
+    const fallbackByKey = new Map([...fallbackColumns, ...extraColumns].map((column) => [column.key, column]))
+    const resolved = metaColumns.map((entry) => normalizeBackendColumn(entry, fallbackByKey))
+    const have = new Set(resolved.map((column) => column.key))
+    return [...resolved, ...extraColumns.filter((column) => !have.has(column.key))]
   }
   // A fallback column marked `optional` (e.g. GST report cgst_amount / sgst_amount) is shown only when the
   // API actually returns that field on at least one row - the value is shown exactly as sent, never derived.
