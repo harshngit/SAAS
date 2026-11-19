@@ -39,6 +39,16 @@ const WholeNumberInput = forwardRef(function WholeNumberInput(
     }
   }, [value])
 
+  // While the box holds a rejected text the form still has the LAST valid quantity, so the row's Amount would
+  // keep showing the total for that old number (2.5 typed -> Amount of 2). The row is marked here and the
+  // Amount cell (data-line-amount) shows "—" instead (see index.css).
+  useEffect(() => {
+    const row = innerRef.current?.closest('tr, [data-line-row]')
+    if (!row || rejected === null) return undefined
+    row.setAttribute('data-qty-invalid', 'true')
+    return () => row.removeAttribute('data-qty-invalid')
+  }, [rejected])
+
   // Registered while invalid so the form can refuse to save; cleaned up when the box goes away (row removed).
   useEffect(() => {
     setWholeNumberInvalid(id, message)

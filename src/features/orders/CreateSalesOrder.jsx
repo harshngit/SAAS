@@ -1558,7 +1558,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                               </button>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-right font-semibold text-neutral-900">
+                          <td data-line-amount className="px-3 py-2.5 text-right font-semibold text-neutral-900">
                             {isInclusiveLine ? formatCurrencyExact(lineTotal) : formatCurrency(lineTotal)}
                             {isInclusiveLine && <span className="block text-[0.62rem] font-normal text-neutral-400">before tax · price incl. GST</span>}
                           </td>
