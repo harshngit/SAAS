@@ -108,10 +108,9 @@ export default function OrderList() {
   const [pageSize, setPageSize] = useState('20')
   const [page, setPage] = useState(1)
   const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
-  // Newest-first ordering from the filter drawer, on the order's real created_at timestamp. The backend does
-  // NOT accept sort_by=updated_at for orders (400 "Invalid sort_by"), so "recently updated" cannot be offered
-  // without inventing a timestamp - only created_at is a real, sortable activity time. A clicked column header
-  // still wins over this, and 'default' sends nothing so the backend order is unchanged.
+  // Optional newest/oldest-created ordering chosen in the filter drawer (sort_by=created_at). 'default' sends nothing, so
+  // every tab keeps its own default (the Confirmed tab sorts by updated_at desc, see serverParams). A clicked column
+  // header still wins over this.
   const [activitySort, setActivitySort] = useState('default')
   const listAbortRef = useRef(null)
   const summaryAbortRef = useRef(null)
@@ -142,6 +141,10 @@ export default function OrderList() {
       ...(dateFrom ? { date_from: dateFrom } : {}),
       ...(dateTo ? { date_to: dateTo } : {}),
       ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+      // Accepted (= the Confirmed tab, status=confirmed) lists the most recently updated orders first. Only that
+      // tab; every other tab keeps the backend's default order. Precedence: a clicked column header (sortParams)
+      // beats an explicit "Sort By" choice in the filter drawer, which beats this default.
+      ...(statusTab === 'confirmed' ? { sort_by: 'updated_at', sort_order: 'desc' } : {}),
       ...(activitySort !== 'default' ? { sort_by: 'created_at', sort_order: activitySort === 'created_asc' ? 'asc' : 'desc' } : {}),
       ...sortParams,
     }
