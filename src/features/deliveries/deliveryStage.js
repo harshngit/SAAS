@@ -195,7 +195,9 @@ export function getNextDeliveryAction(delivery, { isAdmin = false } = {}) {
     case 'ready':
       return { type: 'load', label: 'Load Vehicle' }
     case 'loaded':
-      return { type: 'start_delivery', label: 'Start Delivery' }
+      // No separate "Start Delivery" step any more. A loaded delivery goes straight to completing it; the screen
+      // moves it to in-transit first (the backend refuses loaded -> delivered), see DeliveryDetail.startTripIfNeeded.
+      return { type: 'complete', label: 'Complete Delivery' }
     case 'in_transit':
       return { type: 'complete', label: 'Complete Delivery' }
     case 'partially_delivered':

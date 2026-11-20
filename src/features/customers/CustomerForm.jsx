@@ -212,7 +212,7 @@ const formSections = [
     { name: 'state', label: 'State', description: 'State or province.', type: 'Dropdown/Text', input: 'select' },
     { name: 'country', label: 'Country', description: 'Country.', type: 'Dropdown', input: 'select' },
     { name: 'pinZipCode', label: 'PIN/ZIP Code', description: 'Postal code.', type: 'Text' },
-    { name: 'googleMapsLocation', label: 'Google Maps Location', description: 'Geo-location of customer.', type: 'Map Picker', required: true, input: 'map', placeholder: 'Click Pick, or paste a Google Maps link / coordinates' },
+    { name: 'googleMapsLocation', label: 'Google Maps Location', description: 'Geo-location of customer.', type: 'Map Picker', input: 'map', placeholder: 'Click Pick, or paste a Google Maps link / coordinates' },
   ]),
   section('Business & Tax Information', [
     { name: 'gstNumber', label: 'GSTIN / Tax ID', description: 'Tax registration number.', type: 'Text', placeholder: 'e.g. 27AAAAA0000A1Z5' },
@@ -979,7 +979,6 @@ export default function CustomerForm({
     }
     if (formData.gstNumber && !gstNumberPattern.test(formData.gstNumber.trim().toUpperCase())) nextErrors.gstNumber = 'Enter a valid GST number.'
     if (!formData.billingAddress.trim()) nextErrors.billingAddress = 'Billing address is required.'
-    if (!formData.googleMapsLocation.trim()) nextErrors.googleMapsLocation = 'Google Maps location is required.'
     if (!formData.assignedSalesOfficerId) nextErrors.assignedSalesOfficerId = 'Assign a sales representative.'
     if (formData.creditLimit !== '' && !Number.isFinite(Number(formData.creditLimit))) nextErrors.creditLimit = 'Enter a valid amount.'
     else if (Number(formData.creditLimit) < 0) nextErrors.creditLimit = 'Credit limit cannot be negative.'

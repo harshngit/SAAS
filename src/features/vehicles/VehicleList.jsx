@@ -1,7 +1,7 @@
 import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CarFront, CheckCircle2, Edit, Eye, Plus, RotateCw, Search, Trash2, Truck } from 'lucide-react'
 import { createVehicle, deleteVehicle, listVehicles, updateVehicle } from '../../api/vehicles'
 import { listDeliveryPartners } from '../../api/deliveries'
@@ -40,6 +40,7 @@ import VehicleForm from './VehicleForm'
 
 export default function VehicleList() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   // Explicit demo split (task section 26): demo mode -> demo fixtures only, no real API call;
   // real mode -> real API only, empty response is a real empty state (never a demo fallback).
   const isDemo = DEMO_MODE
@@ -183,6 +184,17 @@ export default function VehicleList() {
     setFormError('')
     setIsFormOpen(true)
   }
+
+  // /admin/vehicles?new=1 (the Add Vehicle button on Vehicle Stock) opens this page's own Add Vehicle form,
+  // so there is still only one vehicle form. The flag is dropped so a refresh does not reopen it.
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return
+    openForm()
+    const next = new URLSearchParams(searchParams)
+    next.delete('new')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSave = async (formData) => {
     setIsSaving(true)

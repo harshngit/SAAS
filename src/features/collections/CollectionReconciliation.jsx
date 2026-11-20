@@ -355,8 +355,8 @@ export default function CollectionReconciliation() {
         <Card className="overflow-hidden p-0">
           <div className="grid grid-cols-2 lg:grid-cols-4">
             {[
-              { label: 'Collected', value: summary ? String(collectedCount) : '—', detail: summary ? `${formatCurrency(collectedAmount)} awaiting + reconciled` : '—', icon: HandCoins },
-              { label: 'Awaiting Reconciliation', value: summary ? String(awaitingReconciliation.count) : '—', detail: summary ? formatCurrency(awaitingReconciliation.amount) : '—', icon: Wallet },
+              { label: 'Collected', value: summary ? String(collectedCount) : '—', detail: summary ? `${formatCurrency(collectedAmount)} pending + reconciled` : '—', icon: HandCoins },
+              { label: 'Pending Admin Confirmation', value: summary ? String(awaitingReconciliation.count) : '—', detail: summary ? formatCurrency(awaitingReconciliation.amount) : '—', icon: Wallet },
               { label: 'Reconciled', value: summary ? String(reconciledStat.count) : '—', detail: summary ? formatCurrency(reconciledStat.amount) : '—', icon: BadgeCheck },
               { label: 'Voided', value: summary ? String(voidedStat.count) : '—', detail: summary ? formatCurrency(voidedStat.amount) : '—', icon: Ban },
             ].map(({ label, value, detail, icon: Icon }, index) => (
@@ -461,7 +461,7 @@ export default function CollectionReconciliation() {
                     onRowClick={(row) => setDetail(row)}
                     emptyTitle={
                       statusFilter === 'recorded'
-                        ? 'No collections waiting for reconciliation.'
+                        ? 'No collections pending admin confirmation.'
                         : statusFilter === 'reconciled'
                           ? 'No reconciled collections yet.'
                           : statusFilter === 'voided'

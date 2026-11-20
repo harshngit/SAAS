@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, RotateCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Plus, RotateCw } from 'lucide-react'
 import { format, isSameDay, isValid, parseISO } from 'date-fns'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -358,10 +358,17 @@ export default function VehicleStockList() {
       <Card className="p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 px-4 py-4">
           <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Today&apos;s Vehicle Load Information</h2>
-          <Button type="button" variant="outline" size="sm" className="h-9 rounded-2xl px-3.5" onClick={loadToday} disabled={todayLoading}>
-            <RotateCw className="size-4" aria-hidden="true" />
-            Refresh
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" className="h-9 rounded-2xl px-3.5" onClick={loadToday} disabled={todayLoading}>
+              <RotateCw className="size-4" aria-hidden="true" />
+              Refresh
+            </Button>
+            {/* Vehicle creation lives in the Vehicles module; this opens its Add Vehicle form. */}
+            <Button type="button" size="sm" className="h-9 rounded-2xl px-3.5" onClick={() => navigate('/admin/vehicles?new=1')}>
+              <Plus className="size-4" aria-hidden="true" />
+              Add Vehicle
+            </Button>
+          </div>
         </div>
         <div className="overflow-x-auto bg-neutral-50/35 py-4">
           <TableState
