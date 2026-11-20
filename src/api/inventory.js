@@ -39,18 +39,32 @@ function authHeader() {
 
 export async function getStockBoard(params = {}) {
   try {
+    // Server-side paging, search and filters (GET /inventory?page&page_size<=100&search&category_id&is_active&sort_by&sort_order).
+    // Response: { items, total, page, page_size, total_pages }. Only parameters that are set are sent.
     const queryParams = {}
 
+    if (params.page) queryParams.page = params.page
+    if (params.page_size) queryParams.page_size = params.page_size
     if (params.search) queryParams.search = params.search
     if (params.category_id) queryParams.category_id = params.category_id
     if (params.is_active !== undefined && params.is_active !== null) queryParams.is_active = params.is_active
+    if (params.sort_by) queryParams.sort_by = params.sort_by
+    if (params.sort_order) queryParams.sort_order = params.sort_order
 
     const { data } = await apiClient.get('/inventory', {
       headers: authHeader(),
       params: queryParams,
     })
 
-    return { success: true, items: Array.isArray(data) ? data : data?.items || [] }
+    const items = Array.isArray(data) ? data : data?.items || []
+    return {
+      success: true,
+      items,
+      total: data?.total ?? items.length,
+      page: data?.page ?? params.page ?? 1,
+      pageSize: data?.page_size ?? params.page_size ?? items.length,
+      totalPages: data?.total_pages ?? 1,
+    }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

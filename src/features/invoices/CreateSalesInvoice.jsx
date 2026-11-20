@@ -19,6 +19,7 @@ import { getDelivery, listDeliveries } from '../../api/deliveries'
 import { listOrders, getOrder } from '../../api/orders'
 import { ORDER_STATUS_VARIANT, formatOrderStatus, getDeliveryStatus } from '../orders/orderHelpers'
 import { listProducts } from '../../api/products'
+import { loadSummaryRows } from '../../utils/listSummary'
 import { listWarehouses } from '../../api/warehouses'
 import { formatCurrency, formatCurrencyExact } from '../../utils/format'
 import { getPaymentMethodFlags, sanitizePaymentDetails } from '../payments/paymentMethodUtils'
@@ -692,7 +693,7 @@ function CreateSalesInvoiceForm() {
 
     let isMounted = true
 
-    Promise.all([listCustomers(), listProducts(), listWarehouses()]).then(([customersResult, productsResult, warehousesResult]) => {
+    Promise.all([listCustomers(), loadSummaryRows(listProducts, 'products', { is_active: true }), listWarehouses()]).then(([customersResult, productsResult, warehousesResult]) => {
       if (!isMounted) return
       if (customersResult.success) setCustomers(customersResult.customers)
       if (productsResult.success) setProducts(productsResult.products)

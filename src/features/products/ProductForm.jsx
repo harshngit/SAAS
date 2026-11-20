@@ -26,7 +26,7 @@ import { listCategories, listSubcategoryVariants, getCategoryBrands } from '../.
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import { listSuppliers } from '../../api/suppliers'
 import { mapProductBackendField } from '../../api/products'
-import { getImageFileError } from '../../utils/imageFile'
+import { getUploadFileError, PRODUCT_FIELD_FILE_KIND } from '../../utils/uploadFileRules'
 import { getFileUrl, uploadFile } from '../../api/files'
 
 const MAX_TOTAL_IMAGES = 5
@@ -255,7 +255,7 @@ const productSections = [
   section('Inventory Information', [
     { name: 'inventoryTracking', label: 'Track inventory', input: 'checkbox' },
     { name: 'unitOfMeasure', label: 'Unit of Measure (UOM)', input: 'select', required: true },
-    { name: 'openingStock', label: 'Opening Stock', input: 'number', step: '1' },
+    { name: 'openingStock', label: 'Opening Stock', input: 'number', whole: true },
     { name: 'variantInventory', label: 'Variant Inventory', input: 'variantInventory', wide: true },
   ]),
   section('Pricing Information', [
@@ -277,7 +277,7 @@ const productSections = [
   section('Purchase Information', [
     { name: 'supplierProductCode', label: 'Supplier Product Code' },
     { name: 'leadTime', label: 'Lead Time', placeholder: 'e.g. 7 days' },
-    { name: 'minimumOrderQuantity', label: 'Minimum Order Quantity', input: 'number', step: '1' },
+    { name: 'minimumOrderQuantity', label: 'Minimum Order Quantity', input: 'number', whole: true },
     { name: 'purchaseUnit', label: 'Purchase Unit', input: 'select' },
   ]),
   section('Physical Specifications', [
@@ -294,7 +294,7 @@ const productSections = [
   section('Digital Product Information', [
     { name: 'downloadableProduct', label: 'Downloadable Product', input: 'checkbox' },
     { name: 'licenseKeyRequired', label: 'License Key Required', input: 'checkbox' },
-    { name: 'downloadLimit', label: 'Download Limit', input: 'number', step: '1' },
+    { name: 'downloadLimit', label: 'Download Limit', input: 'number', whole: true },
     { name: 'downloadFile', label: 'Download File', input: 'compactFile', accept: '.zip,.pdf,image/*' },
   ]),
   section('Additional Information', [
@@ -396,9 +396,10 @@ function withCurrentOption(scopedOptions, currentValue, allOptions) {
   return fallback ? [fallback, ...scopedOptions] : scopedOptions
 }
 
-function ProductUploadField({ field, value, isUploading, onFileSelected, onRemove }) {
+function ProductUploadField({ field, value, isUploading, onFileSelected, onRemove, error }) {
   return (
-    <div className="flex min-h-28 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+    <div className="min-w-0">
+    <div className={`flex min-h-28 items-center rounded-xl border bg-neutral-50 px-4 py-3 ${error ? 'border-red-300' : 'border-neutral-200'}`}>
       <div className="grid w-full grid-cols-1 gap-3 xl:grid-cols-[minmax(10rem,1fr)_auto_auto] xl:items-center">
         <div className="min-w-0 pr-2">
           <p className="text-sm font-semibold leading-5 text-neutral-900">
@@ -444,6 +445,8 @@ function ProductUploadField({ field, value, isUploading, onFileSelected, onRemov
         </div>
       </div>
     </div>
+    {error && <p role="alert" className="mt-1 text-xs text-red-600">{error}</p>}
+    </div>
   )
 }
 
@@ -455,6 +458,7 @@ export default function ProductForm({
   saving = false,
   formError = '',
   formErrorFields = [],
+  formFieldErrors = {},
   catalogProducts = [],
 }) {
   const { visible, required, visibleErrors } = useFormFieldSettings('product')
@@ -476,6 +480,9 @@ export default function ProductForm({
   const [uploadingFields, setUploadingFields] = useState({})
   const [documentUploadError, setDocumentUploadError] = useState('')
   const [validationBanner, setValidationBanner] = useState('')
+  // Files picked under Documents > Other Attachments on a NEW product. They are sent to the product's attachment API
+  // right after the product exists (that API needs the product id), see ProductList.handleSaveProduct.
+  const [pendingAttachments, setPendingAttachments] = useState([])
 
   useEffect(() => {
     let cancelled = false
@@ -505,6 +512,7 @@ export default function ProductForm({
   const isFirstSection = activeSectionIndex <= 0
   const isLastSection = activeSectionIndex === visibleSections.length - 1
   const hasChanges = !product || JSON.stringify(formData) !== JSON.stringify(initialFormData)
+  const anyUploading = Object.values(uploadingFields).some(Boolean)
   const totalImageCount = (formData.coverImage ? 1 : 0) + formData.images.length
   const suggestionOptions = useMemo(() => {
     const collect = (...groups) =>
@@ -652,18 +660,26 @@ export default function ProductForm({
     if (!formErrorFields || formErrorFields.length === 0) return
 
     const mappedFieldName = formErrorFields.map(mapProductBackendField).find(Boolean)
-    if (!mappedFieldName) return
+    const fieldErrorNames = Object.keys(formFieldErrors || {})
+    const jumpTo = fieldErrorNames[0] || mappedFieldName
+    if (!jumpTo) return
 
-    const sectionWithError = findSectionForErrorField(productSections, mappedFieldName)
+    const sectionWithError = findSectionForErrorField(productSections, jumpTo)
     if (sectionWithError) setActiveSection(sectionWithError.id)
     if (['brand', 'brandId'].includes(mappedFieldName)) setErrors((current) => ({ ...current, brand: formError }))
-  }, [formErrorFields, formError])
+    // Backend messages go under the field they belong to (SKU 409, cover_image 400, pricing / opening_stock 422).
+    if (fieldErrorNames.length) setErrors((current) => ({ ...current, ...formFieldErrors }))
+    setTimeout(() => document.querySelector('form [role="alert"], form .text-red-600')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 150)
+  }, [formErrorFields, formError, formFieldErrors])
 
   if (!isOpen) return null
 
   const updateField = (field, value) => {
     // The two tax-inclusive checkboxes write the same backend field (pricing.tax_inclusive) - keep them in step.
-    const linked = field === 'taxInclusive' || field === 'taxInclusivePrice' ? { taxInclusive: Boolean(value), taxInclusivePrice: Boolean(value) } : {}
+    const linked = field === 'taxInclusive' || field === 'taxInclusivePrice'
+      ? { taxInclusive: Boolean(value), taxInclusivePrice: Boolean(value) }
+      // Track inventory OFF: nothing is tracked, so Opening Stock is 0 (and disabled) until it is switched on again.
+      : field === 'inventoryTracking' && !value ? { openingStock: '0' } : {}
     setFormData((current) => ({ ...current, [field]: value, ...linked }))
     setErrors((current) => ({ ...current, [field]: '' }))
   }
@@ -675,6 +691,12 @@ export default function ProductForm({
     if (!file) return
 
     setDocumentUploadError('')
+    // Wrong file type -> stopped here, nothing is uploaded; the message sits under the field.
+    const typeError = getUploadFileError(file, PRODUCT_FIELD_FILE_KIND[field])
+    if (typeError) {
+      setErrors((current) => ({ ...current, [field]: typeError }))
+      return
+    }
     setUploadingFields((current) => ({ ...current, [field]: true }))
 
     const result = await uploadFile(file)
@@ -682,7 +704,7 @@ export default function ProductForm({
     setUploadingFields((current) => ({ ...current, [field]: false }))
 
     if (!result.success) {
-      setDocumentUploadError(result.error)
+      setErrors((current) => ({ ...current, [field]: result.error }))
       return
     }
 
@@ -692,11 +714,33 @@ export default function ProductForm({
   // Same immediate upload-then-store pattern as handleDocumentUpload, just writing into a
   // variant's own imageUrl instead of a top-level field - works identically whether the product
   // is new or already saved, since the image only rides along inside `variations` on Save.
+  const handleAttachmentsPicked = (event) => {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (files.length === 0) return
+    const rejected = files.map((file) => ({ file, message: getUploadFileError(file, 'attachment') })).find((entry) => entry.message)
+    if (rejected) {
+      setErrors((current) => ({ ...current, otherAttachmentsName: `${rejected.file.name}: ${rejected.message}` }))
+      return
+    }
+    if (pendingAttachments.length + files.length > 10) {
+      setErrors((current) => ({ ...current, otherAttachmentsName: 'You can attach up to 10 files.' }))
+      return
+    }
+    setErrors((current) => ({ ...current, otherAttachmentsName: '' }))
+    setPendingAttachments((current) => [...current, ...files])
+  }
+
   const handleVariantImageUpload = async (index, file) => {
     if (!file) return
 
     const fieldKey = `variantImage-${index}`
     setDocumentUploadError('')
+    const typeError = getUploadFileError(file, 'image')
+    if (typeError) {
+      setDocumentUploadError(typeError)
+      return
+    }
     setUploadingFields((current) => ({ ...current, [fieldKey]: true }))
 
     const result = await uploadFile(file)
@@ -728,6 +772,26 @@ export default function ProductForm({
     if (!formData.hasVariants && Number(formData.sellingPrice) < 0) nextErrors.sellingPrice = 'Selling price cannot be negative.'
     if (!formData.hasVariants && !formData.sellingPrice && formData.sellingPrice !== 0) nextErrors.sellingPrice = 'Selling price is required.'
     if (formData.inventoryTracking && !formData.unitOfMeasure) nextErrors.unitOfMeasure = 'UOM is required for inventory-managed products.'
+    // A NEW product needs its Primary Product Image (uploaded first); an existing one without an image can still be edited.
+    if (!product && !formData.coverImage) nextErrors.coverImage = uploadingFields.coverImage ? 'The primary product image is still uploading.' : 'Primary product image is required.'
+    // Numbers are checked as typed - nothing is rounded or corrected for the person.
+    if (!formData.hasVariants) {
+      for (const [fieldName, label] of [['mrp', 'MRP'], ['wholesalePrice', 'Wholesale price'], ['dealerPrice', 'Dealer price']]) {
+        const raw = formData[fieldName]
+        if (raw === '' || raw == null) continue
+        if (!Number.isFinite(Number(raw))) nextErrors[fieldName] = `${label} must be a number.`
+        else if (Number(raw) < 0) nextErrors[fieldName] = `${label} cannot be negative.`
+      }
+      const discountRaw = formData.discountPercent
+      if (discountRaw !== '' && discountRaw != null && (!Number.isFinite(Number(discountRaw)) || Number(discountRaw) < 0 || Number(discountRaw) > 100)) nextErrors.discountPercent = 'Discount must be between 0 and 100.'
+    }
+    for (const [fieldName, label] of [['openingStock', 'Opening stock'], ['minimumOrderQuantity', 'Minimum order quantity'], ['downloadLimit', 'Download limit']]) {
+      if (fieldName === 'openingStock' && !formData.inventoryTracking) continue
+      const raw = String(formData[fieldName] ?? '').trim()
+      if (raw === '') continue
+      if (Number.isFinite(Number(raw)) && Number(raw) < 0) nextErrors[fieldName] = `${label} cannot be negative.`
+      else if (!/^\d+$/.test(raw)) nextErrors[fieldName] = 'Please enter a whole number.'
+    }
     // Variant problems are reported per row as variantRow.<key>.<field> -> a readable message such as
     // "Variant 2 (Blue): enter a selling price." The Variant List shows these above the table, puts a
     // red border on the offending input, and the top banner quotes the first one.
@@ -751,8 +815,10 @@ export default function ProductForm({
       }
 
       Object.entries(inventory).forEach(([field, value]) => {
-        if (value !== '' && Number(value) < 0) {
+        if (value !== '' && value != null && Number(value) < 0) {
           nextErrors[`variantInventory.${variant.id || index}.${field}`] = `${variantLabel}: stock values cannot be negative.`
+        } else if (value !== '' && value != null && !/^\d+$/.test(String(value).trim())) {
+          nextErrors[`variantInventory.${variant.id || index}.${field}`] = `${variantLabel}: please enter a whole number.`
         }
       })
 
@@ -764,6 +830,18 @@ export default function ProductForm({
         nextErrors[`variantInventory.${variant.id || index}.minimumStockLevel`] = `${variantLabel}: Min must be less than or equal to Max.`
       }
     })
+
+    // Two variants with the same combination (Small / small / " Small ") cannot both be created.
+    if (formData.hasVariants) {
+      const normalizeCombination = (name) => String(name || '').split('/').map((part) => part.trim().replace(/\s+/g, ' ')).join('/').toLowerCase()
+      const seen = new Set()
+      formData.variants.forEach((variant, index) => {
+        const key = normalizeCombination(variant.size)
+        if (!key) return
+        if (seen.has(key)) nextErrors[`variantRow.${variant.id || index}.size`] = `Variant ${index + 1} (${variant.size.trim()}): Duplicate variant combination is not allowed.`
+        else seen.add(key)
+      })
+    }
 
     const shownErrors = visibleErrors(nextErrors)
     setErrors(shownErrors)
@@ -778,18 +856,21 @@ export default function ProductForm({
     if (!file) return
 
     setImageError('')
-    const validationError = getImageFileError(file)
+    const validationError = getUploadFileError(file, 'image')
     if (validationError) {
-      setImageError(validationError)
+      setErrors((current) => ({ ...current, coverImage: validationError }))
       return
     }
 
+    // Upload first, create the product afterwards: POST /files/upload -> "/files/{id}" -> cover_image on POST /products.
+    // If the upload fails nothing is selected, so Add Product stays blocked and no product is created.
+    setErrors((current) => ({ ...current, coverImage: '' }))
     setUploadingFields((current) => ({ ...current, coverImage: true }))
     const result = await uploadFile(file)
     setUploadingFields((current) => ({ ...current, coverImage: false }))
 
     if (!result.success) {
-      setImageError(result.error)
+      setErrors((current) => ({ ...current, coverImage: result.error }))
       return
     }
     updateField('coverImage', result.file.path)
@@ -813,7 +894,7 @@ export default function ProductForm({
       setImageError(`Only ${remainingSlots} more image${remainingSlots === 1 ? '' : 's'} can be added.`)
     }
 
-    const invalid = filesToUpload.map((file) => getImageFileError(file)).find(Boolean)
+    const invalid = filesToUpload.map((file) => getUploadFileError(file, 'image')).find(Boolean)
     if (invalid) {
       setImageError(invalid)
       return
@@ -845,13 +926,16 @@ export default function ProductForm({
       ...nextData,
       variants: variants.map((variant) => ({
         ...variant,
-        inventory: normalizeVariantInventory(variant),
+        // Track inventory OFF -> a new variant's opening stock is 0 as well.
+        inventory: nextData.inventoryTracking ? normalizeVariantInventory(variant) : { ...normalizeVariantInventory(variant), openingStock: 0 },
       })),
     }
   }
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    // No second submit while a file or the product itself is being saved.
+    if (saving || anyUploading) return
     setValidationBanner('')
 
     const nextErrors = validate()
@@ -887,7 +971,10 @@ export default function ProductForm({
       productTypeId: syncedData.productTypeId || null,
       productType: product?.legacyProductType ?? (syncedData.productTypeId ? '' : syncedData.productType.trim()),
       price: Number(syncedData.sellingPrice) || 0,
-      totalInventory: syncedData.variants.length ? (syncedData.variants.every((variant) => variant.inventory.openingStock !== '') ? totalVariantInventory : undefined) : Number(syncedData.openingStock) || 0,
+      // Track inventory OFF -> Opening Stock is sent as 0.
+      openingStock: syncedData.inventoryTracking ? syncedData.openingStock : 0,
+      attachmentFiles: product ? undefined : pendingAttachments,
+      totalInventory: syncedData.variants.length ? (syncedData.variants.every((variant) => variant.inventory.openingStock !== '') ? totalVariantInventory : undefined) : (syncedData.inventoryTracking ? Number(syncedData.openingStock) || 0 : 0),
       isActive: syncedData.status === 'active',
       variants: syncedData.variants.map((variant) => ({
         ...variant,
@@ -1279,7 +1366,7 @@ export default function ProductForm({
                               min="0"
                               step="1"
                               value={inventory[inventoryField.key] ?? ''}
-                              disabled={inventoryField.key === 'openingStock' && Boolean(variant.id) && !variant.isNew}
+                              disabled={inventoryField.key === 'openingStock' && ((Boolean(variant.id) && !variant.isNew) || !formData.inventoryTracking)}
                               title={inventoryField.key === 'openingStock' && variant.id && !variant.isNew ? 'Use Inventory stock adjustment to change saved stock.' : undefined}
                               onChange={(event) => updateVariantInventory(index, inventoryField.key, event.target.value)}
                               aria-label={`${variantName} ${inventoryField.label}`}
@@ -1494,10 +1581,44 @@ export default function ProductForm({
       )
     }
 
+    if (field.name === 'otherAttachmentsName') {
+      // Attachments belong to a saved product. On a new product the picked files wait here and go to the product's
+      // attachment API as soon as the product exists; on an existing product they are managed on its detail page.
+      if (product) {
+        return <p className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">Other attachments are managed on the Product Detail page (Attachments).</p>
+      }
+      return (
+        <div className="min-w-0">
+          <div className={`rounded-xl border bg-neutral-50 px-4 py-3 ${errors.otherAttachmentsName ? 'border-red-300' : 'border-neutral-200'}`}>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-neutral-900">{field.label}<span className="ml-1 text-xs font-normal text-neutral-400">PDF, DOCX, PNG or JPG - up to 10 files</span></p>
+              <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-linear-to-b from-primary-500 to-primary-600 px-4 text-xs font-medium tracking-tight text-white">
+                <Upload className="size-3.5" aria-hidden="true" />
+                Add files
+                <input type="file" multiple accept={field.accept} className="sr-only" disabled={saving} onChange={handleAttachmentsPicked} />
+              </label>
+            </div>
+            {pendingAttachments.length > 0 && (
+              <ul className="mt-3 space-y-1.5">
+                {pendingAttachments.map((file, index) => (
+                  <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs text-neutral-700">
+                    <span className="truncate">{file.name}</span>
+                    <button type="button" disabled={saving} onClick={() => setPendingAttachments((current) => current.filter((_, fileIndex) => fileIndex !== index))} aria-label={`Remove ${file.name}`} className="text-neutral-400 hover:text-red-600"><Trash2 className="size-3.5" /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {errors.otherAttachmentsName && <p role="alert" className="mt-1 text-xs text-red-600">{errors.otherAttachmentsName}</p>}
+        </div>
+      )
+    }
+
     if (field.input === 'file') {
       return (
         <ProductUploadField
           field={field}
+          error={errors[field.name]}
           value={formData[field.name]}
           isUploading={Boolean(uploadingFields[field.name])}
           onFileSelected={(file) => handleDocumentUpload(field.name, file)}
@@ -1551,6 +1672,7 @@ export default function ProductForm({
               </Button>
             </div>
           </div>
+          {errors[field.name] && <p role="alert" className="text-xs text-red-600">{errors[field.name]}</p>}
         </div>
       )
     }
@@ -1598,13 +1720,14 @@ export default function ProductForm({
               </Button>
             </div>
           </div>
+          {errors.videoUrl && <p role="alert" className="text-xs text-red-600">{errors.videoUrl}</p>}
         </div>
       )
     }
 
     if (field.input === 'image') {
       return (
-        <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-5 py-4" style={{ minHeight: '13rem' }}>
+        <div className={`rounded-xl border bg-neutral-50 px-5 py-4 ${errors.coverImage ? 'border-red-300' : 'border-neutral-200'}`} style={{ minHeight: '13rem' }}>
           <div className="flex h-full flex-col gap-3">
             <div className="min-h-10 min-w-0">
               <p className="text-sm font-semibold leading-5 text-neutral-900">
@@ -1644,6 +1767,7 @@ export default function ProductForm({
                 Remove
               </Button>
             </div>
+            {errors.coverImage && <p role="alert" className="text-xs text-red-600">{errors.coverImage}</p>}
           </div>
         </div>
       )
@@ -1710,20 +1834,29 @@ export default function ProductForm({
       )
     }
 
-    return (
+    // Whole-number fields are text boxes so what is typed ("2.5", "-1", "abc") stays visible and gets a clear message
+    // on Save instead of being dropped or rounded by the browser.
+    const stockOff = field.name === 'openingStock' && !formData.inventoryTracking
+    const input = (
       <Input
         {...commonProps}
-        disabled={field.name === 'openingStock' && Boolean(product)}
-        type={field.input === 'number' ? 'number' : field.input === 'date' ? 'date' : field.input === 'url' ? 'url' : 'text'}
-        min={field.input === 'number' ? '0' : undefined}
-        step={field.input === 'number' ? field.step : undefined}
+        value={stockOff ? '0' : commonProps.value}
+        disabled={field.name === 'openingStock' && (Boolean(product) || stockOff)}
+        type={field.whole ? 'text' : field.input === 'number' ? 'number' : field.input === 'date' ? 'date' : field.input === 'url' ? 'url' : 'text'}
+        inputMode={field.whole ? 'numeric' : undefined}
+        min={field.input === 'number' && !field.whole ? '0' : undefined}
+        step={field.input === 'number' && !field.whole ? field.step : undefined}
       />
     )
+    return stockOff
+      ? <div className="space-y-1">{input}<p className="text-xs text-neutral-500">Inventory is not tracked, so Opening Stock stays 0.</p></div>
+      : input
   }
 
   return (
     <form
       onSubmit={handleSubmit}
+      noValidate
       className="w-full overflow-hidden rounded-2xl border border-neutral-100 bg-surface shadow-(--shadow-card)"
     >
       <div className="grid min-h-[34rem]" style={{ gridTemplateColumns: '17rem minmax(0, 1fr)' }}>
@@ -1732,6 +1865,8 @@ export default function ProductForm({
             {visibleSections.map((sectionItem) => {
               const Icon = sectionItem.icon
               const isActive = sectionItem.id === activeSection
+              // A tab that holds a field with an error is marked red so the person does not have to guess where it is.
+              const hasError = Object.entries(errors).some(([key, value]) => value && findSectionForErrorField(productSections, key)?.id === sectionItem.id)
 
               return (
                 <button
@@ -1745,7 +1880,8 @@ export default function ProductForm({
                   }`}
                 >
                   <Icon className="size-4 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{sectionItem.title}</span>
+                  <span className={`truncate ${hasError ? 'text-red-600' : ''}`}>{sectionItem.title}</span>
+                  {hasError && <span className="ml-auto size-2 shrink-0 rounded-full bg-red-500" aria-label="This tab has an error" />}
                 </button>
               )
             })}
@@ -1788,7 +1924,7 @@ export default function ProductForm({
               Back
             </Button>
             {isLastSection ? (
-              <Button type="submit" loading={saving} disabled={!hasChanges}>
+              <Button type="submit" loading={saving} disabled={!hasChanges || anyUploading}>
                 {product ? 'Save Changes' : 'Add Product'}
               </Button>
             ) : (

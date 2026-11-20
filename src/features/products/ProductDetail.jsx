@@ -109,6 +109,7 @@ export default function ProductDetail() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [formFieldErrors, setFormFieldErrors] = useState({})
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [statusError, setStatusError] = useState('')
@@ -206,6 +207,7 @@ export default function ProductDetail() {
   const handleSaveProduct = async (productData) => {
     setIsSaving(true)
     setFormError('')
+    setFormFieldErrors({})
 
     const result = await updateProduct(product.id, productData)
 
@@ -213,6 +215,7 @@ export default function ProductDetail() {
 
     if (!result.success) {
       setFormError(result.error)
+      setFormFieldErrors(result.fieldErrors || {})
       return
     }
 
@@ -303,6 +306,7 @@ export default function ProductDetail() {
         onSave={handleSaveProduct}
         saving={isSaving}
         formError={formError}
+        formFieldErrors={formFieldErrors}
       />
     )
   }

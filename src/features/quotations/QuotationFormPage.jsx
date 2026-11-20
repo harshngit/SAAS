@@ -16,6 +16,7 @@ import { createQuotation, getQuotation, updateQuotation } from '../../api/quotat
 import { listCustomers } from '../../api/customers'
 import { listLeads } from '../../api/leads'
 import { listProducts } from '../../api/products'
+import { pickableProducts } from '../../utils/activeProducts'
 import { listUsers } from '../../api/users'
 import { normalizeApiUser } from '../users/userRoleUtils'
 import { useAuthStore } from '../../store/authStore'
@@ -125,7 +126,8 @@ export default function QuotationFormPage() {
       const [customersResult, leadsResult, productsResult, usersResult] = await Promise.all([
         listCustomers(),
         listLeads(),
-        loadSummaryRows(listProducts, 'products'),
+        // New quotation: active products only (GET /products?is_active=true). Edit / duplicate load all so saved lines resolve.
+        loadSummaryRows(listProducts, 'products', !editId && !fromId ? { is_active: true } : {}),
         isSalesOfficer ? Promise.resolve({ success: true, users: [] }) : listUsers(),
       ])
       if (!isMounted) return
@@ -628,7 +630,7 @@ export default function QuotationFormPage() {
             <div>
               <ProductPickerList
               enforceVariantStock={false}
-                products={products}
+                products={pickableProducts(products, formData.items.map((item) => item.productId))}
                 orderItems={formData.items}
                 isLoading={isLoadingOptions}
                 onSetQuantity={setPickerQuantity}
