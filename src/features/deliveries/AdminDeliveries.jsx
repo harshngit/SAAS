@@ -14,7 +14,7 @@ import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { uniqueOptions } from '../../utils/filterOptions'
 
-const PAGE_SIZE = 20
+const DEFAULT_PAGE_SIZE = 25
 const MAX_FULL_LOAD_PAGES = 50
 
 // Maps this page's fine-grained UI stage keys to the backend's own `GET /deliveries?status=`
@@ -53,6 +53,7 @@ export default function AdminDeliveries() {
   const [deliveries, setDeliveries] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [partners, setPartners] = useState([])
@@ -124,7 +125,7 @@ export default function AdminDeliveries() {
     }
 
     if (!clientFiltered) {
-      const result = await listDeliveries({ ...base, page: fetchPage, page_size: PAGE_SIZE })
+      const result = await listDeliveries({ ...base, page: fetchPage, page_size: pageSize })
       if (!result.success) {
         setDeliveries([])
         setTotal(0)
@@ -156,7 +157,7 @@ export default function AdminDeliveries() {
     setDeliveries(rows)
     setTotal(rows.length)
     setIsLoading(false)
-  }, [fetchPage, clientFiltered, partnerFilter, statusFilter, debouncedSearch])
+  }, [fetchPage, pageSize, clientFiltered, partnerFilter, statusFilter, debouncedSearch])
 
   useEffect(() => {
     loadDeliveries()
@@ -216,8 +217,8 @@ export default function AdminDeliveries() {
   }, [deliveries, statusFilter, vehicleFilter, dateFrom, dateTo])
 
   const shownTotal = clientFiltered ? filteredDeliveries.length : total
-  const totalPages = Math.max(1, Math.ceil(shownTotal / PAGE_SIZE))
-  const visibleDeliveries = clientFiltered ? filteredDeliveries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : filteredDeliveries
+  const totalPages = Math.max(1, Math.ceil(shownTotal / pageSize))
+  const visibleDeliveries = clientFiltered ? filteredDeliveries.slice((page - 1) * pageSize, page * pageSize) : filteredDeliveries
 
   return (
     <div className="listing-page space-y-4">
@@ -346,9 +347,11 @@ export default function AdminDeliveries() {
               ]}
               serverPagination
               page={page}
+              pageSize={pageSize}
               totalPages={totalPages}
               totalCount={shownTotal}
               onPageChange={setPage}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
             />
           </>
         )}

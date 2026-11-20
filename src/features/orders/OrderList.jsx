@@ -49,7 +49,7 @@ const formatDate = (value) => {
   }
 }
 
-const PAGE_SIZE_OPTIONS = [{ value: '20', label: '20' }, { value: '25', label: '25' }, { value: '50', label: '50' }]
+const PAGE_SIZE_OPTIONS = [{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }, { value: '100', label: '100' }]
 
 function OrderSummaryCard({ label, value, detail, index }) {
   return (
@@ -105,7 +105,7 @@ export default function OrderList() {
   const [customerFilter, setCustomerFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearch = useDebouncedValue(searchTerm, 350)
-  const [pageSize, setPageSize] = useState('20')
+  const [pageSize, setPageSize] = useState('25')
   const [page, setPage] = useState(1)
   const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
   // Optional newest/oldest-created ordering chosen in the filter drawer (sort_by=created_at). 'default' sends nothing, so

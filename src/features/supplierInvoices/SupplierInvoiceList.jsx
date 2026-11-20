@@ -1,4 +1,5 @@
 import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -40,7 +41,7 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
-const PAGE_SIZE = 25
+const DEFAULT_PAGE_SIZE = 25
 
 const sortOptions = [
   { value: 'recent', label: 'Recent' },
@@ -108,10 +109,20 @@ export default function SupplierInvoiceList() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   // Column-header sorting (backend sort_by/sort_order, GET /supplier-invoices supports it) takes
   // priority over the existing Recent/Oldest/Due Date toolbar control, which only ever re-sorts
   // the already-fetched current page - see `rows` below for how the two compose.
   const { sortBy: headerSortBy, sortOrder: headerSortOrder, toggleSort, sortParams } = useSortState()
+
+  // The Sort By choice in the drawer (Recent / Oldest / Due date) is sent to the backend like a header sort, so it orders the WHOLE
+  // result before it is cut into pages (sorting only the page on screen would reshuffle rows inside each page but never move a row
+  // from page 3 to page 1). A clicked column header still wins.
+  const effectiveSort = useMemo(() => {
+    if (sortParams.sort_by) return sortParams
+    if (sortFilter === 'dueDate') return { sort_by: 'due_date', sort_order: 'asc' }
+    return { sort_by: 'invoice_date', sort_order: sortFilter === 'oldest' ? 'asc' : 'desc' }
+  }, [sortParams, sortFilter])
 
   const handleSort = (field) => {
     toggleSort(field)
@@ -141,8 +152,8 @@ export default function SupplierInvoiceList() {
       payment_status: paymentStatusFilter,
       search: search.trim() || undefined,
       page,
-      page_size: PAGE_SIZE,
-      ...sortParams,
+      page_size: pageSize,
+      ...effectiveSort,
     })
     setServerLoading(false)
     if (!result.success) {
@@ -153,7 +164,7 @@ export default function SupplierInvoiceList() {
     }
     setServerInvoices(result.invoices)
     setServerTotal(result.total)
-  }, [dateActive, lifecycleFilter, page, paymentStatusFilter, search, supplierFilter, verificationFilter, sortParams])
+  }, [dateActive, lifecycleFilter, page, pageSize, paymentStatusFilter, search, supplierFilter, verificationFilter, effectiveSort])
 
   useEffect(() => {
     load()
@@ -187,17 +198,17 @@ export default function SupplierInvoiceList() {
         search: search.trim() || undefined,
         page: pageNumber,
         page_size: size,
-        ...sortParams,
+        ...effectiveSort,
       })
       return result.success ? { success: true, rows: result.invoices, total: result.total } : result
     }),
-    [supplierFilter, lifecycleFilter, verificationFilter, paymentStatusFilter, search, sortParams],
+    [supplierFilter, lifecycleFilter, verificationFilter, paymentStatusFilter, search, effectiveSort],
   )
   const dateMatches = useMemo(
     () => (dateActive ? fullList.rows.filter((invoice) => isWithinDateRange(invoice.invoiceDate, dateFrom, dateTo)) : []),
     [dateActive, fullList.rows, dateFrom, dateTo],
   )
-  const realInvoices = dateActive ? dateMatches.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : serverInvoices
+  const realInvoices = dateActive ? dateMatches.slice((page - 1) * pageSize, page * pageSize) : serverInvoices
   const realTotal = dateActive ? dateMatches.length : serverTotal
   const isLoading = dateActive ? fullList.loading : serverLoading
   const loadError = dateActive ? fullList.error : serverError
@@ -426,13 +437,7 @@ export default function SupplierInvoiceList() {
           )}
         </div>
         {!DEMO_MODE && !isLoading && !loadError && (
-          <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-sm text-neutral-500">
-            <span>Page {page} of {Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} · {realTotal} invoices</span>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
-              <Button type="button" variant="outline" size="sm" disabled={page >= Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} onClick={() => setPage((value) => value + 1)}>Next</Button>
-            </div>
-          </div>
+          <PaginationFooter page={page} pageSize={pageSize} total={realTotal} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
         )}
       </Card>
     </div>

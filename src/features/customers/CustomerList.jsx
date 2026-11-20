@@ -709,7 +709,7 @@ export default function CustomerList() {
             <span>Showing <span className="font-semibold text-fg">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-fg">{filteredCustomers.length}</span></span>
             <span className="hidden text-neutral-300 sm:inline">|</span>
             <label className="flex items-center gap-2">Rows per page
-              <Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" />
+              <Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }, { value: '100', label: '100' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" />
             </label>
           </div>
           <div className="flex items-center gap-1.5">

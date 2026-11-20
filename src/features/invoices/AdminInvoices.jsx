@@ -1,4 +1,5 @@
 import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import { ListOverview, ListSummary, ListTableToolbar, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import ActionMenu from '../../components/ui/ActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -65,7 +66,7 @@ function SalesInvoicesPanel({ toolbarExtras }) {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
-  const pageSize = 10
+  const [pageSize, setPageSize] = useState(10)
 
   const loadInvoices = useCallback(async () => {
     setIsLoading(true)
@@ -143,12 +144,6 @@ function SalesInvoicesPanel({ toolbarExtras }) {
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1
   const rangeEnd = Math.min(filtered.length, currentPage * pageSize)
-
-  const pageNumbers = useMemo(() => {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1)
-    const pages = new Set([1, 2, currentPage - 1, currentPage, currentPage + 1, totalPages - 1, totalPages])
-    return Array.from(pages).filter((value) => value >= 1 && value <= totalPages).sort((a, b) => a - b)
-  }, [totalPages, currentPage])
 
   const appliedFilters = { paymentStatus, customerFilter, datePreset, customFrom, customTo }
   const defaultFilters = { paymentStatus: 'all', customerFilter: 'all', datePreset: 'all', customFrom: '', customTo: '' }
@@ -292,55 +287,7 @@ function SalesInvoicesPanel({ toolbarExtras }) {
               </table>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-4 py-3.5">
-              <p className="text-sm text-neutral-400">
-                Showing {rangeStart} to {rangeEnd} of {filtered.length} results
-              </p>
-              <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1 rounded-full border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700">
-                  10 per page <ChevronDown className="size-3.5" />
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    disabled={currentPage === 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className="flex size-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-40"
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft className="size-4" />
-                  </button>
-                  {pageNumbers.map((pageNumber, index) => {
-                    const previous = pageNumbers[index - 1]
-                    const showEllipsis = previous != null && pageNumber - previous > 1
-
-                    return (
-                      <span key={pageNumber} className="flex items-center gap-1.5">
-                        {showEllipsis && <span className="px-1 text-neutral-300">…</span>}
-                        <button
-                          type="button"
-                          onClick={() => setPage(pageNumber)}
-                          className={`flex size-8 items-center justify-center rounded-full text-sm ${
-                            pageNumber === currentPage ? 'bg-primary-700 text-white' : 'border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
-                          }`}
-                        >
-                          {pageNumber}
-                        </button>
-                      </span>
-                    )
-                  })}
-                  <button
-                    type="button"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    className="flex size-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-40"
-                    aria-label="Next page"
-                  >
-                    <ChevronRight className="size-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
+            <PaginationFooter page={currentPage} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
           </>
         )}
       </div>

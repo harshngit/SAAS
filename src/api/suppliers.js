@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/authStore'
+import { getPagedData } from './paging'
 import { apiClient } from './client'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
@@ -110,10 +111,7 @@ export async function listSuppliers(params = {}) {
     if (params.sort_by) queryParams.sort_by = params.sort_by
     if (params.sort_order) queryParams.sort_order = params.sort_order
 
-    const { data } = await apiClient.get('/suppliers', {
-      headers: authHeader(),
-      params: queryParams,
-    })
+    const data = await getPagedData(apiClient, '/suppliers', { headers: authHeader(), params: queryParams }, params.page === undefined && params.page_size === undefined)
 
     const suppliers = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
     return { success: true, suppliers, total: data?.total ?? suppliers.length }

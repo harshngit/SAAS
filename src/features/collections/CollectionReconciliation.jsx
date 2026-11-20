@@ -1,4 +1,5 @@
 import { SkeletonValue } from '../../components/ui/Skeleton'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { ListDataTable as DataTable } from '../../components/ui/ListPresentation'
 import ActionMenu from '../../components/ui/ActionMenu'
@@ -38,7 +39,7 @@ function formatDateTime(value) {
     : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-const PAGE_SIZE = 20
+const DEFAULT_PAGE_SIZE = 25
 
 export default function CollectionReconciliation() {
   const { showToast } = useToast()
@@ -49,6 +50,7 @@ export default function CollectionReconciliation() {
 
   const [collections, setCollections] = useState([])
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -107,7 +109,7 @@ export default function CollectionReconciliation() {
   // table's own Prev/Next, should NOT reset itself.
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, debouncedSearch, customerId, orderId, collectedByFilter, dateFrom, dateTo])
+  }, [statusFilter, debouncedSearch, customerId, orderId, collectedByFilter, dateFrom, dateTo, pageSize])
 
   const load = useCallback(() => {
     setIsLoading(true)
@@ -123,7 +125,7 @@ export default function CollectionReconciliation() {
       date_from: !dateRangeInvalid && dateFrom ? dateFrom : undefined,
       date_to: !dateRangeInvalid && dateTo ? dateTo : undefined,
       page,
-      page_size: PAGE_SIZE,
+      page_size: pageSize,
     }).then((result) => {
       if (!result.success) {
         setCollections([])
@@ -137,7 +139,7 @@ export default function CollectionReconciliation() {
       }
       setIsLoading(false)
     })
-  }, [statusFilter, debouncedSearch, customerId, orderId, collectedByFilter, dateFrom, dateTo, dateRangeInvalid, page])
+  }, [statusFilter, debouncedSearch, customerId, orderId, collectedByFilter, dateFrom, dateTo, dateRangeInvalid, page, pageSize])
 
   useEffect(() => {
     load()
@@ -417,12 +419,14 @@ export default function CollectionReconciliation() {
                     resetKey={`${statusFilter}-${partnerFilter}-${collectedByFilter}-${datePreset}-${customFrom}-${customTo}-${customerId}-${orderId}`}
                     serverPagination
                     page={page}
-                    totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+                    totalPages={Math.max(1, Math.ceil(total / pageSize))}
                     totalCount={total}
                     onPageChange={setPage}
+                    pageSize={pageSize}
+                    onPageSizeChange={setPageSize}
                     renderToolbar={() => {
-                      const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-                      const rangeEnd = Math.min(page * PAGE_SIZE, total)
+                      const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
+                      const rangeEnd = Math.min(page * pageSize, total)
                       return (
                       <div className="flex flex-col gap-3 border-b border-neutral-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-2">
@@ -507,15 +511,7 @@ export default function CollectionReconciliation() {
                     ))
                   )}
                   {total > 0 && (
-                    <div className="flex items-center justify-between pt-1">
-                      <p className="text-xs text-neutral-400">
-                        Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, total)} of {total}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Button type="button" variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</Button>
-                        <Button type="button" variant="outline" size="sm" disabled={page >= Math.ceil(total / PAGE_SIZE)} onClick={() => setPage((p) => p + 1)}>Next</Button>
-                      </div>
-                    </div>
+                    <PaginationFooter page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={setPageSize} className="-mx-5 -mb-4 mt-2" />
                   )}
                 </div>
               </>

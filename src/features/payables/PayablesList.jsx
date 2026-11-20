@@ -1,4 +1,5 @@
 import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import ListActionMenu from '../../components/ui/ListActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -43,7 +44,7 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
-const PAGE_SIZE = 25
+const DEFAULT_PAGE_SIZE = 25
 
 export default function PayablesList() {
   const navigate = useNavigate()
@@ -65,10 +66,20 @@ export default function PayablesList() {
   const [recordPreset, setRecordPreset] = useState(null)
   const [refresh, setRefresh] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   // Column-header sorting (backend sort_by/sort_order, GET /accounts-payable supports it) takes
   // priority over the existing Recent/Oldest/Outstanding/Due Date toolbar control, which only
   // ever re-sorts the already-fetched current page - see `filtered` below for how they compose.
   const { sortBy: headerSortBy, sortOrder: headerSortOrder, toggleSort, sortParams } = useSortState()
+
+  // The drawer's Sort By (Recent / Oldest / Due date / Outstanding) goes to the backend like a header sort, so the whole list is
+  // ordered before it is cut into pages. A clicked column header still wins.
+  const effectiveSort = useMemo(() => {
+    if (sortParams.sort_by) return sortParams
+    if (sortFilter === 'outstanding') return { sort_by: 'outstanding_amount', sort_order: 'desc' }
+    if (sortFilter === 'dueDate') return { sort_by: 'due_date', sort_order: 'asc' }
+    return { sort_by: 'invoice_date', sort_order: sortFilter === 'oldest' ? 'asc' : 'desc' }
+  }, [sortParams, sortFilter])
 
   const handleSort = (field) => {
     toggleSort(field)
@@ -86,7 +97,10 @@ export default function PayablesList() {
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   // GET /accounts-payable has no date parameter. While a date range is applied the page loads the
   // complete list and filters + paginates it here; otherwise it pages on the server as before.
-  const dateActive = !DEMO_MODE && datePreset !== 'all'
+  // GET /accounts-payable returns no `total` (a page of 10 reads as "10 of 10"), so the page always loads the complete list
+  // (100 per request, until a short page) and paginates it here. The server still applies supplier / payment status /
+  // ageing / search; the date range is applied locally as before.
+  const dateActive = !DEMO_MODE
 
   const loadReal = useCallback(async () => {
     if (DEMO_MODE || dateActive) return
@@ -98,7 +112,7 @@ export default function PayablesList() {
         ageing_bucket: ageingFilter,
         search: search.trim() || undefined,
         page,
-        page_size: PAGE_SIZE,
+        page_size: pageSize,
         ...sortParams,
       })
     setServerLoading(false)
@@ -110,7 +124,7 @@ export default function PayablesList() {
     }
     setServerPayables(listResult.payables)
     setServerTotal(listResult.total)
-  }, [dateActive, ageingFilter, page, paymentStatusFilter, search, supplierFilter, sortParams])
+  }, [dateActive, ageingFilter, page, pageSize, paymentStatusFilter, search, supplierFilter, sortParams])
 
   useEffect(() => {
     loadReal()
@@ -152,17 +166,18 @@ export default function PayablesList() {
         search: search.trim() || undefined,
         page: pageNumber,
         page_size: size,
-        ...sortParams,
+        ...effectiveSort,
       })
-      return result.success ? { success: true, rows: result.payables, total: result.total } : result
+      // No total from the backend: a full page means "there may be more", a short page is the last one.
+      return result.success ? { success: true, rows: result.payables, total: result.payables.length >= size ? Number.POSITIVE_INFINITY : (pageNumber - 1) * size + result.payables.length } : result
     }),
-    [supplierFilter, paymentStatusFilter, ageingFilter, search, sortParams, refresh],
+    [supplierFilter, paymentStatusFilter, ageingFilter, search, effectiveSort, refresh],
   )
   const dateMatches = useMemo(
     () => (dateActive ? fullList.rows.filter((row) => isWithinDateRange(row.invoiceDate, dateFrom, dateTo)) : []),
     [dateActive, fullList.rows, dateFrom, dateTo],
   )
-  const realPayables = dateActive ? dateMatches.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : serverPayables
+  const realPayables = dateActive ? dateMatches.slice((page - 1) * pageSize, page * pageSize) : serverPayables
   const realTotal = dateActive ? dateMatches.length : serverTotal
   const isLoading = dateActive ? fullList.loading : serverLoading
   const loadError = dateActive ? fullList.error : serverError
@@ -459,13 +474,7 @@ export default function PayablesList() {
           )}
         </div>
         {!DEMO_MODE && !isLoading && !loadError && (
-          <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-sm text-neutral-500">
-            <span>Page {page} of {Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} · {realTotal} payables</span>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
-              <Button type="button" variant="outline" size="sm" disabled={page >= Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} onClick={() => setPage((value) => value + 1)}>Next</Button>
-            </div>
-          </div>
+          <PaginationFooter page={page} pageSize={pageSize} total={realTotal} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
         )}
       </Card>
 

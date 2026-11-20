@@ -1,4 +1,5 @@
 import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarClock, IndianRupee, Plus, Search, Users, Wallet } from 'lucide-react'
@@ -51,7 +52,7 @@ function addOneDay(day) {
   return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
 }
 
-const PAGE_SIZE = 25
+const DEFAULT_PAGE_SIZE = 25
 
 // Fold demo + real into one row shape.
 function toRow(payment, isDemo) {
@@ -108,6 +109,7 @@ export default function SupplierPaymentsList() {
   const [quickViewId, setQuickViewId] = useState(null)
   const [refresh, setRefresh] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   // Column-header sorting (backend sort_by/sort_order, GET /supplier-payments supports it) takes
   // priority over the existing Recent/Oldest/Amount toolbar control, which only ever re-sorts
   // the already-fetched current page - see `filtered` below for how they compose.
@@ -126,6 +128,14 @@ export default function SupplierPaymentsList() {
   const { rows: summaryPayments, error: summaryError } = useSummaryRows(listSupplierPayments, 'payments', !DEMO_MODE, refresh)
 
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+
+  // The drawer's Sort By (Recent / Oldest / Highest amount) is sent to the backend like a header sort, so it orders the whole result
+  // before it is cut into pages. A clicked column header still wins.
+  const effectiveSort = useMemo(() => {
+    if (sortParams.sort_by) return sortParams
+    if (sortFilter === 'amount') return { sort_by: 'amount', sort_order: 'desc' }
+    return { sort_by: 'payment_date', sort_order: sortFilter === 'oldest' ? 'asc' : 'desc' }
+  }, [sortParams, sortFilter])
 
   const appliedFilters = { supplierFilter, modeFilter, statusFilter, datePreset, customFrom, customTo, sortFilter }
   const defaultFilters = { supplierFilter: 'all', modeFilter: 'all', statusFilter: 'all', datePreset: 'all', customFrom: '', customTo: '', sortFilter: 'recent' }
@@ -146,7 +156,7 @@ export default function SupplierPaymentsList() {
     setLoadError('')
     const result = await listSupplierPayments({
       page,
-      page_size: PAGE_SIZE,
+      page_size: pageSize,
       supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined,
       status: statusFilter,
       payment_method: modeFilter,
@@ -156,7 +166,7 @@ export default function SupplierPaymentsList() {
       // day's rows below, so the last selected day is always included.
       date_to: dateTo ? addOneDay(dateTo) : undefined,
       search: search.trim() || undefined,
-      ...sortParams,
+      ...effectiveSort,
     })
     setIsLoading(false)
     if (!result.success) {
@@ -168,7 +178,7 @@ export default function SupplierPaymentsList() {
     const kept = dateTo ? result.payments.filter((payment) => String(payment.paymentDate || '').slice(0, 10) <= dateTo) : result.payments
     setRealPayments(kept)
     setRealTotal(Math.max(0, result.total - (result.payments.length - kept.length)))
-  }, [page, statusFilter, modeFilter, dateFrom, dateTo, search, supplierFilter, sortParams])
+  }, [page, pageSize, statusFilter, modeFilter, dateFrom, dateTo, search, supplierFilter, effectiveSort])
 
   useEffect(() => {
     loadReal()
@@ -262,8 +272,7 @@ export default function SupplierPaymentsList() {
   }, [demoStats, summaryPayments])
 
   const bump = () => setRefresh((value) => value + 1)
-  const totalPages = DEMO_MODE ? 1 : Math.max(1, Math.ceil(realTotal / PAGE_SIZE))
-
+  
   return (
     <div className="listing-page space-y-4">
       <div>
@@ -383,14 +392,8 @@ export default function SupplierPaymentsList() {
           )}
         </div>
 
-        {!DEMO_MODE && !isLoading && !loadError && totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-sm text-neutral-500">
-            <span>Page {page} of {totalPages} · {realTotal} payments</span>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
-              <Button type="button" variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
-            </div>
-          </div>
+        {!DEMO_MODE && !isLoading && !loadError && (
+          <PaginationFooter page={page} pageSize={pageSize} total={realTotal} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
         )}
       </Card>
 

@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/authStore'
+import { getPagedData } from './paging'
 import { apiClient } from './client'
 import { handleStorageLimitError } from '../components/ui/storageLimitContext'
 
@@ -190,10 +191,7 @@ export async function listExpenses(params = {}) {
     if (params.sort_by) queryParams.sort_by = params.sort_by
     if (params.sort_order) queryParams.sort_order = params.sort_order
 
-    const { data } = await apiClient.get('/expenses', {
-      headers: authHeader(),
-      params: queryParams,
-    })
+    const data = await getPagedData(apiClient, '/expenses', { headers: authHeader(), params: queryParams }, params.page === undefined && params.page_size === undefined)
 
     const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
     return { success: true, expenses: rows.map(normalizeExpense), total: data?.total ?? rows.length }

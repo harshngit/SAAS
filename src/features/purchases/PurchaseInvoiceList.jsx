@@ -13,6 +13,7 @@ import Select from '../../components/ui/Select'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
 import { fetchAllPages } from '../../hooks/useFullListWhen'
+import PaginationFooter, { usePageSlice } from '../../components/ui/PaginationFooter'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { DEMO_MODE } from '../../config/demoMode'
@@ -165,6 +166,13 @@ export default function PurchaseInvoiceList() {
     })
   }, [purchases, search, supplierFilter, purchaseStatusFilter, receivingStatusFilter, paymentStatusFilter, sortFilter, dateFrom, dateTo, headerSortBy])
 
+  // The list is loaded whole (every page of GET /purchases, 100 per request) because the status filters are derived
+  // in the browser; it is shown 10 / 25 / 50 / 100 at a time. Any filter, search or sort change goes back to page 1.
+  const pager = usePageSlice(filteredPurchases, {
+    initialPageSize: 25,
+    resetKey: [search, supplierFilter, purchaseStatusFilter, receivingStatusFilter, paymentStatusFilter, sortFilter, datePreset, customFrom, customTo, headerSortBy, headerSortOrder].join('|'),
+  })
+
   const stats = useMemo(() => {
     const totalValue = summaryPurchases.reduce((sum, purchase) => sum + (purchase.total || 0), 0)
     const outstanding = summaryPurchases.reduce((sum, purchase) => sum + derivePurchaseOutstanding(purchase), 0)
@@ -291,7 +299,7 @@ export default function PurchaseInvoiceList() {
             <>
               {/* Mobile cards */}
               <div className="space-y-3 p-4 md:hidden">
-                {filteredPurchases.map((purchase) => {
+                {pager.rows.map((purchase) => {
                   const purchaseStatus = derivePurchaseStatus(purchase)
                   const receiving = deriveReceivingStatus(purchase)
                   const payment = derivePaymentStatus(purchase)
@@ -346,7 +354,7 @@ export default function PurchaseInvoiceList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {filteredPurchases.map((purchase) => {
+                  {pager.rows.map((purchase) => {
                     const purchaseStatus = derivePurchaseStatus(purchase)
                     const receiving = deriveReceivingStatus(purchase)
                     const payment = derivePaymentStatus(purchase)
@@ -385,6 +393,7 @@ export default function PurchaseInvoiceList() {
                   })}
                 </tbody>
               </table>
+              <PaginationFooter page={pager.page} pageSize={pager.pageSize} total={pager.total} onPageChange={pager.setPage} onPageSizeChange={pager.setPageSize} />
             </>
           )}
         </div>

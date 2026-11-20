@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/authStore'
+import { getPagedData } from './paging'
 import { apiClient } from './client'
 import { toStoredFilePath } from './files'
 import { handleStorageLimitError } from '../components/ui/storageLimitContext'
@@ -637,10 +638,7 @@ export async function listProducts(params = {}) {
     if (params.sort_by) queryParams.sort_by = params.sort_by
     if (params.sort_order) queryParams.sort_order = params.sort_order
 
-    const { data } = await apiClient.get('/products', {
-      headers: authHeader(),
-      params: queryParams,
-    })
+    const data = await getPagedData(apiClient, '/products', { headers: authHeader(), params: queryParams }, params.page === undefined && params.page_size === undefined)
 
     const products = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
     return { success: true, products, total: data?.total ?? products.length }

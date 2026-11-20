@@ -25,6 +25,7 @@ import { resolveColumns } from '../reports/reportDataUtils'
 const REPORT_TYPE = 'sales-overview'
 
 const PAGE_SIZE_OPTIONS = [
+  { value: '10', label: '10 / page' },
   { value: '25', label: '25 / page' },
   { value: '50', label: '50 / page' },
   { value: '100', label: '100 / page' },

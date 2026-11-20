@@ -1,6 +1,7 @@
 import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import PaginationFooter, { usePageSlice } from '../../components/ui/PaginationFooter'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CarFront, CheckCircle2, Edit, Eye, Plus, RotateCw, Search, Trash2, Truck } from 'lucide-react'
 import { createVehicle, deleteVehicle, listVehicles, updateVehicle } from '../../api/vehicles'
@@ -179,6 +180,7 @@ export default function VehicleList() {
     })
   }, [vehicles, search, statusFilter, availabilityFilter, typeFilter, sortFilter, dateFrom, dateTo, headerSortBy, headerSortOrder])
 
+  const pager = usePageSlice(rows, { resetKey: [search, statusFilter, availabilityFilter, typeFilter, sortFilter, datePreset, customFrom, customTo, headerSortBy, headerSortOrder].join('|') })
   const openForm = (vehicle = null) => {
     setEditingVehicle(vehicle)
     setFormError('')
@@ -327,7 +329,7 @@ export default function VehicleList() {
             <>
               {/* Mobile cards */}
               <div className="space-y-3 p-4 md:hidden">
-                {rows.map((vehicle) => {
+                {pager.rows.map((vehicle) => {
                   const status = vehicleStatusMeta(vehicle)
                   const availability = deriveAvailability(vehicle)
                   return (
@@ -366,7 +368,7 @@ export default function VehicleList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {rows.map((vehicle) => {
+                  {pager.rows.map((vehicle) => {
                     const status = vehicleStatusMeta(vehicle)
                     const availability = deriveAvailability(vehicle)
                     return (
@@ -395,6 +397,7 @@ export default function VehicleList() {
                   })}
                 </tbody>
               </table>
+              <PaginationFooter page={pager.page} pageSize={pager.pageSize} total={pager.total} onPageChange={pager.setPage} onPageSizeChange={pager.setPageSize} />
             </>
           )}
         </div>
