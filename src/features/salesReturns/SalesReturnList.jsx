@@ -1,5 +1,6 @@
 import { SkeletonValue } from '../../components/ui/Skeleton'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import PaginationFooter, { usePageSlice } from '../../components/ui/PaginationFooter'
 import { createPortal } from 'react-dom'
 import { SlidersHorizontal, X, Plus, RotateCcw, RotateCw, Search, PackageCheck, Clock, CheckCircle2 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -117,6 +118,7 @@ export default function SalesReturnList() {
       return matchesStatus && matchesCustomer && matchesDate && matchesSearch
     })
   }, [salesReturns, searchTerm, statusFilter, customerFilter, dateFrom, dateTo])
+  const pager = usePageSlice(filteredSalesReturns, { resetKey: [searchTerm, statusFilter, customerFilter, datePreset, customFrom, customTo].join('|') })
 
   return (
     <div className="listing-page space-y-4">
@@ -224,7 +226,7 @@ export default function SalesReturnList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {filteredSalesReturns.map((salesReturn) => {
+                {pager.rows.map((salesReturn) => {
                   const meta = srStatusMeta(salesReturn.status)
                   return (
                     <tr
@@ -256,12 +258,9 @@ export default function SalesReturnList() {
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-xs text-neutral-400">
-          <span>
-            {filteredSalesReturns.length === 0 ? '0' : `1 to ${filteredSalesReturns.length}`} of {salesReturns.length}
-          </span>
-          <span>Sales Returns</span>
-        </div>
+        {filteredSalesReturns.length > 0 && (
+          <PaginationFooter page={pager.page} pageSize={pager.pageSize} total={pager.total} onPageChange={pager.setPage} onPageSizeChange={pager.setPageSize} />
+        )}
       </Card>
       {isFilterOpen && createPortal(
         <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="sales-return-filter-title" id="sales-return-filter-panel">

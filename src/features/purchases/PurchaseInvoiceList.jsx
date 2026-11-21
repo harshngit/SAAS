@@ -1,4 +1,4 @@
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -12,7 +12,10 @@ import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
+import { fetchAllPages } from '../../hooks/useFullListWhen'
+import PaginationFooter, { usePageSlice } from '../../components/ui/PaginationFooter'
 import { formatCurrency } from '../../utils/format'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { DEMO_MODE } from '../../config/demoMode'
 import { deletePurchase, listPurchases } from '../../api/purchases'
 import { deriveReceivingStatus, derivePaymentStatus, derivePurchaseOutstanding, derivePurchaseStatus, getPurchaseActions } from './purchaseHelpers'
@@ -65,6 +68,22 @@ export default function PurchaseInvoiceList() {
   const [receivingStatusFilter, setReceivingStatusFilter] = useState('all')
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all')
   const [sortFilter, setSortFilter] = useState('recent')
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  const appliedFilters = { supplierFilter, purchaseStatusFilter, receivingStatusFilter, paymentStatusFilter, sortFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { supplierFilter: 'all', purchaseStatusFilter: 'all', receivingStatusFilter: 'all', paymentStatusFilter: 'all', sortFilter: 'recent', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setSupplierFilter(next.supplierFilter)
+    setPurchaseStatusFilter(next.purchaseStatusFilter)
+    setReceivingStatusFilter(next.receivingStatusFilter)
+    setPaymentStatusFilter(next.paymentStatusFilter)
+    setSortFilter(next.sortFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
+  }
   // Column-header sorting (backend sort_by/sort_order, GET /purchases supports it) takes
   // priority over the existing Recent/Oldest toolbar control once a header is clicked; clearing
   // it (3rd click) falls back to that existing date-based default - see filteredPurchases below.
@@ -91,8 +110,15 @@ export default function PurchaseInvoiceList() {
       return
     }
 
-    const [result, summaryResult] = await Promise.all([listPurchases(sortParams), listPurchases()])
-    if (summaryResult.success) setSummaryPurchases(summaryResult.purchases)
+    // GET /purchases returns only 10 rows unless a page is asked for, so the list and the summary
+    // cards both read every page (100 per request) - otherwise only the 10 newest purchases ever
+    // appeared and every filter, search and total worked on that slice.
+    const loadEvery = (extra) => fetchAllPages(async (pageNumber, size) => {
+      const response = await listPurchases({ ...extra, page: pageNumber, page_size: size })
+      return response.success ? { success: true, rows: response.purchases, total: response.total } : response
+    })
+    const [result, summaryResult] = await Promise.all([loadEvery(sortParams), loadEvery({})])
+    if (summaryResult.success) setSummaryPurchases(summaryResult.rows)
     if (!result.success) {
       setPurchases([])
       setListError(result.error)
@@ -100,7 +126,7 @@ export default function PurchaseInvoiceList() {
       return
     }
 
-    setPurchases(result.purchases)
+    setPurchases(result.rows)
     setIsLoading(false)
   }, [sortParams])
 
@@ -125,7 +151,8 @@ export default function PurchaseInvoiceList() {
       const matchesPurchaseStatus = purchaseStatusFilter === 'all' || derivePurchaseStatus(purchase).key === purchaseStatusFilter
       const matchesReceiving = receivingStatusFilter === 'all' || deriveReceivingStatus(purchase).key === receivingStatusFilter
       const matchesPayment = paymentStatusFilter === 'all' || derivePaymentStatus(purchase).key === paymentStatusFilter
-      return matchesSearch && matchesSupplier && matchesPurchaseStatus && matchesReceiving && matchesPayment
+      const matchesDate = isWithinDateRange(purchase.purchaseDate || purchase.invoiceDate, dateFrom, dateTo)
+      return matchesSearch && matchesSupplier && matchesPurchaseStatus && matchesReceiving && matchesPayment && matchesDate
     })
 
     // A clicked column header already sorted this array via the backend's sort_by/sort_order -
@@ -137,7 +164,14 @@ export default function PurchaseInvoiceList() {
       const rightTime = new Date(right.purchaseDate || right.invoiceDate || right.createdAt || 0).getTime()
       return sortFilter === 'oldest' ? leftTime - rightTime : rightTime - leftTime
     })
-  }, [purchases, search, supplierFilter, purchaseStatusFilter, receivingStatusFilter, paymentStatusFilter, sortFilter, headerSortBy])
+  }, [purchases, search, supplierFilter, purchaseStatusFilter, receivingStatusFilter, paymentStatusFilter, sortFilter, dateFrom, dateTo, headerSortBy])
+
+  // The list is loaded whole (every page of GET /purchases, 100 per request) because the status filters are derived
+  // in the browser; it is shown 10 / 25 / 50 / 100 at a time. Any filter, search or sort change goes back to page 1.
+  const pager = usePageSlice(filteredPurchases, {
+    initialPageSize: 25,
+    resetKey: [search, supplierFilter, purchaseStatusFilter, receivingStatusFilter, paymentStatusFilter, sortFilter, datePreset, customFrom, customTo, headerSortBy, headerSortOrder].join('|'),
+  })
 
   const stats = useMemo(() => {
     const totalValue = summaryPurchases.reduce((sum, purchase) => sum + (purchase.total || 0), 0)
@@ -209,12 +243,27 @@ export default function PurchaseInvoiceList() {
                   className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
               </div>
-              <ListFilterPanel title="Filter Purchases">
-                <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Purchase status" options={purchaseStatusFilterOptions} value={purchaseStatusFilter} onChange={(event) => setPurchaseStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Receiving status" options={receivingStatusFilterOptions} value={receivingStatusFilter} onChange={(event) => setReceivingStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Payment status" options={paymentStatusFilterOptions} value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Sort by" options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
+              <ListFilterPanel title="Filter Purchases" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters} ignoreKeys={['sortFilter']}>
+                {({ draft, set, errors }) => (
+                  <>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Supplier
+                      <Select options={supplierOptions} value={draft.supplierFilter} onChange={(event) => set('supplierFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Purchase Status
+                      <Select options={purchaseStatusFilterOptions} value={draft.purchaseStatusFilter} onChange={(event) => set('purchaseStatusFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Receiving Status
+                      <Select options={receivingStatusFilterOptions} value={draft.receivingStatusFilter} onChange={(event) => set('receivingStatusFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Status
+                      <Select options={paymentStatusFilterOptions} value={draft.paymentStatusFilter} onChange={(event) => set('paymentStatusFilter', event.target.value)} />
+                    </label>
+                    <FilterDateRange label="Purchase Date" draft={draft} set={set} errors={errors} />
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort By
+                      <Select options={sortOptions} value={draft.sortFilter} onChange={(event) => set('sortFilter', event.target.value)} />
+                    </label>
+                  </>
+                )}
               </ListFilterPanel>
               <Button type="button" onClick={() => navigate(`${basePath}/create`)}>
               <Plus className="size-4" aria-hidden="true" />
@@ -250,7 +299,7 @@ export default function PurchaseInvoiceList() {
             <>
               {/* Mobile cards */}
               <div className="space-y-3 p-4 md:hidden">
-                {filteredPurchases.map((purchase) => {
+                {pager.rows.map((purchase) => {
                   const purchaseStatus = derivePurchaseStatus(purchase)
                   const receiving = deriveReceivingStatus(purchase)
                   const payment = derivePaymentStatus(purchase)
@@ -305,7 +354,7 @@ export default function PurchaseInvoiceList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {filteredPurchases.map((purchase) => {
+                  {pager.rows.map((purchase) => {
                     const purchaseStatus = derivePurchaseStatus(purchase)
                     const receiving = deriveReceivingStatus(purchase)
                     const payment = derivePaymentStatus(purchase)
@@ -344,6 +393,7 @@ export default function PurchaseInvoiceList() {
                   })}
                 </tbody>
               </table>
+              <PaginationFooter page={pager.page} pageSize={pager.pageSize} total={pager.total} onPageChange={pager.setPage} onPageSizeChange={pager.setPageSize} />
             </>
           )}
         </div>

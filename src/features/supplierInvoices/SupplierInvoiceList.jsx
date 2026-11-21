@@ -1,4 +1,5 @@
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -12,7 +13,7 @@ import Select from '../../components/ui/Select'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
 import { useSummaryRows } from '../../hooks/useSummaryRows'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { fetchAllPages, useFullListWhen } from '../../hooks/useFullListWhen'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { formatCurrency } from '../../utils/format'
 import { usePermission } from '../../auth/usePermission'
@@ -40,7 +41,7 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
-const PAGE_SIZE = 25
+const DEFAULT_PAGE_SIZE = 25
 
 const sortOptions = [
   { value: 'recent', label: 'Recent' },
@@ -108,27 +109,42 @@ export default function SupplierInvoiceList() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   // Column-header sorting (backend sort_by/sort_order, GET /supplier-invoices supports it) takes
   // priority over the existing Recent/Oldest/Due Date toolbar control, which only ever re-sorts
   // the already-fetched current page - see `rows` below for how the two compose.
   const { sortBy: headerSortBy, sortOrder: headerSortOrder, toggleSort, sortParams } = useSortState()
+
+  // The Sort By choice in the drawer (Recent / Oldest / Due date) is sent to the backend like a header sort, so it orders the WHOLE
+  // result before it is cut into pages (sorting only the page on screen would reshuffle rows inside each page but never move a row
+  // from page 3 to page 1). A clicked column header still wins.
+  const effectiveSort = useMemo(() => {
+    if (sortParams.sort_by) return sortParams
+    if (sortFilter === 'dueDate') return { sort_by: 'due_date', sort_order: 'asc' }
+    return { sort_by: 'invoice_date', sort_order: sortFilter === 'oldest' ? 'asc' : 'desc' }
+  }, [sortParams, sortFilter])
 
   const handleSort = (field) => {
     toggleSort(field)
     if (!DEMO_MODE) setPage(1)
   }
 
-  const [realInvoices, setRealInvoices] = useState([])
+  const [serverInvoices, setServerInvoices] = useState([])
   const [realSupplierOptions, setRealSupplierOptions] = useState([{ value: 'all', label: 'All Suppliers' }])
-  const [realTotal, setRealTotal] = useState(0)
-  const [isLoading, setIsLoading] = useState(!DEMO_MODE)
-  const [loadError, setLoadError] = useState('')
+  const [serverTotal, setServerTotal] = useState(0)
+  const [serverLoading, setServerLoading] = useState(!DEMO_MODE)
+  const [serverError, setServerError] = useState('')
   const { rows: summaryInvoices, error: summaryError } = useSummaryRows(listSupplierInvoices, 'invoices', !DEMO_MODE)
 
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  // GET /supplier-invoices has no date parameter. While a date range is applied the page loads the
+  // complete list and filters + paginates it here; otherwise it pages on the server as before.
+  const dateActive = !DEMO_MODE && datePreset !== 'all'
+
   const load = useCallback(async () => {
-    if (DEMO_MODE) return
-    setIsLoading(true)
-    setLoadError('')
+    if (DEMO_MODE || dateActive) return
+    setServerLoading(true)
+    setServerError('')
     const result = await listSupplierInvoices({
       supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined,
       status: lifecycleFilter,
@@ -136,19 +152,19 @@ export default function SupplierInvoiceList() {
       payment_status: paymentStatusFilter,
       search: search.trim() || undefined,
       page,
-      page_size: PAGE_SIZE,
-      ...sortParams,
+      page_size: pageSize,
+      ...effectiveSort,
     })
-    setIsLoading(false)
+    setServerLoading(false)
     if (!result.success) {
-      setRealInvoices([])
-      setRealTotal(0)
-      setLoadError(result.error)
+      setServerInvoices([])
+      setServerTotal(0)
+      setServerError(result.error)
       return
     }
-    setRealInvoices(result.invoices)
-    setRealTotal(result.total)
-  }, [lifecycleFilter, page, paymentStatusFilter, search, supplierFilter, verificationFilter, sortParams])
+    setServerInvoices(result.invoices)
+    setServerTotal(result.total)
+  }, [dateActive, lifecycleFilter, page, pageSize, paymentStatusFilter, search, supplierFilter, verificationFilter, effectiveSort])
 
   useEffect(() => {
     load()
@@ -171,6 +187,32 @@ export default function SupplierInvoiceList() {
     }
   }, [])
 
+  const fullList = useFullListWhen(
+    dateActive,
+    () => fetchAllPages(async (pageNumber, size) => {
+      const result = await listSupplierInvoices({
+        supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined,
+        status: lifecycleFilter,
+        verification_status: verificationFilter,
+        payment_status: paymentStatusFilter,
+        search: search.trim() || undefined,
+        page: pageNumber,
+        page_size: size,
+        ...effectiveSort,
+      })
+      return result.success ? { success: true, rows: result.invoices, total: result.total } : result
+    }),
+    [supplierFilter, lifecycleFilter, verificationFilter, paymentStatusFilter, search, effectiveSort],
+  )
+  const dateMatches = useMemo(
+    () => (dateActive ? fullList.rows.filter((invoice) => isWithinDateRange(invoice.invoiceDate, dateFrom, dateTo)) : []),
+    [dateActive, fullList.rows, dateFrom, dateTo],
+  )
+  const realInvoices = dateActive ? dateMatches.slice((page - 1) * pageSize, page * pageSize) : serverInvoices
+  const realTotal = dateActive ? dateMatches.length : serverTotal
+  const isLoading = dateActive ? fullList.loading : serverLoading
+  const loadError = dateActive ? fullList.error : serverError
+
   const rows = useMemo(() => {
     const source = DEMO_MODE
       ? SUPPLIER_INVOICES_DEMO_ENABLED
@@ -189,8 +231,6 @@ export default function SupplierInvoiceList() {
     })
     return [{ value: 'all', label: 'All Suppliers' }, ...Array.from(suppliers, ([value, label]) => ({ value, label }))]
   }, [realSupplierOptions, rows])
-
-  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
   const filtered = useMemo(() => {
     if (!DEMO_MODE) {
@@ -247,6 +287,20 @@ export default function SupplierInvoiceList() {
     return { total: source.length, totalValue, outstanding, overdue }
   }, [rows, summaryInvoices])
 
+  const appliedFilters = { supplierFilter, lifecycleFilter, verificationFilter, paymentStatusFilter, sortFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { supplierFilter: 'all', lifecycleFilter: 'all', verificationFilter: 'all', paymentStatusFilter: 'all', sortFilter: 'recent', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setSupplierFilter(next.supplierFilter)
+    setLifecycleFilter(next.lifecycleFilter)
+    setVerificationFilter(next.verificationFilter)
+    setPaymentStatusFilter(next.paymentStatusFilter)
+    setSortFilter(next.sortFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
+    setPage(1)
+  }
+
   const lifecycleFilterOptions = DEMO_MODE ? INVOICE_STATUS_OPTIONS : LIFECYCLE_FILTER_OPTIONS
 
   return (
@@ -283,35 +337,27 @@ export default function SupplierInvoiceList() {
                   className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
               </div>
-              <ListFilterPanel title="Filter Supplier Invoices">
-                <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Invoice status"
-                options={[{ value: 'all', label: 'All Statuses' }, ...lifecycleFilterOptions]}
-                value={lifecycleFilter}
-                onChange={(event) => { setLifecycleFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
-                className="w-full"
-                triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
-              />
-              <Select label="Verification"
-                options={[{ value: 'all', label: 'All Verification' }, ...VERIFICATION_FILTER_OPTIONS]}
-                value={verificationFilter}
-                onChange={(event) => { setVerificationFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
-                className="w-full"
-                triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
-              />
-              <Select label="Payment status"
-                options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]}
-                value={paymentStatusFilter}
-                onChange={(event) => { setPaymentStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }}
-                className="w-full"
-                triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs"
-              />
-              <Select label="Sort by" options={sortOptions} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
-                <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
-                {!DEMO_MODE && <span className="text-xs font-normal text-neutral-400">Date filtering is unavailable in live mode because the backend does not support date parameters.</span>}
-              </div>
-              <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setLifecycleFilter('all'); setVerificationFilter('all'); setPaymentStatusFilter('all'); setSortFilter('recent'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
+              <ListFilterPanel title="Filter Supplier Invoices" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters} ignoreKeys={['sortFilter']}>
+                {({ draft, set, errors }) => (
+                  <>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Supplier
+                      <Select options={supplierOptions} value={draft.supplierFilter} onChange={(event) => set('supplierFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Status
+                      <Select options={[{ value: 'all', label: 'All Statuses' }, ...lifecycleFilterOptions]} value={draft.lifecycleFilter} onChange={(event) => set('lifecycleFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Verification
+                      <Select options={[{ value: 'all', label: 'All Verification' }, ...VERIFICATION_FILTER_OPTIONS]} value={draft.verificationFilter} onChange={(event) => set('verificationFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Status
+                      <Select options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]} value={draft.paymentStatusFilter} onChange={(event) => set('paymentStatusFilter', event.target.value)} />
+                    </label>
+                    <FilterDateRange label="Invoice Date" draft={draft} set={set} errors={errors} />
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort By
+                      <Select options={sortOptions} value={draft.sortFilter} onChange={(event) => set('sortFilter', event.target.value)} />
+                    </label>
+                  </>
+                )}
               </ListFilterPanel>
               {canCreate && (
               <Button type="button" onClick={() => navigate(`${basePath}/new`)}>
@@ -391,13 +437,7 @@ export default function SupplierInvoiceList() {
           )}
         </div>
         {!DEMO_MODE && !isLoading && !loadError && (
-          <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-sm text-neutral-500">
-            <span>Page {page} of {Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} · {realTotal} invoices</span>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
-              <Button type="button" variant="outline" size="sm" disabled={page >= Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} onClick={() => setPage((value) => value + 1)}>Next</Button>
-            </div>
-          </div>
+          <PaginationFooter page={page} pageSize={pageSize} total={realTotal} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
         )}
       </Card>
     </div>

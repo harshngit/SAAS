@@ -1,4 +1,5 @@
 import { SkeletonValue } from '../../components/ui/Skeleton'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { loadSummaryRows } from '../../utils/listSummary'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -351,6 +352,45 @@ export default function LeadList() {
     if (customerId) navigate(`/admin/customers/${customerId}`)
   }
 
+  const filterPanel = (
+    <ListFilterPanel
+      title="Filter Leads"
+      applied={{ statusFilter, sourceFilter, teamFilter, datePreset, customFrom, customTo }}
+      defaults={{ statusFilter: 'all', sourceFilter: 'all', teamFilter: 'all', datePreset: 'all', customFrom: '', customTo: '' }}
+      onApply={(next) => {
+        setStatusFilter(next.statusFilter)
+        setSourceFilter(next.sourceFilter)
+        setTeamFilter(next.teamFilter)
+        setDatePreset(next.datePreset)
+        setCustomFrom(next.customFrom)
+        setCustomTo(next.customTo)
+        setPage(1)
+      }}
+    >
+      {({ draft, set, errors }) => (
+        <>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+            Status
+            <Select options={[{ value: 'all', label: 'All Statuses' }, ...LEAD_STATUS_OPTIONS]} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+            Source
+            <Select options={[{ value: 'all', label: 'All Sources' }, ...LEAD_SOURCE_OPTIONS]} value={draft.sourceFilter} onChange={(event) => set('sourceFilter', event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+            Salesperson
+            {isSalesOfficer ? (
+              <span className="flex h-10 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm font-medium text-neutral-500">My Leads</span>
+            ) : (
+              <Select options={[{ value: 'all', label: 'All Salespersons' }, { value: 'unassigned', label: 'Unassigned' }, ...salespersonOptions]} value={draft.teamFilter} onChange={(event) => set('teamFilter', event.target.value)} />
+            )}
+          </label>
+          <FilterDateRange label="Created" draft={draft} set={set} errors={errors} />
+        </>
+      )}
+    </ListFilterPanel>
+  )
+
   return (
     <div className="listing-page space-y-4">
       <div>
@@ -415,10 +455,7 @@ export default function LeadList() {
                     className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                   />
                 </div>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}>
-                  <SlidersHorizontal className="size-4" aria-hidden="true" />
-                  Filter
-                </Button>
+                {filterPanel}
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={exportCsv}>
                   <Download className="size-4" aria-hidden="true" />
                   Export
@@ -569,6 +606,7 @@ export default function LeadList() {
                   { value: '10', label: '10' },
                   { value: '25', label: '25' },
                   { value: '50', label: '50' },
+                  { value: '100', label: '100' },
                 ]}
                 value={pageSize}
                 onChange={(event) => { setPageSize(event.target.value); setPage(1) }}
@@ -601,78 +639,6 @@ export default function LeadList() {
         </div>
       </Card>
 
-      {isFilterOpen && createPortal(
-        <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Lead filters">
-          <button
-            type="button"
-            className="absolute inset-0 cursor-default bg-neutral-950/20"
-            onClick={() => setIsFilterOpen(false)}
-            aria-label="Close filters"
-          />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl">
-            <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
-              <div>
-                <h2 className="text-lg font-semibold text-neutral-900">Filter Leads</h2>
-                <p className="mt-0.5 text-xs text-neutral-400">Refine the leads shown in the table.</p>
-              </div>
-              <button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters">
-                <X className="size-5" />
-              </button>
-            </div>
-            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
-                Status
-                <Select
-                  options={[{ value: 'all', label: 'All Statuses' }, ...LEAD_STATUS_OPTIONS]}
-                  value={statusFilter}
-                  onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
-                Source
-                <Select
-                  options={[{ value: 'all', label: 'All Sources' }, ...LEAD_SOURCE_OPTIONS]}
-                  value={sourceFilter}
-                  onChange={(event) => { setSourceFilter(event.target.value); setPage(1) }}
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
-                Salesperson
-                {isSalesOfficer ? (
-                  <span className="flex h-10 items-center rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm font-medium text-neutral-500">My Leads</span>
-                ) : (
-                  <Select
-                    options={[{ value: 'all', label: 'All Salespersons' }, { value: 'unassigned', label: 'Unassigned' }, ...salespersonOptions]}
-                    value={teamFilter}
-                    onChange={(event) => { setTeamFilter(event.target.value); setPage(1) }}
-                  />
-                )}
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
-                Created
-                <DateRangeFilter
-                  preset={datePreset}
-                  onPresetChange={(value) => { setDatePreset(value); setPage(1) }}
-                  customFrom={customFrom}
-                  customTo={customTo}
-                  onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }}
-                />
-              </label>
-            </div>
-            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4">
-              <button
-                type="button"
-                onClick={() => { setStatusFilter('all'); setSourceFilter('all'); setTeamFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSearchTerm(''); setPage(1) }}
-                className="text-sm font-medium text-neutral-500 hover:text-neutral-900"
-              >
-                Clear all
-              </button>
-              <Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button>
-            </div>
-          </aside>
-        </div>,
-        document.body,
-      )}
 
       <LeadEditForm
         isOpen={Boolean(editingLead)}

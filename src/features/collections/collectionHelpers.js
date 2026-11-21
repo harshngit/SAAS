@@ -3,7 +3,8 @@
 import { roleLabels } from '../../auth/roles'
 
 export const COLLECTION_STATUS_LABEL = {
-  recorded: 'Recorded',
+  // `recorded` = the partner has collected the money and the admin / accounts team has not confirmed it yet.
+  recorded: 'Pending Admin Confirmation',
   reconciled: 'Reconciled',
   voided: 'Voided',
 }
@@ -16,7 +17,7 @@ export const COLLECTION_STATUS_VARIANT = {
 
 export const COLLECTION_STATUS_FILTERS = [
   { value: 'all', label: 'All' },
-  { value: 'recorded', label: 'Recorded' },
+  { value: 'recorded', label: 'Pending Admin Confirmation' },
   { value: 'reconciled', label: 'Reconciled' },
   { value: 'voided', label: 'Voided' },
 ]
@@ -31,7 +32,7 @@ const PAYMENT_MODE_LABEL = {
 }
 
 export function formatStatus(collection) {
-  return COLLECTION_STATUS_LABEL[collection?.status] || 'Recorded'
+  return COLLECTION_STATUS_LABEL[collection?.status] || 'Pending Admin Confirmation'
 }
 
 export function formatPaymentMode(mode) {

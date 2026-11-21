@@ -8,8 +8,7 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { listPurchases, PURCHASE_PAYMENT_STATUS_OPTIONS, PURCHASE_STATUS_OPTIONS, updatePurchasePaymentStatus } from '../../api/purchases'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
@@ -36,13 +35,15 @@ export default function PurchaseInvoices() {
   const [customTo, setCustomTo] = useState('')
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const hasActiveFilters = statusFilter !== 'all' || paymentStatusFilter !== 'all' || supplierFilter !== 'all' || datePreset !== 'all'
-  const clearFilters = () => {
-    setStatusFilter('all')
-    setPaymentStatusFilter('all')
-    setSupplierFilter('all')
-    setDatePreset('all')
-    setCustomFrom('')
-    setCustomTo('')
+  const appliedFilters = { statusFilter, paymentStatusFilter, supplierFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { statusFilter: 'all', paymentStatusFilter: 'all', supplierFilter: 'all', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setStatusFilter(next.statusFilter)
+    setPaymentStatusFilter(next.paymentStatusFilter)
+    setSupplierFilter(next.supplierFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
   }
 
   const loadInvoices = useCallback(async () => {
@@ -161,7 +162,7 @@ export default function PurchaseInvoices() {
       ) : (
         <Card title="Purchase Invoices" className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:mx-5 [&>p]:mx-5 [&>p]:mb-5">
           <DataTable
-            key={`${statusFilter}-${paymentStatusFilter}-${supplierFilter}-${datePreset}-${customFrom}-${customTo}`}
+            resetKey={`${statusFilter}-${paymentStatusFilter}-${supplierFilter}-${datePreset}-${customFrom}-${customTo}`}
             renderToolbar={({ search, onSearchChange, resultCount, searchable }) => (
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 {searchable && (
@@ -176,21 +177,20 @@ export default function PurchaseInvoices() {
                   </div>
                 )}
                 <div className="flex items-center gap-3">
-                  <ListFilterPanel title="Filter Purchase Invoices">
-                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
-                      <Select options={[{ value: 'all', label: 'All status' }, ...PURCHASE_STATUS_OPTIONS]} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Status
-                      <Select options={[{ value: 'all', label: 'All payment status' }, ...PURCHASE_PAYMENT_STATUS_OPTIONS]} value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Supplier
-                      <Select options={supplierOptions} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} />
-                    </label>
-                    <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
-                      <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-                    </div>
-                    {hasActiveFilters && (
-                      <button type="button" onClick={clearFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                  <ListFilterPanel title="Filter Purchase Invoices" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters}>
+                    {({ draft, set, errors }) => (
+                      <>
+                        <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                          <Select options={[{ value: 'all', label: 'All status' }, ...PURCHASE_STATUS_OPTIONS]} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+                        </label>
+                        <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Status
+                          <Select options={[{ value: 'all', label: 'All payment status' }, ...PURCHASE_PAYMENT_STATUS_OPTIONS]} value={draft.paymentStatusFilter} onChange={(event) => set('paymentStatusFilter', event.target.value)} />
+                        </label>
+                        <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Supplier
+                          <Select options={supplierOptions} value={draft.supplierFilter} onChange={(event) => set('supplierFilter', event.target.value)} />
+                        </label>
+                        <FilterDateRange label="Invoice Date" draft={draft} set={set} errors={errors} />
+                      </>
                     )}
                   </ListFilterPanel>
                   <p className="shrink-0 text-xs font-medium text-neutral-400">{resultCount} {resultCount === 1 ? 'result' : 'results'}</p>

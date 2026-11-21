@@ -54,6 +54,18 @@ export function resolveDateRange(preset, customFrom = '', customTo = '') {
   }
 }
 
+// Validation for a Custom Range chosen in a filter drawer. '' = fine, otherwise the message to
+// show. Both ends are required (an incomplete range is never submitted) and From must not be after
+// To. yyyy-MM-dd strings compare correctly as text, so there is no Date/timezone math here either.
+export function validateCustomRange(preset, customFrom, customTo) {
+  if (preset !== 'custom') return ''
+  if (!customFrom && !customTo) return 'Select a From date and a To date.'
+  if (!customFrom) return 'Select a From date.'
+  if (!customTo) return 'Select a To date.'
+  if (customFrom > customTo) return 'From date cannot be after To date.'
+  return ''
+}
+
 // Client-side predicate for modules with no backend date_from/date_to support (see
 // FRONTEND_AUDIT.md-style gap notes at each call site) - only ever applied to a dataset the page
 // already loads in full (never to one page of a paginated result, which would undercount).

@@ -19,6 +19,7 @@ import { getDelivery, listDeliveries } from '../../api/deliveries'
 import { listOrders, getOrder } from '../../api/orders'
 import { ORDER_STATUS_VARIANT, formatOrderStatus, getDeliveryStatus } from '../orders/orderHelpers'
 import { listProducts } from '../../api/products'
+import { loadSummaryRows } from '../../utils/listSummary'
 import { listWarehouses } from '../../api/warehouses'
 import { formatCurrency, formatCurrencyExact } from '../../utils/format'
 import { getPaymentMethodFlags, sanitizePaymentDetails } from '../payments/paymentMethodUtils'
@@ -692,7 +693,7 @@ function CreateSalesInvoiceForm() {
 
     let isMounted = true
 
-    Promise.all([listCustomers(), listProducts(), listWarehouses()]).then(([customersResult, productsResult, warehousesResult]) => {
+    Promise.all([listCustomers(), loadSummaryRows(listProducts, 'products', { is_active: true }), listWarehouses()]).then(([customersResult, productsResult, warehousesResult]) => {
       if (!isMounted) return
       if (customersResult.success) setCustomers(customersResult.customers)
       if (productsResult.success) setProducts(productsResult.products)
@@ -1141,7 +1142,7 @@ function CreateSalesInvoiceForm() {
                             className="w-24 rounded-lg border border-neutral-200 bg-surface px-2.5 py-1.5 text-sm"
                           />
                         </td>
-                        <td className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.amount)}</td>
+                        <td data-line-amount className="px-3 py-2.5 text-right font-medium text-neutral-900">{formatCurrency(item.amount)}</td>
                         <td className="px-3 py-2.5">
                           <button type="button" onClick={() => removeItem(index)} aria-label="Remove item" className="rounded-lg p-1.5 text-red-500 hover:bg-red-50">
                             <Trash2 className="size-4" />

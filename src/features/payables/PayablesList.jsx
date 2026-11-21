@@ -1,4 +1,5 @@
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import { ListOverview, ListSummary, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import ListActionMenu from '../../components/ui/ListActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -11,7 +12,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import { fetchAllPages, useFullListWhen } from '../../hooks/useFullListWhen'
 import { formatCurrency } from '../../utils/format'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { DEMO_MODE } from '../../config/demoMode'
@@ -43,7 +44,7 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
-const PAGE_SIZE = 25
+const DEFAULT_PAGE_SIZE = 25
 
 export default function PayablesList() {
   const navigate = useNavigate()
@@ -65,10 +66,20 @@ export default function PayablesList() {
   const [recordPreset, setRecordPreset] = useState(null)
   const [refresh, setRefresh] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   // Column-header sorting (backend sort_by/sort_order, GET /accounts-payable supports it) takes
   // priority over the existing Recent/Oldest/Outstanding/Due Date toolbar control, which only
   // ever re-sorts the already-fetched current page - see `filtered` below for how they compose.
   const { sortBy: headerSortBy, sortOrder: headerSortOrder, toggleSort, sortParams } = useSortState()
+
+  // The drawer's Sort By (Recent / Oldest / Due date / Outstanding) goes to the backend like a header sort, so the whole list is
+  // ordered before it is cut into pages. A clicked column header still wins.
+  const effectiveSort = useMemo(() => {
+    if (sortParams.sort_by) return sortParams
+    if (sortFilter === 'outstanding') return { sort_by: 'outstanding_amount', sort_order: 'desc' }
+    if (sortFilter === 'dueDate') return { sort_by: 'due_date', sort_order: 'asc' }
+    return { sort_by: 'invoice_date', sort_order: sortFilter === 'oldest' ? 'asc' : 'desc' }
+  }, [sortParams, sortFilter])
 
   const handleSort = (field) => {
     toggleSort(field)
@@ -76,36 +87,44 @@ export default function PayablesList() {
   }
 
   // ---- real data ------------------------------------------------------
-  const [realPayables, setRealPayables] = useState([])
+  const [serverPayables, setServerPayables] = useState([])
   const [realSupplierOptions, setRealSupplierOptions] = useState([{ value: 'all', label: 'All Suppliers' }])
-  const [realTotal, setRealTotal] = useState(0)
+  const [serverTotal, setServerTotal] = useState(0)
   const [realSummary, setRealSummary] = useState(null)
-  const [isLoading, setIsLoading] = useState(!DEMO_MODE)
-  const [loadError, setLoadError] = useState('')
+  const [serverLoading, setServerLoading] = useState(!DEMO_MODE)
+  const [serverError, setServerError] = useState('')
+
+  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
+  // GET /accounts-payable has no date parameter. While a date range is applied the page loads the
+  // complete list and filters + paginates it here; otherwise it pages on the server as before.
+  // GET /accounts-payable returns no `total` (a page of 10 reads as "10 of 10"), so the page always loads the complete list
+  // (100 per request, until a short page) and paginates it here. The server still applies supplier / payment status /
+  // ageing / search; the date range is applied locally as before.
+  const dateActive = !DEMO_MODE
 
   const loadReal = useCallback(async () => {
-    if (DEMO_MODE) return
-    setIsLoading(true)
-    setLoadError('')
+    if (DEMO_MODE || dateActive) return
+    setServerLoading(true)
+    setServerError('')
     const listResult = await listAccountsPayable({
         supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined,
         payment_status: paymentStatusFilter,
         ageing_bucket: ageingFilter,
         search: search.trim() || undefined,
         page,
-        page_size: PAGE_SIZE,
+        page_size: pageSize,
         ...sortParams,
       })
-    setIsLoading(false)
+    setServerLoading(false)
     if (!listResult.success) {
-      setRealPayables([])
-      setRealTotal(0)
-      setLoadError(listResult.error)
+      setServerPayables([])
+      setServerTotal(0)
+      setServerError(listResult.error)
       return
     }
-    setRealPayables(listResult.payables)
-    setRealTotal(listResult.total)
-  }, [ageingFilter, page, paymentStatusFilter, search, supplierFilter, sortParams])
+    setServerPayables(listResult.payables)
+    setServerTotal(listResult.total)
+  }, [dateActive, ageingFilter, page, pageSize, paymentStatusFilter, search, supplierFilter, sortParams])
 
   useEffect(() => {
     loadReal()
@@ -136,6 +155,32 @@ export default function PayablesList() {
       active = false
     }
   }, [])
+
+  const fullList = useFullListWhen(
+    dateActive,
+    () => fetchAllPages(async (pageNumber, size) => {
+      const result = await listAccountsPayable({
+        supplier_id: supplierFilter !== 'all' ? supplierFilter : undefined,
+        payment_status: paymentStatusFilter,
+        ageing_bucket: ageingFilter,
+        search: search.trim() || undefined,
+        page: pageNumber,
+        page_size: size,
+        ...effectiveSort,
+      })
+      // No total from the backend: a full page means "there may be more", a short page is the last one.
+      return result.success ? { success: true, rows: result.payables, total: result.payables.length >= size ? Number.POSITIVE_INFINITY : (pageNumber - 1) * size + result.payables.length } : result
+    }),
+    [supplierFilter, paymentStatusFilter, ageingFilter, search, effectiveSort, refresh],
+  )
+  const dateMatches = useMemo(
+    () => (dateActive ? fullList.rows.filter((row) => isWithinDateRange(row.invoiceDate, dateFrom, dateTo)) : []),
+    [dateActive, fullList.rows, dateFrom, dateTo],
+  )
+  const realPayables = dateActive ? dateMatches.slice((page - 1) * pageSize, page * pageSize) : serverPayables
+  const realTotal = dateActive ? dateMatches.length : serverTotal
+  const isLoading = dateActive ? fullList.loading : serverLoading
+  const loadError = dateActive ? fullList.error : serverError
 
   // refresh is bumped after a demo payment so the demo store is re-read.
   /* eslint-disable react-hooks/exhaustive-deps */
@@ -184,7 +229,6 @@ export default function PayablesList() {
     return [{ value: 'all', label: 'All Suppliers' }, ...Array.from(suppliers, ([value, label]) => ({ value, label }))]
   }, [realSupplierOptions, rows])
 
-  const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
 
   const filtered = useMemo(() => {
     if (!DEMO_MODE) {
@@ -262,6 +306,20 @@ export default function PayablesList() {
 
   const ageingFilterOptions = DEMO_MODE ? AGEING_FILTER_OPTIONS : AP_AGEING_FILTER_OPTIONS
 
+  const appliedFilters = { supplierFilter, paymentStatusFilter, dueFilter, ageingFilter, sortFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { supplierFilter: 'all', paymentStatusFilter: 'all', dueFilter: 'all', ageingFilter: 'all', sortFilter: 'recent', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setSupplierFilter(next.supplierFilter)
+    setPaymentStatusFilter(next.paymentStatusFilter)
+    setDueFilter(next.dueFilter)
+    setAgeingFilter(next.ageingFilter)
+    setSortFilter(next.sortFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
+    setPage(1)
+  }
+
   return (
     <div className="listing-page space-y-4">
       <div>
@@ -324,17 +382,29 @@ export default function PayablesList() {
                   className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
                 />
               </div>
-              <ListFilterPanel title="Filter Accounts Payable">
-                <Select label="Supplier" options={supplierOptions} value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Payment status" options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]} value={paymentStatusFilter} onChange={(event) => { setPaymentStatusFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              {DEMO_MODE && <Select label="Due date" options={DUE_FILTER_OPTIONS} value={dueFilter} onChange={(event) => setDueFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />}
-              <Select label="Ageing" options={ageingFilterOptions} value={ageingFilter} onChange={(event) => { setAgeingFilter(event.target.value); if (!DEMO_MODE) setPage(1) }} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <Select label="Sort by" options={PAYABLE_SORT_OPTIONS} value={sortFilter} onChange={(event) => setSortFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-              <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
-                <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); if (!DEMO_MODE) setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); if (!DEMO_MODE) setPage(1) }} />
-                {!DEMO_MODE && <span className="text-xs font-normal text-neutral-400">Date filtering is unavailable in live mode because the backend does not support date parameters.</span>}
-              </div>
-              <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setSearch(''); setSupplierFilter('all'); setPaymentStatusFilter('all'); setDueFilter('all'); setAgeingFilter('all'); setSortFilter('recent'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); if (!DEMO_MODE) setPage(1) }}>Clear filters</Button>
+              <ListFilterPanel title="Filter Accounts Payable" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters} ignoreKeys={['sortFilter']}>
+                {({ draft, set, errors }) => (
+                  <>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Supplier
+                      <Select options={supplierOptions} value={draft.supplierFilter} onChange={(event) => set('supplierFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Status
+                      <Select options={[{ value: 'all', label: 'All Payment Statuses' }, ...PAYMENT_STATUS_OPTIONS]} value={draft.paymentStatusFilter} onChange={(event) => set('paymentStatusFilter', event.target.value)} />
+                    </label>
+                    {DEMO_MODE && (
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Due Date
+                        <Select options={DUE_FILTER_OPTIONS} value={draft.dueFilter} onChange={(event) => set('dueFilter', event.target.value)} />
+                      </label>
+                    )}
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Ageing
+                      <Select options={ageingFilterOptions} value={draft.ageingFilter} onChange={(event) => set('ageingFilter', event.target.value)} />
+                    </label>
+                    <FilterDateRange label="Invoice Date" draft={draft} set={set} errors={errors} />
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort By
+                      <Select options={PAYABLE_SORT_OPTIONS} value={draft.sortFilter} onChange={(event) => set('sortFilter', event.target.value)} />
+                    </label>
+                  </>
+                )}
               </ListFilterPanel>
             </div>
           </div>
@@ -404,13 +474,7 @@ export default function PayablesList() {
           )}
         </div>
         {!DEMO_MODE && !isLoading && !loadError && (
-          <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-sm text-neutral-500">
-            <span>Page {page} of {Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} · {realTotal} payables</span>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
-              <Button type="button" variant="outline" size="sm" disabled={page >= Math.max(1, Math.ceil(realTotal / PAGE_SIZE))} onClick={() => setPage((value) => value + 1)}>Next</Button>
-            </div>
-          </div>
+          <PaginationFooter page={page} pageSize={pageSize} total={realTotal} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
         )}
       </Card>
 

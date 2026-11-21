@@ -468,7 +468,7 @@ export default function DeliveryDetail() {
     activeCollections.length === 0
       ? 'No Collection'
       : reconciledCollections.length === 0
-        ? 'Awaiting Reconciliation'
+        ? 'Pending Admin Confirmation'
         : recordedCollections.length > 0
           ? 'Partially Reconciled'
           : 'Reconciled / Paid'
@@ -716,7 +716,7 @@ export default function DeliveryDetail() {
           loadedTotal: loadedItems.reduce((sum, li) => sum + li.qty, 0),
           loadedItems,
         },
-        { title: 'Vehicle loaded', message: 'Start the delivery when you leave the warehouse.' },
+        { title: 'Vehicle loaded', message: 'The delivery is now in transit.' },
       )
     }
 
@@ -728,9 +728,12 @@ export default function DeliveryDetail() {
       return
     }
 
-    setDelivery(result.delivery)
+    // Loading is the last warehouse step: move straight on to in-transit. If that call fails the delivery stays at
+    // the loaded step and completing it retries the same move, so nothing is lost.
+    const started = await startTripIfNeeded(result.delivery)
+    setDelivery(started.success && started.delivery ? started.delivery : result.delivery)
     setIsActing(false)
-    showToast({ title: 'Vehicle loaded', message: 'Start the delivery when you leave the warehouse.' })
+    showToast({ title: 'Vehicle loaded', message: started.success ? 'The delivery is now in transit.' : 'Vehicle loaded.' })
   }
 
   // LEGACY contract: one button chains mark-ready (if the backend still needs it) then loads
@@ -756,7 +759,7 @@ export default function DeliveryDetail() {
           loadedTotal: loadedItems.reduce((sum, li) => sum + li.qty, 0),
           loadedItems,
         },
-        { title: 'Vehicle loaded', message: 'Start the delivery when you leave the warehouse.' },
+        { title: 'Vehicle loaded', message: 'The delivery is now in transit.' },
       )
     }
 
@@ -778,34 +781,21 @@ export default function DeliveryDetail() {
       return
     }
 
-    setDelivery(result.delivery)
+    // Loading is the last warehouse step: move straight on to in-transit. If that call fails the delivery stays at
+    // the loaded step and completing it retries the same move, so nothing is lost.
+    const started = await startTripIfNeeded(result.delivery)
+    setDelivery(started.success && started.delivery ? started.delivery : result.delivery)
     setIsActing(false)
-    showToast({ title: 'Vehicle loaded', message: 'Start the delivery when you leave the warehouse.' })
+    showToast({ title: 'Vehicle loaded', message: started.success ? 'The delivery is now in transit.' : 'Vehicle loaded.' })
   }
 
-  const handleDispatch = async () => {
-    if (isActing) return
-    setIsActing(true)
-    setActionError('')
-
-    if (isDemoDelivery(delivery.id)) {
-      return simulateDemoDelivery(
-        { status: 'in_transit', internalStatus: 'in_transit', dispatchedAt: new Date().toISOString() },
-        { title: 'Delivery started', message: 'Delivery is now in transit.' },
-      )
-    }
-
-    const result = await dispatchDelivery(delivery.id)
-
-    if (!result.success) {
-      setActionError(result.error)
-      setIsActing(false)
-      return
-    }
-
-    setDelivery(result.delivery)
-    setIsActing(false)
-    showToast({ title: 'Delivery started', message: 'Delivery is now in transit.' })
+  // The backend only lets an in-transit delivery be confirmed (loaded -> delivered is refused with 400), so the
+  // old "Start Delivery" click is now done for the partner: right after loading, and again before completing or
+  // failing a delivery that is still at the loaded step. Demo deliveries skip it (their confirm needs no dispatch).
+  const startTripIfNeeded = async (target = delivery) => {
+    if (isDemoDelivery(target.id)) return { success: true, delivery: target }
+    if (getDeliveryStage(target).key !== 'loaded') return { success: true, delivery: target }
+    return dispatchDelivery(target.id)
   }
 
   const handleReassign = async () => {
@@ -974,6 +964,13 @@ export default function DeliveryDetail() {
       return
     }
 
+    const trip = await startTripIfNeeded()
+    if (!trip.success) {
+      setActionError(trip.error)
+      setIsActing(false)
+      return
+    }
+
     const result = await confirmDelivery(delivery.id, {
       failed: false,
       items: delivery.items.map((item) => ({
@@ -1022,6 +1019,13 @@ export default function DeliveryDetail() {
         { status: 'returned', internalStatus: 'failed', failureReason: failureReason.trim(), notes: notes.trim() },
         { title: 'Delivery marked failed', message: failureReason.trim() },
       )
+    }
+
+    const trip = await startTripIfNeeded()
+    if (!trip.success) {
+      setActionError(trip.error)
+      setIsActing(false)
+      return
     }
 
     const result = await confirmDelivery(delivery.id, {
@@ -1213,16 +1217,6 @@ export default function DeliveryDetail() {
           >
             <PackageCheck className="size-4" aria-hidden="true" />
             {nextAction.type === 'load' ? 'Load Vehicle' : 'Mark Vehicle Loaded'}
-          </Button>
-        </Card>
-      )}
-
-      {nextAction?.type === 'start_delivery' && (
-        <Card title="Ready to Go">
-          <p className="text-sm text-neutral-500">Start the delivery once you leave the warehouse - it moves to In Transit.</p>
-          <Button type="button" className="mt-4" loading={isActing} onClick={handleDispatch}>
-            <Truck className="size-4" aria-hidden="true" />
-            Start Delivery
           </Button>
         </Card>
       )}
@@ -1592,7 +1586,7 @@ export default function DeliveryDetail() {
               <InfoField label="Order Amount" value={orderAmount > 0 ? formatCurrency(orderAmount) : '—'} />
               <InfoField label="Previous Pending Balance" value={previousPending != null ? formatCurrency(previousPending) : '—'} />
               <InfoField label="Total Amount Due" value={totalAmountDue > 0 ? formatCurrency(totalAmountDue) : '—'} />
-              <InfoField label="Awaiting Reconciliation" value={formatCurrency(recordedCollectionsTotal)} />
+              <InfoField label="Pending Admin Confirmation" value={formatCurrency(recordedCollectionsTotal)} />
               <InfoField label="Reconciled / Paid" value={formatCurrency(reconciledPaidAmount)} />
               <InfoField label="Remaining Receivable" value={formatCurrency(remainingReceivable)} />
               <div>
@@ -1861,8 +1855,8 @@ export default function DeliveryDetail() {
           showToast({
             title: 'Collection recorded',
             message: collection?.amount != null
-              ? `${formatCurrency(collection.amount)} recorded — awaiting reconciliation.`
-              : 'Recorded — awaiting reconciliation by the accounts team.',
+              ? `${formatCurrency(collection.amount)} recorded — pending admin confirmation.`
+              : 'Recorded — pending admin confirmation.',
           })
           loadCollections()
         }}

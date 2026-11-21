@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Search, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import PaginationFooter from './PaginationFooter'
 import ActionMenu from './ActionMenu'
 import EmptyState from './EmptyState'
 import { TableSkeleton } from './Skeleton'
@@ -35,10 +36,24 @@ export default function DataTable({
   totalPages: serverTotalPages = 1,
   onPageChange,
   totalCount,
+  // Changes whenever the caller's filters change: the table goes back to page 1 but keeps its
+  // search text and sort (unlike a React `key`, which remounts and wipes both).
+  resetKey,
+  // Rows-per-page selector. Client-side tables always get one (10 / 25 / 50 / 100). A server-paged table gets it only when
+  // the caller passes onPageSizeChange (it owns `pageSize` and refetches).
+  onPageSizeChange,
+  pageSizeOptions,
 }) {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState({ key: null, direction: 'asc' })
   const [page, setPage] = useState(1)
+  const [localPageSize, setLocalPageSize] = useState(pageSize)
+  const effectivePageSize = serverPagination ? pageSize : localPageSize
+  const [seenResetKey, setSeenResetKey] = useState(resetKey)
+  if (resetKey !== seenResetKey) {
+    setSeenResetKey(resetKey)
+    setPage(1)
+  }
 
   const effectiveSearchKeys = searchKeys || columns.map((column) => column.key)
 
@@ -60,9 +75,9 @@ export default function DataTable({
     return copy
   }, [filtered, sort])
 
-  const totalPages = serverPagination ? Math.max(1, serverTotalPages) : Math.max(1, Math.ceil(sorted.length / pageSize))
+  const totalPages = serverPagination ? Math.max(1, serverTotalPages) : Math.max(1, Math.ceil(sorted.length / effectivePageSize))
   const currentPage = serverPagination ? serverPage : Math.min(page, totalPages)
-  const paginated = serverPagination ? sorted : sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const paginated = serverPagination ? sorted : sorted.slice((currentPage - 1) * effectivePageSize, currentPage * effectivePageSize)
   const resultCount = serverPagination ? (totalCount ?? sorted.length) : sorted.length
   const colSpan = columns.length + (actions ? 1 : 0)
 
@@ -146,7 +161,7 @@ export default function DataTable({
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {loading ? (
-              <TableSkeleton columns={actions ? [...columns, { key: '_actions', align: 'right' }] : columns} rows={Math.min(pageSize, 8)} />
+              <TableSkeleton columns={actions ? [...columns, { key: '_actions', align: 'right' }] : columns} rows={Math.min(effectivePageSize, 8)} />
             ) : paginated.length === 0 ? (
               <tr>
                 <td colSpan={colSpan}>
@@ -180,32 +195,15 @@ export default function DataTable({
         </table>
       </div>
 
-      {!loading && sorted.length > 0 && totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-xs text-neutral-400">
-            Page {currentPage} of {totalPages}
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => goToPage((p) => Math.max(1, p - 1))}
-              className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <button
-              type="button"
-              disabled={currentPage === totalPages}
-              onClick={() => goToPage((p) => Math.min(totalPages, p + 1))}
-              className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent"
-              aria-label="Next page"
-            >
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-        </div>
+      {!loading && resultCount > 0 && (
+        <PaginationFooter
+          page={currentPage}
+          pageSize={effectivePageSize}
+          total={resultCount}
+          onPageChange={(next) => goToPage(() => next)}
+          onPageSizeChange={serverPagination ? onPageSizeChange : (next) => { setLocalPageSize(next); setPage(1) }}
+          pageSizeOptions={pageSizeOptions}
+        />
       )}
     </div>
   )

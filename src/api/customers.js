@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/authStore'
+import { getPagedData } from './paging'
 import { apiClient } from './client'
 import { getFileUrl } from './files'
 import { resolveCustomerGst } from '../utils/customer'
@@ -420,10 +421,7 @@ export async function listCustomers(params = {}) {
     if (params.sort_by) queryParams.sort_by = params.sort_by
     if (params.sort_order) queryParams.sort_order = params.sort_order
 
-    const { data } = await apiClient.get('/customers', {
-      headers: authHeader(),
-      params: queryParams,
-    })
+    const data = await getPagedData(apiClient, '/customers', { headers: authHeader(), params: queryParams }, params.page === undefined && params.page_size === undefined)
 
     // GET /customers now returns a paginated { items, total, page, page_size, total_pages }
     // wrapper instead of a bare array - read `items`, falling back to a bare array for safety.

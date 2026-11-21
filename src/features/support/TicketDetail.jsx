@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, BadgeCheck, RotateCw } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, Lock, Plus, RotateCw } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -8,9 +8,12 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import TicketAttachmentsField from './TicketAttachmentsField'
 import AttachmentChipList from './AttachmentChipList'
+import ConversationScroll from './ConversationScroll'
 import { closeTicket, getTicket, reopenTicket, replyToTicket } from '../../api/support'
 import { formatDateTime } from '../../utils/format'
 import { useToast } from '../../components/ui/toastContext'
+import { useAuthStore } from '../../store/authStore'
+import { ROLES } from '../../auth/roles'
 import {
   TICKET_PRIORITY_VARIANT,
   TICKET_STATUS_VARIANT,
@@ -21,10 +24,19 @@ import {
   ticketStatusLabel,
 } from './supportHelpers'
 
+// "Back" always lands on the Tickets list (the Tickets tab of the Help page) - never browser history,
+// which can send the user to whatever page happened to be open before (e.g. the FAQ tab).
+export const TICKETS_LIST_PATH = '/admin/settings/help?tab=tickets'
+export const RAISE_TICKET_PATH = '/admin/settings/help?tab=tickets&raise=1'
+
 export default function TicketDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { showToast } = useToast()
+  // Users may raise tickets; only a Super Admin may close one. Hiding the button is a courtesy - the
+  // backend still decides, and a 403 is shown below as a plain message.
+  const currentUser = useAuthStore((state) => state.currentUser)
+  const canCloseTickets = currentUser?.role === ROLES.SUPER_ADMIN
 
   const [ticket, setTicket] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -77,7 +89,7 @@ export default function TicketDetail() {
     const result = await closeTicket(id)
     setIsClosing(false)
     if (!result.success) {
-      setActionError(result.error)
+      setActionError(result.status === 403 ? 'Only a Super Admin can close a ticket.' : result.error)
       return
     }
     setTicket(result.ticket)
@@ -94,6 +106,8 @@ export default function TicketDetail() {
       setActionError(result.error)
       return
     }
+    // The response is the reopened ticket, so the status badge, the reply box and the attachment
+    // field all come back immediately - no page refresh needed.
     setTicket(result.ticket)
     showToast({ title: 'Ticket reopened' })
   }
@@ -105,7 +119,7 @@ export default function TicketDetail() {
   if (!ticket) {
     return (
       <Card>
-        <EmptyState title="Ticket not found" description={loadError || 'This ticket may not exist, or belongs to someone else.'} action={{ label: 'Back to Tickets', onClick: () => navigate('/admin/settings/help') }} />
+        <EmptyState title="Ticket not found" description={loadError || 'This ticket may not exist, or belongs to someone else.'} action={{ label: 'Back to Tickets', onClick: () => navigate(TICKETS_LIST_PATH) }} />
       </Card>
     )
   }
@@ -118,19 +132,22 @@ export default function TicketDetail() {
   // Resolved/closed but past the 7-day window - Reopen hides rather than being left clickable
   // to 409, and the reason is shown explicitly instead of the button just silently vanishing.
   const showReopenExpiredHint = reopenEligibleStatus && !withinReopenWindow
-  const showClose = !isClosed
-  const replyAllowed = canReply(ticket)
+  const showClose = !isClosed && canCloseTickets
+  // A closed ticket is read-only: the reply box, the attachment field and Send Reply are not rendered
+  // at all (not just disabled). The only way back to a conversation is Reopen.
+  const replyAllowed = !isClosed && canReply(ticket)
+  const conversationVersion = `${ticket.id}:${ticket.messages.length}:${ticket.status}`
 
   return (
     <div className="space-y-4">
-      <button type="button" onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900">
+      <button type="button" onClick={() => navigate(TICKETS_LIST_PATH)} className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900">
         <ArrowLeft className="size-4" aria-hidden="true" />
         Back
       </button>
 
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-medium text-neutral-400">{ticket.ticketNumber}</p>
             <h1 className="mt-0.5 text-lg font-semibold text-neutral-900">{ticket.subject}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -139,34 +156,44 @@ export default function TicketDetail() {
               <Badge variant="neutral">{ticketCategoryLabel(ticket.category)}</Badge>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {showReopen && (
+              <Button type="button" variant="primary" size="sm" loading={isReopening} onClick={handleReopen}>
+                <RotateCw className="size-4" aria-hidden="true" />
+                Reopen Ticket
+              </Button>
+            )}
+            {isClosed && (
+              <Button type="button" variant="outline" size="sm" onClick={() => navigate(RAISE_TICKET_PATH)}>
+                <Plus className="size-4" aria-hidden="true" />
+                Raise New Ticket
+              </Button>
+            )}
             {showClose && (
               <Button type="button" variant="outline" size="sm" loading={isClosing} onClick={handleClose}>Close Ticket</Button>
-            )}
-            {showReopen && (
-              <Button type="button" variant="outline" size="sm" loading={isReopening} onClick={handleReopen}>
-                <RotateCw className="size-4" aria-hidden="true" />
-                Reopen
-              </Button>
             )}
           </div>
         </div>
         {showReopenExpiredHint && (
           <p className="mt-2 text-xs text-neutral-400">Reopen window expired, please raise a new ticket.</p>
         )}
-        <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-neutral-700">{ticket.description}</p>
+        <dl className="mt-4 grid gap-x-6 gap-y-2 text-xs sm:grid-cols-3">
+          <div><dt className="text-neutral-400">Raised by</dt><dd className="mt-0.5 font-medium text-neutral-700">{ticket.createdByName || 'You'}</dd></div>
+          <div><dt className="text-neutral-400">Created</dt><dd className="mt-0.5 font-medium text-neutral-700">{formatDateTime(ticket.createdAt)}</dd></div>
+          <div><dt className="text-neutral-400">Assigned to</dt><dd className="mt-0.5 font-medium text-neutral-700">{ticket.assignedToName || 'Unassigned'}</dd></div>
+        </dl>
+        <p className="mt-4 max-h-40 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-neutral-700">{ticket.description}</p>
         <AttachmentChipList attachments={ticket.attachments} className="mt-3" />
-        <p className="mt-4 text-xs text-neutral-400">
-          Raised by {ticket.createdByName || 'you'} on {formatDateTime(ticket.createdAt)}
-          {ticket.assignedToName ? ` · Assigned to ${ticket.assignedToName}` : ''}
-        </p>
         {actionError && (
           <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>
         )}
       </Card>
 
-      <Card title="Conversation">
-        <div className="space-y-4">
+      <Card
+        title="Conversation"
+        subtitle={isClosed ? 'Conversation history - read only' : undefined}
+      >
+        <ConversationScroll version={conversationVersion}>
           {ticket.messages.length === 0 ? (
             <p className="text-sm text-neutral-400">No replies yet.</p>
           ) : (
@@ -181,12 +208,21 @@ export default function TicketDetail() {
               </div>
             ))
           )}
-        </div>
+        </ConversationScroll>
 
-        {replyAllowed ? (
-          <div className="mt-5 space-y-3 border-t border-neutral-100 pt-4">
-            <label className="text-sm font-medium text-neutral-700">Reply</label>
+        {isClosed ? (
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3 text-sm text-neutral-500">
+            <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>
+              This ticket is closed, so the conversation is read only.
+              {showReopen ? ' Reopen it to reply, or raise a new ticket.' : ' Please raise a new ticket if you still need help.'}
+            </span>
+          </div>
+        ) : replyAllowed ? (
+          <div className="mt-4 space-y-3 border-t border-neutral-100 pt-4">
+            <label htmlFor="ticket-reply" className="text-sm font-medium text-neutral-700">Reply</label>
             <textarea
+              id="ticket-reply"
               value={replyBody}
               onChange={(event) => setReplyBody(event.target.value)}
               maxLength={5000}
@@ -205,7 +241,7 @@ export default function TicketDetail() {
             </div>
           </div>
         ) : (
-          <div className="mt-5 rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3 text-sm text-neutral-500">
+          <div className="mt-4 rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3 text-sm text-neutral-500">
             This ticket is {ticketStatusLabel(ticket.status).toLowerCase()} and the 7-day reopen window has passed. Please raise a new ticket if you still need help.
           </div>
         )}

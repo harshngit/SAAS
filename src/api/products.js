@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/authStore'
+import { getPagedData } from './paging'
 import { apiClient } from './client'
 import { toStoredFilePath } from './files'
 import { handleStorageLimitError } from '../components/ui/storageLimitContext'
@@ -171,6 +172,55 @@ function extractErrorFields(detail) {
     .filter(Boolean)
 }
 
+// Backend pricing sub-fields -> the form field that edits them, with the short message shown under it.
+const PRICING_FIELD_LABELS = {
+  purchase_price: ['purchasePrice', 'Purchase price'],
+  selling_price: ['sellingPrice', 'Selling price'],
+  mrp: ['mrp', 'MRP'],
+  wholesale_price: ['wholesalePrice', 'Wholesale price'],
+  dealer_price: ['dealerPrice', 'Dealer price'],
+  discount_percent: ['discountPercent', 'Discount'],
+}
+const WHOLE_NUMBER_FIELDS = { opening_stock: ['openingStock', 'Opening stock'], minimum_order_quantity: ['minimumOrderQuantity', 'Minimum order quantity'], download_limit: ['downloadLimit', 'Download limit'] }
+
+function shortMessageFor(label, entry, isPercent) {
+  const type = String(entry?.type || '')
+  if (/int_parsing|int_from_float|int_type/.test(type)) return 'Please enter a whole number.'
+  if (isPercent && /greater_than|less_than/.test(type)) return 'Discount must be between 0 and 100.'
+  if (/greater_than/.test(type)) return `${label} cannot be negative.`
+  if (/less_than/.test(type)) return `${label} is too large.`
+  if (/missing/.test(type)) return `${label} is required.`
+  return entry?.msg || `${label} is not valid.`
+}
+
+// One backend error -> { <form field name>: <short message> }, so the message can sit under the field.
+//   409 "A product with this SKU already exists."            -> productCode
+//   400 "Primary product image ..." (cover_image)            -> coverImage
+//   422 loc [body, pricing, mrp] / [body, opening_stock] ... -> that field, in plain words
+//   400/422 "duplicate variant ..."                          -> variants
+export function extractProductFieldErrors(detail, status) {
+  const fieldErrors = {}
+  if (typeof detail === 'string') {
+    if (/sku/i.test(detail) && (status === 409 || /already exists|duplicate|unique/i.test(detail))) fieldErrors.productCode = detail
+    else if (/primary product image/i.test(detail)) fieldErrors.coverImage = detail
+    else if (/duplicate.*variant|variant.*duplicate/i.test(detail)) fieldErrors.variants = 'Duplicate variant combination is not allowed.'
+    return fieldErrors
+  }
+  if (!Array.isArray(detail)) return fieldErrors
+  detail.forEach((entry) => {
+    const loc = Array.isArray(entry?.loc) ? entry.loc.filter((part) => part !== 'body') : []
+    if (loc[0] === 'pricing' && PRICING_FIELD_LABELS[loc[1]]) {
+      const [formField, label] = PRICING_FIELD_LABELS[loc[1]]
+      fieldErrors[formField] = fieldErrors[formField] || shortMessageFor(label, entry, loc[1] === 'discount_percent')
+    } else if (WHOLE_NUMBER_FIELDS[loc[0]]) {
+      const [formField, label] = WHOLE_NUMBER_FIELDS[loc[0]]
+      fieldErrors[formField] = fieldErrors[formField] || shortMessageFor(label, entry, false)
+    } else if (loc[0] === 'sku') fieldErrors.productCode = fieldErrors.productCode || entry?.msg || 'SKU is not valid.'
+    else if (loc[0] === 'cover_image') fieldErrors.coverImage = fieldErrors.coverImage || entry?.msg || 'Primary product image is not valid.'
+  })
+  return fieldErrors
+}
+
 function coerceFieldValue(kind, value) {
   if (kind === 'number') return Number(value) || 0
   if (kind === 'boolean') return Boolean(value)
@@ -270,6 +320,11 @@ function toVariationPayload(variant, includeId = false) {
 }
 
 export async function createProduct(payload) {
+  // A new product needs its Primary Product Image uploaded first (POST /files/upload -> "/files/{id}").
+  // Never call POST /products without it.
+  if (!toStoredImage(payload.coverImage ?? payload.cover_image)) {
+    return { success: false, error: 'Primary product image is required.', errorFields: ['cover_image'], fieldErrors: { coverImage: 'Primary product image is required.' } }
+  }
   try {
     const variations = (payload.variants || []).map((variant) => toVariationPayload(variant))
 
@@ -289,7 +344,7 @@ export async function createProduct(payload) {
       product_type: payload.productType ?? payload.product_type ?? '',
       vendor: payload.vendor || '',
       brand: payload.brand?.trim() || '',
-      sku: payload.sku || '',
+      sku: (payload.sku || '').trim(),
       category_id: payload.categoryId || payload.category_id || payload.category || '',
       total_inventory: Number(payload.totalInventory ?? payload.total_inventory) || variations.reduce((sum, variant) => sum + Number(variant.inventory || 0), 0),
       pricing: buildPricingPayload(payload),
@@ -310,7 +365,11 @@ export async function createProduct(payload) {
       'Unable to create product. Please try again.',
     )
 
-    return { success: false, error: message, errorFields: extractErrorFields(errorData?.detail) }
+    const fieldErrors = extractProductFieldErrors(errorData?.detail, error.response?.status)
+    const errorFields = extractErrorFields(errorData?.detail)
+    if (fieldErrors.productCode && !errorFields.includes('sku')) errorFields.push('sku')
+    if (fieldErrors.coverImage && !errorFields.includes('cover_image')) errorFields.push('cover_image')
+    return { success: false, error: message, errorFields, fieldErrors, status: error.response?.status }
   }
 }
 
@@ -369,7 +428,7 @@ export async function updateProduct(productId, payload) {
     }
     if (payload.vendor !== undefined) requestBody.vendor = payload.vendor || ''
     if (payload.brand !== undefined) requestBody.brand = payload.brand?.trim() || ''
-    if (payload.sku !== undefined) requestBody.sku = payload.sku || ''
+    if (payload.sku !== undefined) requestBody.sku = (payload.sku || '').trim()
     if (payload.categoryId !== undefined || payload.category_id !== undefined || payload.category !== undefined) {
       requestBody.category_id = payload.categoryId || payload.category_id || payload.category || ''
     }
@@ -412,7 +471,11 @@ export async function updateProduct(productId, payload) {
       'Unable to update product. Please try again.',
     )
 
-    return { success: false, error: message, errorFields: extractErrorFields(errorData?.detail) }
+    const fieldErrors = extractProductFieldErrors(errorData?.detail, error.response?.status)
+    const errorFields = extractErrorFields(errorData?.detail)
+    if (fieldErrors.productCode && !errorFields.includes('sku')) errorFields.push('sku')
+    if (fieldErrors.coverImage && !errorFields.includes('cover_image')) errorFields.push('cover_image')
+    return { success: false, error: message, errorFields, fieldErrors, status: error.response?.status }
   }
 }
 
@@ -575,10 +638,7 @@ export async function listProducts(params = {}) {
     if (params.sort_by) queryParams.sort_by = params.sort_by
     if (params.sort_order) queryParams.sort_order = params.sort_order
 
-    const { data } = await apiClient.get('/products', {
-      headers: authHeader(),
-      params: queryParams,
-    })
+    const data = await getPagedData(apiClient, '/products', { headers: authHeader(), params: queryParams }, params.page === undefined && params.page_size === undefined)
 
     const products = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
     return { success: true, products, total: data?.total ?? products.length }

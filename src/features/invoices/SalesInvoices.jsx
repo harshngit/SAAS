@@ -5,8 +5,7 @@ import { Eye, Wallet } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Select from '../../components/ui/Select'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { usePermission } from '../../auth/usePermission'
 import { listInvoices } from '../../api/invoices'
 import RecordPaymentDrawer from './RecordPaymentDrawer'
@@ -44,12 +43,14 @@ export default function SalesInvoices() {
   const [customTo, setCustomTo] = useState('')
   const { dateFrom, dateTo } = useMemo(() => resolveDateRange(datePreset, customFrom, customTo), [datePreset, customFrom, customTo])
   const hasActiveFilters = statusFilter !== 'all' || customerFilter !== 'all' || datePreset !== 'all'
-  const clearFilters = () => {
-    setStatusFilter('all')
-    setCustomerFilter('all')
-    setDatePreset('all')
-    setCustomFrom('')
-    setCustomTo('')
+  const appliedFilters = { statusFilter, customerFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { statusFilter: 'all', customerFilter: 'all', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setStatusFilter(next.statusFilter)
+    setCustomerFilter(next.customerFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
   }
 
   const load = useCallback(() => {
@@ -93,7 +94,7 @@ export default function SalesInvoices() {
           <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
         <DataTable
-          key={`${statusFilter}-${customerFilter}-${datePreset}-${customFrom}-${customTo}`}
+          resetKey={`${statusFilter}-${customerFilter}-${datePreset}-${customFrom}-${customTo}`}
           renderToolbar={({ search, onSearchChange, resultCount, searchable }) => (
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               {searchable && (
@@ -108,18 +109,17 @@ export default function SalesInvoices() {
                 </div>
               )}
               <div className="flex items-center gap-3">
-                <ListFilterPanel title="Filter Sales Invoices">
-                  <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Status
-                    <Select options={PAYMENT_STATUS_OPTIONS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
-                  </label>
-                  <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Customer
-                    <Select options={customerOptions} value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)} />
-                  </label>
-                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Invoice Date
-                    <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-                  </div>
-                  {hasActiveFilters && (
-                    <button type="button" onClick={clearFilters} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
+                <ListFilterPanel title="Filter Sales Invoices" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters}>
+                  {({ draft, set, errors }) => (
+                    <>
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Payment Status
+                        <Select options={PAYMENT_STATUS_OPTIONS} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+                      </label>
+                      <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Customer
+                        <Select options={customerOptions} value={draft.customerFilter} onChange={(event) => set('customerFilter', event.target.value)} />
+                      </label>
+                      <FilterDateRange label="Invoice Date" draft={draft} set={set} errors={errors} />
+                    </>
                   )}
                 </ListFilterPanel>
                 <p className="shrink-0 text-xs font-medium text-neutral-400">{resultCount} {resultCount === 1 ? 'result' : 'results'}</p>

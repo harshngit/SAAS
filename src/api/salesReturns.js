@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/authStore'
+import { getPagedData } from './paging'
 import { apiClient } from './client'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
@@ -209,7 +210,9 @@ function normalizeSalesReturn(salesReturn) {
 
 export async function listSalesReturns(params = {}) {
   try {
-    const queryParams = {}
+    // GET /sales-returns returns only 10 rows unless a page size is asked for.
+    const queryParams = { page_size: params.page_size || 100 }
+    if (params.page !== undefined) queryParams.page = params.page
     if (params.status) queryParams.status = params.status
     if (params.customer_id || params.customerId) queryParams.customer_id = params.customer_id || params.customerId
     if (params.invoice_reference_id || params.invoiceReferenceId) {
@@ -218,10 +221,7 @@ export async function listSalesReturns(params = {}) {
     if (params.sort_by) queryParams.sort_by = params.sort_by
     if (params.sort_order) queryParams.sort_order = params.sort_order
 
-    const { data } = await apiClient.get('/sales-returns', {
-      headers: authHeader(),
-      params: queryParams,
-    })
+    const data = await getPagedData(apiClient, '/sales-returns', { headers: authHeader(), params: queryParams }, params.page === undefined && params.page_size === undefined)
 
     const salesReturns = Array.isArray(data) ? data : data?.sales_returns || data?.items || []
     return { success: true, salesReturns: salesReturns.map(normalizeSalesReturn) }

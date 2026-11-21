@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Send } from 'lucide-react'
+import { ArrowLeft, Lock, RotateCw, Send } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -8,6 +8,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import AttachmentChipList from './AttachmentChipList'
+import ConversationScroll from './ConversationScroll'
 import { getPlatformSupportTicket, replyToPlatformSupportTicket, updatePlatformSupportTicket } from '../../api/platformSupport'
 import { listPlatformStaff } from '../../api/platform'
 import { useAuthStore } from '../../store/authStore'
@@ -107,6 +108,11 @@ export default function PlatformSupportTicketDetail() {
   }
 
   const currentUserId = currentUser?.id
+  const isClosed = ticket.status === 'closed'
+  // Only a Super Admin may close a ticket: other platform roles do not get "Closed" as a choice
+  // (a ticket that is already closed still shows it so the select reads correctly).
+  const statusOptions = isSuperAdmin || isClosed ? TICKET_STATUS_OPTIONS : TICKET_STATUS_OPTIONS.filter((option) => option.value !== 'closed')
+  const conversationVersion = `${ticket.id}:${ticket.messages.length}:${ticket.status}`
 
   return (
     <div className="listing-page space-y-4">
@@ -126,6 +132,12 @@ export default function PlatformSupportTicketDetail() {
               <Badge variant="neutral">{ticketCategoryLabel(ticket.category)}</Badge>
             </div>
           </div>
+          {isClosed && (
+            <Button type="button" variant="primary" size="sm" loading={isUpdating} onClick={() => applyUpdate({ status: 'open' }, 'Unable to reopen the ticket.')}>
+              <RotateCw className="size-4" aria-hidden="true" />
+              Reopen Ticket
+            </Button>
+          )}
         </div>
         <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-neutral-700">{ticket.description}</p>
         <AttachmentChipList attachments={ticket.attachments} className="mt-3" />
@@ -134,7 +146,7 @@ export default function PlatformSupportTicketDetail() {
         <div className="mt-5 grid gap-3 border-t border-neutral-100 pt-4 sm:grid-cols-3">
           <Select
             label="Status"
-            options={TICKET_STATUS_OPTIONS}
+            options={statusOptions}
             value={ticket.status}
             disabled={isUpdating}
             onChange={(event) => applyUpdate({ status: event.target.value }, 'Unable to update status.')}
@@ -178,8 +190,8 @@ export default function PlatformSupportTicketDetail() {
         )}
       </Card>
 
-      <Card title="Conversation">
-        <div className="space-y-4">
+      <Card title="Conversation" subtitle={isClosed ? 'Conversation history - read only' : undefined}>
+        <ConversationScroll version={conversationVersion}>
           {ticket.messages.length === 0 ? (
             <p className="text-sm text-neutral-400">No replies yet.</p>
           ) : (
@@ -204,11 +216,18 @@ export default function PlatformSupportTicketDetail() {
               </div>
             ))
           )}
-        </div>
+        </ConversationScroll>
 
-        <div className="mt-5 space-y-3 border-t border-neutral-100 pt-4">
-          <label className="text-sm font-medium text-neutral-700">Reply</label>
+        {isClosed ? (
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3 text-sm text-neutral-500">
+            <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>This ticket is closed, so the conversation is read only. Reopen it to reply.</span>
+          </div>
+        ) : (
+        <div className="mt-4 space-y-3 border-t border-neutral-100 pt-4">
+          <label htmlFor="platform-ticket-reply" className="text-sm font-medium text-neutral-700">Reply</label>
           <textarea
+            id="platform-ticket-reply"
             value={replyBody}
             onChange={(event) => setReplyBody(event.target.value)}
             maxLength={5000}
@@ -229,6 +248,7 @@ export default function PlatformSupportTicketDetail() {
             </Button>
           </div>
         </div>
+        )}
       </Card>
     </div>
   )

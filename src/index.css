@@ -816,3 +816,8 @@ main table:not(.od-products):not(.dd-products):not(.listing-table) tbody td {
   font-style: normal;
   font-display: swap;
 }
+
+/* A quantity box in the row holds text that is not a whole number: its Amount is not a real number either, so show a dash (see WholeNumberInput). */
+[data-qty-invalid="true"] [data-line-amount],
+[data-qty-invalid="true"] [data-line-amount] * { font-size: 0 !important; }
+[data-qty-invalid="true"] [data-line-amount]::after { content: "\2014"; font-size: 0.875rem; font-weight: 500; color: var(--color-neutral-400); }

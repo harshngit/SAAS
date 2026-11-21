@@ -1,4 +1,5 @@
 import { loadSummaryRows } from '../../utils/listSummary'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -48,7 +49,7 @@ const formatDate = (value) => {
   }
 }
 
-const PAGE_SIZE_OPTIONS = [{ value: '20', label: '20' }, { value: '25', label: '25' }, { value: '50', label: '50' }]
+const PAGE_SIZE_OPTIONS = [{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }, { value: '100', label: '100' }]
 
 function OrderSummaryCard({ label, value, detail, index }) {
   return (
@@ -104,9 +105,13 @@ export default function OrderList() {
   const [customerFilter, setCustomerFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearch = useDebouncedValue(searchTerm, 350)
-  const [pageSize, setPageSize] = useState('20')
+  const [pageSize, setPageSize] = useState('25')
   const [page, setPage] = useState(1)
   const { sortBy, sortOrder, toggleSort, sortParams } = useSortState()
+  // Optional newest/oldest-created ordering chosen in the filter drawer (sort_by=created_at). 'default' sends nothing, so
+  // every tab keeps its own default (the Confirmed tab sorts by updated_at desc, see serverParams). A clicked column
+  // header still wins over this.
+  const [activitySort, setActivitySort] = useState('default')
   const listAbortRef = useRef(null)
   const summaryAbortRef = useRef(null)
 
@@ -136,9 +141,14 @@ export default function OrderList() {
       ...(dateFrom ? { date_from: dateFrom } : {}),
       ...(dateTo ? { date_to: dateTo } : {}),
       ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+      // Accepted (= the Confirmed tab, status=confirmed) lists the most recently updated orders first. Only that
+      // tab; every other tab keeps the backend's default order. Precedence: a clicked column header (sortParams)
+      // beats an explicit "Sort By" choice in the filter drawer, which beats this default.
+      ...(statusTab === 'confirmed' ? { sort_by: 'updated_at', sort_order: 'desc' } : {}),
+      ...(activitySort !== 'default' ? { sort_by: 'created_at', sort_order: activitySort === 'created_asc' ? 'asc' : 'desc' } : {}),
       ...sortParams,
     }
-  }, [statusTab, deliveryPartnerFilter, customerFilter, sourceFilter, dateFrom, dateTo, debouncedSearch, sortParams])
+  }, [statusTab, deliveryPartnerFilter, customerFilter, sourceFilter, dateFrom, dateTo, debouncedSearch, sortParams, activitySort])
 
   // GET /orders/summary takes the same filters as the list MINUS delivery-partner/sort - those
   // two don't affect the org-wide totals the cards show.
@@ -309,6 +319,42 @@ export default function OrderList() {
     loadOrders()
   }
 
+  const filterPanel = (
+    <ListFilterPanel
+      title="Filter Orders"
+      applied={{ deliveryPartnerFilter, statusTab, customerFilter, sourceFilter, activitySort, datePreset, customFrom, customTo }}
+      defaults={{ deliveryPartnerFilter: 'all', statusTab: 'all', customerFilter: 'all', sourceFilter: 'all', activitySort: 'default', datePreset: 'all', customFrom: '', customTo: '' }}
+      onApply={(next) => {
+        setDeliveryPartnerFilter(next.deliveryPartnerFilter)
+        setStatusTab(next.statusTab)
+        setCustomerFilter(next.customerFilter)
+        setSourceFilter(next.sourceFilter)
+        setActivitySort(next.activitySort)
+        setDatePreset(next.datePreset)
+        setCustomFrom(next.customFrom)
+        setCustomTo(next.customTo)
+        setPage(1)
+      }}
+    >
+      {({ draft, set, errors }) => (
+        <>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+            <Select options={ORDER_TABS.map((tab) => ({ value: tab.value, label: tab.label }))} value={draft.statusTab} onChange={(event) => set('statusTab', event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Delivery partner<Select options={deliveryPartnerOptions} value={draft.deliveryPartnerFilter} onChange={(event) => set('deliveryPartnerFilter', event.target.value)} /></label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Customer<Select options={customerOptions} value={draft.customerFilter} onChange={(event) => set('customerFilter', event.target.value)} /></label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Source
+            <Select options={ORDER_SOURCE_OPTIONS} value={draft.sourceFilter} onChange={(event) => set('sourceFilter', event.target.value)} />
+          </label>
+          <FilterDateRange label="Order Date" draft={draft} set={set} errors={errors} />
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Sort By
+            <Select options={[{ value: 'default', label: 'Default order' }, { value: 'created_desc', label: 'Newest created first' }, { value: 'created_asc', label: 'Oldest created first' }]} value={draft.activitySort} onChange={(event) => set('activitySort', event.target.value)} />
+          </label>
+        </>
+      )}
+    </ListFilterPanel>
+  )
+
   return (
     <div className="listing-page space-y-4">
       <div>
@@ -343,7 +389,7 @@ export default function OrderList() {
               <div><h2 className="text-xl font-semibold tracking-tight text-neutral-900">Orders</h2><p className="mt-1 text-xs text-neutral-400">{total} orders</p></div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className="relative w-full sm:w-60"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" /><input type="search" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search orders..." className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" /></div>
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsFilterOpen(true)}><SlidersHorizontal className="size-4" aria-hidden="true" />Filter</Button>
+                {filterPanel}
                 <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" loading={isExporting} onClick={() => exportOrders()}><Download className="size-4" aria-hidden="true" />Export</Button>
                 <RequirePermission module="sales_orders" action="create"><Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => setIsBulkImportOpen(true)}><UploadCloud className="size-4" aria-hidden="true" />Bulk Import</Button></RequirePermission>
                 <RequirePermission module="sales_orders" action="create"><Button size="sm" onClick={() => navigate(`${basePath}/create`)} className="h-9 rounded-2xl px-3.5"><Plus className="size-4" aria-hidden="true" />New Order</Button></RequirePermission>
@@ -510,34 +556,6 @@ export default function OrderList() {
         </div>
       </Card>
 
-      {isFilterOpen && createPortal(
-        <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label="Order filters">
-          <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl">
-            <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
-              <div><h2 className="text-lg font-semibold text-neutral-900">Filter Orders</h2><p className="mt-0.5 text-xs text-neutral-400">Refine the orders shown in the table.</p></div>
-              <button type="button" onClick={() => setIsFilterOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50" aria-label="Close filters"><X className="size-5" /></button>
-            </div>
-            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Delivery partner<Select options={deliveryPartnerOptions} value={deliveryPartnerFilter} onChange={(event) => { setDeliveryPartnerFilter(event.target.value); setPage(1) }} /></label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
-                <Select options={ORDER_TABS.map((tab) => ({ value: tab.value, label: tab.label }))} value={statusTab} onChange={(event) => { setStatusTab(event.target.value); setPage(1) }} />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Customer<Select options={customerOptions} value={customerFilter} onChange={(event) => { setCustomerFilter(event.target.value); setPage(1) }} /></label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
-                Source
-                <Select options={ORDER_SOURCE_OPTIONS} value={sourceFilter} onChange={(event) => { setSourceFilter(event.target.value); setPage(1) }} />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
-                Order Date
-                <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} />
-              </label>
-            </div>
-            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4"><button type="button" onClick={() => { setDeliveryPartnerFilter('all'); setSourceFilter('all'); setStatusTab('all'); setCustomerFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setSearchTerm(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button><Button type="button" onClick={() => setIsFilterOpen(false)}>Apply filters</Button></div>
-          </aside>
-        </div>,
-        document.body,
-      )}
 
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => { if (!isDeleting) { setDeleteTarget(null); setDeleteError('') } }} title="Delete Order">
         <div className="space-y-5">

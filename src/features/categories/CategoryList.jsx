@@ -1,4 +1,5 @@
 import AllowedBrandsField from '../../components/ui/AllowedBrandsField'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { useCategoryBrandSelection } from '../../hooks/useCategoryBrandSelection'
 import { usePermission } from '../../auth/usePermission'
 import { SkeletonValue } from '../../components/ui/Skeleton'
@@ -546,6 +547,38 @@ export default function CategoryList() {
     setIsDeleting(false)
   }
 
+  const filterPanel = (
+    <ListFilterPanel
+      title="Filter Categories"
+      applied={{ categoryFilter, datePreset, customFrom, customTo }}
+      defaults={{ categoryFilter: 'all', datePreset: 'all', customFrom: '', customTo: '' }}
+      onApply={(next) => {
+        setCategoryFilter(next.categoryFilter)
+        setDatePreset(next.datePreset)
+        setCustomFrom(next.customFrom)
+        setCustomTo(next.customTo)
+        setPage(1)
+      }}
+    >
+      {({ draft, set, errors }) => (
+        <>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Image
+            <Select
+              options={[
+                { value: 'all', label: 'All categories' },
+                { value: 'with-image', label: 'With image' },
+                { value: 'without-image', label: 'Without image' },
+              ]}
+              value={draft.categoryFilter}
+              onChange={(event) => set('categoryFilter', event.target.value)}
+            />
+          </label>
+          <FilterDateRange label="Created" draft={draft} set={set} errors={errors} />
+        </>
+      )}
+    </ListFilterPanel>
+  )
+
   return (
     <div className="listing-page space-y-4">
       <div>
@@ -584,20 +617,7 @@ export default function CategoryList() {
               />
             </div>
 
-            <Button
-              ref={filterTriggerRef}
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl px-3.5"
-              onClick={() => { setIsSortMenuOpen(false); setIsFilterMenuOpen(true) }}
-              aria-haspopup="dialog"
-              aria-expanded={isFilterMenuOpen}
-              aria-controls="category-filter-panel"
-            >
-              <SlidersHorizontal className="size-4" aria-hidden="true" />
-              Filter
-            </Button>
+            {filterPanel}
 
             <div ref={sortMenuRef} className="relative shrink-0">
               <Button
@@ -792,47 +812,11 @@ export default function CategoryList() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-4 text-xs text-fg-muted">
-          <div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-fg">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-fg">{filteredCategories.length}</span></span><span className="hidden text-neutral-300 sm:inline">|</span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" /></label></div>
+          <div className="flex items-center gap-3"><span>Showing <span className="font-semibold text-fg">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-fg">{filteredCategories.length}</span></span><span className="hidden text-neutral-300 sm:inline">|</span><label className="flex items-center gap-2">Rows per page<Select options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }, { value: '100', label: '100' }]} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" /></label></div>
           <div className="flex items-center gap-1.5"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Previous page">‹</button><span className="min-w-14 text-center font-medium text-fg">{currentPage} / {totalPages}</span><button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 disabled:opacity-40" aria-label="Next page">›</button></div>
         </div>
       </Card>
 
-      {isFilterMenuOpen && createPortal(
-        <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="category-filter-title" id="category-filter-panel">
-          <button type="button" className="absolute inset-0 cursor-default bg-neutral-950/20" onClick={() => setIsFilterMenuOpen(false)} aria-label="Close filters" tabIndex={-1} />
-          <aside className="relative z-10 flex h-full w-full max-w-sm flex-col bg-(--modal-bg) shadow-2xl">
-            <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
-              <div>
-                <h2 id="category-filter-title" className="text-lg font-semibold text-neutral-900">Filter Categories</h2>
-                <p className="mt-0.5 text-xs text-neutral-400">Refine the categories shown in the table.</p>
-              </div>
-              <button ref={filterCloseRef} type="button" onClick={() => setIsFilterMenuOpen(false)} className="flex size-9 items-center justify-center rounded-xl text-neutral-500 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" aria-label="Close filters">
-                <X className="size-5" aria-hidden="true" />
-              </button>
-            </div>
-            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
-              <Select
-                label="Image"
-                options={[
-                  { value: 'all', label: 'All categories' },
-                  { value: 'with-image', label: 'With image' },
-                  { value: 'without-image', label: 'Without image' },
-                ]}
-                value={categoryFilter}
-                onChange={(event) => { setCategoryFilter(event.target.value); setPage(1) }}
-              />
-              <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Created
-                <DateRangeFilter preset={datePreset} onPresetChange={(value) => { setDatePreset(value); setPage(1) }} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to); setPage(1) }} />
-              </label>
-            </div>
-            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4">
-              <button type="button" onClick={() => { setCategoryFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setPage(1) }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
-              <Button type="button" onClick={() => setIsFilterMenuOpen(false)}>Apply filters</Button>
-            </div>
-          </aside>
-        </div>,
-        document.body,
-      )}
 
       <Modal
         isOpen={isFormOpen}

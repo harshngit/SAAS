@@ -273,13 +273,24 @@ export async function listInvoices(params = {}) {
     if (params.order_id) queryParams.order_id = params.order_id
     if (params.search) queryParams.search = params.search
 
-    const { data } = await apiClient.get('/invoices', {
-      headers: authHeader(),
-      params: queryParams,
-    })
+    // A caller that asks for neither a page nor a page size wants the WHOLE list (the invoice list, receivables, the
+    // dashboard). One request only returns 100, so it keeps asking for the next page until everything has arrived -
+    // otherwise invoice number 101 onwards silently never shows up.
+    const wantsAll = params.page === undefined && params.page_size === undefined
+    let rows = []
+    let total = 0
+    for (let page = 1; page <= 50; page += 1) {
+      const { data } = await apiClient.get('/invoices', {
+        headers: authHeader(),
+        params: wantsAll ? { ...queryParams, page } : queryParams,
+      })
+      const pageRows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
+      rows = rows.concat(pageRows)
+      total = data?.total ?? rows.length
+      if (!wantsAll || pageRows.length === 0 || rows.length >= total) break
+    }
 
-    const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
-    return { success: true, invoices: rows.map(normalizeInvoice), total: data?.total ?? rows.length }
+    return { success: true, invoices: rows.map(normalizeInvoice), total }
   } catch (error) {
     const errorData = error.response?.data
     const message = formatApiError(

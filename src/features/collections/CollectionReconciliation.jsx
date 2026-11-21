@@ -1,5 +1,6 @@
 import { SkeletonValue } from '../../components/ui/Skeleton'
-import ListFilterPanel from '../../components/ui/ListFilterPanel'
+import PaginationFooter from '../../components/ui/PaginationFooter'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { ListDataTable as DataTable } from '../../components/ui/ListPresentation'
 import ActionMenu from '../../components/ui/ActionMenu'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -10,7 +11,6 @@ import Card from '../../components/ui/Card'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import EntitySearchSelect from '../reports/components/EntitySearchSelect'
 import { resolveDateRange } from '../../utils/dateRange'
 import { uniqueOptions } from '../../utils/filterOptions'
@@ -39,7 +39,7 @@ function formatDateTime(value) {
     : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-const PAGE_SIZE = 20
+const DEFAULT_PAGE_SIZE = 25
 
 export default function CollectionReconciliation() {
   const { showToast } = useToast()
@@ -50,6 +50,7 @@ export default function CollectionReconciliation() {
 
   const [collections, setCollections] = useState([])
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -108,7 +109,7 @@ export default function CollectionReconciliation() {
   // table's own Prev/Next, should NOT reset itself.
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, debouncedSearch, customerId, orderId, collectedByFilter, dateFrom, dateTo])
+  }, [statusFilter, debouncedSearch, customerId, orderId, collectedByFilter, dateFrom, dateTo, pageSize])
 
   const load = useCallback(() => {
     setIsLoading(true)
@@ -124,7 +125,7 @@ export default function CollectionReconciliation() {
       date_from: !dateRangeInvalid && dateFrom ? dateFrom : undefined,
       date_to: !dateRangeInvalid && dateTo ? dateTo : undefined,
       page,
-      page_size: PAGE_SIZE,
+      page_size: pageSize,
     }).then((result) => {
       if (!result.success) {
         setCollections([])
@@ -138,7 +139,7 @@ export default function CollectionReconciliation() {
       }
       setIsLoading(false)
     })
-  }, [statusFilter, debouncedSearch, customerId, orderId, collectedByFilter, dateFrom, dateTo, dateRangeInvalid, page])
+  }, [statusFilter, debouncedSearch, customerId, orderId, collectedByFilter, dateFrom, dateTo, dateRangeInvalid, page, pageSize])
 
   useEffect(() => {
     load()
@@ -306,6 +307,46 @@ export default function CollectionReconciliation() {
     return items
   }
 
+  const appliedFilters = { statusFilter, partnerFilter, collectedByFilter, customerId, customerLabel, orderId, orderLabel, datePreset, customFrom, customTo }
+  const defaultFilters = { statusFilter: 'all', partnerFilter: 'all', collectedByFilter: 'all', customerId: '', customerLabel: '', orderId: '', orderLabel: '', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setStatusFilter(next.statusFilter)
+    setPartnerFilter(next.partnerFilter)
+    setCollectedByFilter(next.collectedByFilter)
+    setCustomerId(next.customerId)
+    setCustomerLabel(next.customerLabel)
+    setOrderId(next.orderId)
+    setOrderLabel(next.orderLabel)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
+    setPage(1)
+  }
+  const filterPanel = (
+    <ListFilterPanel title="Filter Collections" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters} ignoreKeys={['customerLabel', 'orderLabel']}>
+      {({ draft, set, errors }) => (
+        <>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+            <Select options={COLLECTION_STATUS_FILTERS} value={draft.statusFilter} onChange={(event) => set('statusFilter', event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Delivery Partner
+            <Select options={partnerOptions} value={draft.partnerFilter} onChange={(event) => set('partnerFilter', event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collected By
+            <Select options={collectedByOptions} value={draft.collectedByFilter} onChange={(event) => set('collectedByFilter', event.target.value)} />
+          </label>
+          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Customer
+            <EntitySearchSelect value={draft.customerId} selectedLabel={draft.customerLabel} onChange={(value, label) => set({ customerId: value, customerLabel: label })} fetchOptions={fetchCustomerOptions} placeholder="Any customer" className="w-full" />
+          </div>
+          <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Order
+            <EntitySearchSelect value={draft.orderId} selectedLabel={draft.orderLabel} onChange={(value, label) => set({ orderId: value, orderLabel: label })} fetchOptions={fetchOrderOptions} placeholder="Any order" className="w-full" />
+          </div>
+          <FilterDateRange label="Collection Date" draft={draft} set={set} errors={errors} />
+        </>
+      )}
+    </ListFilterPanel>
+  )
+
   return (
     <div className="listing-page space-y-4">
       <div>
@@ -316,8 +357,8 @@ export default function CollectionReconciliation() {
         <Card className="overflow-hidden p-0">
           <div className="grid grid-cols-2 lg:grid-cols-4">
             {[
-              { label: 'Collected', value: summary ? String(collectedCount) : '—', detail: summary ? `${formatCurrency(collectedAmount)} awaiting + reconciled` : '—', icon: HandCoins },
-              { label: 'Awaiting Reconciliation', value: summary ? String(awaitingReconciliation.count) : '—', detail: summary ? formatCurrency(awaitingReconciliation.amount) : '—', icon: Wallet },
+              { label: 'Collected', value: summary ? String(collectedCount) : '—', detail: summary ? `${formatCurrency(collectedAmount)} pending + reconciled` : '—', icon: HandCoins },
+              { label: 'Pending Admin Confirmation', value: summary ? String(awaitingReconciliation.count) : '—', detail: summary ? formatCurrency(awaitingReconciliation.amount) : '—', icon: Wallet },
               { label: 'Reconciled', value: summary ? String(reconciledStat.count) : '—', detail: summary ? formatCurrency(reconciledStat.amount) : '—', icon: BadgeCheck },
               { label: 'Voided', value: summary ? String(voidedStat.count) : '—', detail: summary ? formatCurrency(voidedStat.amount) : '—', icon: Ban },
             ].map(({ label, value, detail, icon: Icon }, index) => (
@@ -362,28 +403,7 @@ export default function CollectionReconciliation() {
           <Card className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:m-5">
             <div className={isLoading ? 'flex items-center justify-between gap-3 px-5 py-4' : 'flex items-center justify-between gap-3 px-5 py-4 md:hidden'}>
               <h3 className="text-base font-semibold tracking-tight text-neutral-900">Collections</h3>
-              {!isLoading && (
-                <ListFilterPanel title="Filter Collections">
-                  <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                  <Select label="Delivery Partner (this page only)" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                  <Select label="Collected By" options={collectedByOptions} value={collectedByFilter} onChange={(event) => setCollectedByFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-neutral-700">Customer</label>
-                    <EntitySearchSelect value={customerId} selectedLabel={customerLabel} onChange={(value, label) => { setCustomerId(value); setCustomerLabel(label) }} fetchOptions={fetchCustomerOptions} placeholder="Any customer" className="w-full" />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-neutral-700">Order</label>
-                    <EntitySearchSelect value={orderId} selectedLabel={orderLabel} onChange={(value, label) => { setOrderId(value); setOrderLabel(label) }} fetchOptions={fetchOrderOptions} placeholder="Any order" className="w-full" />
-                  </div>
-                  <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date
-                    <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-                    {dateRangeInvalid && <span className="text-xs font-normal text-red-600">From date must be on or before the to date.</span>}
-                  </div>
-                  {hasExtraFilters && (
-                    <button type="button" onClick={() => { setPartnerFilter('all'); setCollectedByFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setCustomerId(''); setCustomerLabel(''); setOrderId(''); setOrderLabel('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
-                  )}
-                </ListFilterPanel>
-              )}
+              {!isLoading && filterPanel}
             </div>
             {loadError && !unavailable && (
               <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>
@@ -396,15 +416,17 @@ export default function CollectionReconciliation() {
                 {/* Desktop / tablet: compact table */}
                 <div className="hidden md:block">
                   <DataTable
-                    key={`${statusFilter}-${partnerFilter}-${collectedByFilter}-${datePreset}-${customFrom}-${customTo}-${customerId}-${orderId}`}
+                    resetKey={`${statusFilter}-${partnerFilter}-${collectedByFilter}-${datePreset}-${customFrom}-${customTo}-${customerId}-${orderId}`}
                     serverPagination
                     page={page}
-                    totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+                    totalPages={Math.max(1, Math.ceil(total / pageSize))}
                     totalCount={total}
                     onPageChange={setPage}
+                    pageSize={pageSize}
+                    onPageSizeChange={setPageSize}
                     renderToolbar={() => {
-                      const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-                      const rangeEnd = Math.min(page * PAGE_SIZE, total)
+                      const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
+                      const rangeEnd = Math.min(page * pageSize, total)
                       return (
                       <div className="flex flex-col gap-3 border-b border-neutral-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-2">
@@ -417,26 +439,7 @@ export default function CollectionReconciliation() {
                             <input type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search collections..." aria-label="Search collections"
                               className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12" />
                           </div>
-                          <ListFilterPanel title="Filter Collections">
-                            <Select label="Status" options={COLLECTION_STATUS_FILTERS} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                            <Select label="Delivery Partner (this page only)" options={partnerOptions} value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                            <Select label="Collected By" options={collectedByOptions} value={collectedByFilter} onChange={(event) => setCollectedByFilter(event.target.value)} className="w-full" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-sm font-medium text-neutral-700">Customer</label>
-                              <EntitySearchSelect value={customerId} selectedLabel={customerLabel} onChange={(value, label) => { setCustomerId(value); setCustomerLabel(label) }} fetchOptions={fetchCustomerOptions} placeholder="Any customer" className="w-full" />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-sm font-medium text-neutral-700">Order</label>
-                              <EntitySearchSelect value={orderId} selectedLabel={orderLabel} onChange={(value, label) => { setOrderId(value); setOrderLabel(label) }} fetchOptions={fetchOrderOptions} placeholder="Any order" className="w-full" />
-                            </div>
-                            <div className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Collection Date
-                              <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-                              {dateRangeInvalid && <span className="text-xs font-normal text-red-600">From date must be on or before the to date.</span>}
-                            </div>
-                            {hasExtraFilters && (
-                              <button type="button" onClick={() => { setPartnerFilter('all'); setCollectedByFilter('all'); setDatePreset('all'); setCustomFrom(''); setCustomTo(''); setCustomerId(''); setCustomerLabel(''); setOrderId(''); setOrderLabel('') }} className="text-sm font-medium text-neutral-500 hover:text-neutral-900">Clear all</button>
-                            )}
-                          </ListFilterPanel>
+                          {filterPanel}
                         </div>
                       </div>
                       )
@@ -462,7 +465,7 @@ export default function CollectionReconciliation() {
                     onRowClick={(row) => setDetail(row)}
                     emptyTitle={
                       statusFilter === 'recorded'
-                        ? 'No collections waiting for reconciliation.'
+                        ? 'No collections pending admin confirmation.'
                         : statusFilter === 'reconciled'
                           ? 'No reconciled collections yet.'
                           : statusFilter === 'voided'
@@ -508,15 +511,7 @@ export default function CollectionReconciliation() {
                     ))
                   )}
                   {total > 0 && (
-                    <div className="flex items-center justify-between pt-1">
-                      <p className="text-xs text-neutral-400">
-                        Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, total)} of {total}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Button type="button" variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</Button>
-                        <Button type="button" variant="outline" size="sm" disabled={page >= Math.ceil(total / PAGE_SIZE)} onClick={() => setPage((p) => p + 1)}>Next</Button>
-                      </div>
-                    </div>
+                    <PaginationFooter page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={setPageSize} className="-mx-5 -mb-4 mt-2" />
                   )}
                 </div>
               </>
