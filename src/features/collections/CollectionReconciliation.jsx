@@ -1,4 +1,5 @@
 import { SkeletonValue } from '../../components/ui/Skeleton'
+import useSubmitLock from '../../hooks/useSubmitLock'
 import PaginationFooter from '../../components/ui/PaginationFooter'
 import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { ListDataTable as DataTable } from '../../components/ui/ListPresentation'
@@ -99,6 +100,7 @@ export default function CollectionReconciliation() {
   const [voidReason, setVoidReason] = useState('')
   const [actionError, setActionError] = useState('')
   const [isActing, setIsActing] = useState(false)
+  const { begin, end } = useSubmitLock(setIsActing)
 
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedSearch(searchInput.trim()), 400)
@@ -252,10 +254,10 @@ export default function CollectionReconciliation() {
 
   const runReconcile = async (collection) => {
     if (isActing) return
-    setIsActing(true)
+    if (!begin()) return
     setActionError('')
     const result = await reconcileCollection(collection.id)
-    setIsActing(false)
+    end()
     if (!result.success) {
       setActionError(result.error)
       // Collections state didn't change, but the day-end that now blocks this row did -
@@ -278,10 +280,10 @@ export default function CollectionReconciliation() {
 
   const runVoid = async () => {
     if (isActing) return
-    setIsActing(true)
+    if (!begin()) return
     setActionError('')
     const result = await voidCollection(voidTarget.id, voidReason.trim() || undefined)
-    setIsActing(false)
+    end()
     if (!result.success) {
       setActionError(result.error)
       if (result.code === 'DAY_END_CLOSED') load()

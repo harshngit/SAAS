@@ -1,4 +1,5 @@
 import NumericInput from '../../components/ui/NumericInput'
+import useSubmitLock from '../../hooks/useSubmitLock'
 import { useMemo, useState } from 'react'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -31,6 +32,7 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
   const [error, setError] = useState('')
   const [permissionGap, setPermissionGap] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const { begin, end } = useSubmitLock(setIsSaving)
 
   const close = () => {
     if (isSaving) return
@@ -51,7 +53,7 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
       return
     }
 
-    setIsSaving(true)
+    if (!begin()) return
     setError('')
     setPermissionGap(false)
 
@@ -79,7 +81,7 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
       // account" hint appears ONLY for the exact feature-not-enabled error (plan restriction).
       setError(result.error)
       setPermissionGap(result.code === 'FEATURE_NOT_ENABLED')
-      setIsSaving(false)
+      end()
       // Nothing was recorded, but the data behind this screen changed in the background - the
       // partner's day closed (DAY_END_CLOSED), or this customer's money is already collected and
       // awaiting admin approval (409 CONFLICT). Re-fetch the delivery (and its collections) so the
@@ -106,7 +108,7 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
       return
     }
 
-    setIsSaving(false)
+    end()
     onRecorded?.(result.collection)
     onClose()
   }

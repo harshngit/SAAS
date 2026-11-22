@@ -1,4 +1,5 @@
 import NumericInput from '../../components/ui/NumericInput'
+import useSubmitLock from '../../hooks/useSubmitLock'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Wand2, X } from 'lucide-react'
@@ -60,6 +61,7 @@ export default function RecordSupplierPaymentDrawer({ isOpen, onClose, onRecorde
   const [allocations, setAllocations] = useState({})
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const { begin, end } = useSubmitLock(setIsSaving)
 
   const [realSuppliers, setRealSuppliers] = useState([])
   const [realInvoices, setRealInvoices] = useState([])
@@ -176,7 +178,7 @@ export default function RecordSupplierPaymentDrawer({ isOpen, onClose, onRecorde
       setError(validationError)
       return
     }
-    setIsSaving(true)
+    if (!begin()) return
 
     if (DEMO_MODE) {
       recordSupplierPaymentDemo({
@@ -190,7 +192,7 @@ export default function RecordSupplierPaymentDrawer({ isOpen, onClose, onRecorde
           .map((invoice) => ({ invoiceId: invoice.id, amount: Number(allocations[invoice.id]) || 0 }))
           .filter((line) => line.amount > 0),
       })
-      setIsSaving(false)
+      end()
       onRecorded?.()
       onClose()
       return
@@ -207,7 +209,7 @@ export default function RecordSupplierPaymentDrawer({ isOpen, onClose, onRecorde
         .map((invoice) => ({ supplierInvoiceId: invoice.id, amount: Number(allocations[invoice.id]) || 0 }))
         .filter((line) => line.amount > 0),
     })
-    setIsSaving(false)
+    end()
     if (!result.success) {
       setError(result.error)
       return
