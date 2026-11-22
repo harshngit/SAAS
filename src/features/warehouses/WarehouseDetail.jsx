@@ -335,6 +335,7 @@ export default function WarehouseDetail() {
               <h1 className="text-2xl font-semibold text-neutral-900">{warehouse.name}</h1>
               <span className="text-sm text-neutral-400">{warehouse.code}</span>
               <Badge variant={status.variant} dot>{status.label}</Badge>
+              {warehouse.isDefault && <Badge variant="primary">Default</Badge>}
               {isDemo && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>}
             </div>
           </div>
