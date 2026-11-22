@@ -462,8 +462,10 @@ export default function DeliveryDetail() {
   const reconciledCollections = deliveryCollections.filter((collection) => collection.status === 'reconciled')
   const recordedCollectionsTotal = recordedCollections.reduce((sum, collection) => sum + (Number(collection.amount) || 0), 0)
   // Backend-authoritative "money in": what the order/delivery says is no longer owed. Never
-  // derived from unreconciled recorded collections.
-  const reconciledPaidAmount = Math.max(totalAmountDue - amountDue, 0)
+  // derived from unreconciled recorded collections. THIS ORDER only: order_total - amount_due. The customer's
+  // Previous Balance is its own line and must not be counted as paid (on a credit order the old
+  // order_total + previous_pending_balance - amount_due showed the Previous Balance as "paid").
+  const reconciledPaidAmount = Math.max(orderAmount - amountDue, 0)
   const collectionLifecycleStatus =
     activeCollections.length === 0
       ? 'No Collection'
@@ -483,12 +485,13 @@ export default function DeliveryDetail() {
     !parentOrderCancelled &&
     (deliveryCollections.length > 0 ||
       (COLLECTION_STAGES.includes(stageKey) && (totalAmountDue > 0 || collectedAmount > 0)))
-  // Gated on the canonical `delivery_collections:create` permission (no role check) - delivery
-  // collections are always supported, no per-org toggle to also check.
+  // Gated on `deliveries:create` (no role check) - there is no `delivery_collections` permission module on the
+  // backend, so the old check could never be granted. Delivery collections are always supported, no per-org
+  // toggle to also check.
   const canRecordCollection =
     showCollectionSection &&
     remainingReceivable > 0 &&
-    can('delivery_collections', 'create')
+    can('deliveries', 'create')
   // Never surface a raw UUID as the visible value - show the name, or nothing.
   const warehouseName = delivery.warehouseName || warehouses.find((warehouse) => warehouse.id === delivery.warehouseId)?.name || ''
   const podPhotoFileIds = Array.isArray(delivery.pod?.photo_file_ids) ? delivery.pod.photo_file_ids.filter(Boolean) : []

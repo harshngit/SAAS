@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useSubmitLock from '../../hooks/useSubmitLock'
 import { createPortal } from 'react-dom'
 import { Upload, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
@@ -40,6 +41,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, customer, onSaved
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm)
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const { begin, end } = useSubmitLock(setIsSaving)
   // Kept mounted a beat after isOpen flips false so the slide-out/fade-out can actually play -
   // an instant unmount would just make the drawer vanish instead of transitioning closed.
   const [shouldRender, setShouldRender] = useState(false)
@@ -120,7 +122,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, customer, onSaved
       return
     }
 
-    setIsSaving(true)
+    if (!begin()) return
 
     const paymentDetails = sanitizePaymentDetails(paymentForm.paymentMode, {
       upiId: paymentForm.upiId.trim(),
@@ -142,7 +144,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, customer, onSaved
       receivedOn: paymentForm.receivedOn ? `${paymentForm.receivedOn}T00:00:00.000Z` : undefined,
     })
 
-    setIsSaving(false)
+    end()
 
     if (!result.success) {
       setFormError(result.error)

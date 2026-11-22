@@ -28,6 +28,7 @@ import { listSuppliers } from '../../api/suppliers'
 import { mapProductBackendField } from '../../api/products'
 import { getUploadFileError, PRODUCT_FIELD_FILE_KIND } from '../../utils/uploadFileRules'
 import { getFileUrl, uploadFile } from '../../api/files'
+import { listWarehouses } from '../../api/warehouses'
 
 const MAX_TOTAL_IMAGES = 5
 
@@ -483,6 +484,20 @@ export default function ProductForm({
   // Files picked under Documents > Other Attachments on a NEW product. They are sent to the product's attachment API
   // right after the product exists (that API needs the product id), see ProductList.handleSaveProduct.
   const [pendingAttachments, setPendingAttachments] = useState([])
+  // Opening Stock on a NEW product goes into the default warehouse (backend rule) - named next to the field so
+  // nobody has to guess where the stock lands. `loaded` is false until the warehouse list has answered.
+  const [defaultWarehouse, setDefaultWarehouse] = useState({ loaded: false, name: '' })
+
+  useEffect(() => {
+    if (!isOpen || product) return undefined
+    let cancelled = false
+    listWarehouses({ is_active: true }).then((result) => {
+      if (cancelled) return
+      const found = result.success ? result.warehouses.find((warehouse) => warehouse.isDefault) : null
+      setDefaultWarehouse({ loaded: Boolean(result.success), name: found?.name || '' })
+    })
+    return () => { cancelled = true }
+  }, [isOpen, product])
 
   useEffect(() => {
     let cancelled = false
@@ -678,8 +693,9 @@ export default function ProductForm({
     // The two tax-inclusive checkboxes write the same backend field (pricing.tax_inclusive) - keep them in step.
     const linked = field === 'taxInclusive' || field === 'taxInclusivePrice'
       ? { taxInclusive: Boolean(value), taxInclusivePrice: Boolean(value) }
-      // Track inventory OFF: nothing is tracked, so Opening Stock is 0 (and disabled) until it is switched on again.
-      : field === 'inventoryTracking' && !value ? { openingStock: '0' } : {}
+      // Track inventory OFF (or serial tracking ON): Opening Stock is 0 and disabled - serial stock enters through a GRN or a
+      // Stock Adjust with serial numbers, never as a bare number.
+      : (field === 'inventoryTracking' && !value) || (field === 'serialNumberTracking' && value) ? { openingStock: '0' } : {}
     setFormData((current) => ({ ...current, [field]: value, ...linked }))
     setErrors((current) => ({ ...current, [field]: '' }))
   }
@@ -786,7 +802,7 @@ export default function ProductForm({
       if (discountRaw !== '' && discountRaw != null && (!Number.isFinite(Number(discountRaw)) || Number(discountRaw) < 0 || Number(discountRaw) > 100)) nextErrors.discountPercent = 'Discount must be between 0 and 100.'
     }
     for (const [fieldName, label] of [['openingStock', 'Opening stock'], ['minimumOrderQuantity', 'Minimum order quantity'], ['downloadLimit', 'Download limit']]) {
-      if (fieldName === 'openingStock' && !formData.inventoryTracking) continue
+      if (fieldName === 'openingStock' && (!formData.inventoryTracking || formData.serialNumberTracking)) continue
       const raw = String(formData[fieldName] ?? '').trim()
       if (raw === '') continue
       if (Number.isFinite(Number(raw)) && Number(raw) < 0) nextErrors[fieldName] = `${label} cannot be negative.`
@@ -926,8 +942,8 @@ export default function ProductForm({
       ...nextData,
       variants: variants.map((variant) => ({
         ...variant,
-        // Track inventory OFF -> a new variant's opening stock is 0 as well.
-        inventory: nextData.inventoryTracking ? normalizeVariantInventory(variant) : { ...normalizeVariantInventory(variant), openingStock: 0 },
+        // Track inventory OFF / serial-tracked -> a new variant's opening stock is 0 as well.
+        inventory: nextData.inventoryTracking && !nextData.serialNumberTracking ? normalizeVariantInventory(variant) : { ...normalizeVariantInventory(variant), openingStock: 0 },
       })),
     }
   }
@@ -971,8 +987,8 @@ export default function ProductForm({
       productTypeId: syncedData.productTypeId || null,
       productType: product?.legacyProductType ?? (syncedData.productTypeId ? '' : syncedData.productType.trim()),
       price: Number(syncedData.sellingPrice) || 0,
-      // Track inventory OFF -> Opening Stock is sent as 0.
-      openingStock: syncedData.inventoryTracking ? syncedData.openingStock : 0,
+      // Track inventory OFF, or serial-tracked -> Opening Stock is sent as 0.
+      openingStock: syncedData.inventoryTracking && !syncedData.serialNumberTracking ? syncedData.openingStock : 0,
       attachmentFiles: product ? undefined : pendingAttachments,
       totalInventory: syncedData.variants.length ? (syncedData.variants.every((variant) => variant.inventory.openingStock !== '') ? totalVariantInventory : undefined) : (syncedData.inventoryTracking ? Number(syncedData.openingStock) || 0 : 0),
       isActive: syncedData.status === 'active',
@@ -1366,7 +1382,7 @@ export default function ProductForm({
                               min="0"
                               step="1"
                               value={inventory[inventoryField.key] ?? ''}
-                              disabled={inventoryField.key === 'openingStock' && ((Boolean(variant.id) && !variant.isNew) || !formData.inventoryTracking)}
+                              disabled={inventoryField.key === 'openingStock' && ((Boolean(variant.id) && !variant.isNew) || !formData.inventoryTracking || formData.serialNumberTracking)}
                               title={inventoryField.key === 'openingStock' && variant.id && !variant.isNew ? 'Use Inventory stock adjustment to change saved stock.' : undefined}
                               onChange={(event) => updateVariantInventory(index, inventoryField.key, event.target.value)}
                               aria-label={`${variantName} ${inventoryField.label}`}
@@ -1836,21 +1852,28 @@ export default function ProductForm({
 
     // Whole-number fields are text boxes so what is typed ("2.5", "-1", "abc") stays visible and gets a clear message
     // on Save instead of being dropped or rounded by the browser.
-    const stockOff = field.name === 'openingStock' && !formData.inventoryTracking
+    // Opening Stock is locked (and shows 0) when the product is serial-tracked or inventory is not tracked; each case says why.
+    const isStockField = field.name === 'openingStock'
+    const serialTracked = isStockField && Boolean(formData.serialNumberTracking)
+    const stockOff = isStockField && (!formData.inventoryTracking || serialTracked)
     const input = (
       <Input
         {...commonProps}
         value={stockOff ? '0' : commonProps.value}
-        disabled={field.name === 'openingStock' && (Boolean(product) || stockOff)}
+        disabled={isStockField && (Boolean(product) || stockOff)}
         type={field.whole ? 'text' : field.input === 'number' ? 'number' : field.input === 'date' ? 'date' : field.input === 'url' ? 'url' : 'text'}
         inputMode={field.whole ? 'numeric' : undefined}
         min={field.input === 'number' && !field.whole ? '0' : undefined}
         step={field.input === 'number' && !field.whole ? field.step : undefined}
       />
     )
-    return stockOff
-      ? <div className="space-y-1">{input}<p className="text-xs text-neutral-500">Inventory is not tracked, so Opening Stock stays 0.</p></div>
-      : input
+    if (serialTracked) return <div className="space-y-1">{input}<p className="text-xs text-neutral-500">Add stock through a GRN or Stock Adjust with serial numbers</p></div>
+    if (stockOff) return <div className="space-y-1">{input}<p className="text-xs text-neutral-500">Stock is not tracked for this product</p></div>
+    if (isStockField && !product) {
+      if (defaultWarehouse.name) return <div className="space-y-1">{input}<p className="text-xs text-neutral-500">Goes into: {defaultWarehouse.name}</p></div>
+      if (defaultWarehouse.loaded) return <div className="space-y-1">{input}<p className="text-xs text-amber-700">No default warehouse is set - set one under Warehouses so Opening Stock has somewhere to go.</p></div>
+    }
+    return input
   }
 
   return (

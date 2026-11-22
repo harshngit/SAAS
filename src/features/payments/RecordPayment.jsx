@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import useSubmitLock from '../../hooks/useSubmitLock'
 import { Save } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -39,6 +40,7 @@ export default function RecordPayment() {
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { begin, end } = useSubmitLock(setIsSubmitting)
 
   useEffect(() => {
     Promise.all([listCustomers(), listSuppliers()]).then(([customersResult, suppliersResult]) => {
@@ -103,7 +105,7 @@ export default function RecordPayment() {
       return
     }
 
-    setIsSubmitting(true)
+    if (!begin()) return
     setError('')
 
     const paymentDetails = sanitizePaymentDetails(paymentMode, {
@@ -135,7 +137,7 @@ export default function RecordPayment() {
 
     if (!result.success) {
       setError(result.error)
-      setIsSubmitting(false)
+      end()
       return
     }
 
@@ -150,7 +152,7 @@ export default function RecordPayment() {
     setCollectionInstructions('')
     setPaymentStatus('pending')
     setNotes('')
-    setIsSubmitting(false)
+    end()
   }
 
   return (

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useSubmitLock from '../../hooks/useSubmitLock'
 import { createPortal } from 'react-dom'
 import { Upload, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
@@ -25,6 +26,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const { begin, end } = useSubmitLock(setIsSaving)
 
   useEffect(() => {
     if (!isOpen) return
@@ -96,7 +98,7 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
       return
     }
 
-    setIsSaving(true)
+    if (!begin()) return
     setError('')
 
     const paymentDetails = sanitizePaymentDetails(paymentMethod, {
@@ -119,11 +121,11 @@ export default function RecordPaymentDrawer({ isOpen, onClose, invoice, onSave }
 
     if (!result.success) {
       setError(result.error)
-      setIsSaving(false)
+      end()
       return
     }
 
-    setIsSaving(false)
+    end()
     onSave(result.receipt)
   }
 

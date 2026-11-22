@@ -384,6 +384,7 @@ export default function WarehouseList() {
                           <p className="truncate font-medium text-neutral-900">
                             {warehouse.name}
                             {isDemoWarehouse(warehouse.id) && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>}
+                            {warehouse.isDefault && <Badge variant="primary" className="ml-2">Default</Badge>}
                           </p>
                           <p className="truncate text-xs text-neutral-500">{warehouse.code} · {warehouse.city || '—'}</p>
                         </div>
@@ -423,6 +424,7 @@ export default function WarehouseList() {
                           <span className="font-medium text-neutral-900">{warehouse.name}</span>
                           <span className="ml-2 text-xs text-neutral-400">{warehouse.code}</span>
                           {isDemoWarehouse(warehouse.id) && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">Demo</span>}
+                            {warehouse.isDefault && <Badge variant="primary" className="ml-2">Default</Badge>}
                         </td>
                         <td className="whitespace-nowrap px-6 py-5 text-neutral-600">{[warehouse.city, warehouse.state].filter(Boolean).join(', ') || '—'}</td>
                         <td className="whitespace-nowrap px-6 py-5 text-neutral-600">{warehouse.managerName || '—'}</td>
