@@ -328,7 +328,7 @@ export const roleMenus = {
         { label: 'Vehicle Loading', path: '/delivery/vehicle-loading', icon: PackageCheck, module: 'vehicle_stock', feature: ENTITLEMENT_KEYS.SALES_VEHICLE_STOCK },
         { label: 'Vehicle Stock', path: '/delivery/vehicle-stock', icon: Warehouse, module: 'vehicle_stock', feature: ENTITLEMENT_KEYS.SALES_VEHICLE_STOCK },
         { label: 'End of Day Return', path: '/delivery/end-of-day', icon: PackageX, module: 'vehicle_stock', feature: ENTITLEMENT_KEYS.SALES_VEHICLE_STOCK },
-        { label: 'Close My Day', path: '/delivery/day-end', icon: HandCoins, module: 'delivery_collections' },
+        { label: 'Close My Day', path: '/delivery/day-end', icon: HandCoins, module: 'deliveries' },
       ],
     },
     {

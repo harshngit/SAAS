@@ -1083,7 +1083,7 @@ export default function AppRoutes() {
           <Route
             path="/delivery/day-end"
             element={
-              <RequirePermissionRoute module="delivery_collections" action="view">
+              <RequirePermissionRoute module="deliveries" action="view">
                 <DayEndClose />
               </RequirePermissionRoute>
             }
