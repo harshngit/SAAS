@@ -43,12 +43,13 @@ function formatDateTime(value) {
 // (hidden from nav) - this reviews one daily session per delivery partner.
 export default function DayEndApprovals() {
   const { showToast } = useToast()
-  const { can } = usePermission()
+  const { can, fullAccess } = usePermission()
   const currentUser = useAuthStore((state) => state.currentUser)
   // Day-End is a Deliveries-module feature in the backend (GET/approve/reject all answer 403 "view deliveries" without it); there is
-  // no separate Day-End or delivery_collections permission. Approve / Reject need the Deliveries "approve" action, and nobody
-  // approves their own day-end.
-  const canReview = can('deliveries', 'approve')
+  // no separate Day-End or delivery_collections permission. Reviewing a Day-End is Admin only in the backend ("Only an Admin can
+  // review a Day-End", even for a role that holds deliveries:approve, e.g. Accountant), so Approve / Reject are shown to an Admin
+  // (full access) only. Nobody approves their own day-end.
+  const canReview = Boolean(fullAccess) && can('deliveries', 'approve')
   const canReviewRow = (row) => canReview && row.deliveryPartnerId !== currentUser?.id
 
   const [dayEnds, setDayEnds] = useState([])
@@ -202,7 +203,7 @@ export default function DayEndApprovals() {
     }
     if (!result.success) {
       setActionError(result.error)
-      if (result.status === 403) showToast({ title: "You don't have permission", message: 'Approving a day-end needs the Deliveries > Approve permission on your role.', variant: 'error' })
+      if (result.status === 403) showToast({ title: "You don't have permission", message: 'Only an Admin can approve a day-end.', variant: 'error' })
       return
     }
     showToast({ title: 'Day-end approved', message: `${approveTarget.deliveryPartnerName || 'Delivery partner'}'s ${approveTarget.businessDate} day-end was approved.` })
@@ -227,7 +228,7 @@ export default function DayEndApprovals() {
     }
     if (!result.success) {
       setActionError(result.error)
-      if (result.status === 403) showToast({ title: "You don't have permission", message: 'Rejecting a day-end needs the Deliveries > Approve permission on your role.', variant: 'error' })
+      if (result.status === 403) showToast({ title: "You don't have permission", message: 'Only an Admin can reject a day-end.', variant: 'error' })
       return
     }
     showToast({ title: 'Day-end rejected', message: `${rejectTarget.deliveryPartnerName || 'Delivery partner'} can correct and resubmit.` })

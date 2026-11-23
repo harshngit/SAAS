@@ -7,7 +7,7 @@ import Badge from '../../components/ui/Badge'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
-import { listDeliveries, loadDeliveriesBatch, markDeliveryReady } from '../../api/deliveries'
+import { listDeliveries, loadDeliveriesBatch, markDeliveryReady, readLoadFailure } from '../../api/deliveries'
 import { listProducts } from '../../api/products'
 import { listVehicles } from '../../api/vehicles'
 import {
@@ -72,6 +72,12 @@ const getLoadWeight = (item) => {
   return quantity > 0 && Number.isFinite(weight) ? quantity * weight : 0
 }
 
+// Per-delivery failure text from load-batch: a closed day comes back as a stringified dict; show its message, never the dict.
+const loadFailureFields = (detail) => {
+  const { code, message } = readLoadFailure(detail)
+  return { error: message, code }
+}
+
 const getBatchResults = (data, requestedIds) => {
   const treatsDeliveryArrayAsSuccess = Array.isArray(data?.deliveries)
     || Array.isArray(data?.loaded_deliveries)
@@ -94,14 +100,14 @@ const getBatchResults = (data, requestedIds) => {
       ? true
       : entry.success ?? entry.ok ?? entry.loaded ?? (treatsDeliveryArrayAsSuccess || entry.status === 'loaded' || entry.status === 'success'),
     delivery: entry.delivery,
-    error: entry.detail || entry.error || entry.message || entry.reason || '',
+    ...loadFailureFields(entry.detail || entry.error || entry.message || entry.reason || ''),
   })).filter((entry) => entry.deliveryId)
 
   const failed = data?.failed_deliveries || data?.failed || []
   failed.forEach((entry) => {
     const deliveryId = entry.delivery_id || entry.deliveryId || entry.id
     if (deliveryId && !results.some((result) => result.deliveryId === deliveryId)) {
-      results.push({ deliveryId, success: false, delivery: null, error: entry.detail || entry.error || entry.message || '' })
+      results.push({ deliveryId, success: false, delivery: null, ...loadFailureFields(entry.detail || entry.error || entry.message || '') })
     }
   })
 
@@ -328,9 +334,13 @@ export default function VehicleLoading() {
         // The backend says the day is closed: lock the screen at once instead of waiting for a refresh.
         if (batchResult.code === 'DAY_END_CLOSED') reloadDayEnd()
       } else {
+        let dayClosed = false
         getBatchResults(batchResult.data, readyIds).forEach((result) => {
           if (!result.success) failures[result.deliveryId] = result.error || 'Vehicle loading failed. Please try again.'
+          if (!result.success && result.code === 'DAY_END_CLOSED') dayClosed = true
         })
+        // load-batch answers 200 with a per-delivery DAY_END_CLOSED: lock the screen at once, same as a whole-batch 409.
+        if (dayClosed) reloadDayEnd()
       }
     }
 

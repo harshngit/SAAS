@@ -32,6 +32,35 @@ function formatApiError(errorData, fallbackMessage = 'Something went wrong. Plea
   return String(errorData)
 }
 
+const DAY_END_CLOSED_MESSAGE = 'This day is Approved and Closed. The vehicle load can no longer be changed.'
+
+// POST /deliveries/load-batch answers HTTP 200 and reports a per-delivery failure as results[].ok=false with `detail`.
+// For a closed day that `detail` is today the Python repr of a dict, e.g. "{'code': 'DAY_END_CLOSED', 'message': '...'}".
+// A structured object ({code, message}) is read directly; a stringified one has its code/message pulled out with a
+// tolerant parse (single or double quotes). Never show the raw dict to the user.
+// Returns { code, message } - `code` is '' when none could be found, `message` is always plain text.
+export function readLoadFailure(detail, fallback = '') {
+  if (detail && typeof detail === 'object') {
+    const code = typeof detail.code === 'string' ? detail.code : ''
+    const text = typeof detail.message === 'string' ? detail.message : ''
+    if (code === 'DAY_END_CLOSED') return { code, message: text || DAY_END_CLOSED_MESSAGE }
+    return { code, message: text || formatApiError(detail, fallback) }
+  }
+  const raw = typeof detail === 'string' ? detail.trim() : ''
+  if (!raw) return { code: '', message: fallback }
+  if (/DAY_END_CLOSED/.test(raw)) {
+    const found = raw.match(/['"]message['"]\s*:\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")/)
+    const text = (found && (found[1] ?? found[2]) || '').replace(/\\(['"])/g, '$1').trim()
+    return { code: 'DAY_END_CLOSED', message: text || DAY_END_CLOSED_MESSAGE }
+  }
+  if (/^[{[]/.test(raw)) {
+    const found = raw.match(/['"]message['"]\s*:\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")/)
+    const text = (found && (found[1] ?? found[2]) || '').replace(/\\(['"])/g, '$1').trim()
+    return { code: '', message: text || fallback }
+  }
+  return { code: '', message: raw }
+}
+
 function formatVehicleLoadError(error) {
   if (!error.response) {
     return { message: 'Server did not respond. Please retry or contact support.', status: null }
@@ -40,11 +69,12 @@ function formatVehicleLoadError(error) {
   const status = error.response.status
   const detail = error.response.data?.detail
   // The backend closes a partner's day once the Day-End is approved: no more loading on that day.
-  if (detail && typeof detail === 'object' && detail.code === 'DAY_END_CLOSED') {
-    return { message: formatApiError(detail.message, 'This day is Approved and Closed. The vehicle load can no longer be changed.'), status, code: 'DAY_END_CLOSED' }
+  const parsed = readLoadFailure(detail)
+  if (parsed.code === 'DAY_END_CLOSED') {
+    return { message: parsed.message, status, code: 'DAY_END_CLOSED' }
   }
   const message = typeof detail === 'string'
-    ? detail
+    ? parsed.message
     : formatApiError(detail || error.response.data?.message || error.response.data?.error, '')
 
   return {
