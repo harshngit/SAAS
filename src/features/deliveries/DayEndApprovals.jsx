@@ -13,6 +13,7 @@ import { resolveDateRange } from '../../utils/dateRange'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
 import { useAuthStore } from '../../store/authStore'
+import useSubmitLock from '../../hooks/useSubmitLock'
 import { listDeliveryPartners } from '../../api/deliveries'
 import { formatCurrency } from '../../utils/format'
 import DayEndDetailDrawer from './DayEndDetailDrawer'
@@ -85,6 +86,8 @@ export default function DayEndApprovals() {
   const [rejectReason, setRejectReason] = useState('')
   const [actionError, setActionError] = useState('')
   const [isActing, setIsActing] = useState(false)
+  // One request at a time however fast Approve / Reject is clicked; the lock is released on success, 4xx/5xx, network error and timeout.
+  const { begin, end } = useSubmitLock(setIsActing)
 
   useEffect(() => {
     listDeliveryPartners().then((result) => {
@@ -189,13 +192,17 @@ export default function DayEndApprovals() {
   }
 
   const runApprove = async () => {
-    if (isActing) return
-    setIsActing(true)
+    if (!begin()) return
     setActionError('')
-    const result = await approveDayEnd(approveTarget.id, approveNote.trim() || undefined)
-    setIsActing(false)
+    let result
+    try {
+      result = await approveDayEnd(approveTarget.id, approveNote.trim() || undefined)
+    } finally {
+      end()
+    }
     if (!result.success) {
       setActionError(result.error)
+      if (result.status === 403) showToast({ title: "You don't have permission", message: 'Approving a day-end needs the Deliveries > Approve permission on your role.', variant: 'error' })
       return
     }
     showToast({ title: 'Day-end approved', message: `${approveTarget.deliveryPartnerName || 'Delivery partner'}'s ${approveTarget.businessDate} day-end was approved.` })
@@ -206,17 +213,21 @@ export default function DayEndApprovals() {
   }
 
   const runReject = async () => {
-    if (isActing) return
     if (!rejectReason.trim()) {
       setActionError('Enter a reason for rejecting this day-end.')
       return
     }
-    setIsActing(true)
+    if (!begin()) return
     setActionError('')
-    const result = await rejectDayEnd(rejectTarget.id, rejectReason.trim())
-    setIsActing(false)
+    let result
+    try {
+      result = await rejectDayEnd(rejectTarget.id, rejectReason.trim())
+    } finally {
+      end()
+    }
     if (!result.success) {
       setActionError(result.error)
+      if (result.status === 403) showToast({ title: "You don't have permission", message: 'Rejecting a day-end needs the Deliveries > Approve permission on your role.', variant: 'error' })
       return
     }
     showToast({ title: 'Day-end rejected', message: `${rejectTarget.deliveryPartnerName || 'Delivery partner'} can correct and resubmit.` })

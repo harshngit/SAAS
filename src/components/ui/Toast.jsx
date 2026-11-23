@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle, X } from 'lucide-react'
+import { AlertCircle, CheckCircle, X } from 'lucide-react'
 import { setToastHandler, ToastContext } from './toastContext'
 
 export function ToastProvider({ children }) {
@@ -41,8 +41,8 @@ export function ToastProvider({ children }) {
             // readable regardless of image-background mode - same token Modal.jsx/Tabs.jsx use.
             className="flex items-start gap-3 rounded-2xl border border-primary-100 bg-(--modal-bg) p-4 shadow-(--shadow-popover)"
           >
-            <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
-              <CheckCircle className="size-5" aria-hidden="true" />
+            <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full ${toast.variant === 'error' ? 'bg-red-50 text-red-600' : 'bg-primary-50 text-primary-700'}`}>
+              {toast.variant === 'error' ? <AlertCircle className="size-5" aria-hidden="true" /> : <CheckCircle className="size-5" aria-hidden="true" />}
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-neutral-900">{toast.title}</p>

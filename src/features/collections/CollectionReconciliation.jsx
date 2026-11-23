@@ -261,6 +261,7 @@ export default function CollectionReconciliation() {
     end()
     if (!result.success) {
       setActionError(result.error)
+      if (result.code === 'FORBIDDEN') showToast({ title: "You don't have permission", message: 'Reconcile needs the Deliveries > Approve permission on your role.', variant: 'error' })
       // Collections state didn't change, but the day-end that now blocks this row did -
       // re-sync the list in the background so a stale "Reconcile" action doesn't linger.
       if (result.code === 'DAY_END_CLOSED') load()
@@ -287,6 +288,7 @@ export default function CollectionReconciliation() {
     end()
     if (!result.success) {
       setActionError(result.error)
+      if (result.code === 'FORBIDDEN') showToast({ title: "You don't have permission", message: 'Void needs the Deliveries > Approve permission on your role.', variant: 'error' })
       if (result.code === 'DAY_END_CLOSED') load()
       return
     }

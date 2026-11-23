@@ -8,6 +8,7 @@ import Modal from '../../components/ui/Modal'
 import NumericInput from '../../components/ui/NumericInput'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { formatCurrency } from '../../utils/format'
+import useSubmitLock from '../../hooks/useSubmitLock'
 import {
   DAY_END_STATUS_LABEL,
   DAY_END_STATUS_VARIANT,
@@ -40,6 +41,8 @@ export default function DayEndClose() {
   const [formError, setFormError] = useState('')
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // One submit at a time (a double click must not send the day-end twice); released on success, 4xx/5xx, network error and timeout.
+  const { begin, end } = useSubmitLock(setIsSubmitting)
 
   const load = () => {
     setIsLoading(true)
@@ -93,10 +96,14 @@ export default function DayEndClose() {
   }
 
   const handleSubmit = async () => {
-    setIsSubmitting(true)
+    if (!begin()) return
     setFormError('')
-    const result = await submitDayEnd({ businessDate: dayEnd.businessDate, handedOver, notes: notes.trim() })
-    setIsSubmitting(false)
+    let result
+    try {
+      result = await submitDayEnd({ businessDate: dayEnd.businessDate, handedOver, notes: notes.trim() })
+    } finally {
+      end()
+    }
     if (!result.success) {
       setFormError(result.error)
       setIsConfirmOpen(false)
