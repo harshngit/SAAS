@@ -414,10 +414,10 @@ export default function AdminPlans() {
                 <div
                   key={plan.id}
                   className={`group flex h-full rounded-2xl border shadow-(--shadow-card) transition-all duration-300 hover:-translate-y-1 hover:shadow-(--shadow-card-hover) ${
-                    isCurrent ? 'border-primary-600! bg-surface' : 'border-neutral-100 bg-surface'
+                    isCurrent ? 'border-2 border-primary-600! bg-surface' : 'border-neutral-100 bg-surface'
                   }`}
                 >
-                  <div className="flex w-full flex-col p-6">
+                  <div className={`flex w-full flex-col ${isCurrent ? 'p-[23px]' : 'p-6'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-3">

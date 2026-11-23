@@ -1,5 +1,6 @@
 import { Check, Database, Minus } from 'lucide-react'
 import Card from '../../components/ui/Card'
+import { ListTableToolbar } from '../../components/ui/ListPresentation'
 import { ENTITLEMENT_KEYS, formatLimitValue } from '../../entitlements/entitlementKeys'
 
 // Every row reads straight from each plan's own real `entitlements`/`max_*` fields (the same
@@ -51,11 +52,13 @@ export default function PlanComparisonTable({ plans, isExpanded }) {
   if (!plans || plans.length === 0 || !isExpanded) return null
 
   return (
-    <Card
-      title="Compare Plans"
-      subtitle="What each plan actually includes, read directly from its configuration."
-    >
-      <div className="overflow-x-auto rounded-xl border border-neutral-100">
+    // Single-card list standard: ONE card, title row inside it, table edge-to-edge (no box inside the box).
+    <Card className="overflow-hidden p-0">
+      <ListTableToolbar
+        title="Compare Plans"
+        subtitle="What each plan actually includes, read directly from its configuration."
+      />
+      <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">

@@ -356,12 +356,12 @@ export default function RolePermissionMatrix({ role, saving, formError, onClose,
             The permission catalog is empty.
           </p>
         ) : (
-          <div className="mt-3 max-h-104 overflow-auto rounded-2xl border border-neutral-100">
+          <div className="mt-3 overflow-x-auto rounded-2xl border border-neutral-100">
             <table className="w-full min-w-160 text-left text-sm">
               <thead>
                 <tr className="border-b border-neutral-100 bg-neutral-50 text-[0.68rem] font-semibold text-neutral-400">
-                  <th className="sticky left-0 top-0 z-20 bg-neutral-50 px-4 py-3">Module</th>
-                  <th className="sticky top-0 z-10 bg-neutral-50 px-3 py-3 text-center">All</th>
+                  <th className="sticky left-0 top-0 z-20 bg-neutral-50 px-4 py-3 text-neutral-600!">Module</th>
+                  <th className="sticky top-0 z-10 bg-neutral-50 px-3 py-3 text-center text-neutral-600!">All</th>
                   {catalogActions.map((action) => (
                     <th key={action.key} className="sticky top-0 z-10 bg-neutral-50 px-3 py-3 text-center">
                       <label className="flex cursor-pointer flex-col items-center gap-1">
