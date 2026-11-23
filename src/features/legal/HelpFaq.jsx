@@ -234,7 +234,7 @@ function TicketsPanel() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
         <div className="flex gap-1 rounded-xl bg-neutral-100 p-1">
           <button type="button" onClick={() => setTab('faq')} className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${tab === 'faq' ? 'bg-surface text-neutral-900 shadow-(--shadow-xs)' : 'text-neutral-500 hover:text-neutral-800'}`}>FAQ</button>
           <button type="button" onClick={() => setTab('tickets')} className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${tab === 'tickets' ? 'bg-surface text-neutral-900 shadow-(--shadow-xs)' : 'text-neutral-500 hover:text-neutral-800'}`}>Tickets</button>
@@ -245,9 +245,9 @@ function TicketsPanel() {
         </Button>
       </div>
 
-      <div className="mt-5">
+      <div>
         {tab === 'faq' ? (
-          <div className="space-y-6">
+          <div className="space-y-6 px-5 pb-5 pt-1">
             {SECTIONS.map((section) => (
               <FaqSection key={section.title} title={section.title} items={section.items} />
             ))}
@@ -273,7 +273,7 @@ function TicketsPanel() {
 export default function HelpFaq({ embedded = false }) {
   if (embedded) {
     return (
-      <LegalPageLayout title="Help & FAQ" description="Answers to common questions, or raise a support ticket." embedded>
+      <LegalPageLayout title="Help & FAQ" description="Answers to common questions, or raise a support ticket." embedded flush>
         <TicketsPanel />
       </LegalPageLayout>
     )

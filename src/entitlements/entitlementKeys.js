@@ -294,7 +294,8 @@ export function buildPlanSummaryBullets(plan) {
   const entitlements = plan?.entitlements || {}
   const bullets = []
 
-  const usersBullet = limitBullet(plan?.max_users, 'Admin User')
+  // Meeting wording: a plan with one seat is "1 Admin User"; any other limit reads "N Users" / "Unlimited Users". The number is always the plan's real max_users.
+  const usersBullet = plan?.max_users === 1 ? '1 Admin User' : limitBullet(plan?.max_users, 'User')
   if (usersBullet) bullets.push(usersBullet)
 
   const warehousesBullet = limitBullet(plan?.max_warehouses, 'Warehouse')

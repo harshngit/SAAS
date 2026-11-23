@@ -39,6 +39,10 @@ function formatVehicleLoadError(error) {
 
   const status = error.response.status
   const detail = error.response.data?.detail
+  // The backend closes a partner's day once the Day-End is approved: no more loading on that day.
+  if (detail && typeof detail === 'object' && detail.code === 'DAY_END_CLOSED') {
+    return { message: formatApiError(detail.message, 'This day is Approved and Closed. The vehicle load can no longer be changed.'), status, code: 'DAY_END_CLOSED' }
+  }
   const message = typeof detail === 'string'
     ? detail
     : formatApiError(detail || error.response.data?.message || error.response.data?.error, '')
@@ -353,9 +357,9 @@ export async function loadDeliveryOntoVehicle(deliveryId) {
 
     return { success: true, delivery: normalizeDelivery(data) }
   } catch (error) {
-    const { message, status } = formatVehicleLoadError(error)
+    const { message, status, code } = formatVehicleLoadError(error)
 
-    return { success: false, error: message, status, deliveryId }
+    return { success: false, error: message, status, code, deliveryId }
   }
 }
 
@@ -367,8 +371,8 @@ export async function loadDeliveriesBatch(deliveryIds) {
 
     return { success: true, data }
   } catch (error) {
-    const { message, status } = formatVehicleLoadError(error)
-    return { success: false, error: message, status, deliveryIds }
+    const { message, status, code } = formatVehicleLoadError(error)
+    return { success: false, error: message, status, code, deliveryIds }
   }
 }
 
@@ -444,9 +448,9 @@ export async function markDeliveryReady(deliveryId) {
 
     return { success: true, delivery: normalizeDelivery(data) }
   } catch (error) {
-    const { message, status } = formatVehicleLoadError(error)
+    const { message, status, code } = formatVehicleLoadError(error)
 
-    return { success: false, error: message, status, deliveryId }
+    return { success: false, error: message, status, code, deliveryId }
   }
 }
 

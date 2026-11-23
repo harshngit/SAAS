@@ -36,7 +36,7 @@ export function ListOverview({ children }) {
 export function ListStatCard({ icon: Icon, label, value, delta, actions, className = '' }) {
   const loading = useContext(SummaryLoadingContext)
   return (
-    <div className={`h-full min-h-32 bg-surface px-5 py-4 lg:px-6 ${className}`}>
+    <div className={`h-full min-h-32 bg-surface px-5 py-4 [container-type:inline-size] lg:px-6 ${className}`}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-medium text-fg-muted">{label}</p>
         <div className="flex shrink-0 items-center gap-1">
@@ -48,7 +48,7 @@ export function ListStatCard({ icon: Icon, label, value, delta, actions, classNa
           {actions}
         </div>
       </div>
-      <p className="mt-4 break-words font-(--font-display) text-[2rem] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={loading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
+      <p className="mt-4 break-words font-(--font-display) text-[clamp(1.1rem,12cqw,2rem)] font-semibold leading-none tracking-tight text-fg"><SkeletonValue loading={loading} className="h-8 w-20 rounded-lg">{value}</SkeletonValue></p>
       {delta && (
         <p className={`mt-2 flex items-center gap-1 text-xs font-medium ${delta.positive ? 'text-emerald-600' : 'text-red-600'}`}>
           <SkeletonValue loading={loading} className="h-3 w-28">{delta.trend === 'up' ? <ArrowUp className="size-3" aria-hidden="true" /> : <ArrowDown className="size-3" aria-hidden="true" />}{delta.label}</SkeletonValue>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, RotateCcw, Truck, CheckCircle2, PackageX } from 'lucide-react'
+import { Plus, RotateCcw, Truck, CheckCircle2, PackageX } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -7,6 +7,7 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import { useSortState } from '../../hooks/useSortState'
 import { ListOverview, ListSummary, ListTableToolbar, ListStatCard as StatCard } from '../../components/ui/ListPresentation'
 import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
@@ -26,12 +27,6 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10' },
-  { value: '25', label: '25' },
-  { value: '50', label: '50' },
-  { value: '100', label: '100' },
-]
 
 export default function PurchaseReturnList() {
   const navigate = useNavigate()
@@ -182,9 +177,6 @@ export default function PurchaseReturnList() {
   }, [returns, searchTerm, statusFilter])
 
   const effectiveTotal = PURCHASE_RETURNS_DEMO_ENABLED ? filtered.length : total
-  const totalPages = Math.max(1, Math.ceil(effectiveTotal / Number(pageSize)))
-  const rangeStart = filtered.length === 0 ? 0 : (page - 1) * Number(pageSize) + 1
-  const rangeEnd = PURCHASE_RETURNS_DEMO_ENABLED ? filtered.length : Math.min(effectiveTotal, (page - 1) * Number(pageSize) + filtered.length)
 
   return (
     <div className="space-y-5">
@@ -310,45 +302,7 @@ export default function PurchaseReturnList() {
             <span>Purchase Returns · demo</span>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-4 py-3">
-            <div className="flex items-center gap-3 text-xs text-neutral-400">
-              <span>
-                Showing <span className="font-semibold text-neutral-700">{rangeStart}-{rangeEnd}</span> of{' '}
-                <span className="font-semibold text-neutral-700">{total}</span>
-              </span>
-              <span className="hidden text-neutral-300 sm:inline">|</span>
-              <label className="flex items-center gap-2">Rows per page
-                <Select
-                  options={PAGE_SIZE_OPTIONS}
-                  value={pageSize}
-                  onChange={(event) => { setPageSize(event.target.value); setPage(1) }}
-                  className="w-20"
-                  triggerClassName="h-8 bg-surface py-1 text-xs"
-                />
-              </label>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={page === 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-              <span className="min-w-14 text-center text-xs font-medium text-neutral-700">{page} / {totalPages}</span>
-              <button
-                type="button"
-                disabled={page === totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Next page"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
-          </div>
+          <PaginationFooter page={page} pageSize={Number(pageSize)} total={total} onPageChange={setPage} onPageSizeChange={(next) => { setPageSize(String(next)); setPage(1) }} />
         )}
       </Card>
     </div>

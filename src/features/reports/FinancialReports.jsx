@@ -30,6 +30,7 @@ import { getReportConfig, resolveValidGroupBy } from './reportConfig'
 import { resolveColumns } from './reportDataUtils'
 import ReportSelector from './components/ReportSelector'
 import ReportKpiRow from './components/ReportKpiRow'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import GstSplitSummary from './components/GstSplitSummary'
 import ReportChart from './components/ReportChart'
 import ReportTable from './components/ReportTable'
@@ -37,12 +38,6 @@ import ProfitLossStatement from './components/ProfitLossStatement'
 import EntitySearchSelect from './components/EntitySearchSelect'
 
 const DEFAULT_REPORT = 'sales'
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10 / page' },
-  { value: '25', label: '25 / page' },
-  { value: '50', label: '50 / page' },
-  { value: '100', label: '100 / page' },
-]
 
 // Catalogs that can genuinely be too large to preload in full (listCustomers/listProducts expose
 // no page-size override, so a one-shot load silently stops at the backend's own default page for
@@ -387,10 +382,7 @@ export default function FinancialReports({
 
   const pagination = report?.pagination
   const total = pagination?.total ?? rows.length
-  const totalPages = pagination?.total_pages ?? 1
   const currentPage = pagination?.page ?? page
-  const rangeStart = total === 0 ? 0 : (currentPage - 1) * Number(pageSize) + 1
-  const rangeEnd = total === 0 ? 0 : Math.min(currentPage * Number(pageSize), total)
 
   const isDemoUnavailable = loadError === 'demo-unavailable'
   const hasData = config?.isSpecialView === 'pnl'
@@ -477,6 +469,10 @@ export default function FinancialReports({
     </ListFilterPanel>
   )
 
+  // The report body sits straight on the card like every other list (Customers, Expenses): when there is data the
+  // table runs edge to edge with no second box around it; messages / loaders / empty states keep their own padding.
+  const showData = isReportEntitled(reportType) && !isLoading && !(loadError && !isDemoUnavailable) && !isDemoUnavailable && !missingRequiredFilter && hasData
+
   return (
     <div className="listing-page space-y-4">
       <div>
@@ -489,7 +485,7 @@ export default function FinancialReports({
       )}
 
       <Card className="overflow-hidden p-0">
-        <div className="space-y-3 border-b border-neutral-100 px-5 py-4">
+        <div className="space-y-3 px-5 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               {lockReportType ? (
@@ -553,12 +549,12 @@ export default function FinancialReports({
           )}
         </div>
 
-        <div className="px-5 py-4">
+        <div className={showData ? '' : 'px-5 pb-5'}>
           {exportError && (
-            <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{exportError}</div>
+            <div className="mx-5 mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{exportError}</div>
           )}
           {DEMO_MODE && (
-            <p className="mb-4 text-xs text-neutral-400">Report export (PDF / Excel) is disabled in demo mode.</p>
+            <p className="mx-5 mb-4 text-xs text-neutral-400">Report export (PDF / Excel) is disabled in demo mode.</p>
           )}
 
           {!isReportEntitled(reportType) ? (
@@ -579,9 +575,9 @@ export default function FinancialReports({
           ) : !hasData ? (
             <EmptyState icon={FileSpreadsheet} title="No report data found" description="No records match the selected filters." />
           ) : (
-            <div className="space-y-5">
+            <div className="space-y-4 [&_.overflow-x-auto]:rounded-none [&_.overflow-x-auto]:border-x-0 [&>.overflow-x-auto:last-child]:border-b-0">
               {completenessStatus && completenessStatus !== 'complete' && (
-                <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <div className="mx-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <span>{completenessMessage || 'This statement is not yet based on complete operational records.'}</span>
                 </div>
@@ -606,23 +602,7 @@ export default function FinancialReports({
                     onExportRow={rowExportEnabled ? handleExportRow : undefined}
                   />
 
-                  <div className="flex flex-col items-center justify-between gap-3 pt-1 text-sm text-neutral-500 sm:flex-row">
-                    <div className="flex items-center gap-3">
-                      <span>Showing <span className="font-semibold text-neutral-900">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-neutral-900">{total}</span></span>
-                      <Select
-                        options={PAGE_SIZE_OPTIONS}
-                        value={pageSize}
-                        onChange={(event) => { setPageSize(event.target.value); setPage(1) }}
-                        triggerClassName="h-8 bg-surface py-1 text-xs"
-                        className="w-28"
-                      />
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-neutral-600 disabled:opacity-40">Previous</button>
-                      <span className="min-w-16 text-center font-medium text-neutral-700">{currentPage} / {totalPages || 1}</span>
-                      <button type="button" disabled={currentPage >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-neutral-600 disabled:opacity-40">Next</button>
-                    </div>
-                  </div>
+                  <PaginationFooter page={currentPage} pageSize={Number(pageSize)} total={total} onPageChange={setPage} onPageSizeChange={(next) => { setPageSize(String(next)); setPage(1) }} />
                 </>
               )}
             </div>

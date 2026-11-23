@@ -38,13 +38,24 @@ function authHeader() {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
-export const DAY_END_STATUS_LABEL = { open: 'Open', submitted: 'Submitted', approved: 'Approved', rejected: 'Rejected' }
+// An approved day-end is final: the day is closed (collections, handed-over amounts and the vehicle load of that day are read-only).
+// Day-End approve / reject are backend-gated on the Deliveries module (view). A 403 gets one clear, actionable message instead of
+// the raw backend text ("You don't have permission to view deliveries").
+function dayEndActionError(error, fallback) {
+  if (error.response?.status === 403) {
+    return { error: 'You do not have permission to review day-ends. Ask an Admin to give your role access to Deliveries.', status: 403 }
+  }
+  const errorData = error.response?.data
+  return { error: formatApiError(errorData?.detail || errorData?.message || errorData?.error || errorData, fallback), status: error.response?.status }
+}
+
+export const DAY_END_STATUS_LABEL = { open: 'Open', submitted: 'Submitted', approved: 'Approved and Closed', rejected: 'Rejected' }
 export const DAY_END_STATUS_VARIANT = { open: 'neutral', submitted: 'info', approved: 'success', rejected: 'danger' }
 
 export const DAY_END_STATUS_FILTERS = [
   { value: '', label: 'All Statuses' },
   { value: 'submitted', label: 'Submitted' },
-  { value: 'approved', label: 'Approved' },
+  { value: 'approved', label: 'Approved and Closed' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'open', label: 'Open' },
 ]
@@ -225,13 +236,7 @@ export async function approveDayEnd(id, note) {
       }
     }
 
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to approve this day-end. Please try again.',
-    )
-
-    return { success: false, error: message }
+    return { success: false, ...dayEndActionError(error, 'Unable to approve this day-end. Please try again.') }
   }
 }
 
@@ -241,12 +246,6 @@ export async function rejectDayEnd(id, reason) {
 
     return { success: true, dayEnd: normalizeDayEnd(data) }
   } catch (error) {
-    const errorData = error.response?.data
-    const message = formatApiError(
-      errorData?.detail || errorData?.message || errorData?.error || errorData,
-      'Unable to reject this day-end. Please try again.',
-    )
-
-    return { success: false, error: message }
+    return { success: false, ...dayEndActionError(error, 'Unable to reject this day-end. Please try again.') }
   }
 }

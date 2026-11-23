@@ -9,6 +9,7 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import {
@@ -210,6 +211,9 @@ export default function FollowUpsList() {
   const [isSaving, setIsSaving] = useState(false)
   const [actingId, setActingId] = useState('')
   const [activeTab, setActiveTab] = useState('today')
+  // Each tab pages through ITS OWN list only: a page number per tab, one rows-per-page for the screen. Switching tab starts that tab on page 1.
+  const [tabPages, setTabPages] = useState({})
+  const [tabPageSize, setTabPageSize] = useState(10)
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -576,7 +580,7 @@ export default function FollowUpsList() {
           <LoadingSpinner variant="table" minWidth="min-w-205" columns={["Follow-up", "Contact", "Type", "Due", "Priority", "Status", "Actions"]} label="Loading follow-ups..." />
         </Card>
       ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); setTabPages((current) => ({ ...current, [value]: 1 })) }}>
           <TabsList className="mb-6 flex-wrap">
             {FOLLOWUP_TABS.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}>
@@ -585,16 +589,21 @@ export default function FollowUpsList() {
             ))}
           </TabsList>
 
-          {FOLLOWUP_TABS.map((tab) => (
+          {FOLLOWUP_TABS.map((tab) => {
+            const tabItems = buckets[tab.value]
+            const tabTotalPages = Math.max(1, Math.ceil(tabItems.length / tabPageSize))
+            const tabPage = Math.min(Math.max(1, tabPages[tab.value] || 1), tabTotalPages)
+            const tabRows = tabItems.slice((tabPage - 1) * tabPageSize, tabPage * tabPageSize)
+            return (
             <TabsContent key={tab.value} value={tab.value}>
-              {buckets[tab.value].length === 0 ? (
+              {tabItems.length === 0 ? (
                 <Card>
                   <p className="p-8 text-center text-sm text-neutral-500">
                     {tab.value === 'completed' ? 'No completed follow-ups yet.' : `Nothing ${tab.label.toLowerCase()}.`}
                   </p>
                 </Card>
               ) : (
-                <Card className="p-0">
+                <Card className="overflow-hidden p-0">
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-205 text-left text-sm">
                       <thead>
@@ -609,7 +618,7 @@ export default function FollowUpsList() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100">
-                        {buckets[tab.value].map((followUp) => {
+                        {tabRows.map((followUp) => {
                           const contact = resolveContact(followUp)
                           const next = followUpNextAction(followUp, contact)
                           const visitOrigin = followUp.visitId ? visitIndex.get(followUp.visitId) : null
@@ -651,10 +660,18 @@ export default function FollowUpsList() {
                       </tbody>
                     </table>
                   </div>
+                  <PaginationFooter
+                    page={tabPage}
+                    pageSize={tabPageSize}
+                    total={tabItems.length}
+                    onPageChange={(next) => setTabPages((current) => ({ ...current, [tab.value]: next }))}
+                    onPageSizeChange={(next) => { setTabPageSize(next); setTabPages({}) }}
+                  />
                 </Card>
               )}
             </TabsContent>
-          ))}
+            )
+          })}
         </Tabs>
       )}
 

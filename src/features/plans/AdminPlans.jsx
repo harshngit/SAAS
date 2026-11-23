@@ -401,10 +401,9 @@ export default function AdminPlans() {
             />
           </Card>
         ) : (
-          <div className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-5 xl:grid-cols-[22.5rem_25rem_22.5rem] xl:justify-center">
-            {plans.map((plan, index) => {
+          <div className="mx-auto grid max-w-6xl grid-cols-1 items-stretch gap-5 xl:grid-cols-3">
+            {plans.map((plan) => {
               const isCurrent = String(plan.id) === String(currentPlanId)
-              const isFeatured = index === 1
               const isRequested = !isCurrent && String(requestedPlanId || '') === String(plan.id)
               const price = billingCycle === 'monthly' ? plan.price_monthly : plan.price_yearly
               const originalPrice = billingCycle === 'monthly' ? plan.original_price_monthly : plan.original_price_yearly
@@ -414,12 +413,8 @@ export default function AdminPlans() {
               return (
                 <div
                   key={plan.id}
-                  className={`group flex min-h-[39rem] rounded-2xl border shadow-(--shadow-card) transition-all duration-300 hover:-translate-y-2 hover:shadow-(--shadow-card-hover) ${
-                    isFeatured
-                      ? 'xl:min-h-[43rem] border-primary-700 bg-primary-700 ring-1 ring-primary-700 xl:shadow-[0_10px_22px_-12px_rgb(0_9_42/0.22),0_34px_70px_-40px_rgb(0_9_42/0.42)]'
-                    : isCurrent
-                        ? 'border-primary-300 bg-surface ring-2 ring-primary-100'
-                        : 'border-neutral-100 bg-surface'
+                  className={`group flex h-full rounded-2xl border shadow-(--shadow-card) transition-all duration-300 hover:-translate-y-1 hover:shadow-(--shadow-card-hover) ${
+                    isCurrent ? 'border-primary-600! bg-surface' : 'border-neutral-100 bg-surface'
                   }`}
                 >
                   <div className="flex w-full flex-col p-6">
@@ -427,19 +422,15 @@ export default function AdminPlans() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`flex size-10 shrink-0 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 group-hover:scale-105 ${
-                              isFeatured
-                                ? 'bg-white/12 text-white ring-white/15'
-                                : 'bg-primary-50 text-primary-700 ring-primary-100'
-                            }`}
+                            className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100 transition-transform duration-300 group-hover:scale-105"
                           >
                             <Crown className="size-5" aria-hidden="true" />
                           </div>
-                          <h3 className={`truncate text-xl font-semibold tracking-tight ${isFeatured ? 'text-white' : 'text-neutral-900'}`}>
+                          <h3 className="truncate text-xl font-semibold tracking-tight text-neutral-900">
                             {plan.name}
                           </h3>
                         </div>
-                        <p className={`mt-4 text-sm leading-6 ${isFeatured ? 'text-white/70' : 'text-neutral-500'}`}>
+                        <p className="mt-4 text-sm leading-6 text-neutral-500">
                           per {cycleLabel}
                         </p>
                       </div>
@@ -454,23 +445,17 @@ export default function AdminPlans() {
                       {buildPlanSummaryBullets(plan).map((bullet) => (
                         <li
                           key={bullet}
-                          className={`flex items-start gap-3 rounded-2xl px-0 py-1 text-sm transition-colors duration-200 ${
-                            isFeatured ? 'text-white/85 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'
-                          }`}
+                          className="flex items-start gap-3 rounded-2xl px-0 py-1 text-sm text-neutral-600 transition-colors duration-200 hover:text-neutral-900"
                         >
                           <span
-                            className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full ring-1 transition-transform duration-200 group-hover:scale-105 ${
-                              isFeatured
-                                ? 'bg-white/12 text-white ring-white/15'
-                                : 'bg-green-50 text-green-600 ring-green-100'
-                            }`}
+                            className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600 ring-1 ring-green-100 transition-transform duration-200 group-hover:scale-105"
                           >
                             <Check
                               className="size-3.5"
                               aria-hidden="true"
                             />
                           </span>
-                          <span className={`min-w-0 font-medium ${isFeatured ? 'text-white' : 'text-neutral-800'}`}>
+                          <span className="min-w-0 font-medium text-neutral-800">
                             {bullet}
                           </span>
                         </li>
@@ -483,61 +468,59 @@ export default function AdminPlans() {
                         scope). Only the CURRENT plan's card additionally shows real usage,
                         beneath its allowance, from the same GET /organizations/me/storage-usage
                         the banner above uses. */}
-                    <div className={`mt-5 rounded-xl border px-3.5 py-3 ${isFeatured ? 'border-white/15 bg-white/5' : 'border-neutral-100 bg-neutral-50'}`}>
+                    <div className="mt-5 min-h-[4.9rem] rounded-xl border border-neutral-100 bg-neutral-50 px-3.5 py-3">
                       <div className="flex items-center justify-between gap-2 text-xs font-medium">
-                        <span className={`flex items-center gap-1.5 ${isFeatured ? 'text-white/80' : 'text-neutral-600'}`}>
+                        <span className="flex items-center gap-1.5 text-neutral-600">
                           <Database className="size-3.5" aria-hidden="true" />
                           Storage
                         </span>
-                        <span className={isFeatured ? 'text-white' : 'text-neutral-900'}>
+                        <span className={'text-neutral-900'}>
                           {plan.max_storage_gb === undefined ? '—' : plan.max_storage_gb === null ? 'Unlimited' : `${formatLimitValue(plan.max_storage_gb)} GB`}
                         </span>
                       </div>
                       {isCurrent && storageUsage && (
                         <>
-                          <div className={`mt-2 h-1.5 overflow-hidden rounded-full ${isFeatured ? 'bg-white/10' : 'bg-neutral-200'}`}>
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-200">
                             {!storageUsage.is_unlimited && (
                               <div
-                                className={`h-full rounded-full ${isFeatured ? 'bg-white/70' : storageUsage.is_over_limit || storageUsage.percentage_used >= 90 ? 'bg-red-500' : storageUsage.percentage_used >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`}
+                                className={`h-full rounded-full ${storageUsage.is_over_limit || storageUsage.percentage_used >= 90 ? 'bg-red-500' : storageUsage.percentage_used >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`}
                                 style={{ width: `${Math.min(100, storageUsage.percentage_used ?? 0)}%` }}
                               />
                             )}
                           </div>
-                          <p className={`mt-1.5 text-[0.65rem] ${isFeatured ? 'text-white/50' : 'text-neutral-400'}`}>
+                          <p className="mt-1.5 text-[0.65rem] text-neutral-400">
                             {formatBytes(storageUsage.total_used_bytes)} used{formatStoragePercent(storageUsage.percentage_used) ? ` (${formatStoragePercent(storageUsage.percentage_used)})` : ''}
                           </p>
                         </>
                       )}
                     </div>
 
-                    <div className={`mt-8 border-t pt-6 ${isFeatured ? 'border-white/15' : 'border-neutral-100'}`}>
+                    <div className="mt-8 border-t pt-6 border-neutral-100">
                       <div>
-                        <p className={`text-4xl font-semibold tracking-tight ${isFeatured ? 'text-white' : 'text-neutral-900'}`}>
+                        <p className="text-4xl font-semibold tracking-tight text-neutral-900">
                           {formatCurrency(price)}
                           {originalPrice != null && (
-                            <span className={`ml-2 align-middle text-base font-medium line-through ${isFeatured ? 'text-white/35' : 'text-neutral-400'}`}>
+                            <span className="ml-2 align-middle text-base font-medium line-through text-neutral-400">
                               {formatCurrency(originalPrice)}
                             </span>
                           )}
                         </p>
-                        <p className={`mt-1 text-xs ${isFeatured ? 'text-white/65' : 'text-neutral-500'}`}>
+                        <p className="mt-1 text-xs text-neutral-500">
                           per {cycleLabel}
                         </p>
                         {buildPlanLimitsSummary(plan) && (
-                          <p className={`mt-2 text-xs ${isFeatured ? 'text-white/55' : 'text-neutral-400'}`}>
+                          <p className="mt-2 min-h-8 text-xs text-neutral-400">
                             {buildPlanLimitsSummary(plan)}
                           </p>
                         )}
                       </div>
 
+                      {/* same height whether the card shows Pay + Request upgrade or Current Plan, so the prices and buttons line up across all three plans */}
+                      <div className="min-h-[6.75rem]">
                       {!isCurrent && !onlinePaymentUnavailable && (
                         <Button
-                          variant={isFeatured ? 'outline' : 'primary'}
-                          className={`mt-5 w-full transition-transform duration-200 group-hover:scale-[1.01] ${
-                            isFeatured
-                              ? 'border-primary-200 bg-primary-100 text-primary-700 shadow-[0_10px_24px_-12px_rgb(0_9_42/0.35)] hover:border-primary-300 hover:bg-primary-200 hover:text-primary-900'
-                              : ''
-                          }`}
+                          variant="primary"
+                          className="mt-5 w-full transition-transform duration-200 group-hover:scale-[1.01]"
                           disabled={Boolean(payingPlanId) && !isPaying}
                           loading={isPaying}
                           onClick={() => handlePayForPlan(plan)}
@@ -549,12 +532,8 @@ export default function AdminPlans() {
 
                       {isCurrent ? (
                         <Button
-                          variant={isFeatured ? 'outline' : 'primary'}
-                          className={`mt-5 w-full disabled:opacity-100 ${
-                            isFeatured
-                              ? 'border-primary-200 bg-primary-100 text-primary-700 hover:border-primary-200 hover:bg-primary-100'
-                              : ''
-                          }`}
+                          variant="primary"
+                          className="mt-5 w-full disabled:opacity-100"
                           disabled
                         >
                           Current Plan
@@ -565,12 +544,13 @@ export default function AdminPlans() {
                           disabled={isRequested || Boolean(requestingPlanId) || Boolean(payingPlanId)}
                           onClick={() => handleChoosePlan(plan)}
                           className={`mt-3 w-full text-center text-xs font-medium underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:no-underline ${
-                            isFeatured ? 'text-white/70 hover:text-white' : 'text-neutral-500 hover:text-neutral-800'
-                          } ${isRequested ? 'text-amber-600' : ''}`}
+                            isRequested ? 'text-amber-600' : 'text-neutral-500 hover:text-neutral-800'
+                          }`}
                         >
                           {isRequested ? 'Upgrade requested - awaiting approval' : 'Request upgrade (manual)'}
                         </button>
                       )}
+                      </div>
                     </div>
                   </div>
                 </div>

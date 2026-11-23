@@ -12,7 +12,6 @@ import {
   Phone,
   Plus,
   RefreshCw,
-  Search,
   Settings,
   ShieldCheck,
   Trash2,
@@ -24,7 +23,9 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import PaginationFooter from '../../components/ui/PaginationFooter'
+import { ListTableToolbar } from '../../components/ui/ListPresentation'
 import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -118,7 +119,6 @@ const systemStatusOptions = [
   { value: 'locked', label: 'Locked' },
 ]
 
-const pageSizeOptions = [10, 25, 50].map((value) => ({ value: String(value), label: `${value} / page` }))
 
 const initialStaffFormData = {
   employeeId: '',
@@ -898,21 +898,6 @@ export default function UserManagement() {
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / Number(pageSize)))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const paginatedUsers = filteredUsers.slice((safeCurrentPage - 1) * Number(pageSize), safeCurrentPage * Number(pageSize))
-  const rangeStart = filteredUsers.length === 0 ? 0 : (safeCurrentPage - 1) * Number(pageSize) + 1
-  const rangeEnd = Math.min(filteredUsers.length, safeCurrentPage * Number(pageSize))
-  const paginationPages = (() => {
-    const pages = new Set([
-      1,
-      totalPages,
-      safeCurrentPage - 1,
-      safeCurrentPage,
-      safeCurrentPage + 1,
-    ])
-
-    return Array.from(pages)
-      .filter((pageNumber) => pageNumber >= 1 && pageNumber <= totalPages)
-      .sort((a, b) => a - b)
-  })()
 
   useEffect(() => {
     setCurrentPage(1)
@@ -1359,31 +1344,39 @@ export default function UserManagement() {
           </div>
         </div>
       </Modal>
-      <Card className="p-0">
-        <div className="px-5 pt-5"><h1 className="text-xl font-semibold tracking-tight text-neutral-900">Staff</h1></div>
-        <div className="px-5 py-5">
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[12rem_1fr_auto] lg:items-center">
-            <div className="w-full">
-              <Select
-                options={effectiveFilterTabs}
-                value={activeRoleFilter}
-                onChange={(event) => setActiveRoleFilter(event.target.value)}
-                className="w-full"
-              />
-            </div>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Staff</h1>
+      </div>
 
-            <div className="relative w-full lg:ml-auto lg:max-w-60">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search staff"
-                className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+      <Card className="overflow-hidden p-0">
+        <ListTableToolbar
+          title="Staff"
+          resultCount={isLoadingUsers || listError ? undefined : filteredUsers.length}
+          search={searchTerm}
+          onSearchChange={(event) => setSearchTerm(event.target.value)}
+          searchPlaceholder="Search staff..."
+          actions={(
+            <>
+              <ListFilterPanel
+                title="Filter Staff"
+                applied={{ role: activeRoleFilter, datePreset, customFrom, customTo }}
+                defaults={{ role: 'all', datePreset: 'all', customFrom: '', customTo: '' }}
+                onApply={(next) => {
+                  setActiveRoleFilter(next.role)
+                  setDatePreset(next.datePreset)
+                  setCustomFrom(next.customFrom)
+                  setCustomTo(next.customTo)
+                }}
+              >
+                {({ draft, set, errors }) => (
+                  <>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Role
+                      <Select options={effectiveFilterTabs} value={draft.role} onChange={(event) => set('role', event.target.value)} />
+                    </label>
+                    <FilterDateRange label="Joined" draft={draft} set={set} errors={errors} />
+                  </>
+                )}
+              </ListFilterPanel>
               <RequirePermission module="users" action="create">
                 {(() => {
                   const maxUsers = getLimit(LIMIT_KEYS.MAX_USERS)
@@ -1395,7 +1388,7 @@ export default function UserManagement() {
                           {maxUsers} user limit reached - <Link to="/admin/plans" className="font-medium text-primary-600 hover:underline">View Plans</Link>
                         </span>
                       )}
-                      <Button onClick={handleOpenModal} size="sm" disabled={atUserLimit} title={atUserLimit ? `Your current plan allows ${maxUsers} user(s).` : undefined}>
+                      <Button onClick={handleOpenModal} size="sm" className="h-9 rounded-2xl px-3.5" disabled={atUserLimit} title={atUserLimit ? `Your current plan allows ${maxUsers} user(s).` : undefined}>
                         <Plus className="size-4" />
                         Add Staff
                       </Button>
@@ -1403,15 +1396,11 @@ export default function UserManagement() {
                   )
                 })()}
               </RequirePermission>
-              <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} className="w-44" />
-            </div>
-          </div>
-        </div>
+            </>
+          )}
+        />
 
-        </Card>
-
-      <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto bg-surface px-0 py-0">
+        <div className="overflow-x-auto border-t border-neutral-100 bg-surface">
           {isLoadingUsers ? (
             <LoadingSpinner variant="table" columns={["User", "Email", "Role", "Status", "Joined", "Action"]} label="Loading staff..." />
           ) : listError ? (
@@ -1496,64 +1485,7 @@ export default function UserManagement() {
                 </tbody>
               </table>
 
-              <div className="flex flex-col gap-3 border-t border-neutral-100 px-4 py-3 text-xs text-neutral-400 lg:flex-row lg:items-center lg:justify-between">
-                <span>
-                  Showing <span className="font-semibold text-neutral-700">{rangeStart}</span> to{' '}
-                  <span className="font-semibold text-neutral-700">{rangeEnd}</span> of{' '}
-                  <span className="font-semibold text-neutral-700">{filteredUsers.length}</span> users
-                </span>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={safeCurrentPage === 1}
-                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                    className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent"
-                    aria-label="Previous page"
-                  >
-                    <span aria-hidden="true">‹</span>
-                  </button>
-
-                  {paginationPages.map((pageNumber, index) => {
-                    const previousPage = paginationPages[index - 1]
-                    const isGap = previousPage && pageNumber - previousPage > 1
-
-                    return (
-                      <span key={pageNumber} className="flex items-center gap-2">
-                        {isGap && <span className="px-1 text-neutral-300">…</span>}
-                        <button
-                          type="button"
-                          onClick={() => setCurrentPage(pageNumber)}
-                          className={`flex size-8 items-center justify-center rounded-full text-sm font-medium transition-colors ${
-                            pageNumber === safeCurrentPage
-                              ? 'bg-primary-600 text-white'
-                              : 'text-neutral-600 hover:bg-neutral-100'
-                          }`}
-                        >
-                          {pageNumber}
-                        </button>
-                      </span>
-                    )
-                  })}
-
-                  <button
-                    type="button"
-                    disabled={safeCurrentPage === totalPages}
-                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                    className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent"
-                    aria-label="Next page"
-                  >
-                    <span aria-hidden="true">›</span>
-                  </button>
-
-                  <Select
-                    options={pageSizeOptions}
-                    value={pageSize}
-                    onChange={(event) => setPageSize(event.target.value)}
-                    className="w-28"
-                  />
-                </div>
-              </div>
+              <PaginationFooter page={safeCurrentPage} pageSize={Number(pageSize)} total={filteredUsers.length} onPageChange={setCurrentPage} onPageSizeChange={(next) => setPageSize(String(next))} />
             </>
           )}
         </div>

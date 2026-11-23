@@ -77,7 +77,7 @@ export default function AdminAttendance() {
   const [isLoading, setIsLoading] = useState(true)
   const [roleFilter, setRoleFilter] = useState('all')
   const [userFilter, setUserFilter] = useState('all')
-  const [datePreset, setDatePreset] = useState('today')
+  const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -152,10 +152,8 @@ export default function AdminAttendance() {
     ]
   }, [rowsWithUser])
 
-  const latestDate = useMemo(
-    () => rowsWithUser.reduce((latest, row) => (!latest || row.date > latest ? row.date : latest), ''),
-    [rowsWithUser],
-  )
+  // "Present Today", "On Leave", ... are about the real today, whichever date range the table is showing.
+  const todayKey = resolveDateRange('today').dateFrom
 
   const filteredRows = useMemo(() => {
     const search = searchTerm.trim().toLowerCase()
@@ -176,7 +174,7 @@ export default function AdminAttendance() {
     setPage(1)
   }, [roleFilter, userFilter, statusFilter, searchTerm, dateFrom, dateTo, pageSize])
 
-  const todaysRows = useMemo(() => rowsWithUser.filter((row) => row.date === latestDate), [rowsWithUser, latestDate])
+  const todaysRows = useMemo(() => rowsWithUser.filter((row) => row.date === todayKey), [rowsWithUser, todayKey])
   const totalStaff = useMemo(() => new Set(rowsWithUser.map((row) => row.userId)).size, [rowsWithUser])
   const presentToday = todaysRows.filter((row) => row.status === 'Present').length
   const onLeaveToday = todaysRows.filter((row) => row.status === 'On Leave').length
@@ -258,7 +256,7 @@ export default function AdminAttendance() {
       </ListOverview>
 
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-neutral-100">
+        <div>
           <ListTableToolbar
             title="Attendance Records"
             subtitle="Select rows with the checkboxes to download only those, or leave none selected to download everything currently filtered."
@@ -270,7 +268,7 @@ export default function AdminAttendance() {
                 <ListFilterPanel
                   title="Filter Attendance"
                   applied={{ roleFilter, userFilter, statusFilter, datePreset, customFrom, customTo }}
-                  defaults={{ roleFilter: 'all', userFilter: 'all', statusFilter: 'all', datePreset: 'today', customFrom: '', customTo: '' }}
+                  defaults={{ roleFilter: 'all', userFilter: 'all', statusFilter: 'all', datePreset: 'all', customFrom: '', customTo: '' }}
                   onApply={(next) => {
                     setRoleFilter(next.roleFilter)
                     setUserFilter(next.userFilter)
@@ -313,7 +311,7 @@ export default function AdminAttendance() {
           />
         </div>
 
-        <div className="overflow-x-auto bg-neutral-50/35 py-4">
+        <div className="overflow-x-auto border-t border-neutral-100 bg-surface">
           {isLoading ? (
             <LoadingSpinner variant="table" columns={["", "Employee", "Role", "Date", "Status", "Check In", "Check Out", "Work Hours", ""]} checkboxColumn={0} label="Loading attendance..." />
           ) : filteredRows.length === 0 ? (

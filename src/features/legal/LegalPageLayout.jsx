@@ -19,7 +19,7 @@ import { LEGAL_PAGES } from './legalNav'
 // otherwise double up with the admin layout and its footer nav would route the user back out
 // to the public pages. Renders just the title/description/content, same ui/Card others admin
 // pages use, no duplicated legal text - same component, same props, one extra flag.
-export default function LegalPageLayout({ title, description, children, embedded = false }) {
+export default function LegalPageLayout({ title, description, children, embedded = false, flush = false }) {
   if (embedded) {
     return (
       <div className="space-y-5">
@@ -27,9 +27,16 @@ export default function LegalPageLayout({ title, description, children, embedded
           <h1 className="text-2xl font-semibold text-neutral-900">{title}</h1>
           {description && <p className="mt-1 text-sm text-neutral-500">{description}</p>}
         </div>
-        <Card>
-          <div className="space-y-6 text-sm leading-6 text-neutral-700">{children}</div>
-        </Card>
+        {flush ? (
+          // The page lays out its own padding, so a table inside can run edge to edge (same as every list page).
+          <Card className="overflow-hidden p-0">
+            <div className="text-sm leading-6 text-neutral-700">{children}</div>
+          </Card>
+        ) : (
+          <Card>
+            <div className="space-y-6 text-sm leading-6 text-neutral-700">{children}</div>
+          </Card>
+        )}
       </div>
     )
   }

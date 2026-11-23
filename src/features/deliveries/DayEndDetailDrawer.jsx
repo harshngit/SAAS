@@ -114,8 +114,8 @@ export default function DayEndDetailDrawer({ dayEnd, isOpen, onClose, onApprove,
             <Row label="Submission Count">{dayEnd.submissionCount}</Row>
             {dayEnd.reviewedAt && (
               <>
-                <Row label="Reviewed At">{formatDateTime(dayEnd.reviewedAt)}</Row>
-                <Row label="Reviewed By">{dayEnd.reviewedByName || '—'}</Row>
+                <Row label={dayEnd.status === 'approved' ? 'Approved At' : 'Reviewed At'}>{formatDateTime(dayEnd.reviewedAt)}</Row>
+                <Row label={dayEnd.status === 'approved' ? 'Approved By' : 'Reviewed By'}>{dayEnd.reviewedByName || '—'}</Row>
                 {dayEnd.reviewNote && <Row label="Review Note">{dayEnd.reviewNote}</Row>}
               </>
             )}

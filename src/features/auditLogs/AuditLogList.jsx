@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
 import {
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   CircleUserRound,
   CreditCard,
   Download,
@@ -12,10 +9,7 @@ import {
   History,
   Image as ImageIcon,
   MapPin,
-  Search,
-  SlidersHorizontal,
   Users,
-  X,
 } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -23,10 +17,12 @@ import Card from '../../components/ui/Card'
 import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import PaginationFooter from '../../components/ui/PaginationFooter'
+import { ListTableToolbar } from '../../components/ui/ListPresentation'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
 import { useSortState } from '../../hooks/useSortState'
-import { isWithinDateRange, resolveDateRange, validateCustomRange } from '../../utils/dateRange'
+import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { exportRowsToExcel } from '../../utils/exportToExcel'
 import { getOrganizationOverview } from '../../api/organizations'
 
@@ -54,12 +50,6 @@ const ACTION_COLOR_BY_TYPE = {
   document: 'text-amber-600 bg-amber-50',
   employee: 'text-green-600 bg-green-50',
 }
-
-const ROWS_PER_PAGE_OPTIONS = [
-  { value: '25', label: '25' },
-  { value: '50', label: '50' },
-  { value: '100', label: '100' },
-]
 
 const TYPE_LABEL = {
   company_profile: 'Company Profile',
@@ -110,20 +100,11 @@ export default function AuditLogList() {
   const [loadError, setLoadError] = useState('')
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
   const [typeFilter, setTypeFilter] = useState('')
   const [actorFilter, setActorFilter] = useState('')
   const [datePreset, setDatePreset] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-
-  // The Filters drawer is staged - nothing takes effect until Apply, same convention used on
-  // Super Admin's Organizations list.
-  const [draftType, setDraftType] = useState('')
-  const [draftActor, setDraftActor] = useState('')
-  const [draftDatePreset, setDraftDatePreset] = useState('all')
-  const [draftCustomFrom, setDraftCustomFrom] = useState('')
-  const [draftCustomTo, setDraftCustomTo] = useState('')
 
   const [rowsPerPage, setRowsPerPage] = useState(25)
   const [currentPage, setCurrentPage] = useState(1)
@@ -149,41 +130,6 @@ export default function AuditLogList() {
   useEffect(() => {
     load()
   }, [])
-
-  const openFilters = () => {
-    setDraftType(typeFilter)
-    setDraftActor(actorFilter)
-    setDraftDatePreset(datePreset)
-    setDraftCustomFrom(customFrom)
-    setDraftCustomTo(customTo)
-    setShowFilters(true)
-  }
-
-  const [rangeError, setRangeError] = useState('')
-
-  const applyFilters = () => {
-    const message = validateCustomRange(draftDatePreset, draftCustomFrom, draftCustomTo)
-    if (message) {
-      setRangeError(message)
-      return
-    }
-    setRangeError('')
-    setTypeFilter(draftType)
-    setActorFilter(draftActor)
-    setDatePreset(draftDatePreset)
-    setCustomFrom(draftCustomFrom)
-    setCustomTo(draftCustomTo)
-    setShowFilters(false)
-  }
-
-  const resetFilters = () => {
-    setRangeError('')
-    setDraftType('')
-    setDraftActor('')
-    setDraftDatePreset('all')
-    setDraftCustomFrom('')
-    setDraftCustomTo('')
-  }
 
   // Options derived from whatever is actually loaded - never a guessed list - so a type/actor
   // that doesn't appear in the current activity never shows as a dead filter option.
@@ -243,8 +189,6 @@ export default function AuditLogList() {
 
   const totalPages = Math.max(1, Math.ceil(visibleLogs.length / rowsPerPage))
   const safeCurrentPage = Math.min(currentPage, totalPages)
-  const pageStartIndex = visibleLogs.length === 0 ? 0 : (safeCurrentPage - 1) * rowsPerPage + 1
-  const pageEndIndex = Math.min(safeCurrentPage * rowsPerPage, visibleLogs.length)
   const paginatedLogs = useMemo(
     () => visibleLogs.slice((safeCurrentPage - 1) * rowsPerPage, safeCurrentPage * rowsPerPage),
     [visibleLogs, rowsPerPage, safeCurrentPage],
@@ -252,99 +196,57 @@ export default function AuditLogList() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, typeFilter, actorFilter, datePreset, customFrom, customTo, rowsPerPage])
+  }, [searchTerm, typeFilter, actorFilter, datePreset, customFrom, customTo, rowsPerPage, sortBy, sortOrder])
 
-  const activeFilterCount = [typeFilter, actorFilter, datePreset !== 'all' ? datePreset : ''].filter(Boolean).length
+  const appliedFilters = { typeFilter, actorFilter, datePreset, customFrom, customTo }
+  const defaultFilters = { typeFilter: '', actorFilter: '', datePreset: 'all', customFrom: '', customTo: '' }
+  const applyFilters = (next) => {
+    setTypeFilter(next.typeFilter)
+    setActorFilter(next.actorFilter)
+    setDatePreset(next.datePreset)
+    setCustomFrom(next.customFrom)
+    setCustomTo(next.customTo)
+  }
 
   return (
     <div className="listing-page space-y-4">
-      <Card className="overflow-hidden p-0">
-        <div className="border-b border-neutral-100 px-5 py-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Audit Log</h1>
-              <p className="mt-1 text-xs text-neutral-400">
-                {visibleLogs.length} of the last {logs.length} recorded changes to your organization&apos;s profile, billing, documents and team
-              </p>
-            </div>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Audit Log</h1>
+      </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <div className="relative w-full sm:w-60">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search audit log..."
-                  className="h-9 w-full rounded-xl border border-neutral-100 bg-surface py-1.5 pl-10 pr-4 text-xs text-neutral-700 shadow-(--shadow-xs) placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                />
-              </div>
-              <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={openFilters}>
-                <SlidersHorizontal className="size-4" aria-hidden="true" />
-                Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-              </Button>
+      <Card className="overflow-hidden p-0">
+        <ListTableToolbar
+          title="Audit Logs"
+          subtitle={`The last ${logs.length} recorded changes to your organization's profile, billing, documents and team.`}
+          resultCount={isLoading || loadError ? undefined : visibleLogs.length}
+          search={searchTerm}
+          onSearchChange={(event) => setSearchTerm(event.target.value)}
+          searchPlaceholder="Search audit log..."
+          actions={(
+            <>
+              <ListFilterPanel title="Filter Audit Log" applied={appliedFilters} defaults={defaultFilters} onApply={applyFilters}>
+                {({ draft, set, errors }) => (
+                  <>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Type
+                      <Select options={typeOptions} value={draft.typeFilter} onChange={(event) => set('typeFilter', event.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Team member
+                      <Select searchable options={actorOptions} value={draft.actorFilter} onChange={(event) => set('actorFilter', event.target.value)} />
+                    </label>
+                    <FilterDateRange label="Date" draft={draft} set={set} errors={errors} />
+                    <p className="text-xs text-neutral-400">Filters apply only to the {ACTIVITY_LIMIT} most recent entries loaded.</p>
+                  </>
+                )}
+              </ListFilterPanel>
               <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportAuditLogs(visibleLogs)}>
                 <Download className="size-4" aria-hidden="true" />
                 Export
               </Button>
-            </div>
-          </div>
-        </div>
-      </Card>
+            </>
+          )}
+        />
 
-      {showFilters && createPortal(
-        <div className="fixed inset-0 z-[100] flex justify-end bg-slate-950/35 backdrop-blur-[2px]" onClick={() => setShowFilters(false)}>
-          <aside
-            className="flex h-full w-full max-w-sm flex-col border-l border-surface-border bg-surface shadow-[0_24px_70px_-32px_rgb(15_23_42/0.6)]"
-            onClick={(event) => event.stopPropagation()}
-            aria-label="Audit log filters"
-          >
-            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-surface-border p-6">
-              <div>
-                <h2 className="font-(--font-display) text-lg font-semibold tracking-tight text-fg">Filters</h2>
-                <p className="mt-1 text-sm text-fg-muted">Refine the audit log by type, team member and date.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowFilters(false)}
-                className="flex size-9 shrink-0 items-center justify-center rounded-full border border-surface-border text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg"
-                aria-label="Close filters"
-              >
-                <X className="size-4" aria-hidden="true" />
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
-              <Select label="Type" options={typeOptions} value={draftType} onChange={(event) => setDraftType(event.target.value)} />
-              <Select label="Team member" options={actorOptions} value={draftActor} onChange={(event) => setDraftActor(event.target.value)} searchable />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-fg">Date</label>
-                <DateRangeFilter
-                  preset={draftDatePreset}
-                  onPresetChange={setDraftDatePreset}
-                  customFrom={draftCustomFrom}
-                  customTo={draftCustomTo}
-                  onCustomChange={({ from, to }) => {
-                    setDraftCustomFrom(from)
-                    setDraftCustomTo(to)
-                  }}
-                />
-              </div>
-              <p className="text-xs text-neutral-400">Filters apply only to the {ACTIVITY_LIMIT} most recent entries loaded.</p>
-            </div>
-
-            {rangeError && <p role="alert" className="px-6 pb-3 text-xs text-red-600">{rangeError}</p>}
-            <div className="flex shrink-0 justify-between gap-3 border-t border-surface-border p-6">
-              <Button type="button" variant="secondary" onClick={resetFilters}>Reset</Button>
-              <Button type="button" onClick={applyFilters}>Apply Filters</Button>
-            </div>
-          </aside>
-        </div>,
-        document.body,
-      )}
-
-      <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto bg-surface px-0 py-0">
+        <div className="overflow-x-auto border-t border-neutral-100 bg-surface">
           {isLoading ? (
             <LoadingSpinner variant="table" minWidth="min-w-[56rem]" columns={["Action", "Type", "By", "Date"]} label="Loading activity..." />
           ) : loadError ? (
@@ -400,46 +302,7 @@ export default function AuditLogList() {
         </div>
 
         {!isLoading && !loadError && visibleLogs.length > 0 && (
-          <div className="flex flex-col gap-4 border-t border-surface-border px-6 py-4 text-sm text-fg-muted sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-4">
-              <span>
-                Showing <span className="font-semibold text-fg">{pageStartIndex}-{pageEndIndex}</span> of{' '}
-                <span className="font-semibold text-fg">{visibleLogs.length}</span>
-              </span>
-              <span className="hidden h-4 w-px bg-surface-border sm:block" aria-hidden="true" />
-              <label className="flex items-center gap-3">
-                <span>Rows per page</span>
-                <Select
-                  options={ROWS_PER_PAGE_OPTIONS}
-                  value={String(rowsPerPage)}
-                  onChange={(event) => setRowsPerPage(Number(event.target.value))}
-                  triggerClassName="h-8 bg-surface py-1 text-xs"
-                  className="w-20"
-                />
-              </label>
-            </div>
-            <div className="flex items-center gap-4 sm:justify-end">
-              <button
-                type="button"
-                disabled={safeCurrentPage === 1}
-                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                className="flex size-10 items-center justify-center rounded-full border border-surface-border text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="size-5" aria-hidden="true" />
-              </button>
-              <span className="font-semibold text-fg">{safeCurrentPage} / {totalPages}</span>
-              <button
-                type="button"
-                disabled={safeCurrentPage === totalPages}
-                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                className="flex size-10 items-center justify-center rounded-full border border-surface-border text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                aria-label="Next page"
-              >
-                <ChevronRight className="size-5" aria-hidden="true" />
-              </button>
-            </div>
-          </div>
+          <PaginationFooter page={safeCurrentPage} pageSize={rowsPerPage} total={visibleLogs.length} onPageChange={setCurrentPage} onPageSizeChange={setRowsPerPage} />
         )}
       </Card>
     </div>

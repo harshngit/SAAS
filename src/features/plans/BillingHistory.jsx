@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Clipboard, CreditCard, Receipt, Search } from 'lucide-react'
+import { CalendarClock, Clipboard, CreditCard, Repeat, Search } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EmptyState from '../../components/ui/EmptyState'
-import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
-import DateRangeFilter from '../../components/ui/DateRangeFilter'
+import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
+import { ListOverview, ListSummary, ListStatCard, ListTableToolbar } from '../../components/ui/ListPresentation'
 import { useToast } from '../../components/ui/toastContext'
 import { getPaymentHistory } from '../../api/billing'
 import { getCurrentOrganizationState } from '../../api/organizations'
@@ -120,61 +120,68 @@ export default function BillingHistory() {
   const planExpiry = organization?.plan_expires_at
 
   return (
-    <div className="space-y-6 pb-6">
+    <div className="listing-page space-y-4">
       <div>
-        <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
-            <Receipt className="size-5" aria-hidden="true" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Billing History</h1>
-            <p className="mt-1 text-sm text-neutral-500">View payments made for your organization&apos;s CRM subscription.</p>
-          </div>
-        </div>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Billing History</h1>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <p className="text-sm font-medium text-neutral-500">Current Plan</p>
-          <p className="mt-2 text-lg font-semibold text-neutral-900">{currentPlanName}</p>
-        </Card>
-        <Card>
-          <p className="text-sm font-medium text-neutral-500">Billing Cycle</p>
-          <p className="mt-2 text-lg font-semibold capitalize text-neutral-900">{formatCycle(currentBillingCycle)}</p>
-        </Card>
-        <Card>
-          <p className="text-sm font-medium text-neutral-500">Valid Until / Plan Expiry</p>
-          <p className="mt-2 text-lg font-semibold text-neutral-900">{formatDateLabel(planExpiry)}</p>
-        </Card>
-      </div>
+      <ListOverview>
+        <ListSummary className="grid-cols-1 md:grid-cols-3">
+          <ListStatCard icon={CreditCard} label="Current Plan" value={currentPlanName} />
+          <ListStatCard icon={Repeat} label="Billing Cycle" value={formatCycle(currentBillingCycle)} />
+          <ListStatCard icon={CalendarClock} label="Valid Until / Plan Expiry" value={formatDateLabel(planExpiry)} />
+        </ListSummary>
+      </ListOverview>
 
-      <Card title="Subscription Payments" subtitle="Online payments made for this organization&apos;s CRM subscription.">
-        <div className="mb-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_12rem_auto]">
-          <Input
-            aria-label="Search billing payments"
-            placeholder="Search plan or payment ID..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            inputClassName="pl-10"
-          />
-          <Select label="" options={statusOptions} value={status} onChange={(event) => setStatus(event.target.value)} />
-          <Select label="" options={cycleOptions} value={billingCycle} onChange={(event) => setBillingCycle(event.target.value)} />
-          <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomChange={({ from, to }) => { setCustomFrom(from); setCustomTo(to) }} />
-        </div>
+      <Card className="overflow-hidden p-0">
+        <ListTableToolbar
+          title="Subscription Payments"
+          subtitle="Online payments made for this organization's CRM subscription."
+          search={search}
+          onSearchChange={(event) => setSearch(event.target.value)}
+          searchPlaceholder="Search plan or payment ID..."
+          resultCount={isLoading || error ? undefined : filteredPayments.length}
+          actions={(
+            <ListFilterPanel
+              title="Filter Payments"
+              applied={{ status, billingCycle, datePreset, customFrom, customTo }}
+              defaults={{ status: '', billingCycle: '', datePreset: 'all', customFrom: '', customTo: '' }}
+              onApply={(next) => { setStatus(next.status); setBillingCycle(next.billingCycle); setDatePreset(next.datePreset); setCustomFrom(next.customFrom); setCustomTo(next.customTo) }}
+            >
+              {({ draft, set, errors }) => (
+                <>
+                  <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Status
+                    <Select options={statusOptions} value={draft.status} onChange={(event) => set('status', event.target.value)} />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Billing cycle
+                    <Select options={cycleOptions} value={draft.billingCycle} onChange={(event) => set('billingCycle', event.target.value)} />
+                  </label>
+                  <FilterDateRange label="Payment date" draft={draft} set={set} errors={errors} />
+                </>
+              )}
+            </ListFilterPanel>
+          )}
+        />
 
         {isLoading ? (
-          <LoadingSpinner variant="table" minWidth="min-w-[52rem]" columns={["Date", "Plan", "Billing Cycle", "Amount", "Status", "Payment ID", "Action"]} label="Loading billing history..." />
+          <div className="px-5 pb-5">
+            <LoadingSpinner variant="table" minWidth="min-w-[52rem]" columns={["Date", "Plan", "Billing Cycle", "Amount", "Status", "Payment ID", "Action"]} label="Loading billing history..." />
+          </div>
         ) : error ? (
-          <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
             <p className="text-sm text-red-600">{error}</p>
             <Button variant="outline" size="sm" onClick={load}>Try again</Button>
           </div>
         ) : payments.length === 0 ? (
-          <EmptyState icon={CreditCard} title="No billing payments yet." description="Your subscription payments will appear here after a plan payment is made." />
+          <div className="px-5 pb-5">
+            <EmptyState icon={CreditCard} title="No billing payments yet." description="Your subscription payments will appear here after a plan payment is made." />
+          </div>
         ) : filteredPayments.length === 0 ? (
-          <EmptyState icon={Search} title="No matching payments" description="Try changing your search or filters." />
+          <div className="px-5 pb-5">
+            <EmptyState icon={Search} title="No matching payments" description="Try changing your search or filters." />
+          </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-neutral-100">
+          <div className="overflow-x-auto border-t border-neutral-100">
             <table className="w-full min-w-[52rem] text-left text-sm">
               <thead>
                 <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">

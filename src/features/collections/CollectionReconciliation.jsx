@@ -45,9 +45,10 @@ const DEFAULT_PAGE_SIZE = 25
 export default function CollectionReconciliation() {
   const { showToast } = useToast()
   const { can } = usePermission()
-  // Canonical backend permission module: `delivery_collections`. Reconcile + Void both post to
-  // the collection lifecycle endpoints, so both are gated on the `approve` action.
-  const canReconcile = can('delivery_collections', 'approve')
+  // There is no delivery_collections permission in the backend. Reconcile and Void (same gate in the backend, build 78ba5a0) need
+  // the Deliveries > Approve permission AND finance read access (Payments or Invoices view) - without Approve the backend answers
+  // 403 "this needs the Deliveries > Approve permission on your role", without finance access 403 "Only Accountants or Admins ...".
+  const canReconcile = can('deliveries', 'approve') && (can('payments', 'view') || can('invoices', 'view'))
 
   const [collections, setCollections] = useState([])
   const [page, setPage] = useState(1)

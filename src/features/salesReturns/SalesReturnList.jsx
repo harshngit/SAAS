@@ -150,11 +150,11 @@ export default function SalesReturnList() {
       </Card>
 
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-neutral-100 px-5 py-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Sales Returns</h2>
-              <p className="mt-1 text-xs text-neutral-400">{filteredSalesReturns.length} returns in view</p>
+        <div className="px-5 py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-(--font-display) text-base font-semibold tracking-tight text-neutral-900">Sales Returns</h2>
+              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium tabular-nums text-neutral-500" aria-live="polite">{filteredSalesReturns.length} {filteredSalesReturns.length === 1 ? 'result' : 'results'}</span>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               <div className="relative w-full sm:w-60">
@@ -181,10 +181,8 @@ export default function SalesReturnList() {
             </div>
           </div>
         </div>
-      </Card>
 
-      <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto bg-surface px-0 py-0">
+        <div className="overflow-x-auto border-t border-neutral-100 bg-surface px-0 py-0">
           {listError ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-600">{listError}</p>

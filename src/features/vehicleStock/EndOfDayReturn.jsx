@@ -18,6 +18,7 @@ import {
 } from '../../api/vehicleStock'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
+import useOwnDayClosed from '../../hooks/useOwnDayClosed'
 import { formatDate, formatDateTime } from '../../utils/format'
 import { DEMO_EMPTY, DEMO_MODE } from '../../config/demoMode'
 import {
@@ -470,6 +471,8 @@ export default function EndOfDayReturn() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
+  // Approved and Closed day-end = the vehicle stock of that day is read-only, whatever the session status says.
+  const { isClosed: dayClosed } = useOwnDayClosed({ enabled: !DEMO_VEHICLE_STOCK_ENABLED })
 
   const [session, setSession] = useState(null)
   const [demo, setDemo] = useState(false)
@@ -700,7 +703,7 @@ export default function EndOfDayReturn() {
   // §17: the backend can close the loading session once the EOD return is done. Any status
   // other than "active" makes this screen read-only - no second return, no reconcile post.
   // The backend remains authoritative; this only stops an obviously-invalid resubmit.
-  const sessionClosed = Boolean(session) && !demo && String(session.status || 'active').toLowerCase() !== 'active'
+  const sessionClosed = Boolean(session) && !demo && (dayClosed || String(session.status || 'active').toLowerCase() !== 'active')
 
   const lineErrors = useMemo(() => {
     const errs = {}
@@ -858,8 +861,9 @@ export default function EndOfDayReturn() {
             <>
               <VehicleContextCard session={session} onViewStock={goToStock} />
               <p className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-                This vehicle session is closed ({session.status}). The end of day return is complete and cannot be
-                resubmitted.
+                {dayClosed
+                  ? "Today's day-end is Approved and Closed. The vehicle stock for this day is read-only."
+                  : `This vehicle session is closed (${session.status}). The end of day return is complete and cannot be resubmitted.`}
               </p>
               <SummaryTiles totals={totals} />
               <ReturnLines lines={lines} editable={false} onChange={updateLine} lineErrors={{}} />

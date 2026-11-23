@@ -4,6 +4,7 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import ListFilterPanel, { FilterDateRange } from '../../components/ui/ListFilterPanel'
 import { ListTableToolbar } from '../../components/ui/ListPresentation'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
@@ -24,12 +25,6 @@ import { resolveColumns } from '../reports/reportDataUtils'
 
 const REPORT_TYPE = 'sales-overview'
 
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10 / page' },
-  { value: '25', label: '25 / page' },
-  { value: '50', label: '50 / page' },
-  { value: '100', label: '100 / page' },
-]
 
 // Exact backend summary keys confirmed for GET /reports/sales-overview - ReportSummaryCards
 // skips any card whose key the response doesn't actually send, never shows a fabricated zero.
@@ -301,10 +296,7 @@ export default function SalesOverview() {
   const columns = useMemo(() => resolveColumns(report, SALES_OVERVIEW_COLUMNS), [report])
   const pagination = report?.pagination
   const total = pagination?.total ?? rows.length
-  const totalPages = pagination?.total_pages ?? 1
   const currentPage = pagination?.page ?? page
-  const rangeStart = total === 0 ? 0 : (currentPage - 1) * Number(pageSize) + 1
-  const rangeEnd = total === 0 ? 0 : Math.min(currentPage * Number(pageSize), total)
 
   const isDemoUnavailable = loadError === 'demo-unavailable'
   const hasData = rows.length > 0
@@ -359,6 +351,9 @@ export default function SalesOverview() {
     </ListFilterPanel>
   )
 
+  // Table runs edge to edge inside the one card (like Expenses / Customers); messages and empty states keep padding.
+  const showData = !isLoading && !(loadError && !isDemoUnavailable) && !isDemoUnavailable && hasData
+
   return (
     <div className="listing-page space-y-4">
       <div>
@@ -368,7 +363,7 @@ export default function SalesOverview() {
       <ReportKpiRow summary={report?.summary} cards={SUMMARY_CARDS} loading={isLoading && !report} />
 
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-neutral-100">
+        <div>
           <ListTableToolbar
             title="Sales Orders"
             subtitle="Combined view of sales orders and delivery fulfilment."
@@ -380,12 +375,12 @@ export default function SalesOverview() {
           />
         </div>
 
-        <div className="px-5 py-4">
+        <div className={showData ? '' : 'px-5 pb-5'}>
           {exportError && (
-            <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{exportError}</div>
+            <div className="mx-5 mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{exportError}</div>
           )}
           {DEMO_MODE && (
-            <p className="mb-4 text-xs text-neutral-400">Report export (PDF / Excel) is disabled in demo mode.</p>
+            <p className="mx-5 mb-4 text-xs text-neutral-400">Report export (PDF / Excel) is disabled in demo mode.</p>
           )}
 
           {isLoading ? (
@@ -397,26 +392,10 @@ export default function SalesOverview() {
           ) : !hasData ? (
             <EmptyState icon={PieChart} title="No orders found" description="No sales orders match the selected filters." />
           ) : (
-            <div className="space-y-5">
+            <div className="space-y-4 [&_.overflow-x-auto]:rounded-none [&_.overflow-x-auto]:border-x-0">
               <ReportTable columns={columns} rows={rows} />
 
-              <div className="flex flex-col items-center justify-between gap-3 pt-1 text-sm text-neutral-500 sm:flex-row">
-                <div className="flex items-center gap-3">
-                  <span>Showing <span className="font-semibold text-neutral-900">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-neutral-900">{total}</span></span>
-                  <Select
-                    options={PAGE_SIZE_OPTIONS}
-                    value={pageSize}
-                    onChange={(event) => { setPageSize(event.target.value); setPage(1) }}
-                    triggerClassName="h-8 bg-surface py-1 text-xs"
-                    className="w-28"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-neutral-600 disabled:opacity-40">Previous</button>
-                  <span className="min-w-16 text-center font-medium text-neutral-700">{currentPage} / {totalPages || 1}</span>
-                  <button type="button" disabled={currentPage >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-neutral-600 disabled:opacity-40">Next</button>
-                </div>
-              </div>
+              <PaginationFooter page={currentPage} pageSize={Number(pageSize)} total={total} onPageChange={setPage} onPageSizeChange={(next) => { setPageSize(String(next)); setPage(1) }} />
             </div>
           )}
         </div>

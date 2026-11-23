@@ -66,6 +66,7 @@ import {
 import { formatCurrency } from '../../utils/format'
 import { useAuthStore } from '../../store/authStore'
 import { usePermission } from '../../auth/usePermission'
+import useOwnDayClosed from '../../hooks/useOwnDayClosed'
 import { useEntitlements } from '../../entitlements/EntitlementsContext'
 import { ENTITLEMENT_KEYS } from '../../entitlements/entitlementKeys'
 import { useToast } from '../../components/ui/toastContext'
@@ -216,6 +217,8 @@ export default function DeliveryDetail() {
   const basePath = isAdminView ? '/admin/deliveries' : '/delivery/deliveries'
 
   const [delivery, setDelivery] = useState(null)
+  // The partner's day Approved and Closed = no more loading onto the vehicle for that day.
+  const { isClosed: dayClosed, reload: reloadDayEnd } = useOwnDayClosed({ partnerId: delivery?.deliveryPartnerId, enabled: Boolean(delivery?.deliveryPartnerId) })
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isActing, setIsActing] = useState(false)
@@ -514,7 +517,8 @@ export default function DeliveryDetail() {
   const ADJUSTABLE_STAGES = ['accepted', 'picking', 'ready', 'loaded', 'in_transit', 'partially_delivered']
   const canAdjustDelivery = !isAdminView && !parentOrderCancelled && ADJUSTABLE_STAGES.includes(stageKey)
   const showAdjustmentSection = !isAdminView && !parentOrderCancelled && (canAdjustDelivery || isDeliveredStage)
-  const adjustmentLocked = !canAdjustDelivery // delivered / any non-active stage -> read-only recap
+  // delivered / any non-active stage -> read-only recap; an Approved and Closed day also locks the quantities
+  const adjustmentLocked = !canAdjustDelivery || dayClosed
 
   const unitPriceForProduct = (productId, fallback = null) =>
     orderPricing[productId]?.unitPrice ??
@@ -728,6 +732,7 @@ export default function DeliveryDetail() {
     if (!result.success) {
       setActionError(result.error)
       setIsActing(false)
+      if (result.code === 'DAY_END_CLOSED') reloadDayEnd()
       return
     }
 
@@ -781,6 +786,7 @@ export default function DeliveryDetail() {
     if (!result.success) {
       setActionError(result.error)
       setIsActing(false)
+      if (result.code === 'DAY_END_CLOSED') reloadDayEnd()
       return
     }
 
@@ -1212,10 +1218,16 @@ export default function DeliveryDetail() {
             Move the picked goods onto {delivery.vehicleNumber || 'your vehicle'}. This takes the stock off the
             warehouse and onto the van.
           </p>
+          {dayClosed && (
+            <p role="status" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              This day is <span className="font-semibold">Approved and Closed</span>. The vehicle load can no longer be changed.
+            </p>
+          )}
           <Button
             type="button"
             className="mt-4"
             loading={isActing}
+            disabled={dayClosed}
             onClick={nextAction.type === 'load' ? handleLoad : handleMarkLoaded}
           >
             <PackageCheck className="size-4" aria-hidden="true" />

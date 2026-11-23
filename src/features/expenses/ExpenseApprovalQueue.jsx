@@ -230,6 +230,7 @@ export default function ExpenseApprovalQueue() {
           <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
         <DataTable
+          resetKey={`${tab}|${datePreset}|${customFrom}|${customTo}`}
           loading={isLoading}
           columns={[
             { key: 'expenseNumber', header: 'Expense #', sortable: true, render: (row) => row.expenseNumber || row.expenseId || '—' },

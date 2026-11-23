@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { ChevronLeft, ChevronRight, Copy, Download, Eye, Pencil, Plus, RotateCw, Search, ShoppingCart, SlidersHorizontal, Trash2, UploadCloud, X } from 'lucide-react'
+import { Copy, Download, Eye, Pencil, Plus, RotateCw, Search, ShoppingCart, SlidersHorizontal, Trash2, UploadCloud, X } from 'lucide-react'
 import ActionMenu from '../../components/ui/ActionMenu'
 import Badge from '../../components/ui/Badge'
 import BulkImportModal from '../../components/ui/BulkImportModal'
@@ -16,6 +16,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import SortableHeaderCell from '../../components/ui/SortableHeaderCell'
+import PaginationFooter from '../../components/ui/PaginationFooter'
 import { useSortState } from '../../hooks/useSortState'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { RequirePermission } from '../../auth/RequirePermission'
@@ -49,7 +50,6 @@ const formatDate = (value) => {
   }
 }
 
-const PAGE_SIZE_OPTIONS = [{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }, { value: '100', label: '100' }]
 
 function OrderSummaryCard({ label, value, detail, index }) {
   return (
@@ -263,8 +263,6 @@ export default function OrderList() {
 
   const totalPages = Math.max(1, Math.ceil(total / Number(pageSize)))
   const currentPage = Math.min(page, totalPages)
-  const rangeStart = total === 0 ? 0 : (currentPage - 1) * Number(pageSize) + 1
-  const rangeEnd = Math.min(total, currentPage * Number(pageSize))
   const allVisibleSelected = orders.length > 0 && orders.every((order) => selectedIds.includes(order.id))
 
   const toggleAllVisible = () => {
@@ -524,36 +522,7 @@ export default function OrderList() {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-4">
-          <div className="flex items-center gap-3 text-xs text-fg-muted">
-            <span>Showing <span className="font-semibold text-fg">{rangeStart}-{rangeEnd}</span> of <span className="font-semibold text-fg">{total}</span></span>
-            <span className="hidden text-neutral-300 sm:inline">|</span>
-            <label className="flex items-center gap-2">Rows per page
-              <Select options={PAGE_SIZE_OPTIONS} value={pageSize} onChange={(event) => { setPageSize(event.target.value); setPage(1) }} className="w-20" triggerClassName="h-8 bg-surface py-1 text-xs" />
-            </label>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <span className="min-w-14 text-center font-medium text-fg">{currentPage} / {totalPages}</span>
-            <button
-              type="button"
-              disabled={currentPage === totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="flex size-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Next page"
-            >
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-        </div>
+        <PaginationFooter page={currentPage} pageSize={Number(pageSize)} total={total} onPageChange={setPage} onPageSizeChange={(next) => { setPageSize(String(next)); setPage(1) }} />
       </Card>
 
 

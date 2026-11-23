@@ -725,7 +725,7 @@ export default function AppRoutes() {
           <Route
             path="/admin/day-end-approvals"
             element={
-              <RequirePermissionRoute module="payments" action="view">
+              <RequirePermissionRoute module="deliveries" action="view">
                 <DayEndApprovals />
               </RequirePermissionRoute>
             }
@@ -1249,7 +1249,7 @@ export default function AppRoutes() {
           <Route
             path="/accounts/day-end-approvals"
             element={
-              <RequirePermissionRoute module="payments" action="view">
+              <RequirePermissionRoute module="deliveries" action="view">
                 <DayEndApprovals />
               </RequirePermissionRoute>
             }

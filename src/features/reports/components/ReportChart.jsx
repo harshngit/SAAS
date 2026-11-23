@@ -1,4 +1,3 @@
-import Card from '../../../components/ui/Card'
 import SalesLineChart from '../../../components/charts/SalesLineChart'
 import TopProductsBarChart from '../../../components/charts/TopProductsBarChart'
 import CategoryPieChart from '../../../components/charts/CategoryPieChart'
@@ -35,10 +34,11 @@ export default function ReportChart({ chart, fallbackTitle, chartKeys }) {
   const title = chart.title || fallbackTitle
 
   return (
-    <Card title={title} bodyClassName="pt-1">
+    <div className="px-5">
+      {title && <h3 className="mb-3 font-(--font-display) text-base font-semibold tracking-tight text-neutral-900">{title}</h3>}
       {chart.type === 'line' && <SalesLineChart data={data} dataKey={valueKey} labelKey={labelKey} valueType={valueType} />}
       {chart.type === 'bar' && <TopProductsBarChart data={data} dataKey={valueKey} nameKey={labelKey} />}
       {chart.type === 'pie' && <CategoryPieChart data={data} dataKey={valueKey} nameKey={labelKey} />}
-    </Card>
+    </div>
   )
 }

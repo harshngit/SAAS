@@ -2,9 +2,9 @@ import { ListOverview, ListSummary, ListStatCard } from '../../../components/ui/
 import { resolveSummaryValue, formatSummaryValue } from '../reportDataUtils'
 import { resolveCardVisual } from './ReportSummaryCards'
 
-// Five or six cards go three-per-row until the screen is wide (2xl) - six currency values such as
+// Five or six cards go three-per-row until the screen is very wide (1850px) - six currency values such as
 // "₹7,47,118.03" do not fit one row at laptop widths and would wrap mid-number.
-const COLUMNS = { 1: 'lg:grid-cols-1', 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4', 5: 'lg:grid-cols-3 2xl:grid-cols-5', 6: 'lg:grid-cols-3 2xl:grid-cols-6' }
+const COLUMNS = { 1: 'lg:grid-cols-1', 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4', 5: 'lg:grid-cols-3 2xl:grid-cols-5', 6: 'lg:grid-cols-3 min-[1850px]:grid-cols-6' }
 
 // The report summary as the same KPI strip every list page (Customers, Purchases, Expenses, ...)
 // shows directly under the page heading. Same data rules as ReportSummaryCards: a card whose

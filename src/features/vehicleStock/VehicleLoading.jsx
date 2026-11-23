@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Info, Package, PackageCheck, RotateCw, Truck } from 'lucide-react'
+import { AlertTriangle, Info, Lock, Package, PackageCheck, RotateCw, Truck } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
@@ -19,6 +19,7 @@ import {
 import { getDeliveryStage } from '../deliveries/deliveryStage'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/ui/toastContext'
+import useOwnDayClosed from '../../hooks/useOwnDayClosed'
 
 // Explicit dev switch only (VITE_DEMO_DATA=true). Demo is NEVER inferred from a failed / empty
 // deliveries API.
@@ -133,6 +134,8 @@ export default function VehicleLoading() {
   // never derived from whichever delivery happens to already carry vehicle data.
   const [assignedVehicle, setAssignedVehicle] = useState(null)
   const [vehicleError, setVehicleError] = useState('')
+  // Today's day-end approved = the day is Approved and Closed: no more loading onto the vehicle for that day.
+  const { isClosed: dayClosed, reload: reloadDayEnd } = useOwnDayClosed({ enabled: !DEMO_VEHICLE_STOCK_ENABLED })
 
   const load = useCallback(async () => {
     if (!currentUser?.id) return
@@ -281,7 +284,7 @@ export default function VehicleLoading() {
   const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(eligible.map((delivery) => delivery.id)))
 
   const handleConfirm = async () => {
-    if (isSubmitting || selectedDeliveries.length === 0) return
+    if (isSubmitting || dayClosed || selectedDeliveries.length === 0) return
     setIsSubmitting(true)
     setSubmitError('')
     const selectedAtSubmit = [...selectedDeliveries]
@@ -322,6 +325,8 @@ export default function VehicleLoading() {
         readyIds.forEach((deliveryId) => {
           failures[deliveryId] = batchResult.error
         })
+        // The backend says the day is closed: lock the screen at once instead of waiting for a refresh.
+        if (batchResult.code === 'DAY_END_CLOSED') reloadDayEnd()
       } else {
         getBatchResults(batchResult.data, readyIds).forEach((result) => {
           if (!result.success) failures[result.deliveryId] = result.error || 'Vehicle loading failed. Please try again.'
@@ -364,6 +369,13 @@ export default function VehicleLoading() {
             <RotateCw className="size-4" aria-hidden="true" />
             Retry
           </Button>
+        </div>
+      )}
+
+      {dayClosed && (
+        <div role="status" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>Today&apos;s day-end is <span className="font-semibold">Approved and Closed</span>. The vehicle load for this day can no longer be changed.</span>
         </div>
       )}
 
@@ -454,6 +466,7 @@ export default function VehicleLoading() {
                 type="checkbox"
                 checked={allSelected}
                 onChange={toggleAll}
+                disabled={dayClosed}
                 className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
               />
               Select all ready
@@ -475,6 +488,7 @@ export default function VehicleLoading() {
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => toggleDelivery(delivery.id)}
+                    disabled={dayClosed}
                     className="size-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                     aria-label={`Include ${delivery.deliveryNumber || delivery.orderNumber}`}
                   />
@@ -554,7 +568,7 @@ export default function VehicleLoading() {
               <Button
                 type="button"
                 loading={isSubmitting}
-                disabled={selectedDeliveries.length === 0 || summary.units === 0}
+                disabled={dayClosed || selectedDeliveries.length === 0 || summary.units === 0}
                 onClick={handleConfirm}
               >
                 <PackageCheck className="size-4" aria-hidden="true" />

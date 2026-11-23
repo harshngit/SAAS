@@ -197,7 +197,7 @@ export const roleMenus = {
         { label: 'Collection Reconciliation', path: '/admin/collections', icon: HandCoins, module: 'payments', feature: ENTITLEMENT_KEYS.FINANCE_COLLECTION_RECONCILIATION },
         // Cash Reconciliation nav entry removed (crm_changes15.md §V) - superseded by the
         // Delivery Day-End workflow below. Route/component/API are untouched, just hidden from nav.
-        { label: 'Day-End Approvals', path: '/admin/day-end-approvals', icon: HandCoins, module: 'payments' },
+        { label: 'Day-End Approvals', path: '/admin/day-end-approvals', icon: HandCoins, module: 'deliveries' },
         { label: 'Expenses', path: '/admin/expenses', icon: Receipt, module: 'expenses', feature: ENTITLEMENT_KEYS.FINANCE_EXPENSES },
         {
           label: 'Reports',
@@ -353,7 +353,7 @@ export const roleMenus = {
         { label: 'Collection Reconciliation', path: '/accounts/collections', icon: HandCoins, module: 'payments', feature: ENTITLEMENT_KEYS.FINANCE_COLLECTION_RECONCILIATION },
         // Cash Reconciliation nav entry removed (crm_changes15.md §V) - superseded by the
         // Delivery Day-End workflow below. Route/component/API are untouched, just hidden from nav.
-        { label: 'Day-End Approvals', path: '/accounts/day-end-approvals', icon: HandCoins, module: 'payments' },
+        { label: 'Day-End Approvals', path: '/accounts/day-end-approvals', icon: HandCoins, module: 'deliveries' },
         { label: 'Expense Approval', path: '/accounts/expenses/approval', icon: Receipt, module: 'expenses', action: 'approve', feature: ENTITLEMENT_KEYS.FINANCE_EXPENSES },
         { label: 'My Expenses', path: '/accounts/expenses', icon: Receipt, module: 'expenses', feature: ENTITLEMENT_KEYS.FINANCE_EXPENSES },
         { label: 'Leaves', path: '/accounts/leaves', icon: CalendarClock, module: 'leaves', feature: ENTITLEMENT_KEYS.EMPLOYEE_LEAVES },

@@ -76,7 +76,8 @@ function collectionError(error, fallback) {
   if (status === 404) {
     return { error: 'The delivery collections service did not respond (404). Nothing was changed — please retry.' }
   }
-  if (status === 403) return { error: 'You do not have permission to perform this action.' }
+  // Reconcile / void are finance actions: the backend answers 403 with its own sentence ("Only Accountants or Admins can reconcile ...") - show it.
+  if (status === 403) return { code: 'FORBIDDEN', error: typeof detail === 'string' && detail ? detail : 'You do not have permission to perform this action.' }
   // 409 (e.g. money from this customer is already collected and awaiting admin approval): the
   // backend's own `detail` text, as sent. `code` lets the caller refresh what the screen shows.
   if (status === 409) return { code: 'CONFLICT', error: formatApiError(detail, 'This collection has already been reconciled or voided.') }

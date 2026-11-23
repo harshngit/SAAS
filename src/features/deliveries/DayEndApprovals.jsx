@@ -12,6 +12,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { resolveDateRange } from '../../utils/dateRange'
 import { useToast } from '../../components/ui/toastContext'
 import { usePermission } from '../../auth/usePermission'
+import { useAuthStore } from '../../store/authStore'
 import { listDeliveryPartners } from '../../api/deliveries'
 import { formatCurrency } from '../../utils/format'
 import DayEndDetailDrawer from './DayEndDetailDrawer'
@@ -30,15 +31,24 @@ function formatDate(value) {
   return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+function formatDateTime(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
 // Admin "Day-End Approvals" - the submitted-session queue for the new Delivery Day-End
 // workflow. Separate from Collection Reconciliation (per-transaction) and Cash Reconciliation
 // (hidden from nav) - this reviews one daily session per delivery partner.
 export default function DayEndApprovals() {
   const { showToast } = useToast()
   const { can } = usePermission()
-  // Same permission module CollectionReconciliation.jsx gates its reconcile/void actions on -
-  // Day-End approval is the same class of admin/reviewer action over delivery-side money.
-  const canReview = can('delivery_collections', 'approve')
+  const currentUser = useAuthStore((state) => state.currentUser)
+  // Day-End is a Deliveries-module feature in the backend (GET/approve/reject all answer 403 "view deliveries" without it); there is
+  // no separate Day-End or delivery_collections permission. Approve / Reject need the Deliveries "approve" action, and nobody
+  // approves their own day-end.
+  const canReview = can('deliveries', 'approve')
+  const canReviewRow = (row) => canReview && row.deliveryPartnerId !== currentUser?.id
 
   const [dayEnds, setDayEnds] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -62,6 +72,11 @@ export default function DayEndApprovals() {
     setCustomTo(next.customTo)
   }
   const hasExtraFilters = partnerFilter !== 'all' || datePreset !== 'all'
+
+  // Approval History: every approved (= closed) day-end, newest first, independent of the queue's status filter.
+  const [history, setHistory] = useState([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true)
+  const [historyError, setHistoryError] = useState('')
 
   const [detail, setDetail] = useState(null)
   const [approveTarget, setApproveTarget] = useState(null)
@@ -104,6 +119,30 @@ export default function DayEndApprovals() {
   useEffect(() => {
     load()
   }, [load])
+
+  const loadHistory = useCallback(() => {
+    setIsLoadingHistory(true)
+    setHistoryError('')
+    listDayEnds({
+      status: 'approved',
+      deliveryPartnerId: partnerFilter !== 'all' ? partnerFilter : undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      pageSize: 100,
+    }).then((result) => {
+      setIsLoadingHistory(false)
+      if (!result.success) {
+        setHistory([])
+        setHistoryError(result.error)
+        return
+      }
+      setHistory([...result.dayEnds].sort((a, b) => String(b.reviewedAt || b.businessDate).localeCompare(String(a.reviewedAt || a.businessDate))))
+    })
+  }, [partnerFilter, dateFrom, dateTo])
+
+  useEffect(() => {
+    loadHistory()
+  }, [loadHistory])
 
   const stats = useMemo(() => {
     const submitted = dayEnds.filter((d) => d.status === 'submitted')
@@ -163,6 +202,7 @@ export default function DayEndApprovals() {
     setApproveTarget(null)
     refreshDetailIfOpen(result.dayEnd)
     load()
+    loadHistory()
   }
 
   const runReject = async () => {
@@ -197,7 +237,7 @@ export default function DayEndApprovals() {
             { label: 'Submitted', value: String(stats.submittedCount), detail: 'awaiting review', icon: CalendarCheck2 },
             { label: 'Total Collection', value: formatCurrency(stats.totalCollection), detail: 'handed over (filtered set)', icon: Wallet },
             { label: 'Total Variance', value: formatCurrency(stats.totalVariance), detail: 'expected vs handed over', icon: AlertTriangle },
-            { label: 'Approved', value: String(stats.approvedCount), detail: 'in the filtered set', icon: BadgeCheck },
+            { label: 'Approved and Closed', value: String(stats.approvedCount), detail: 'in the filtered set', icon: BadgeCheck },
           ].map(({ label, value, detail: detailText, icon: Icon }) => (
             <div key={label} className="min-h-32 border-neutral-100 px-5 py-4 lg:border-r lg:px-6 lg:last:border-r-0">
               <div className="flex items-start justify-between gap-3">
@@ -292,7 +332,7 @@ export default function DayEndApprovals() {
               }
               actions={(row) => [
                 { label: 'View Details', icon: Eye, onClick: () => setDetail(row) },
-                ...(canReview && row.status === 'submitted'
+                ...(canReviewRow(row) && row.status === 'submitted'
                   ? [
                       { label: 'Approve', icon: BadgeCheck, onClick: () => openApprove(row) },
                       { label: 'Reject', icon: XCircle, danger: true, onClick: () => openReject(row) },
@@ -338,11 +378,46 @@ export default function DayEndApprovals() {
         )}
       </Card>
 
+      <Card className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:m-5">
+        {historyError && (
+          <div className="m-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {historyError}
+            <Button type="button" variant="outline" size="sm" className="ml-3" onClick={loadHistory}>Retry</Button>
+          </div>
+        )}
+        {isLoadingHistory ? (
+          <LoadingSpinner variant="table" columns={['Date', 'Delivery Person', 'Assigned', 'Delivered', 'Returned', 'Pending', 'Status', 'Approved By', 'Approved At']} label="Loading approval history…" />
+        ) : (
+          <DataTable
+            resetKey={`${partnerFilter}-${datePreset}-${customFrom}-${customTo}`}
+            title="Approval History"
+            subtitle="Every day-end that was approved and closed."
+            columns={[
+              { key: '_dateLabel', header: 'Date', sortable: true },
+              { key: 'deliveryPartnerName', header: 'Delivery Person', sortable: true, render: (r) => r.deliveryPartnerName || '—' },
+              { key: 'assigned', header: 'Assigned', align: 'right', render: (r) => r.deliveries.assigned },
+              { key: 'delivered', header: 'Delivered', align: 'right', render: (r) => r.deliveries.delivered },
+              { key: 'returned', header: 'Returned', align: 'right', render: (r) => r.deliveries.returned },
+              { key: 'pending', header: 'Pending', align: 'right', render: (r) => r.deliveries.pending },
+              { key: 'status', header: 'Status', render: (r) => <Badge variant={DAY_END_STATUS_VARIANT[r.status] || 'neutral'} dot>{DAY_END_STATUS_LABEL[r.status] || r.status}</Badge> },
+              { key: 'reviewedByName', header: 'Approved By', sortable: true, render: (r) => r.reviewedByName || '—' },
+              { key: '_approvedAt', header: 'Approved At', sortable: true },
+            ]}
+            data={history.map((d) => ({ ...d, _dateLabel: formatDate(d.businessDate), _approvedAt: formatDateTime(d.reviewedAt) }))}
+            searchKeys={['deliveryPartnerName', 'reviewedByName']}
+            searchPlaceholder="Search by delivery partner or approver..."
+            onRowClick={(row) => setDetail(row)}
+            emptyTitle="No approved day-ends yet."
+            emptyDescription="Approved and closed days will be listed here."
+          />
+        )}
+      </Card>
+
       <DayEndDetailDrawer
         dayEnd={detail}
         isOpen={Boolean(detail)}
         onClose={() => setDetail(null)}
-        canReview={canReview}
+        canReview={canReview && detail?.deliveryPartnerId !== currentUser?.id}
         busy={isActing}
         onApprove={openApprove}
         onReject={openReject}

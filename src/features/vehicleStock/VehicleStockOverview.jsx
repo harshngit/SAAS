@@ -134,7 +134,7 @@ export function VehicleSessionPanel({ session, onViewDetails, onEndDayReturn, he
             {heading || <h2 className="text-xl font-semibold tracking-tight text-neutral-900">{contextBits[0]}</h2>}
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={session.status === 'active' ? 'success' : 'neutral'} dot>
-                {session.status === 'active' ? 'Active session' : session.status || 'Session'}
+                {session.status === 'active' ? 'Active session' : 'Closed session'}
               </Badge>
       {onEndDayReturn && totalRemaining > 0 && (
         <div className="shrink-0">

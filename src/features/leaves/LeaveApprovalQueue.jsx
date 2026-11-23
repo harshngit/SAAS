@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, XCircle } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
-import DataTable from '../../components/ui/DataTable'
+import { ListDataTable as DataTable } from '../../components/ui/ListPresentation'
 import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import ListFilterPanel from '../../components/ui/ListFilterPanel'
 import { LEAVE_TYPE_OPTIONS, approveLeave, listLeaves, rejectLeave } from '../../api/leaves'
 import { useToast } from '../../components/ui/toastContext'
 import { uniqueOptions } from '../../utils/filterOptions'
@@ -26,6 +27,7 @@ export default function LeaveApprovalQueue() {
   const [rejectReason, setRejectReason] = useState('')
   const [isActing, setIsActing] = useState(false)
   const [employeeFilter, setEmployeeFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
 
   const loadLeaves = useCallback(async () => {
     setIsLoading(true)
@@ -87,41 +89,42 @@ export default function LeaveApprovalQueue() {
 
   const employeeOptions = useMemo(() => uniqueOptions(leaveList, 'userName', 'All employees'), [leaveList])
   const filteredLeaves = useMemo(() => {
-    if (employeeFilter === 'all') return leaveList
-    return leaveList.filter((leave) => leave.userName === employeeFilter)
-  }, [leaveList, employeeFilter])
+    return leaveList.filter((leave) => (employeeFilter === 'all' || leave.userName === employeeFilter) && (typeFilter === 'all' || leave.leaveType === typeFilter))
+  }, [leaveList, employeeFilter, typeFilter])
 
   return (
-    <div className="space-y-6">
+    <div className="listing-page space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Leave Approval Queue</h1>
-        <p className="mt-1 text-sm text-neutral-500">Approve or reject pending leave requests from staff</p>
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Leave Approval Queue</h1>
+        <p className="mt-1 text-xs text-neutral-400">Approve or reject pending leave requests from staff</p>
       </div>
 
-      <Card title="Pending Leave Requests">
+      <Card className="overflow-hidden p-0" bodyClassName="[&>div.mb-4]:m-5 [&>p]:mx-5 [&>p]:mb-5">
         {error && (
           <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
         <DataTable
-          key={employeeFilter}
-          renderToolbar={({ search, onSearchChange, resultCount, searchable }) => (
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              {searchable && (
-                <div className="relative w-full max-w-xs">
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={onSearchChange}
-                    placeholder="Search pending leave requests..."
-                    className="w-full rounded-full border border-neutral-100 bg-neutral-50 py-2.5 pl-4 pr-4 text-sm text-neutral-700 shadow-(--shadow-xs) transition-all placeholder:text-neutral-400 focus:border-primary-400 focus:bg-(--modal-bg) focus:outline-none focus:ring-4 focus:ring-primary-500/12"
-                  />
-                </div>
+          resetKey={`${employeeFilter}|${typeFilter}`}
+          title="Pending Leave Requests"
+          subtitle="Approve or reject pending leave requests from staff"
+          toolbarActions={(
+            <ListFilterPanel
+              title="Filter Leave Requests"
+              applied={{ employeeFilter, typeFilter }}
+              defaults={{ employeeFilter: 'all', typeFilter: 'all' }}
+              onApply={(next) => { setEmployeeFilter(next.employeeFilter); setTypeFilter(next.typeFilter) }}
+            >
+              {({ draft, set }) => (
+                <>
+                  <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Employee
+                    <Select options={employeeOptions} value={draft.employeeFilter} onChange={(event) => set('employeeFilter', event.target.value)} />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">Leave type
+                    <Select options={[{ value: 'all', label: 'All types' }, ...LEAVE_TYPE_OPTIONS]} value={draft.typeFilter} onChange={(event) => set('typeFilter', event.target.value)} />
+                  </label>
+                </>
               )}
-              <div className="flex items-center gap-3">
-                <Select options={employeeOptions} value={employeeFilter} onChange={(event) => setEmployeeFilter(event.target.value)} className="w-44" triggerClassName="h-9 rounded-xl bg-surface py-1.5 text-xs" />
-                <p className="shrink-0 text-xs font-medium text-neutral-400">{resultCount} {resultCount === 1 ? 'result' : 'results'}</p>
-              </div>
-            </div>
+            </ListFilterPanel>
           )}
           loading={isLoading}
           columns={[
