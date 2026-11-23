@@ -45,9 +45,9 @@ const DEFAULT_PAGE_SIZE = 25
 export default function CollectionReconciliation() {
   const { showToast } = useToast()
   const { can } = usePermission()
-  // Canonical backend permission module: `delivery_collections`. Reconcile + Void both post to
-  // the collection lifecycle endpoints, so both are gated on the `approve` action.
-  const canReconcile = can('delivery_collections', 'approve')
+  // There is no `delivery_collections` permission in the backend catalog. Reconcile + Void are Deliveries > Approve (the backend
+  // answers 403 without it). No permission -> the actions are hidden; Admin (full access) always sees them.
+  const canReconcile = can('deliveries', 'approve')
 
   const [collections, setCollections] = useState([])
   const [page, setPage] = useState(1)
@@ -260,6 +260,7 @@ export default function CollectionReconciliation() {
     end()
     if (!result.success) {
       setActionError(result.error)
+      if (result.code === 'FORBIDDEN') showToast({ title: "You don't have permission", message: 'Reconcile needs the Deliveries > Approve permission on your role.', variant: 'error' })
       // Collections state didn't change, but the day-end that now blocks this row did -
       // re-sync the list in the background so a stale "Reconcile" action doesn't linger.
       if (result.code === 'DAY_END_CLOSED') load()
@@ -286,6 +287,7 @@ export default function CollectionReconciliation() {
     end()
     if (!result.success) {
       setActionError(result.error)
+      if (result.code === 'FORBIDDEN') showToast({ title: "You don't have permission", message: 'Void needs the Deliveries > Approve permission on your role.', variant: 'error' })
       if (result.code === 'DAY_END_CLOSED') load()
       return
     }

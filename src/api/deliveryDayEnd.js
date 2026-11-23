@@ -231,7 +231,7 @@ export async function approveDayEnd(id, note) {
       'Unable to approve this day-end. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, error: message, status: error.response?.status }
   }
 }
 
@@ -247,6 +247,6 @@ export async function rejectDayEnd(id, reason) {
       'Unable to reject this day-end. Please try again.',
     )
 
-    return { success: false, error: message }
+    return { success: false, error: message, status: error.response?.status }
   }
 }

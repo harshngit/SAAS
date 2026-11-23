@@ -29,12 +29,12 @@ const RECOMMENDED_MODULES = {
     'sales_orders', 'sales_returns', 'visits', 'follow_ups', 'attendance', 'leaves',
   ],
   delivery: [
-    'dashboard', 'products', 'customers', 'deliveries', 'delivery_collections', 'vehicle_stock',
+    'dashboard', 'products', 'customers', 'deliveries', 'vehicle_stock',
     'attendance', 'leaves', 'expenses',
   ],
   accounts: [
     'dashboard', 'products', 'inventory', 'purchases', 'grn', 'supplier_invoices', 'accounts_payable',
-    'supplier_payments', 'invoices', 'payments', 'payment_receipts', 'delivery_collections',
+    'supplier_payments', 'invoices', 'payments', 'payment_receipts', 'deliveries',
     'expenses', 'gst', 'reports', 'leaves',
   ],
 }
@@ -45,7 +45,6 @@ const moduleLabelOverrides = {
   supplier_invoices: 'Supplier Invoices',
   accounts_payable: 'Accounts Payable',
   supplier_payments: 'Supplier Payments',
-  delivery_collections: 'Delivery Collections',
 }
 function moduleLabelFor(moduleKey, fallbackLabel) {
   return moduleLabelOverrides[moduleKey] || fallbackLabel
