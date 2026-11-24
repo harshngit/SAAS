@@ -472,7 +472,7 @@ export default function EndOfDayReturn() {
   const { showToast } = useToast()
   const currentUser = useAuthStore((state) => state.currentUser)
   // Approved and Closed day-end = the vehicle stock of that day is read-only, whatever the session status says.
-  const { isClosed: dayClosed } = useOwnDayClosed({ enabled: !DEMO_VEHICLE_STOCK_ENABLED })
+  const { isClosed: dayClosed, isSubmitted: daySubmitted } = useOwnDayClosed({ enabled: !DEMO_VEHICLE_STOCK_ENABLED })
 
   const [session, setSession] = useState(null)
   const [demo, setDemo] = useState(false)
@@ -862,7 +862,9 @@ export default function EndOfDayReturn() {
               <VehicleContextCard session={session} onViewStock={goToStock} />
               <p className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
                 {dayClosed
-                  ? "Today's day-end is Approved and Closed. The vehicle stock for this day is read-only."
+                  ? daySubmitted
+                    ? "Today's day-end is Submitted and waiting for admin review. The vehicle stock for this day is read-only unless the admin rejects it."
+                    : "Today's day-end is Approved and Closed. The vehicle stock for this day is read-only."
                   : `This vehicle session is closed (${session.status}). The end of day return is complete and cannot be resubmitted.`}
               </p>
               <SummaryTiles totals={totals} />

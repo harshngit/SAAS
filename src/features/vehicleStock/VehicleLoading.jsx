@@ -141,7 +141,7 @@ export default function VehicleLoading() {
   const [assignedVehicle, setAssignedVehicle] = useState(null)
   const [vehicleError, setVehicleError] = useState('')
   // Today's day-end approved = the day is Approved and Closed: no more loading onto the vehicle for that day.
-  const { isClosed: dayClosed, reload: reloadDayEnd } = useOwnDayClosed({ enabled: !DEMO_VEHICLE_STOCK_ENABLED })
+  const { isClosed: dayClosed, isSubmitted: daySubmitted, reload: reloadDayEnd } = useOwnDayClosed({ enabled: !DEMO_VEHICLE_STOCK_ENABLED })
 
   const load = useCallback(async () => {
     if (!currentUser?.id) return
@@ -385,7 +385,11 @@ export default function VehicleLoading() {
       {dayClosed && (
         <div role="status" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>Today&apos;s day-end is <span className="font-semibold">Approved and Closed</span>. The vehicle load for this day can no longer be changed.</span>
+          {daySubmitted ? (
+            <span>Today&apos;s day-end is <span className="font-semibold">Submitted</span> and waiting for admin review. The vehicle load for this day can no longer be changed unless the admin rejects it.</span>
+          ) : (
+            <span>Today&apos;s day-end is <span className="font-semibold">Approved and Closed</span>. The vehicle load for this day can no longer be changed.</span>
+          )}
         </div>
       )}
 

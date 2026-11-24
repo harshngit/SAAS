@@ -217,8 +217,9 @@ export default function DeliveryDetail() {
   const basePath = isAdminView ? '/admin/deliveries' : '/delivery/deliveries'
 
   const [delivery, setDelivery] = useState(null)
-  // The partner's day Approved and Closed = no more loading onto the vehicle for that day.
-  const { isClosed: dayClosed, reload: reloadDayEnd } = useOwnDayClosed({ partnerId: delivery?.deliveryPartnerId, enabled: Boolean(delivery?.deliveryPartnerId) })
+  // The partner's day Submitted (waiting for the admin) or Approved and Closed = no more loading onto the vehicle for that day;
+  // a rejection by the admin re-opens it (the hook re-checks while closed).
+  const { isClosed: dayClosed, isSubmitted: daySubmitted, reload: reloadDayEnd } = useOwnDayClosed({ partnerId: delivery?.deliveryPartnerId, enabled: Boolean(delivery?.deliveryPartnerId) })
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isActing, setIsActing] = useState(false)
@@ -517,7 +518,7 @@ export default function DeliveryDetail() {
   const ADJUSTABLE_STAGES = ['accepted', 'picking', 'ready', 'loaded', 'in_transit', 'partially_delivered']
   const canAdjustDelivery = !isAdminView && !parentOrderCancelled && ADJUSTABLE_STAGES.includes(stageKey)
   const showAdjustmentSection = !isAdminView && !parentOrderCancelled && (canAdjustDelivery || isDeliveredStage)
-  // delivered / any non-active stage -> read-only recap; an Approved and Closed day also locks the quantities
+  // delivered / any non-active stage -> read-only recap; a closed (Submitted or Approved) day also locks the quantities
   const adjustmentLocked = !canAdjustDelivery || dayClosed
 
   const unitPriceForProduct = (productId, fallback = null) =>
@@ -1220,7 +1221,9 @@ export default function DeliveryDetail() {
           </p>
           {dayClosed && (
             <p role="status" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              This day is <span className="font-semibold">Approved and Closed</span>. The vehicle load can no longer be changed.
+              {daySubmitted
+                ? <>This day&apos;s day-end is <span className="font-semibold">Submitted</span> and waiting for admin review. The vehicle load can no longer be changed unless the admin rejects it.</>
+                : <>This day is <span className="font-semibold">Approved and Closed</span>. The vehicle load can no longer be changed.</>}
             </p>
           )}
           <Button
