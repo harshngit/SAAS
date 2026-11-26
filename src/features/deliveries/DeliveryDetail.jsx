@@ -470,16 +470,18 @@ export default function DeliveryDetail() {
   // Previous Balance is its own line and must not be counted as paid (on a credit order the old
   // order_total + previous_pending_balance - amount_due showed the Previous Balance as "paid").
   const reconciledPaidAmount = Math.max(orderAmount - amountDue, 0)
+  // Only show the Collection # column when the backend sends a real, human-readable number.
+  const showCollectionNumber = deliveryCollections.some((collection) => collection.collectionNumber)
   const collectionLifecycleStatus =
     activeCollections.length === 0
       ? 'No Collection'
       : reconciledCollections.length === 0
-        ? 'Pending Admin Confirmation'
+        ? 'Collected'
         : recordedCollections.length > 0
-          ? 'Partially Reconciled'
-          : 'Reconciled / Paid'
+          ? 'Partially Completed'
+          : 'Completed'
   const collectionStatusVariant =
-    collectionLifecycleStatus === 'Reconciled / Paid'
+    collectionLifecycleStatus === 'Completed'
       ? 'success'
       : collectionLifecycleStatus === 'No Collection'
         ? 'neutral'
@@ -1604,8 +1606,8 @@ export default function DeliveryDetail() {
               <InfoField label="Order Amount" value={orderAmount > 0 ? formatCurrency(orderAmount) : '—'} />
               <InfoField label="Previous Pending Balance" value={previousPending != null ? formatCurrency(previousPending) : '—'} />
               <InfoField label="Total Amount Due" value={totalAmountDue > 0 ? formatCurrency(totalAmountDue) : '—'} />
-              <InfoField label="Pending Admin Confirmation" value={formatCurrency(recordedCollectionsTotal)} />
-              <InfoField label="Reconciled / Paid" value={formatCurrency(reconciledPaidAmount)} />
+              <InfoField label="Collected" value={formatCurrency(recordedCollectionsTotal)} />
+              <InfoField label="Completed" value={formatCurrency(reconciledPaidAmount)} />
               <InfoField label="Remaining Receivable" value={formatCurrency(remainingReceivable)} />
               <div>
                 <p className="text-xs text-neutral-400">Collection Status</p>
@@ -1621,7 +1623,7 @@ export default function DeliveryDetail() {
                   Record Collection
                 </Button>
               )}
-              {remainingReceivable <= 0 && reconciledPaidAmount > 0 && <Badge variant="success" dot>Reconciled / Paid</Badge>}
+              {remainingReceivable <= 0 && reconciledPaidAmount > 0 && <Badge variant="success" dot>Completed</Badge>}
             </div>
 
             {deliveryCollections.length > 0 && (
@@ -1629,11 +1631,11 @@ export default function DeliveryDetail() {
                 <table className="w-full min-w-2xl text-left text-sm">
                   <thead>
                     <tr className="border-b border-neutral-100 bg-neutral-50/80 text-[0.68rem] font-semibold text-neutral-400">
-                      <th className="px-3.5 py-2.5">Collection #</th>
+                      {showCollectionNumber && <th className="px-3.5 py-2.5">Collection #</th>}
                       <th className="px-3.5 py-2.5 text-right">Amount</th>
                       <th className="px-3.5 py-2.5">Mode</th>
                       <th className="px-3.5 py-2.5">Reference</th>
-                      <th className="px-3.5 py-2.5">Recorded</th>
+                      <th className="px-3.5 py-2.5">Collected At</th>
                       <th className="px-3.5 py-2.5">Status</th>
                       <th className="px-3.5 py-2.5" />
                     </tr>
@@ -1641,7 +1643,7 @@ export default function DeliveryDetail() {
                   <tbody className="divide-y divide-neutral-50">
                     {deliveryCollections.map((collection) => (
                       <tr key={collection.id}>
-                        <td className="px-3.5 py-2.5 font-medium text-neutral-800">{collection.collectionNumber}</td>
+                        {showCollectionNumber && <td className="px-3.5 py-2.5 font-medium text-neutral-800">{collection.collectionNumber || '—'}</td>}
                         <td className="px-3.5 py-2.5 text-right text-neutral-700">{formatCurrency(collection.amount)}</td>
                         <td className="px-3.5 py-2.5 text-neutral-500">{formatPaymentMode(collection.paymentMode)}</td>
                         <td className="px-3.5 py-2.5 text-neutral-500">{collection.reference || '—'}</td>
@@ -1664,8 +1666,7 @@ export default function DeliveryDetail() {
             )}
 
             <p className="text-xs text-neutral-400">
-              A recorded collection is not a payment yet — the accounts team reconciles it, and the customer / invoice
-              balance updates only then.
+              A collected payment is confirmed by Admin or Accountant before the customer balance is updated.
             </p>
           </div>
         </Card>
@@ -1873,8 +1874,8 @@ export default function DeliveryDetail() {
           showToast({
             title: 'Collection recorded',
             message: collection?.amount != null
-              ? `${formatCurrency(collection.amount)} recorded — pending admin confirmation.`
-              : 'Recorded — pending admin confirmation.',
+              ? `${formatCurrency(collection.amount)} collected. The admin will confirm the payment.`
+              : 'Collected. The admin will confirm the payment.',
           })
           loadCollections()
         }}

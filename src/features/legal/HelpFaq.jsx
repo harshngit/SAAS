@@ -104,7 +104,7 @@ const SECTIONS = [
       },
       {
         question: 'How are delivery collections handled?',
-        answer: 'Cash or other payments collected by a delivery partner during a delivery are recorded against that delivery and reconciled afterwards.',
+        answer: 'Cash or other payments collected by a delivery partner during a delivery are recorded against that delivery as Collected, then confirmed by Admin or Accountant (Completed).',
       },
     ],
   },

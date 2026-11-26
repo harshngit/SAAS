@@ -92,7 +92,8 @@ function normalizeCollection(raw) {
   ).toLowerCase()
   return {
     id: raw.id,
-    collectionNumber: raw.collection_number || raw.number || raw.id,
+    // Human-readable number only - never fall back to the raw id (a UUID must not reach the UI).
+    collectionNumber: raw.collection_number || raw.number || '',
     deliveryId: raw.delivery_id || raw.delivery?.id || null,
     deliveryNumber: raw.delivery_number || raw.delivery?.delivery_number || '',
     // Where the collection was recorded from: 'delivery' (COD at the doorstep) or
@@ -102,12 +103,19 @@ function normalizeCollection(raw) {
     orderId: raw.order_id || raw.order?.id || null,
     orderNumber: raw.order_number || raw.order?.order_number || '',
     customerId: raw.customer_id || raw.customer?.id || '',
-    customerName: raw.customer_name || raw.customer?.name || raw.customer?.business_name || '',
+    // The API sends the display names itself (customer_name / business_name / contact_name / customer_code,
+    // collected_by_name, delivery_partner_name, delivery_number, order_number, reconciled_by_name), so the
+    // screens never look anything up. Customer reads business -> customer -> contact -> code; a raw id is never a name.
+    customerName: raw.business_name || raw.customer_name || raw.contact_name || raw.customer_code
+      || raw.customer?.business_name || raw.customer?.name || '',
+    customerCode: raw.customer_code || raw.customer?.customer_code || '',
     deliveryPartnerId: raw.delivery_partner_id || raw.delivery_partner?.id || '',
     deliveryPartnerName: raw.delivery_partner_name || raw.delivery_partner?.name || '',
     amount: Number(raw.amount ?? raw.amount_collected) || 0,
     paymentMode: raw.payment_mode || raw.payment_method || raw.mode || '',
     reference: raw.reference || raw.transaction_reference || '',
+    // A /files/{id} link to the proof (receipt photo / screenshot) the collector attached - empty when none.
+    paymentProofUrl: raw.payment_proof_url || '',
     note: raw.note || raw.notes || '',
     status: status === 'reconciled' || status === 'voided' ? status : 'recorded',
     // `collector_id` is the field this endpoint actually sends (confirmed on live data) -
@@ -117,6 +125,8 @@ function normalizeCollection(raw) {
       raw.recorded_by_name || raw.collected_by_name || raw.recorded_by?.name || raw.created_by?.name || '',
     recordedByRole:
       raw.recorded_by_role || raw.collected_by_role || raw.recorded_by?.role || raw.recorded_by?.system_role || raw.created_by?.role || '',
+    // Business date the money belongs to (YYYY-MM-DD, date only) - separate from the moment it was recorded below.
+    paymentDate: raw.payment_date || '',
     recordedAt: raw.collected_at || raw.recorded_at || raw.created_at || null,
     reconciledAt: raw.reconciled_at || null,
     reconciledById: raw.reconciled_by_id || raw.reconciled_by?.id || '',
@@ -192,12 +202,29 @@ export async function listCollections(params = {}) {
     if (params.date_from) queryParams.date_from = params.date_from
     if (params.date_to) queryParams.date_to = params.date_to
     if (params.collected_by_user_id) queryParams.collected_by_user_id = params.collected_by_user_id
+    if (params.delivery_partner_id) queryParams.delivery_partner_id = params.delivery_partner_id
+    // view=collected: only collected + completed records (never voided), with customer / order / delivery / collector names.
+    if (params.view) queryParams.view = params.view
     const { data } = await apiClient.get('/deliveries/collections', { headers: authHeader(), params: queryParams })
     const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []
-    return { success: true, collections: rows.map(normalizeCollection), total: data?.total ?? rows.length }
+    return { success: true, collections: rows.map(normalizeCollection), total: data?.total ?? rows.length, summary: data?.summary || null }
   } catch (error) {
     return { success: false, ...collectionError(error, 'Unable to load collections. Please try again.') }
   }
+}
+
+// Every record matching the filters (100 per request). Only for a filter the endpoint does not support (payment mode):
+// the caller then filters, totals and pages the whole list itself, so nothing is cut off after the first page.
+export async function listAllCollections(params = {}) {
+  let collections = []
+  for (let page = 1; page <= 100; page += 1) {
+    const result = await listCollections({ ...params, page, page_size: 100 })
+    if (!result.success) return result
+    collections = collections.concat(result.collections)
+    // Demo mode returns the whole list in one call (no `total`).
+    if (result.collections.length === 0 || collections.length >= (result.total ?? collections.length)) break
+  }
+  return { success: true, collections, total: collections.length }
 }
 
 // GET /deliveries/collections/summary -> { total{count,amount}, by_status{awaiting_reconciliation,
@@ -213,6 +240,8 @@ export async function getCollectionsSummary(params = {}) {
     if (params.collected_by_user_id) queryParams.collected_by_user_id = params.collected_by_user_id
     if (params.customer_id) queryParams.customer_id = params.customer_id
     if (params.order_id) queryParams.order_id = params.order_id
+    if (params.delivery_partner_id) queryParams.delivery_partner_id = params.delivery_partner_id
+    if (params.search) queryParams.search = params.search
     const { data } = await apiClient.get('/deliveries/collections/summary', { headers: authHeader(), params: queryParams })
     return {
       success: true,

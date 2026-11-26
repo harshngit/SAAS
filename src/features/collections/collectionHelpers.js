@@ -3,9 +3,10 @@
 import { roleLabels } from '../../auth/roles'
 
 export const COLLECTION_STATUS_LABEL = {
-  // `recorded` = the partner has collected the money and the admin / accounts team has not confirmed it yet.
-  recorded: 'Pending Admin Confirmation',
-  reconciled: 'Reconciled',
+  // User-facing lifecycle everywhere: Collected -> Confirm Payment -> Completed (or Voided).
+  // Stored / backend values stay recorded / reconciled / voided. `recorded` = money received, not confirmed yet.
+  recorded: 'Collected',
+  reconciled: 'Completed',
   voided: 'Voided',
 }
 
@@ -15,11 +16,13 @@ export const COLLECTION_STATUS_VARIANT = {
   voided: 'neutral',
 }
 
-export const COLLECTION_STATUS_FILTERS = [
-  { value: 'all', label: 'All' },
-  { value: 'recorded', label: 'Pending Admin Confirmation' },
-  { value: 'reconciled', label: 'Reconciled' },
-  { value: 'voided', label: 'Voided' },
+// The lifecycle tabs. `status` is the backend filter value. `named` tabs read view=collected, whose rows carry the
+// customer / order / delivery / collector names (that view never contains voided records).
+export const COLLECTION_TABS = [
+  { value: 'all', label: 'All', status: undefined, named: false, empty: 'No collections recorded yet.' },
+  { value: 'collected', label: 'Collected', status: 'recorded', named: true, empty: 'No collections waiting for confirmation.' },
+  { value: 'completed', label: 'Completed', status: 'reconciled', named: true, empty: 'No completed collections yet.' },
+  { value: 'voided', label: 'Voided', status: 'voided', named: false, empty: 'No voided collections.' },
 ]
 
 const PAYMENT_MODE_LABEL = {
@@ -32,7 +35,15 @@ const PAYMENT_MODE_LABEL = {
 }
 
 export function formatStatus(collection) {
-  return COLLECTION_STATUS_LABEL[collection?.status] || 'Pending Admin Confirmation'
+  return COLLECTION_STATUS_LABEL[collection?.status] || 'Collected'
+}
+
+export const PAYMENT_MODE_FILTER_KEYS = ['cash', 'upi', 'card', 'bank_transfer', 'cheque']
+
+// The backend totals bank / NEFT / RTGS / IMPS together as bank transfer - the payment-mode filter groups them the same way.
+export function paymentModeKey(mode) {
+  const key = String(mode || '').toLowerCase()
+  return ['bank', 'neft', 'rtgs', 'imps'].includes(key) ? 'bank_transfer' : key
 }
 
 export function formatPaymentMode(mode) {
@@ -75,4 +86,19 @@ export function isSameDay(value, ref = new Date()) {
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return false
   return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate()
+}
+
+// What a cell shows when the API sent no name/number for it. A record that really has no delivery/order/partner
+// shows a dash (nothing to show); a record that HAS the id but arrived without its name shows "Not available" -
+// never the raw id, "undefined" or an empty cell.
+export const NOT_AVAILABLE = 'Not available'
+export const nameOrNotAvailable = (value) => value || NOT_AVAILABLE
+export const linkedValue = (value, id) => value || (id ? NOT_AVAILABLE : '—')
+
+// "20 Nov 2026" from a date-only value (YYYY-MM-DD). Built from the parts, so no timezone can move it to another day.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+export function formatBusinessDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''))
+  if (!match) return '\u2014'
+  return `${match[3]} ${MONTHS[Number(match[2]) - 1] || ''} ${match[1]}`
 }
