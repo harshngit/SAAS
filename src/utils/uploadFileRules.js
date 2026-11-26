@@ -56,3 +56,16 @@ export function getUploadFileError(file, kind) {
   if (rule.maxBytes && file.size > rule.maxBytes) return `${file.name} is larger than ${Math.round(rule.maxBytes / (1024 * 1024))}MB.`
   return null
 }
+
+// "PDF, JPG or PNG" style text built from the SAME extension list the check above uses, so the hint shown next to an
+// upload field can never drift from what is really accepted.
+export function getAcceptedTypesLabel(kind) {
+  const rule = RULES[kind]
+  if (!rule || !rule.extensions) return ''
+  const shown = []
+  for (const extension of rule.extensions) {
+    const label = extension.toUpperCase()
+    if (!shown.includes(label)) shown.push(label)
+  }
+  return shown.join(', ')
+}
