@@ -26,7 +26,7 @@ import { listCategories, listSubcategoryVariants, getCategoryBrands } from '../.
 import { useFormFieldSettings } from '../../fieldSettings/useFormFieldSettings'
 import { listSuppliers } from '../../api/suppliers'
 import { mapProductBackendField } from '../../api/products'
-import { getUploadFileError, PRODUCT_FIELD_FILE_KIND } from '../../utils/uploadFileRules'
+import { getAcceptedTypesLabel, getUploadFileError, PRODUCT_FIELD_FILE_KIND } from '../../utils/uploadFileRules'
 import { getFileUrl, uploadFile } from '../../api/files'
 import { listWarehouses } from '../../api/warehouses'
 
@@ -241,7 +241,7 @@ const productSections = [
     { name: 'coverImage', label: 'Primary Product Image', input: 'image', required: true },
     { name: 'images', label: 'Additional Images', input: 'multiImage' },
     { name: 'videoUrl', label: 'Product Video', input: 'video', wide: true },
-    { name: 'catalogBrochure', label: 'Product Catalog/Brochure', input: 'file', accept: '.pdf' },
+    { name: 'catalogBrochure', label: 'Product Catalog/Brochure', input: 'file', accept: '.pdf', showAcceptedTypes: true },
     { name: 'productManual', label: 'Product Manual', input: 'file', accept: '.pdf' },
   ]),
   section('Variants & Attributes', [
@@ -408,6 +408,11 @@ function ProductUploadField({ field, value, isUploading, onFileSelected, onRemov
             {field.required && <span className="text-red-500"> *</span>}
           </p>
           {value && <p className="mt-1 truncate text-xs font-medium text-primary-700">{value}</p>}
+          {field.showAcceptedTypes && (
+            <p data-testid={`${field.name}-accepted-types`} className="mt-1 text-xs font-medium text-neutral-500">
+              Accepted file types: {getAcceptedTypesLabel(PRODUCT_FIELD_FILE_KIND[field.name])}
+            </p>
+          )}
         </div>
         {value ? (
           <a
@@ -1099,7 +1104,9 @@ export default function ProductForm({
       error: errors[field.name],
       // validate() always requires Product Code / SKU while it is visible, even though the org
       // field catalog lists sku as optional - so it always carries the red asterisk.
-      required: (required(field.name, field.required) || field.name === 'productCode') && !(formData.hasVariants && ['purchasePrice', 'sellingPrice'].includes(field.name)),
+      // Same for Category and Sub Category: validate() below always demands both, so the asterisk must not depend on
+      // the organization's field settings (an org marking them "optional" would otherwise show no * yet still block).
+      required: (required(field.name, field.required) || ['productCode', 'category', 'subCategory'].includes(field.name)) && !(formData.hasVariants && ['purchasePrice', 'sellingPrice'].includes(field.name)),
       maxLength: field.maxLength,
       placeholder: field.placeholder,
     }
