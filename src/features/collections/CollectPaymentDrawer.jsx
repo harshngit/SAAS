@@ -207,7 +207,7 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, onBl
     // derives the collector from auth, this is purely a confirmation of who's signed in.
     showToast({
       title: 'Collection recorded successfully',
-      message: `${formatCurrency(amountValue)} recorded${partner?.name ? ` · Collected by ${partner.name}` : ''} · waiting for accountant reconciliation.`,
+      message: `${formatCurrency(amountValue)} collected${partner?.name ? ` · Collected by ${partner.name}` : ''} · waiting for Admin or Accountant to confirm the payment.`,
     })
     onRecorded?.(result.collection)
     onClose()
@@ -390,7 +390,7 @@ export default function CollectPaymentDrawer({ isOpen, onClose, onRecorded, onBl
                   <span className="font-semibold text-neutral-900">{formatCurrency(remainingBalance)}</span>
                 </div>
                 <p className="mt-2 text-xs text-neutral-500">
-                  The final balance is confirmed by the accounts team when they reconcile this collection.
+                  The balance updates after Admin or Accountant confirms this payment.
                 </p>
               </div>
             </div>

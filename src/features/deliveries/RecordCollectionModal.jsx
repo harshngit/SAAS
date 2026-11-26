@@ -138,7 +138,7 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
             <span className="font-semibold text-neutral-900">{formatCurrency(amountDue)}</span>
           </div>
           <p className="mt-1.5 text-xs text-neutral-400">
-            Recording a collection does not mark the invoice paid — the accounts team reconciles it.
+            A collected payment is confirmed by Admin or Accountant before the customer balance is updated.
           </p>
         </div>
 
@@ -165,7 +165,7 @@ export default function RecordCollectionModal({ delivery, isOpen, onClose, onRec
         {permissionGap && (
           <p className="text-xs text-neutral-500">
             Recording collections from the delivery app isn&apos;t enabled for your account yet. Nothing was saved —
-            the amount stays as due for the accounts team to reconcile.
+            the amount stays as due for the accounts team to collect.
           </p>
         )}
       </div>

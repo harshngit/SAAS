@@ -194,7 +194,7 @@ export const roleMenus = {
         { label: 'Receivables', path: '/admin/receivables', icon: IndianRupee, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_RECEIVABLES },
         { label: 'Accounts Payable', path: '/admin/payables', icon: Wallet, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_ACCOUNTS_PAYABLE },
         { label: 'Supplier Payments', path: '/admin/supplier-payments', icon: Wallet, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_SUPPLIER_PAYMENTS },
-        { label: 'Collection Reconciliation', path: '/admin/collections', icon: HandCoins, module: 'payments', feature: ENTITLEMENT_KEYS.FINANCE_COLLECTION_RECONCILIATION },
+        { label: 'Collections', path: '/admin/collections', icon: HandCoins, module: 'payments', feature: ENTITLEMENT_KEYS.FINANCE_COLLECTION_RECONCILIATION },
         // Cash Reconciliation nav entry removed (crm_changes15.md §V) - superseded by the
         // Delivery Day-End workflow below. Route/component/API are untouched, just hidden from nav.
         { label: 'Day-End Approvals', path: '/admin/day-end-approvals', icon: HandCoins, module: 'deliveries' },
@@ -350,7 +350,7 @@ export const roleMenus = {
         { label: 'Supplier Payments', path: '/accounts/supplier-payments', icon: Wallet, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_SUPPLIER_PAYMENTS },
         { label: 'Sales Invoices', path: '/accounts/invoices/sales', icon: ShoppingCart, module: 'invoices', feature: ENTITLEMENT_KEYS.INVOICE_SALES_INVOICES },
         { label: 'Receivables', path: '/accounts/receivables', icon: TrendingUp, module: 'invoices', feature: ENTITLEMENT_KEYS.FINANCE_RECEIVABLES },
-        { label: 'Collection Reconciliation', path: '/accounts/collections', icon: HandCoins, module: 'payments', feature: ENTITLEMENT_KEYS.FINANCE_COLLECTION_RECONCILIATION },
+        { label: 'Collections', path: '/accounts/collections', icon: HandCoins, module: 'payments', feature: ENTITLEMENT_KEYS.FINANCE_COLLECTION_RECONCILIATION },
         // Cash Reconciliation nav entry removed (crm_changes15.md §V) - superseded by the
         // Delivery Day-End workflow below. Route/component/API are untouched, just hidden from nav.
         { label: 'Day-End Approvals', path: '/accounts/day-end-approvals', icon: HandCoins, module: 'deliveries' },

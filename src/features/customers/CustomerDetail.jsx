@@ -135,7 +135,7 @@ const normalizeCustomerPayment = (payment) => ({
   // A field collection not yet reconciled by an accountant shows up here too (crm_changes18 §4)
   // - status is "awaiting_reconciliation", source is "field_collection"/"delivery_cod", and
   // receipt_number is null since it isn't a real CustomerPayment yet. Not in the customer's
-  // balance/ledger - shown as "Pending Admin Confirmation", never offered Void (nothing to void here).
+  // balance/ledger - shown as "Collected", never offered Void (nothing to void here).
   status: payment.status || '',
   isPendingReconciliation: payment.status === 'awaiting_reconciliation',
   source: payment.source || '',
@@ -1285,7 +1285,7 @@ export default function CustomerDetail() {
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-neutral-900">{formatCurrency(payment.amount)}</p>
                       {payment.isPendingReconciliation ? (
-                        <Badge variant="warning">Pending Admin Confirmation</Badge>
+                        <Badge variant="warning">Collected</Badge>
                       ) : (
                         <Badge variant="neutral">
                           {paymentModeOptions.find((option) => option.value === payment.paymentMode)?.label || payment.paymentMode || '-'}

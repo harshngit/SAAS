@@ -1,17 +1,21 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { ExternalLink, X } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import { getFileUrl } from '../../api/files'
 import { formatCurrency } from '../../utils/format'
 import {
   COLLECTION_STATUS_VARIANT,
   formatCollectionSource,
+  formatBusinessDate,
   formatCollectorRole,
   formatPaymentMode,
   formatStatus,
   isReconcilable,
   isVoidable,
+  linkedValue,
+  nameOrNotAvailable,
 } from './collectionHelpers'
 
 function formatDateTime(value) {
@@ -41,7 +45,7 @@ function Section({ title, children }) {
 }
 
 // Read-only detail for one collection. `onReconcile` / `onVoid` are optional and only
-// wired where the current role is allowed to act.
+// wired where the current role is allowed to act. Lifecycle wording everywhere: Collected -> Confirm Payment -> Completed.
 export default function CollectionDetailDrawer({ collection, isOpen, onClose, onReconcile, onVoid, canReconcile, busy }) {
   useEffect(() => {
     if (!isOpen) return undefined
@@ -54,6 +58,8 @@ export default function CollectionDetailDrawer({ collection, isOpen, onClose, on
   if (!isOpen || !collection) return null
 
   const showActions = canReconcile && (isReconcilable(collection) || isVoidable(collection))
+  const statusText = formatStatus(collection)
+  const proofUrl = getFileUrl(collection.paymentProofUrl)
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end bg-neutral-900/60 backdrop-blur-sm" onClick={onClose}>
@@ -67,9 +73,9 @@ export default function CollectionDetailDrawer({ collection, isOpen, onClose, on
               {/* No real collection number exists on this record (the backend doesn't send
                   one) - the customer's name is the meaningful thing to lead with instead of
                   this collection's own raw id. */}
-              <h2 className="truncate text-lg font-semibold text-neutral-900">{collection.customerName || 'Collection'}</h2>
+              <h2 className="truncate text-lg font-semibold text-neutral-900">{nameOrNotAvailable(collection.customerName)}</h2>
               <Badge variant={COLLECTION_STATUS_VARIANT[collection.status] || 'neutral'} dot>
-                {formatStatus(collection)}
+                {statusText}
               </Badge>
             </div>
             <p className="mt-0.5 text-sm text-neutral-500">
@@ -91,18 +97,34 @@ export default function CollectionDetailDrawer({ collection, isOpen, onClose, on
             <Row label="Amount">{formatCurrency(collection.amount)}</Row>
             <Row label="Payment Mode">{formatPaymentMode(collection.paymentMode)}</Row>
             <Row label="Reference">{collection.reference || '—'}</Row>
+            <Row label="Payment Proof">
+              {proofUrl ? (
+                <a
+                  href={proofUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-primary-600 hover:underline"
+                >
+                  View proof
+                  <ExternalLink className="size-3.5" aria-hidden="true" />
+                </a>
+              ) : (
+                '—'
+              )}
+            </Row>
             <Row label="Notes">{collection.note || '—'}</Row>
-            <Row label="Collected By">{collection.recordedByName || '—'}</Row>
+            <Row label="Collected By">{nameOrNotAvailable(collection.recordedByName)}</Row>
             {collection.recordedByRole && <Row label="Role">{formatCollectorRole(collection.recordedByRole)}</Row>}
-            <Row label="Recorded At">{formatDateTime(collection.recordedAt)}</Row>
+            <Row label="Payment Date">{formatBusinessDate(collection.paymentDate)}</Row>
+            <Row label="Collected At">{formatDateTime(collection.recordedAt)}</Row>
           </Section>
 
           <Section title="Source Delivery / Order">
             {collection.source && <Row label="Source">{formatCollectionSource(collection.source)}</Row>}
-            <Row label="Delivery #">{collection.deliveryNumber || '—'}</Row>
-            <Row label="Order #">{collection.orderNumber || '—'}</Row>
-            <Row label="Customer">{collection.customerName || '—'}</Row>
-            <Row label="Delivery Partner">{collection.deliveryPartnerName || '—'}</Row>
+            <Row label="Delivery #">{linkedValue(collection.deliveryNumber, collection.deliveryId)}</Row>
+            <Row label="Order #">{linkedValue(collection.orderNumber, collection.orderId)}</Row>
+            <Row label="Customer">{nameOrNotAvailable(collection.customerName)}</Row>
+            {collection.deliveryPartnerName && <Row label="Delivery Partner">{collection.deliveryPartnerName}</Row>}
             <Row label="Invoice">{collection.invoiceNumber || 'Not linked'}</Row>
             {collection.orderTotal != null && <Row label="Order Total">{formatCurrency(collection.orderTotal)}</Row>}
             {collection.outstandingAtRecording != null ? (
@@ -112,13 +134,13 @@ export default function CollectionDetailDrawer({ collection, isOpen, onClose, on
             ) : null}
           </Section>
 
-          <Section title="Reconciliation">
-            <Row label="Status">{formatStatus(collection)}</Row>
+          <Section title="Payment Confirmation">
+            <Row label="Status">{statusText}</Row>
             {collection.status === 'reconciled' && (
               <>
                 <Row label="Customer Payment #">{collection.customerPaymentNumber || '—'}</Row>
-                <Row label="Reconciled At">{formatDateTime(collection.reconciledAt)}</Row>
-                <Row label="Reconciled By">{collection.reconciledByName || '—'}</Row>
+                <Row label="Completed At">{formatDateTime(collection.reconciledAt)}</Row>
+                <Row label="Completed By">{nameOrNotAvailable(collection.reconciledByName)}</Row>
               </>
             )}
             {collection.status === 'voided' && (
@@ -130,7 +152,7 @@ export default function CollectionDetailDrawer({ collection, isOpen, onClose, on
             )}
             {collection.status === 'recorded' && (
               <p className="py-1.5 text-xs text-neutral-500">
-                Not reconciled yet. Reconciling creates one customer payment on the backend and updates the customer / invoice balance.
+                Money received, not completed yet. Check the amount, proof and handover, then Confirm Payment to complete it and update the customer balance.
               </p>
             )}
           </Section>
@@ -145,7 +167,7 @@ export default function CollectionDetailDrawer({ collection, isOpen, onClose, on
             )}
             {isReconcilable(collection) && (
               <Button type="button" loading={busy} onClick={() => onReconcile?.(collection)}>
-                Reconcile
+                Confirm Payment
               </Button>
             )}
           </div>
