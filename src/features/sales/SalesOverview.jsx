@@ -360,7 +360,7 @@ export default function SalesOverview() {
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Sales</h1>
       </div>
 
-      <ReportKpiRow summary={report?.summary} cards={SUMMARY_CARDS} loading={isLoading && !report} />
+      <ReportKpiRow summary={report?.summary} cards={SUMMARY_CARDS} loading={isLoading && !report} singleRow />
 
       <Card className="overflow-hidden p-0">
         <div>
