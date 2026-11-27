@@ -26,7 +26,7 @@ import { isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 import { exportRowsToExcel } from '../../utils/exportToExcel'
 import { LeadEditForm } from './LeadForms'
 import ConvertLeadModal from './ConvertLeadModal'
-import { LEAD_STATUS_VARIANT, formatLeadStatus, getLastActivityLabel, getNextFollowUpSummary } from './leadActivity'
+import { LEAD_STATUS_VARIANT, formatLeadStatus, getNextFollowUpSummary } from './leadActivity'
 
 const statusVariant = LEAD_STATUS_VARIANT
 
@@ -267,28 +267,41 @@ export default function LeadList() {
     )
   }
 
+  // `onlySelected` must be the literal `true` - the "Export" button used to pass the click event
+  // straight in (onClick={exportCsv}), which is truthy, so a plain Export silently exported only the
+  // (empty) selection and produced a header-only file.
   const exportCsv = (onlySelected = false) => {
-    const leadsToExport = onlySelected ? filteredLeads.filter((lead) => selectedIds.includes(lead.id)) : filteredLeads
+    const leadsToExport = onlySelected === true ? filteredLeads.filter((lead) => selectedIds.includes(lead.id)) : filteredLeads
+    // Real dates (a fixed "27 Nov 2026"), not relative text like "Created 4 days ago" which is stale
+    // the moment the file is opened; friendly status labels, blank (not "-") for missing values.
+    const day = (value) => (value ? formatDate(value) : '')
     const rows = [
-      ['Lead ID', 'Lead', 'Mobile', 'Email', 'Source', 'Assigned', 'Status', 'Last Activity', 'Next Follow-up', 'Created'],
+      ['Lead ID', 'Lead', 'Contact Person', 'Mobile', 'Email', 'Source', 'Lead Type', 'Segment', 'Interested Products', 'Assigned To', 'Status', 'Next Follow-up', 'Created', 'Last Updated', 'Converted On', 'Notes'],
       ...leadsToExport.map((lead) => {
-        const lastActivity = getLastActivityLabel(lead)
-        const nextFollowUp = getNextFollowUpSummary(nextFollowUpByLeadId[lead.id])
+        const products = lead.interestedProducts?.length
+          ? lead.interestedProducts.map((product) => product.name).filter(Boolean).join(', ')
+          : lead.interestedProduct
         return [
           lead.leadId,
           lead.name || lead.customerName,
+          lead.contactPerson,
           lead.mobileNumber,
           lead.email,
           lead.leadSource,
+          lead.leadType,
+          lead.segment,
+          products,
           lead.assignedSalespersonName,
-          lead.leadStatus,
-          lastActivity.label,
-          nextFollowUp.label,
-          lead.createdAt,
+          formatLeadStatus(lead.leadStatus),
+          day(nextFollowUpByLeadId[lead.id]),
+          day(lead.createdAt),
+          day(lead.updatedAt),
+          day(lead.convertedAt),
+          lead.notes,
         ]
       }),
     ]
-    exportRowsToExcel('leads', rows)
+    exportRowsToExcel('leads', rows, 'Leads', { autoWidth: true })
   }
 
   const handleBulkDelete = async () => {
@@ -456,7 +469,7 @@ export default function LeadList() {
                   />
                 </div>
                 {filterPanel}
-                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={exportCsv}>
+                <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl px-3.5" onClick={() => exportCsv()}>
                   <Download className="size-4" aria-hidden="true" />
                   Export
                 </Button>

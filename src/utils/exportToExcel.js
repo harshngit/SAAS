@@ -6,9 +6,15 @@
 // `rows` is a plain array of arrays: the first row is the header, the rest are data rows - the
 // same shape every existing CSV export already built, so callers only need to swap the final
 // CSV-string + Blob + link-click block for a call to this function.
-export async function exportRowsToExcel(filename, rows, sheetName = 'Sheet1') {
+export async function exportRowsToExcel(filename, rows, sheetName = 'Sheet1', options = {}) {
   const XLSX = await import('xlsx')
   const worksheet = XLSX.utils.aoa_to_sheet(rows)
+  if (options.autoWidth) {
+    // Opt-in: size each column to its longest value (min 8, max 50 characters) so nothing is cut off.
+    worksheet['!cols'] = (rows[0] || []).map((_, index) => ({
+      wch: Math.min(50, Math.max(8, ...rows.map((row) => String(row[index] ?? '').length)) + 2),
+    }))
+  }
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
   const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
