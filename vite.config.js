@@ -5,9 +5,10 @@ import tailwindcss from '@tailwindcss/vite'
 // Groups third-party deps that change far less often than our own code into their own vendor
 // chunks, instead of all of it sitting in one entry bundle - page code (AppRoutes.jsx's
 // React.lazy() routes) already splits per-route on top of this. Heavy one-off libs (firebase,
-// xlsx, jspdf/html2canvas) are NOT listed here - they're dynamically import()'d only where used
-// (push/firebase.js, push/pushService.js, utils/exportToExcel.js, utils/pdfExport.js), so Vite
-// already gives each its own async chunk without needing a manualChunks rule.
+// jspdf/html2canvas) are NOT listed here - they're dynamically import()'d only where used
+// (push/firebase.js, push/pushService.js, utils/pdfExport.js), so Vite already gives each its
+// own async chunk without needing a manualChunks rule. (Excel files are written by
+// utils/exportToExcel.js itself - there is no spreadsheet library dependency.)
 function manualChunks(id) {
   if (!id.includes('node_modules')) return undefined
   if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react'

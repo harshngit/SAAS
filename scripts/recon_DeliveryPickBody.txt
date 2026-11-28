@@ -1,2 +1,0 @@
---- DeliveryPickBody (required=['items']) ---
-items: {"items": {"$ref": "#/components/schemas/DeliveryPickItem"}, "type": "array", "title": "Items"}
