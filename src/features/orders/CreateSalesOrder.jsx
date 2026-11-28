@@ -157,6 +157,10 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
   // (Admin's normal flow assigns it later from the order via Plan Delivery).
   const [deliveryPartnerId, setDeliveryPartnerId] = useState('')
   const [deliveryPartners, setDeliveryPartners] = useState([])
+  // 'idle' (picker not needed) | 'loading' | 'success' (200, maybe an empty list) | 'error' (403/500/network).
+  // A failed request must never look like an empty list, so the two are kept apart.
+  const [partnersStatus, setPartnersStatus] = useState('idle')
+  const [partnersReloadKey, setPartnersReloadKey] = useState(0)
 
   const [errors, setErrors] = useState({})
   const [submitError, setSubmitError] = useState('')
@@ -175,15 +179,12 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     let isMounted = true
 
     async function loadOptions() {
-      // Delivery-partner list for the Home Delivery picker (create flow, both roles).
-      const needsPartners = !restrictToVehicleStock && !isEditMode
-      const [productsResult, customersResult, warehousesResult, partnersResult] = await Promise.all([
+      const [productsResult, customersResult, warehousesResult] = await Promise.all([
         // A NEW order only offers active products (GET /products?is_active=true). Editing / duplicating an order or
         // converting a quotation loads everything so lines with a since-deactivated product still resolve.
         loadSummaryRows(listProducts, 'products', !editOrderId && !duplicateFromId && !sourceQuotationId ? { is_active: true } : {}),
         listCustomers(),
         listWarehouses(),
-        needsPartners ? listDeliveryPartners() : Promise.resolve({ success: false }),
       ])
 
       if (!isMounted) return
@@ -201,7 +202,6 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
         const defaultWarehouse = activeWarehouses.find((warehouse) => warehouse.isDefault)
         setWarehouseId((current) => current || defaultWarehouse?.id || activeWarehouses[0]?.id || '')
       }
-      if (partnersResult.success) setDeliveryPartners(partnersResult.partners)
 
       setIsLoadingOptions(false)
     }
@@ -211,6 +211,36 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       isMounted = false
     }
   }, [preselectedCustomerId, isEditMode, restrictToVehicleStock])
+
+  // Delivery Partner picker: GET /deliveries/partners (never GET /users, which is admin-only). Fetched only
+  // while Home Delivery is selected on a NEW order - Takeaway / Self Pickup never calls it, so partner loading can
+  // never block a pickup order. Only active delivery partners are shown.
+  const needsPartnerPicker = !restrictToVehicleStock && !isEditMode && deliveryType === 'delivery_boy'
+  useEffect(() => {
+    if (!needsPartnerPicker) {
+      setPartnersStatus('idle')
+      return undefined
+    }
+
+    let isMounted = true
+    setPartnersStatus('loading')
+    listDeliveryPartners().then((result) => {
+      if (!isMounted) return
+      if (!result.success) {
+        setDeliveryPartners([])
+        setPartnersStatus('error')
+        return
+      }
+      setDeliveryPartners(
+        result.partners.filter((partner) => partner && partner.id && partner.is_active !== false && (!partner.role || partner.role === 'delivery_partner')),
+      )
+      setPartnersStatus('success')
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [needsPartnerPicker, partnersReloadKey])
 
   useEffect(() => {
     if (!restrictToVehicleStock || !currentUser?.id) return
@@ -516,7 +546,8 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
     }
   }, [orderItems, availableProducts, discountType, discountValue])
 
-  // A delivery partner is NOT required at creation - it is assigned later via Plan Delivery.
+  // Home Delivery needs a Delivery Partner picked on the form (a frontend rule only - the backend still allows
+  // assigning later). Takeaway never needs one.
   const canCreateOrder = restrictToVehicleStock || Boolean(deliveryType)
 
   // Takeaway / Self Pickup on a fresh order goes through the Preview Sales Order modal first.
@@ -546,11 +577,14 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
       if (!deliveryType) {
         nextErrors.deliveryType = 'Select a delivery method.'
       } else if (deliveryType === 'delivery_boy') {
-        // Home Delivery: address is always required. The delivery partner is OPTIONAL at
-        // creation for every role (backend contract §2) - it can be assigned later from the
-        // order via Plan Delivery. Order creation must never block on a missing partner.
+        // Home Delivery: address and (on a new order) a Delivery Partner are required.
         if (!deliveryAddress.trim()) {
           nextErrors.deliveryAddress = 'Delivery address is required for home delivery.'
+        }
+        if (!isEditMode && !deliveryPartnerId) {
+          nextErrors.deliveryPartnerId = partnersStatus === 'error'
+            ? 'Could not load delivery partners. Retry to select one.'
+            : 'Select a delivery partner for home delivery.'
         }
       }
     }
@@ -1133,6 +1167,7 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                           checked={isSelected}
                           onChange={() => {
                             setDeliveryType(option.value)
+                            if (option.value !== 'delivery_boy') setDeliveryPartnerId('')
                             setShowPreview(false)
                             setErrors((current) => ({ ...current, deliveryType: '', deliveryAddress: '', deliveryPartnerId: '' }))
                           }}
@@ -1200,23 +1235,35 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                       <ConfiguredField module="sales_order" name="deliveryPartnerId"><div className="flex flex-col gap-1.5">
                         <Select
                           label="Delivery Partner"
+                          required
                           options={deliveryPartners.map((partner) => ({ value: partner.id, label: partner.name }))}
                           value={deliveryPartnerId}
                           onChange={(event) => {
                             setDeliveryPartnerId(event.target.value)
                             setErrors((current) => ({ ...current, deliveryPartnerId: '' }))
                           }}
-                          placeholder={deliveryPartners.length ? 'Select a delivery partner (optional)' : 'No delivery partners available'}
+                          placeholder={
+                            partnersStatus === 'loading'
+                              ? 'Loading delivery partners…'
+                              : partnersStatus === 'error'
+                                ? 'Could not load delivery partners'
+                                : deliveryPartners.length
+                                  ? 'Select a delivery partner'
+                                  : 'No delivery partners available'
+                          }
                           error={errors.deliveryPartnerId}
-                          disabled={!deliveryPartners.length}
+                          disabled={partnersStatus !== 'success' || !deliveryPartners.length}
                         />
-                        {!deliveryPartners.length && !isLoadingOptions ? (
-                          <p className="text-xs text-neutral-400">Add an active delivery partner in Staff before assigning one here.</p>
-                        ) : (
-                          <p className="text-xs text-neutral-400">
-                            Optional — you can also assign a partner later from the order via Plan Delivery.
+                        {partnersStatus === 'error' ? (
+                          <p className="text-xs text-red-600">
+                            Could not load delivery partners.{' '}
+                            <button type="button" className="font-medium underline" onClick={() => setPartnersReloadKey((key) => key + 1)}>
+                              Retry
+                            </button>
                           </p>
-                        )}
+                        ) : partnersStatus === 'success' && !deliveryPartners.length ? (
+                          <p className="text-xs text-neutral-400">Add an active delivery partner in Staff, then reopen this list.</p>
+                        ) : null}
                       </div></ConfiguredField>
                     ) : (
                       <p className="rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-500 sm:self-center">
@@ -1333,7 +1380,9 @@ export default function CreateSalesOrder({ restrictToVehicleStock = false }) {
                         : deliveryType === 'delivery_boy'
                           ? selectedDeliveryPartnerName
                             ? `Home Delivery · ${selectedDeliveryPartnerName}`
-                            : 'Home Delivery (partner assigned later)'
+                            : isEditMode
+                              ? 'Home Delivery (partner assigned later)'
+                              : 'Home Delivery · partner not selected'
                           : 'Not selected'}
                   </span>
                 </div>
