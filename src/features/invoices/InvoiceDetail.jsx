@@ -213,6 +213,8 @@ export default function InvoiceDetail() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [payments, setPayments] = useState([])
+  const [showVoided, setShowVoided] = useState(false)
+  const showVoidedRef = useRef(false)
   const [paymentsError, setPaymentsError] = useState('')
   const [isPaymentDrawerOpen, setIsPaymentDrawerOpen] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -270,7 +272,8 @@ export default function InvoiceDetail() {
   const loadPayments = async (invoiceId, requestId) => {
     if (!invoiceId) return
     setPaymentsError('')
-    const result = await listPaymentReceipts({ invoice_id: invoiceId })
+    // "Show voided" is OFF by default: the request is then identical to before. ON adds include_voided=true.
+    const result = await listPaymentReceipts({ invoice_id: invoiceId, ...(showVoidedRef.current ? { include_voided: true } : {}) })
     if (requestId !== invoiceRequest.current) return
     if (!result.success) {
       setPayments([])
@@ -280,6 +283,12 @@ export default function InvoiceDetail() {
     setPayments(
       [...result.receipts].sort((a, b) => new Date(b.receiptDate || b.createdAt || 0) - new Date(a.receiptDate || a.createdAt || 0)),
     )
+  }
+
+  const handleToggleVoided = (event) => {
+    showVoidedRef.current = event.target.checked
+    setShowVoided(event.target.checked)
+    if (invoice?.id) loadPayments(invoice.id, invoiceRequest.current)
   }
 
   useEffect(() => {
@@ -580,9 +589,17 @@ export default function InvoiceDetail() {
                 <Wallet className="size-4 text-neutral-400" aria-hidden="true" />
                 Payments
               </p>
-              <span className="text-xs text-neutral-400">
-                {formatCurrency(invoice.amountPaid)} of {formatCurrency(invoice.total)} received
-              </span>
+              <div className="flex items-center gap-4">
+                {!INVOICE_DEMO_ENABLED && (
+                  <label className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500">
+                    <input type="checkbox" checked={showVoided} onChange={handleToggleVoided} className="size-3.5 rounded border-neutral-300 text-primary-600" />
+                    Show voided
+                  </label>
+                )}
+                <span className="text-xs text-neutral-400">
+                  {formatCurrency(invoice.amountPaid)} of {formatCurrency(invoice.total)} received
+                </span>
+              </div>
             </div>
             {paymentsError ? (
               <p className="mt-3 text-xs text-neutral-500">
@@ -609,16 +626,20 @@ export default function InvoiceDetail() {
                   </thead>
                   <tbody className="divide-y divide-neutral-50">
                     {payments.map((payment) => (
-                      <tr key={payment.id}>
+                      <tr key={payment.id} className={payment.isVoid ? 'bg-neutral-50/70' : undefined}>
                         <td className="px-3.5 py-2.5 text-neutral-600">{formatDateLabel(payment.receiptDate || payment.createdAt)}</td>
                         <td className="px-3.5 py-2.5 text-neutral-800">{payment.receiptNumber || '—'}</td>
-                        <td className="px-3.5 py-2.5 text-right font-medium text-green-600">{formatCurrency(payment.amountReceived)}</td>
+                        <td className={`px-3.5 py-2.5 text-right font-medium ${payment.isVoid ? 'text-neutral-400 line-through' : 'text-green-600'}`}>{formatCurrency(payment.amountReceived)}</td>
                         <td className="px-3.5 py-2.5 text-neutral-500">{payment.paymentMethod ? String(payment.paymentMethod).replace(/_/g, ' ') : '—'}</td>
                         <td className="px-3.5 py-2.5 text-neutral-500">{payment.transactionReference || '—'}</td>
                         <td className="px-3.5 py-2.5">
-                          <Badge variant={paymentStatusVariant[String(payment.paymentStatus || '').replace(/^\w/, (c) => c.toUpperCase())] || 'neutral'}>
-                            {payment.paymentStatus || 'Recorded'}
-                          </Badge>
+                          {payment.isVoid ? (
+                            <Badge variant="danger">Void</Badge>
+                          ) : (
+                            <Badge variant={paymentStatusVariant[String(payment.paymentStatus || '').replace(/^\w/, (c) => c.toUpperCase())] || 'neutral'}>
+                              {payment.paymentStatus || 'Recorded'}
+                            </Badge>
+                          )}
                         </td>
                       </tr>
                     ))}

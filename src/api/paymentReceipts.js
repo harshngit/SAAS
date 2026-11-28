@@ -1,5 +1,5 @@
 import { useAuthStore } from '../store/authStore'
-import { apiClient } from './client'
+import { apiClient, HEAVY_WRITE_TIMEOUT_MS } from './client'
 import {
   INVOICE_DEMO_ENABLED,
   demoReceiptsResult,
@@ -92,6 +92,9 @@ function normalizeReceipt(receipt) {
     totalPaid: receipt.total_paid ?? null,
     outstandingAmount: receipt.outstanding_amount ?? null,
     paymentStatus: receipt.payment_status || '',
+    // 'void' only appears when the list was requested with include_voided=true (a voided receipt is hidden otherwise).
+    receiptStatus: receipt.receipt_status || '',
+    isVoid: receipt.receipt_status === 'void',
     createdAt: receipt.created_at,
   }
 }
@@ -106,6 +109,8 @@ export async function listPaymentReceipts(params = {}) {
     const queryParams = { page_size: params.page_size || 100 }
     if (params.customer_id) queryParams.customer_id = params.customer_id
     if (params.invoice_id) queryParams.invoice_id = params.invoice_id
+    // Opt-in only: without it the request (and therefore the list and its count) is exactly what it always was.
+    if (params.include_voided) queryParams.include_voided = true
 
     const { data } = await apiClient.get('/payment-receipts', {
       headers: authHeader(),
@@ -157,6 +162,7 @@ export async function createPaymentReceipt(payload) {
   try {
     const { data } = await apiClient.post('/payment-receipts', buildReceiptBody(payload), {
       headers: authHeader(),
+      timeout: HEAVY_WRITE_TIMEOUT_MS,
     })
 
     return { success: true, receipt: normalizeReceipt(data) }
