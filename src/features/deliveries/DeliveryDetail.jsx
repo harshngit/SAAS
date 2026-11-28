@@ -383,18 +383,22 @@ export default function DeliveryDetail() {
       return () => { isMounted = false }
     }
 
-    getOrder(delivery.orderId).then((result) => {
-      if (!isMounted || !result.success) return
-      const map = {}
-      result.order.items.forEach((item) => {
-        map[item.productId] = {
-          unitPrice: Number(item.unitPrice) || 0,
-          discountPercent: Number(item.discountPercent) || 0,
-          taxRate: Number(item.taxRate) || 0,
-        }
+    // GET /orders/{id} needs the Orders view right: without it the call can only come back 403 (console noise) and the
+    // pricing map would stay empty anyway, so it is skipped. Users who have the right (and Admin) behave exactly as before.
+    if (can('orders', 'view')) {
+      getOrder(delivery.orderId).then((result) => {
+        if (!isMounted || !result.success) return
+        const map = {}
+        result.order.items.forEach((item) => {
+          map[item.productId] = {
+            unitPrice: Number(item.unitPrice) || 0,
+            discountPercent: Number(item.discountPercent) || 0,
+            taxRate: Number(item.taxRate) || 0,
+          }
+        })
+        setOrderPricing(map)
       })
-      setOrderPricing(map)
-    })
+    }
 
     listProducts().then((result) => {
       if (isMounted && result.success) setCatalogProducts(result.products)
