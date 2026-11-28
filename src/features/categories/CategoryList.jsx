@@ -523,7 +523,7 @@ export default function CategoryList() {
   const exportCategories = (onlySelected = false) => {
     const categoriesToExport = onlySelected ? categories.filter((category) => !category.parentId && selectedIds.includes(category.id)) : filteredCategories
     const rows = [['Category', 'Subcategories', 'Description'], ...categoriesToExport.map((category) => [category.name, (subcategoriesByParent.get(category.id) || []).map((child) => child.name).join(', '), category.description])]
-    exportRowsToExcel('categories', rows)
+    exportRowsToExcel('categories', rows, 'Categories')
   }
 
   const handleDelete = async () => {

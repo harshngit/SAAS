@@ -247,7 +247,7 @@ export default function WarehouseList() {
   const exportWarehouses = (onlySelected = false) => {
     const rowsToExport = onlySelected ? rows.filter((warehouse) => selectedIds.includes(warehouse.id)) : rows
     const data = [['Warehouse', 'Code', 'Location', 'Manager', 'Products', 'Stock Units', 'Low Stock', 'Status'], ...rowsToExport.map((warehouse) => [warehouse.name, warehouse.code, [warehouse.city, warehouse.state].filter(Boolean).join(', '), warehouse.managerName, safeNumber(warehouse.productCount), safeNumber(warehouse.stockUnits), safeNumber(warehouse.lowStockCount), warehouse.isActive ? 'Active' : 'Inactive'])]
-    exportRowsToExcel('warehouses', data)
+    exportRowsToExcel('warehouses', data, 'Warehouses')
   }
 
   const handleBulkDelete = async () => {

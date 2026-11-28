@@ -231,8 +231,8 @@ export default function ProductList() {
     : [...new Set([...current, ...visibleProducts.map((product) => product.id)])])
 
   const exportProducts = (onlySelected = false) => {
-    const rows = [['Product', 'Brand', 'Category', 'Variants', 'Price', 'Status'], ...filteredProducts.filter((product) => !onlySelected || selectedIds.includes(product.id)).map((product) => [product.name, product.brand, product.categoryLabel || product.category, product.variants.length, formatCurrency(Number(product.price ?? product.variants?.[0]?.sellingPrice ?? 0)), product.status])]
-    exportRowsToExcel('products', rows)
+    const rows = [['Product', 'Brand', 'Category', 'Variants', 'Price', 'Status'], ...filteredProducts.filter((product) => !onlySelected || selectedIds.includes(product.id)).map((product) => [product.name, product.brand, product.categoryLabel || product.category, product.variants.length, Number(product.price ?? product.variants?.[0]?.sellingPrice ?? 0) || 0, product.status])]
+    exportRowsToExcel('products', rows, 'Products')
   }
 
   const handleBulkDelete = async () => {

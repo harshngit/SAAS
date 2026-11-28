@@ -231,9 +231,9 @@ export default function SupplierList() {
   const exportSuppliers = (onlySelected = false) => {
     const rows = [
       ['Supplier', 'Category', 'Contact', 'City', 'Product Count', 'Total Purchases', 'Outstanding Payable', 'Status'],
-      ...filteredSuppliers.filter((supplier) => !onlySelected || selectedIds.includes(supplier.id)).map((supplier) => [supplier.name, supplier.category, supplier.contactPerson, supplier.city, getProductCount(supplier), formatCurrency(supplier.totalPurchases), formatCurrency(supplier.outstandingPayable), formatSupplierStatus(supplier.status)]),
+      ...filteredSuppliers.filter((supplier) => !onlySelected || selectedIds.includes(supplier.id)).map((supplier) => [supplier.name, supplier.category, supplier.contactPerson, supplier.city, getProductCount(supplier), Number(supplier.totalPurchases) || 0, Number(supplier.outstandingPayable) || 0, formatSupplierStatus(supplier.status)]),
     ]
-    exportRowsToExcel('suppliers', rows)
+    exportRowsToExcel('suppliers', rows, 'Suppliers')
   }
 
   const handleBulkDelete = async () => {

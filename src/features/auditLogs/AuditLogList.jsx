@@ -90,8 +90,8 @@ const ACTIVITY_LIMIT = 100
 
 function exportAuditLogs(rows) {
   const headers = ['Date', 'Type', 'Title', 'Description', 'By']
-  const dataRows = rows.map((log) => [formatTimestamp(log.at), typeLabel(log.type), log.title || '', log.description || '', log.by || ''])
-  exportRowsToExcel('audit-log', [headers, ...dataRows])
+  const dataRows = rows.map((log) => [log.at, typeLabel(log.type), log.title || '', log.description || '', log.by || ''])
+  exportRowsToExcel('audit-log', [headers, ...dataRows], 'Audit Log', { columns: [{ type: 'datetime' }, { type: 'text' }, { type: 'text', width: 30 }, { type: 'longtext', width: 46 }, { type: 'text' }] })
 }
 
 export default function AuditLogList() {

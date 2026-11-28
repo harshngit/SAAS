@@ -126,9 +126,9 @@ function exportOrganizations(rows) {
     row.mrr,
     row.status,
     row.upgradeStatus,
-    row.createdAtLabel,
+    row.createdAt,
   ])
-  exportRowsToExcel('organizations', [headers, ...dataRows])
+  exportRowsToExcel('organizations', [headers, ...dataRows], 'Organizations', { columns: [undefined, undefined, undefined, { type: 'currency' }] })
 }
 
 export default function OrganizationsList() {

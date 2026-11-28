@@ -75,6 +75,48 @@ export async function getReport(type, filters = {}) {
   }
 }
 
+// Every row matching the filters, by walking the paged report endpoint (the backend caps page_size at 100).
+// Used by exports built in the browser (Excel). Same params as getReport, so the rows are exactly what the screen
+// filters select - just all of them instead of one screen page. Capped like the backend exports (10,000 rows).
+export async function getAllReportRows(type, filters = {}, { pageSize = 100, maxRows = 10000, concurrency = 4 } = {}) {
+  if (DEMO_MODE) return { success: false, error: 'Report export is disabled in demo mode.', demoUnavailable: true }
+
+  const { page: _page, page_size: _pageSize, ...rest } = filters
+  const fetchPage = async (page) => {
+    const { data } = await apiClient.get(`/reports/${type}`, {
+      headers: authHeader(),
+      params: { ...buildReportParams(rest), page, page_size: pageSize },
+    })
+    return data
+  }
+
+  try {
+    const first = await fetchPage(1)
+    const total = first?.pagination?.total ?? (Array.isArray(first?.rows) ? first.rows.length : 0)
+    if (total > maxRows) {
+      return { success: false, error: `This report has ${total} rows. Narrow the filters to ${maxRows} rows or fewer to export it.` }
+    }
+
+    const totalPages = Math.max(1, first?.pagination?.total_pages ?? Math.ceil(total / pageSize))
+    const pages = [first]
+    for (let start = 2; start <= totalPages; start += concurrency) {
+      const batch = []
+      for (let page = start; page < start + concurrency && page <= totalPages; page += 1) batch.push(fetchPage(page))
+      pages.push(...(await Promise.all(batch)))
+    }
+
+    const rows = pages.flatMap((entry) => (Array.isArray(entry?.rows) ? entry.rows : []))
+    return { success: true, rows, total, summary: first?.summary || {}, meta: first?.meta || {} }
+  } catch (error) {
+    const errorData = error.response?.data
+    const message = formatApiError(
+      errorData?.detail || errorData?.message || errorData?.error || errorData,
+      'Unable to load the full report. Please try again.',
+    )
+    return { success: false, error: message, status: error.response?.status }
+  }
+}
+
 // Exports exactly ONE row, confirmed via the live backend contract: GET /reports/{type}/export/{row_id}.
 // Takes the same filters the visible report/full-export use (minus page/page_size), since the
 // row-export endpoint shares the same query-param surface - the row_id alone does not uniquely

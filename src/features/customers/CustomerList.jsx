@@ -304,13 +304,13 @@ export default function CustomerList() {
         customer.contactPerson,
         customer.city,
         salesOfficerById.get(customer.assignedSalesOfficerId) || 'Unassigned',
-        formatListDate(customer.lastOrderDate, 'No order yet'),
-        formatListDate(customer.lastVisitDate, 'No visit yet'),
-        formatCurrency(customer.outstandingBalance),
+        customer.lastOrderDate,
+        customer.lastVisitDate,
+        Number(customer.outstandingBalance) || 0,
         customer.status,
       ]),
     ]
-    exportRowsToExcel('customers', rows)
+    exportRowsToExcel('customers', rows, 'Customers')
   }
 
   const handleBulkDelete = async () => {

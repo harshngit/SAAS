@@ -66,8 +66,8 @@ function formatTimestamp(value) {
 
 function exportNotifications(rows) {
   const headers = ['Date', 'Type', 'Title', 'Message', 'Status']
-  const dataRows = rows.map((n) => [formatTimestamp(n.createdAt), typeLabel(n.type), n.title || '', n.body || '', n.isRead ? 'Read' : 'Unread'])
-  exportRowsToExcel('notifications', [headers, ...dataRows])
+  const dataRows = rows.map((n) => [n.createdAt, typeLabel(n.type), n.title || '', n.body || '', n.isRead ? 'Read' : 'Unread'])
+  exportRowsToExcel('notifications', [headers, ...dataRows], 'Notifications', { columns: [{ type: 'datetime' }, { type: 'text' }, { type: 'text', width: 30 }, { type: 'longtext', width: 46 }, { type: 'status' }] })
 }
 
 export default function NotificationsList() {

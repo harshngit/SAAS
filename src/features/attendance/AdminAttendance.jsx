@@ -231,11 +231,11 @@ export default function AdminAttendance() {
         roleLabels[row.role] || row.role,
         row.date,
         row.status,
-        formatTimeLabel(row.checkIn) || '-',
-        formatTimeLabel(row.checkOut) || '-',
-        workHoursLabel(row.checkIn, row.checkOut) || '-',
+        formatTimeLabel(row.checkIn) || '',
+        formatTimeLabel(row.checkOut) || '',
+        workHoursLabel(row.checkIn, row.checkOut) || '',
       ]),
-    ])
+    ], 'Attendance')
   }
 
   return (

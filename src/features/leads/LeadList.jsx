@@ -53,6 +53,26 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
+// Column types for the Leads workbook (index = column). Long text wraps inside a capped width.
+const LEAD_EXPORT_COLUMNS = [
+  { type: 'id' }, // Lead ID
+  { type: 'text', width: 26 }, // Lead
+  { type: 'text', width: 22 }, // Contact Person
+  { type: 'phone' }, // Mobile
+  { type: 'email' }, // Email
+  { type: 'text', width: 16 }, // Source
+  { type: 'text', width: 16 }, // Lead Type
+  { type: 'text', width: 16 }, // Segment
+  { type: 'longtext', width: 40 }, // Interested Products
+  { type: 'text', width: 20 }, // Assigned To
+  { type: 'status' }, // Status
+  { type: 'date' }, // Next Follow-up
+  { type: 'date' }, // Created
+  { type: 'date' }, // Last Updated
+  { type: 'date' }, // Converted On
+  { type: 'longtext', width: 40 }, // Notes
+]
+
 export default function LeadList() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((state) => state.currentUser)
@@ -272,9 +292,8 @@ export default function LeadList() {
   // (empty) selection and produced a header-only file.
   const exportCsv = (onlySelected = false) => {
     const leadsToExport = onlySelected === true ? filteredLeads.filter((lead) => selectedIds.includes(lead.id)) : filteredLeads
-    // Real dates (a fixed "27 Nov 2026"), not relative text like "Created 4 days ago" which is stale
-    // the moment the file is opened; friendly status labels, blank (not "-") for missing values.
-    const day = (value) => (value ? formatDate(value) : '')
+    // RAW values go to the shared Excel renderer (src/utils/exportToExcel.js): real date cells (not relative
+    // text like "Created 4 days ago"), text for ID / mobile / email, friendly status labels, blank for missing.
     const rows = [
       ['Lead ID', 'Lead', 'Contact Person', 'Mobile', 'Email', 'Source', 'Lead Type', 'Segment', 'Interested Products', 'Assigned To', 'Status', 'Next Follow-up', 'Created', 'Last Updated', 'Converted On', 'Notes'],
       ...leadsToExport.map((lead) => {
@@ -293,15 +312,18 @@ export default function LeadList() {
           products,
           lead.assignedSalespersonName,
           formatLeadStatus(lead.leadStatus),
-          day(nextFollowUpByLeadId[lead.id]),
-          day(lead.createdAt),
-          day(lead.updatedAt),
-          day(lead.convertedAt),
+          nextFollowUpByLeadId[lead.id],
+          lead.createdAt,
+          lead.updatedAt,
+          lead.convertedAt,
           lead.notes,
         ]
       }),
     ]
-    exportRowsToExcel('leads', rows, 'Leads', { autoWidth: true })
+    exportRowsToExcel('leads', rows, 'Leads', {
+      columns: LEAD_EXPORT_COLUMNS,
+      dateRange: datePreset !== 'all' && dateFrom && dateTo ? { from: dateFrom, to: dateTo } : undefined,
+    })
   }
 
   const handleBulkDelete = async () => {

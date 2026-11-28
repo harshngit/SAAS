@@ -37,7 +37,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { deleteOrganization, listSuperAdminOrganizations, updateOrganizationStatus } from '../../api/superadmin'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/format'
-import { exportRowsToExcel } from '../../utils/exportToExcel'
+import { exportSheetsToExcel } from '../../utils/exportToExcel'
 import DateRangeFilter from '../../components/ui/DateRangeFilter'
 import { DATE_RANGE_PRESETS, isWithinDateRange, resolveDateRange } from '../../utils/dateRange'
 
@@ -191,6 +191,7 @@ function MiniTable({ columns, rows, emptyText }) {
 }
 
 function exportDashboardReport({ stats, dateWindow, organizations }) {
+  // Two sheets, each one clean table (header row, frozen, filterable): the headline numbers, then the organizations.
   const summaryRows = [
     ['Metric', 'Value'],
     ['Date Range', dateWindow.label],
@@ -199,19 +200,23 @@ function exportDashboardReport({ stats, dateWindow, organizations }) {
     ['Trial Organizations', stats.trial],
     ['Suspended Organizations', stats.suspended],
     ['Pending Upgrades', stats.pendingUpgrades],
-    ['MRR Estimate', stats.mrr],
-    [],
+    ['MRR Estimate (₹ per month)', stats.mrr],
+  ]
+  const organizationRows = [
     ['Organization', 'Plan', 'Status', 'Upgrade Status', 'Joined On', 'MRR'],
     ...organizations.map((organization) => [
       organization.name,
       organization.plan,
       titleCase(organization.status),
       titleCase(organization.upgradeStatus),
-      organization.createdAt,
+      organization.createdAtRaw || organization.createdAt,
       organization.priceMonthly,
     ]),
   ]
-  exportRowsToExcel('superadmin-dashboard-report', summaryRows)
+  exportSheetsToExcel('superadmin-dashboard-report', [
+    { name: 'Summary', rows: summaryRows, columns: [{ type: 'text', width: 30 }, { type: 'number', width: 22 }] },
+    { name: 'Organizations', rows: organizationRows, columns: [undefined, undefined, undefined, undefined, { type: 'date' }, { type: 'currency' }] },
+  ])
 }
 
 export default function SuperAdminDashboard() {

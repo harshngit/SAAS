@@ -9,6 +9,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import { exportReport, getReport } from '../../api/reports'
+import { exportReportToExcel } from '../reports/reportExcel'
 import { listCustomers } from '../../api/customers'
 import { listUsers } from '../../api/users'
 import { ORDER_STATUS_OPTIONS, FULFILMENT_STATUS_OPTIONS } from '../../api/orders'
@@ -155,6 +156,25 @@ function normalizeSalesOverviewRow(row) {
 // aggregated delivery fields), not a client-side merge of the separately-paginated Orders and
 // Deliveries lists. The financial "Sales" report under Reports (net invoiced sales/collections)
 // is a different, unrelated report and is intentionally not reused here.
+// What the Excel export is built from: the same columns / row normalizer the screen table uses, plus the KPI cards.
+const SALES_OVERVIEW_EXPORT_CONFIG = {
+  label: 'Sales Overview',
+  columns: SALES_OVERVIEW_COLUMNS,
+  normalizeRow: normalizeSalesOverviewRow,
+  summaryCards: [
+    { keys: ['total_orders'], label: 'Total Orders', format: 'number' },
+    { keys: ['total_sales_value'], label: 'Total Sales Value', format: 'currency' },
+    { keys: ['not_started'], label: 'Not Started', format: 'number' },
+    { keys: ['planned'], label: 'Planned', format: 'number' },
+    { keys: ['partially_delivered'], label: 'Partially Delivered', format: 'number' },
+    { keys: ['delivered'], label: 'Delivered', format: 'number' },
+    { keys: ['cancelled_orders'], label: 'Cancelled Orders', format: 'number' },
+    { keys: ['total_ordered_quantity'], label: 'Total Ordered Quantity', format: 'number' },
+    { keys: ['total_delivered_quantity'], label: 'Total Delivered Quantity', format: 'number' },
+    { keys: ['total_remaining_quantity'], label: 'Total Remaining Quantity', format: 'number' },
+  ],
+}
+
 export default function SalesOverview() {
   const { can } = usePermission()
   const canExport = can('reports', 'export')
@@ -266,7 +286,10 @@ export default function SalesOverview() {
     setExportError('')
 
     const { page: _page, page_size: _pageSize, ...exportParams } = requestParams
-    const result = await exportReport(REPORT_TYPE, exportParams, format)
+    // Excel is built in the browser with the shared workbook standard (every page of the filtered report); PDF unchanged.
+    const result = format === 'excel'
+      ? await exportReportToExcel({ reportType: REPORT_TYPE, config: SALES_OVERVIEW_EXPORT_CONFIG, filters: exportParams })
+      : await exportReport(REPORT_TYPE, exportParams, format)
 
     setIsExporting('')
     if (!result.success) setExportError(result.error)

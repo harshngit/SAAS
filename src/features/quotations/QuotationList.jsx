@@ -144,9 +144,9 @@ export default function QuotationList() {
     const quotationsToExport = onlySelected ? filteredQuotations.filter((quotation) => selectedIds.includes(quotation.id)) : filteredQuotations
     const rows = [
       ['Quotation', 'Customer / Prospect', 'Salesperson', 'Date', 'Valid Until', 'Amount', 'Status'],
-      ...quotationsToExport.map((quotation) => [quotation.quotationNumber, quotation.customerName || quotation.leadName || '', quotation.salespersonName || '', formatDate(quotation.quotationDate), formatDate(quotation.validUntil), formatCurrency(quotation.total), formatQuotationStatus(deriveQuotationStatus(quotation))]),
+      ...quotationsToExport.map((quotation) => [quotation.quotationNumber, quotation.customerName || quotation.leadName || '', quotation.salespersonName || '', quotation.quotationDate, quotation.validUntil, Number(quotation.total) || 0, formatQuotationStatus(deriveQuotationStatus(quotation))]),
     ]
-    exportRowsToExcel('quotations', rows)
+    exportRowsToExcel('quotations', rows, 'Quotations')
   }
 
   const dropQuotation = (id) => updateQuotations((current) => current.filter((quotation) => quotation.id !== id))

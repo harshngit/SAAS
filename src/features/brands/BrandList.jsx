@@ -351,7 +351,7 @@ export default function BrandList() {
   const exportBrands = (onlySelected = false) => {
     const brandsToExport = onlySelected ? brands.filter((brand) => selectedIds.includes(brand.id)) : sortedBrands
     const rows = [['Brand', 'Categories', 'Description', 'Status'], ...brandsToExport.map((brand) => [brand.name, brand.categories.map((category) => category.name).join(', '), brand.description, brand.isActive ? 'Active' : 'Inactive'])]
-    exportRowsToExcel('brands', rows)
+    exportRowsToExcel('brands', rows, 'Brands')
   }
 
   const handleDelete = async () => {

@@ -67,9 +67,9 @@ function buildExportRows(list) {
     ...list.map((order) => [
       order.orderNumber,
       order.customerName,
-      formatDate(order.orderDate),
+      order.orderDate,
       order.items.length,
-      formatCurrency(order.total),
+      Number(order.total) || 0,
       formatOrderStatus(order.status),
       formatPaymentStatus(order.paymentStatus),
       getFulfilmentLabel(order),
@@ -273,7 +273,7 @@ export default function OrderList() {
 
   const exportOrders = async (onlySelected = false) => {
     if (onlySelected) {
-      exportRowsToExcel('orders', buildExportRows(orders.filter((order) => selectedIds.includes(order.id))))
+      exportRowsToExcel('orders', buildExportRows(orders.filter((order) => selectedIds.includes(order.id))), 'Orders')
       return
     }
 
@@ -286,7 +286,7 @@ export default function OrderList() {
       showToast({ title: 'Export failed', message: result.error, variant: 'error' })
       return
     }
-    exportRowsToExcel('orders', buildExportRows(result.orders))
+    exportRowsToExcel('orders', buildExportRows(result.orders), 'Orders')
   }
 
   const handleDeleteOrder = async (order) => {

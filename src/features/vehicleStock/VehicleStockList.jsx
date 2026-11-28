@@ -329,7 +329,7 @@ export default function VehicleStockList() {
     const rows = [
       ['Date', 'Vehicle No', 'Driver Name', 'Order Units', 'Loaded Units', 'Delivered', 'Returned', 'Available', 'Status'],
       ...all.map((row) => [
-        formatHistoryDate(row.date),
+        row.date,
         row.vehicleNumber || '',
         row.driverName || '',
         row.orderUnits,

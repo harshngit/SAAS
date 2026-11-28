@@ -145,10 +145,10 @@ function exportAnalytics(organizations) {
       org.plan?.name || 'No Plan',
       org.status || '',
       org.email || '',
-      formatDateLabel(org.created_at, true),
+      org.created_at,
     ]),
   ]
-  exportRowsToExcel('platform-analytics', rows)
+  exportRowsToExcel('platform-analytics', rows, 'Platform Analytics')
 }
 
 export default function PlatformAnalytics() {

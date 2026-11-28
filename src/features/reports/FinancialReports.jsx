@@ -10,6 +10,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import { exportReport, exportReportRow, getReport } from '../../api/reports'
+import { exportReportToExcel } from './reportExcel'
 import { listCustomers } from '../../api/customers'
 import { listSuppliers } from '../../api/suppliers'
 import { listProducts } from '../../api/products'
@@ -366,7 +367,11 @@ export default function FinancialReports({
     setExportError('')
 
     const { page: _page, page_size: _pageSize, ...exportParams } = requestParams
-    const result = await exportReport(reportType, exportParams, format)
+    // Excel is built in the browser (shared workbook standard, every page of the filtered report). The Profit & Loss
+    // statement view has no row table, so it keeps the backend file; PDF is unchanged.
+    const result = format === 'excel' && config && config.isSpecialView !== 'pnl'
+      ? await exportReportToExcel({ reportType, config, filters: exportParams })
+      : await exportReport(reportType, exportParams, format)
 
     setIsExporting('')
 
