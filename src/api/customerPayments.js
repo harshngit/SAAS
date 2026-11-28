@@ -1,5 +1,5 @@
 import { useAuthStore } from '../store/authStore'
-import { apiClient } from './client'
+import { apiClient, HEAVY_WRITE_TIMEOUT_MS } from './client'
 import { getCustomer, listCustomers } from './customers'
 import { listOrders } from './orders'
 import { toLocalDateString } from '../utils/format'
@@ -168,6 +168,7 @@ export async function recordCustomerCollection(payload) {
   try {
     const { data } = await apiClient.post(COLLECTION_ENDPOINT, buildCollectionBody(payload), {
       headers: authHeader(),
+      timeout: HEAVY_WRITE_TIMEOUT_MS,
     })
     return { success: true, collection: data }
   } catch (error) {

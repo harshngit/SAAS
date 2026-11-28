@@ -1,5 +1,5 @@
 import { useAuthStore } from '../store/authStore'
-import { apiClient } from './client'
+import { apiClient, HEAVY_WRITE_TIMEOUT_MS } from './client'
 
 // =============================================================================
 // Delivery Day-End API.
@@ -158,7 +158,7 @@ export async function submitDayEnd({ businessDate, handedOver, notes }) {
       notes: notes || '',
     }
 
-    const { data } = await apiClient.post('/delivery-day-ends/submit', body, { headers: authHeader() })
+    const { data } = await apiClient.post('/delivery-day-ends/submit', body, { headers: authHeader(), timeout: HEAVY_WRITE_TIMEOUT_MS })
 
     return { success: true, dayEnd: normalizeDayEnd(data) }
   } catch (error) {

@@ -1,5 +1,5 @@
 import { useAuthStore } from '../store/authStore'
-import { apiClient } from './client'
+import { apiClient, HEAVY_WRITE_TIMEOUT_MS } from './client'
 
 function formatApiError(errorData, fallbackMessage = 'Something went wrong. Please try again.') {
   if (!errorData) {
@@ -397,6 +397,7 @@ export async function loadDeliveriesBatch(deliveryIds) {
   try {
     const { data } = await apiClient.post('/deliveries/load-batch', { delivery_ids: deliveryIds }, {
       headers: authHeader(),
+      timeout: HEAVY_WRITE_TIMEOUT_MS,
     })
 
     return { success: true, data }

@@ -12,6 +12,11 @@ export const apiClient = axios.create({
   },
 })
 
+// Heavy writes (batch loading, payments/collections, receipts, Day-End submit) can legitimately take longer than the
+// default 20 s. ONLY those requests pass `timeout: HEAVY_WRITE_TIMEOUT_MS` per request; every other request keeps the
+// 20 s default above, and the GET-only retry logic is unchanged.
+export const HEAVY_WRITE_TIMEOUT_MS = 60000
+
 const refreshClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 20000,
